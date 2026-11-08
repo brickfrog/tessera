@@ -15,10 +15,13 @@ let tess (args: string list) =
     use err = new StringWriter()
     let code = App.run out err (Array.ofList args)
 
+    // WriteLine uses the platform newline (CRLF on Windows); tests compare against LF.
+    let lf (s: string) = s.Replace("\r\n", "\n")
+
     {
         Code = code
-        Out = out.ToString()
-        Err = err.ToString()
+        Out = lf (out.ToString())
+        Err = lf (err.ToString())
     }
 
 /// Parse a run's stdout as JSON (fails the test if it isn't).
