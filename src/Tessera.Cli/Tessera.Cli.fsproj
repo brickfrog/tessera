@@ -21,11 +21,30 @@
     <Compile Include="Commands/DiffCommand.fs" />
     <Compile Include="Commands/DepsCommand.fs" />
     <Compile Include="Commands/ConvertCommand.fs" />
+    <Compile Include="Commands/InitCommand.fs" />
     <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
+
+  <!-- Release binaries: self-contained single-file publishes per runtime (see .github/workflows/release.yml).
+       Not trimmed: TOM and its serializers rely on reflection. -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>embedded</DebugType>
+    <PublishTrimmed>false</PublishTrimmed>
+  </PropertyGroup>
+
+  <!-- TOM pulls in MSAL's native broker (libmsalruntime.so / msalruntime*.dll / .dylib, ~37 MB) for
+       interactive sign-in to servers. tess only reads and writes files, so leave it out of single-file
+       publishes: bundling it would force self-extraction to ~/.net, which fails without a writable HOME.
+       Revisit if tess ever authenticates against a server. -->
+  <Target Name="TessExcludeMsalRuntime" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="$([System.String]::Copy('%(Filename)').Contains('msalruntime'))" />
+    </ItemGroup>
+  </Target>
 
   <ItemGroup>
     <PackageReference Include="Argu" Version="6.2.5" />

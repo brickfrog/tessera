@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  format:
+    name: Format (fantomas)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet tool restore
+      - run: dotnet fantomas --check src tests
+
+  build:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.fsproj', 'Directory.Build.props', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: dotnet restore
+      - run: dotnet tool restore
+      - run: dotnet build -c Release --no-restore
+      - run: dotnet test -c Release --no-build
+
+  sample-model:
+    name: Sample model (spaceparts-analytics)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TESSERA_SAMPLE_MODEL: ${{ github.workspace }}/spaceparts
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
+        with:
+          repository: TabularEditor/spaceparts-analytics
+          # Pinned so upstream changes can't break CI unannounced; bump deliberately.
+          ref: a74c5833ef3ad2b402b2556e059c3d61cc3a4673
+          path: spaceparts
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/cache@v6
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.fsproj', 'Directory.Build.props', 'global.json') }}
+          restore-keys: nuget-${{ runner.os }}-
+      - run: dotnet build -c Release
+      - run: dotnet test -c Release --no-build
+      - name: Smoke-test the CLI on the sample
+        run: |
+          dotnet run --project src/Tessera.Cli -c Release --no-build -- info "$TESSERA_SAMPLE_MODEL"
+          dotnet run --project src/Tessera.Cli -c Release --no-build -- convert "$TESSERA_SAMPLE_MODEL" "$RUNNER_TEMP/sample.bim"
+          dotnet run --project src/Tessera.Cli -c Release --no-build -- info "$RUNNER_TEMP/sample.bim"
