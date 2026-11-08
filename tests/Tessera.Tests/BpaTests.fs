@@ -235,6 +235,16 @@ let loaderTests =
             Expect.equal (parseIgnoreList """{"RuleIDs":["A","B"]}""") [ "A"; "B" ] ""
             Expect.equal (parseIgnoreList """["A"]""") [ "A" ] ""
             Expect.equal (parseIgnoreList "garbage") [] ""
+
+        testCase "built-in rules load, have unique IDs, and all compile"
+        <| fun () ->
+            let rules = builtIn.Value
+            Expect.isGreaterThanOrEqual rules.Length 15 ""
+            Expect.equal (rules |> List.distinctBy (fun r -> r.Id.ToUpperInvariant())).Length rules.Length "unique"
+
+            for r in rules do
+                Expect.equal (Bpa.compile r) (Ok()) r.Id
+                Expect.isSome r.Description r.Id
     ]
 
 [<Tests>]
@@ -498,6 +508,34 @@ let ignoreTests =
             )
 
             Expect.equal (statusOf db (one "Model" "true")) [ "T", Bpa.Disabled ] ""
+    ]
+
+[<Tests>]
+let builtInTests =
+    testList "BPA built-in rules" [
+        testCase "every built-in rule finds something in the BPA fixture"
+        <| fun () ->
+            let results = Bpa.analyze (bpaDatabase ()) builtIn.Value
+
+            for r in results do
+                Expect.equal r.Status Bpa.Evaluated r.Rule.Id
+                Expect.isNonEmpty r.Findings r.Rule.Id
+
+        testCase "built-in rules don't fire on objects that follow them"
+        <| fun () ->
+            let findings =
+                Bpa.analyze (bpaDatabase ()) builtIn.Value
+                |> List.collect (fun r -> r.Findings |> List.map (fun f -> r.Rule.Id, ObjectRef.format f.Ref))
+
+            for unexpected in
+                [
+                    "TESS_DIVIDE", "measure:Sales/Per Ten"
+                    "TESS_TODO_COMMENT", "measure:Sales/Not a todo"
+                    "TESS_MEASURE_FORMAT_STRING", "measure:Sales/Total"
+                    "TESS_UNUSED_HIDDEN_COLUMN", "column:Sales/DateKey"
+                    "TESS_QUALIFY_COLUMNS", "measure:Sales/Total"
+                ] do
+                Expect.isFalse (List.contains unexpected findings) $"%A{unexpected}"
     ]
 
 [<Tests>]
