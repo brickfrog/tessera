@@ -50,6 +50,7 @@ tess validate ./model.bim --fail-on warning --rule unresolved-reference --json
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue"          # preview: the rename + every DAX reference it fixes
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue" --save   # ... and write it back
 tess set   ./MyReport.pbip "[Revenue]" -p formatString='#,0.00' -p isHidden=true --save   # set properties
+tess get   ./MyReport.pbip "[Revenue]" --properties   # what `set` can write there, with types and values
 tess bpa   ./MyReport.pbip                       # Best Practice Analyzer: built-in rules + the model's own
 tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE rule files, CI output
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
@@ -166,6 +167,43 @@ An object's own sub-objects are part of it: `kpi.targetExpression`, `formatStrin
 `extendedProperties.<name>` are properties of the measure, table or column, in `get -p`, `find` and `diff` alike.
 Child objects that have their own reference (columns, measures, calculation items, ...) and a role's members are
 not.
+
+`get --properties` lists the properties [`set`](#setting-properties-set) can write on an object: the path, its
+type, its current value, and the allowed values of enums. `--all` adds read-only properties, with the reason.
+
+```
+$ tess get ./Sales.pbip "Sales[Amount]" --properties
+alternateOf                     object
+alternateOf.baseColumn          reference                -> column
+annotations.<name>              string
+annotations.SummarizationSetBy  string     Automatic
+dataType                        enum       decimal       string|int64|double|dateTime|decimal|boolean|binary|unknown|variant
+isHidden                        bool       false
+sortByColumn                    reference                -> column
+summarizeBy                     enum       sum           default|none|sum|min|max|count|average|distinctCount
+...
+```
+
+`--json` writes an array with one entry per property, sorted by path:
+
+```json
+[ { "property": "summarizeBy", "type": "enum", "writable": true, "value": "sum",
+    "allowed": [ "default", "none", "sum", "min", "max", "count", "average", "distinctCount" ] },
+  { "property": "sortByColumn", "type": "reference", "writable": true, "value": null, "refersTo": "column" },
+  { "property": "name", "type": "string", "writable": false, "value": "Amount",
+    "reason": "use `tess rename`, which also updates the DAX that refers to it" } ]
+```
+
+Each entry has:
+- `type`: `string`, `expression` (DAX, M or a query), `bool`, `int`, `number`, `enum`, `reference` or
+  `object` (a sub-object).
+- `value`: a JSON string, boolean or number, a reference such as `"column:Date/MonthNo"`, `{}` for a sub-object
+  that exists, or `null` when unset.
+- optional keys: `allowed` (enums only), `refersTo` (references only: an object kind) and `reason` (read-only
+  properties only).
+
+`annotations.<name>` and `extendedProperties.<name>` stand for new items of any name. Existing ones are listed
+by name. Text output shows the first line of long values; `--json` has them in full.
 
 `find --in` takes path wildcards. A wildcard matches if it matches the whole path or just the last segment, so
 `--in expression` covers both `expression` and `source.expression`. `find` searches every property except

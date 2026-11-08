@@ -242,4 +242,106 @@ let tests =
                     "SUMX(Sales, Sales[Amount])"
                     "")
         )
+
+        testList "get --properties" [
+            testCase "an aligned table of writable properties"
+            <| fun () ->
+                use t = project ()
+                let r = tess [ "get"; t.Path; "[Total]"; "--properties" ]
+                Expect.equal r.Code ExitCode.ok r.Err
+                let lines = r.Out.TrimEnd().Split('\n') |> List.ofArray
+
+                let line (path: string) =
+                    lines |> List.find (fun l -> l.StartsWith(path + " "))
+
+                Expect.stringContains (line "formatString") "string" ""
+                Expect.stringContains (line "formatString") "#,0" ""
+                Expect.stringContains (line "kpi.targetExpression") "expression" ""
+                Expect.isFalse (lines |> List.exists (fun l -> l.StartsWith "name ")) "name is read-only"
+                // Columns line up: every type starts at the same offset.
+                let offsets = lines |> List.map (fun l -> l.IndexOf("  ")) |> List.distinct
+                Expect.isTrue (List.forall (fun o -> o > 0) offsets) ""
+
+                let enum = tess [ "get"; t.Path; "Sales[Amount]"; "--properties" ]
+                Expect.stringContains enum.Out "default|none|sum" "enum values"
+                Expect.stringContains enum.Out "-> column" "what a reference points at"
+
+            testCase "--all adds read-only properties, with why"
+            <| fun () ->
+                use t = project ()
+                let r = tess [ "get"; t.Path; "[Total]"; "--properties"; "--all" ]
+                Expect.equal r.Code ExitCode.ok r.Err
+                let name = r.Out.Split('\n') |> Array.find (fun l -> l.StartsWith "name ")
+                Expect.stringContains name "read-only" ""
+                Expect.stringContains name "tess rename" ""
+
+            testCase "--json: an array of {property, type, writable, value, allowed?}"
+            <| fun () ->
+                use t = project ()
+                let r = tess [ "get"; t.Path; "Sales[Amount]"; "--properties"; "--json" ]
+                Expect.equal r.Code ExitCode.ok r.Err
+                use doc = json r
+                Expect.equal doc.RootElement.ValueKind JsonValueKind.Array ""
+                let items = doc.RootElement.EnumerateArray() |> List.ofSeq
+
+                let find (path: string) =
+                    items |> List.find (fun i -> i.GetProperty("property").GetString() = path)
+
+                let keys (e: JsonElement) =
+                    e.EnumerateObject() |> Seq.map (fun p -> p.Name) |> List.ofSeq
+
+                let summarize = find "summarizeBy"
+                Expect.equal (keys summarize) [ "property"; "type"; "writable"; "value"; "allowed" ] ""
+                Expect.equal (summarize.GetProperty("type").GetString()) "enum" ""
+                Expect.isTrue (summarize.GetProperty("writable").GetBoolean()) ""
+                Expect.equal (summarize.GetProperty("value").GetString()) "default" ""
+
+                Expect.contains
+                    [ for a in summarize.GetProperty("allowed").EnumerateArray() -> a.GetString() ]
+                    "none"
+                    ""
+
+                let hidden = find "isHidden"
+                Expect.equal (keys hidden) [ "property"; "type"; "writable"; "value" ] ""
+                Expect.equal (hidden.GetProperty("value").ValueKind) JsonValueKind.False "a JSON boolean"
+                Expect.equal ((find "displayOrdinal").GetProperty("value").ValueKind) JsonValueKind.Number ""
+                Expect.equal ((find "description").GetProperty("value").ValueKind) JsonValueKind.Null ""
+                let sortBy = find "sortByColumn"
+                Expect.equal (sortBy.GetProperty("type").GetString()) "reference" ""
+                Expect.equal (sortBy.GetProperty("refersTo").GetString()) "column" ""
+                Expect.isFalse (items |> List.exists (fun i -> i.GetProperty("property").GetString() = "name")) ""
+
+                let all = tess [ "get"; t.Path; "Sales[Amount]"; "--properties"; "--all"; "--json" ]
+                use doc = json all
+
+                let name =
+                    doc.RootElement.EnumerateArray()
+                    |> Seq.find (fun i -> i.GetProperty("property").GetString() = "name")
+
+                Expect.isFalse (name.GetProperty("writable").GetBoolean()) ""
+                Expect.stringContains (name.GetProperty("reason").GetString()) "rename" ""
+
+            testCase "the catalog and set agree: every writable path is accepted"
+            <| fun () ->
+                use t = project ()
+                let r = tess [ "get"; t.Path; "[Total]"; "--properties"; "--json" ]
+                use doc = json r
+
+                for item in doc.RootElement.EnumerateArray() do
+                    let path = item.GetProperty("property").GetString().Replace("<name>", "X")
+                    let s = tess [ "set"; t.Path; "[Total]"; "--unset"; path ]
+                    Expect.equal s.Code ExitCode.ok $"{path}: {s.Err}"
+
+            testCase "usage errors"
+            <| fun () ->
+                use t = project ()
+                Expect.equal (tess [ "get"; t.Path; "[Total]"; "--all" ]).Code ExitCode.usage ""
+
+                Expect.equal
+                    (tess [ "get"; t.Path; "[Total]"; "--properties"; "-p"; "expression" ]).Code
+                    ExitCode.usage
+                    ""
+
+                Expect.equal (tess [ "get"; t.Path; "[Nope]"; "--properties" ]).Code ExitCode.input ""
+        ]
     ]
