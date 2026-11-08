@@ -24,6 +24,10 @@ type TessError =
     | InvalidRules of path: string * reason: string
     /// An edit would leave the model with errors it didn't have (save refused without --force).
     | ChangeIntroducesErrors of count: int
+    /// `add` can't create this object here (e.g. a column of a calculated table).
+    | CannotAdd of objectRef: string * reason: string
+    /// No object matches, but some are named similarly.
+    | ObjectNotFoundSuggest of input: string * candidates: string list
 
 module TessError =
 
@@ -49,6 +53,8 @@ module TessError =
         | RenameConflict _ -> "rename-conflict"
         | InvalidRules _ -> "invalid-rules"
         | ChangeIntroducesErrors _ -> "change-introduces-errors"
+        | CannotAdd _ -> "cannot-add"
+        | ObjectNotFoundSuggest _ -> "object-not-found"
 
     let message =
         function
@@ -80,3 +86,7 @@ module TessError =
         | ChangeIntroducesErrors n ->
             let errors = if n = 1 then "1 error" else $"{n} errors"
             $"Not saved: the change introduces {errors} (see above; use --force to save anyway)"
+        | CannotAdd(objectRef, reason) -> $"Can't add {objectRef}: {reason}"
+        | ObjectNotFoundSuggest(input, candidates) ->
+            let list = candidates |> String.concat ", "
+            $"No object matches '{input}'; did you mean {list}?"

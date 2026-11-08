@@ -37,6 +37,8 @@ module ExitCode =
         | SaveFailed _ -> output
         | InvalidPattern _
         | InvalidName _ -> usage
+        | CannotAdd _
+        | ObjectNotFoundSuggest _ -> input
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()

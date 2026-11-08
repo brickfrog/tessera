@@ -24,6 +24,20 @@ let tess (args: string list) =
         Err = lf (err.ToString())
     }
 
+let private stdinLock = obj ()
+
+/// Run `tess <args>` with `input` as stdin (Console.In, swapped for the run). Runs are serialized,
+/// but Console.In is process-wide: put tests that use this in a testSequenced list.
+let tessWithStdin (input: string) (args: string list) =
+    lock stdinLock (fun () ->
+        let original = System.Console.In
+        System.Console.SetIn(new StringReader(input))
+
+        try
+            tess args
+        finally
+            System.Console.SetIn original)
+
 /// Parse a run's stdout as JSON (fails the test if it isn't).
 let json (r: Run) =
     try
