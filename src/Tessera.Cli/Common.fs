@@ -31,6 +31,7 @@ module ExitCode =
         | NameCollision _
         | UnsupportedRename _
         | RenameConflict _ -> input
+        | InvalidRules _ -> input
         | DestinationNotEmpty _
         | SaveFailed _ -> output
         | InvalidPattern _

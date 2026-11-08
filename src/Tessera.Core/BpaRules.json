@@ -1,0 +1,227 @@
+[
+  {
+    "ID": "TESS_UNUSED_HIDDEN_COLUMN",
+    "Name": "Remove hidden columns nothing uses",
+    "Category": "Performance",
+    "Description": "This column is hidden, and no DAX expression, relationship, hierarchy, sort-by or variation uses it. It still takes memory and refresh time; remove it from the model (and from the source query) unless a report needs it.",
+    "Severity": 2,
+    "Scope": "DataColumn, CalculatedColumn, CalculatedTableColumn",
+    "Expression": "IsHidden && ReferencedBy.Count == 0 && !UsedInRelationships.Any() && !UsedInSortBy.Any() && !UsedInHierarchies.Any() && !UsedInVariations.Any()"
+  },
+  {
+    "ID": "TESS_UNUSED_HIDDEN_MEASURE",
+    "Name": "Remove hidden measures nothing uses",
+    "Category": "Maintenance",
+    "Description": "This measure is hidden and no other DAX refers to it, so report users can't see it and nothing builds on it. Remove it, or unhide it if it is meant to be used.",
+    "Severity": 1,
+    "Scope": "Measure",
+    "Expression": "IsHidden && ReferencedBy.Count == 0"
+  },
+  {
+    "ID": "TESS_MEASURE_FORMAT_STRING",
+    "Name": "Give visible measures a format string",
+    "Category": "Formatting",
+    "Description": "Without a format string, a measure shows raw numbers (many decimals, no thousands separator). Set a format string or a format string expression. Measures that return text can be exempted with an ignore annotation.",
+    "Severity": 2,
+    "Scope": "Measure",
+    "Expression": "IsVisible && string.IsNullOrWhiteSpace(FormatString) && string.IsNullOrWhiteSpace(FormatStringExpression)"
+  },
+  {
+    "ID": "TESS_MEASURE_DESCRIPTION",
+    "Name": "Describe visible measures",
+    "Category": "Documentation",
+    "Description": "Report authors see a measure's description as a tooltip in the field list. Explain what the measure calculates and any filters it applies.",
+    "Severity": 1,
+    "Scope": "Measure",
+    "Expression": "IsVisible && string.IsNullOrWhiteSpace(Description)"
+  },
+  {
+    "ID": "TESS_NUMERIC_COLUMN_SUMMARIZED",
+    "Name": "Don't summarize visible numeric columns by default",
+    "Category": "Formatting",
+    "Description": "A visible numeric column with a default summarization is summed (or counted) as soon as it is dropped on a visual, which is rarely what an ID, year or rate column needs. Set SummarizeBy to None and expose explicit measures instead.",
+    "Severity": 1,
+    "Scope": "DataColumn, CalculatedColumn, CalculatedTableColumn",
+    "Expression": "IsVisible && SummarizeBy != \"None\" && (DataType == DataType.Int64 || DataType == DataType.Decimal || DataType == DataType.Double)"
+  },
+  {
+    "ID": "TESS_FLOATING_POINT_COLUMN",
+    "Name": "Prefer Decimal over floating point columns",
+    "Category": "Data types",
+    "Description": "Double (floating point) columns can produce rounding differences in totals and compress less well. Use Decimal (fixed decimal number) unless the values really need more than four decimal places.",
+    "Severity": 2,
+    "Scope": "DataColumn, CalculatedColumn, CalculatedTableColumn",
+    "Expression": "DataType == DataType.Double"
+  },
+  {
+    "ID": "TESS_RELATIONSHIP_DATA_TYPES",
+    "Name": "Relate columns of the same data type",
+    "Category": "Relationships",
+    "Description": "The two columns of this relationship have different data types, so the engine has to convert values to match them. That is slow and can silently drop rows. Change one column so both types agree.",
+    "Severity": 3,
+    "Scope": "Relationship",
+    "Expression": "FromColumn != null && ToColumn != null && FromColumn.DataType != ToColumn.DataType"
+  },
+  {
+    "ID": "TESS_RELATIONSHIP_BIDIRECTIONAL",
+    "Name": "Avoid filtering relationships in both directions",
+    "Category": "Relationships",
+    "Description": "Bi-directional filtering makes filter propagation harder to predict, can introduce ambiguity between paths, and costs performance. Keep relationships single-direction and use CROSSFILTER in the measures that need it.",
+    "Severity": 2,
+    "Scope": "Relationship",
+    "Expression": "CrossFilteringBehavior == CrossFilteringBehavior.BothDirections"
+  },
+  {
+    "ID": "TESS_RELATIONSHIP_MANY_TO_MANY",
+    "Name": "Check many-to-many relationships",
+    "Category": "Relationships",
+    "Description": "Neither side of this relationship is unique. Many-to-many relationships are sometimes right, but often hide a missing dimension table or duplicate keys; confirm it is intended.",
+    "Severity": 2,
+    "Scope": "Relationship",
+    "Expression": "FromCardinality == \"Many\" && ToCardinality == \"Many\""
+  },
+  {
+    "ID": "TESS_RELATIONSHIP_INTEGER_KEYS",
+    "Name": "Relate on whole-number keys",
+    "Category": "Relationships",
+    "Description": "Relationships on text or date columns use more memory and are slower to join than whole-number (Int64) surrogate keys.",
+    "Severity": 1,
+    "Scope": "Relationship",
+    "Expression": "ToColumn != null && ToColumn.DataType != DataType.Int64"
+  },
+  {
+    "ID": "TESS_HIDE_FOREIGN_KEYS",
+    "Name": "Hide foreign key columns",
+    "Category": "Model layout",
+    "Description": "This column is the many side of a relationship. Report users should filter by the related table's attributes instead, so hide the key to keep the field list clean.",
+    "Severity": 2,
+    "Scope": "DataColumn, CalculatedColumn, CalculatedTableColumn",
+    "Expression": "IsVisible && UsedInRelationships.Any(FromColumn == outerIt && FromCardinality == \"Many\")"
+  },
+  {
+    "ID": "TESS_TEXT_MONTH_SORT",
+    "Name": "Sort text month columns by a month number",
+    "Category": "Model layout",
+    "Description": "A text month column without a sort-by column sorts alphabetically (April, August, December...). Set its Sort By Column to the month number.",
+    "Severity": 2,
+    "Scope": "DataColumn, CalculatedColumn, CalculatedTableColumn",
+    "Expression": "DataType == DataType.String && SortByColumn == null && RegEx.IsMatch(Name, \"(?i)^(fiscal )?month( name)?$\")"
+  },
+  {
+    "ID": "TESS_MARK_DATE_TABLE",
+    "Name": "Mark a date table",
+    "Category": "Model layout",
+    "Description": "The model has date columns but no table marked as a date table (data category Time). Time intelligence functions need a marked date table with a contiguous date key.",
+    "Severity": 2,
+    "Scope": "Model",
+    "Expression": "!Tables.Any(DataCategory == \"Time\") && AllColumns.Any(DataType == DataType.DateTime)"
+  },
+  {
+    "ID": "TESS_AUTO_DATE_TABLE",
+    "Name": "Turn off auto date/time",
+    "Category": "Performance",
+    "Description": "Power BI's auto date/time option creates a hidden date table for every date column, which inflates the model. Turn the option off and use a single shared date table.",
+    "Severity": 2,
+    "Scope": "CalculatedTable",
+    "Expression": "HasAnnotation(\"__PBI_LocalDateTable\") || Name.StartsWith(\"LocalDateTable_\") || Name.StartsWith(\"DateTableTemplate_\")"
+  },
+  {
+    "ID": "TESS_IFERROR",
+    "Name": "Avoid IFERROR",
+    "Category": "DAX",
+    "Description": "IFERROR evaluates its argument and catches errors row by row, which prevents some engine optimisations. Test for the error condition instead, for example with DIVIDE for division by zero.",
+    "Severity": 2,
+    "Scope": "Measure, CalculatedColumn, CalculationItem",
+    "Expression": "Tokenize().Any(Type == IFERROR)"
+  },
+  {
+    "ID": "TESS_DIVIDE",
+    "Name": "Use DIVIDE when the divisor can be zero",
+    "Category": "DAX",
+    "Description": "Dividing with '/' by a column, measure or expression returns an error (or infinity) when the divisor is zero or blank. DIVIDE(numerator, denominator) handles that case and is usually faster. Division by a constant is fine.",
+    "Severity": 2,
+    "Scope": "Measure, CalculatedColumn, CalculationItem",
+    "Expression": "Tokenize().Any(Type == DIV && Next != null && !(Next.Type in (INTEGER_LITERAL, REAL_LITERAL)))"
+  },
+  {
+    "ID": "TESS_QUALIFY_COLUMNS",
+    "Name": "Qualify column references with their table",
+    "Category": "DAX",
+    "Description": "Write columns as 'Table'[Column] and measures as [Measure]. Then a reader can tell columns from measures at a glance, and the expression keeps working if it is moved to another table.",
+    "Severity": 2,
+    "Scope": "Measure, CalculatedColumn, CalculatedTable, CalculationItem, KPI",
+    "Expression": "DependsOn.Any(Key.ObjectType == ObjectType.Column && Value.Any(!it.FullyQualified))"
+  },
+  {
+    "ID": "TESS_UNQUALIFIED_MEASURES",
+    "Name": "Don't qualify measure references with a table",
+    "Category": "DAX",
+    "Description": "A measure written as 'Table'[Measure] looks like a column reference. Write measures as [Measure] only.",
+    "Severity": 2,
+    "Scope": "Measure, CalculatedColumn, CalculatedTable, CalculationItem, KPI",
+    "Expression": "DependsOn.Any(Key.ObjectType == ObjectType.Measure && Value.Any(it.FullyQualified))"
+  },
+  {
+    "ID": "TESS_EVALUATEANDLOG",
+    "Name": "Remove EVALUATEANDLOG",
+    "Category": "DAX",
+    "Description": "EVALUATEANDLOG is a debugging aid. It slows queries down and should not ship in a production model.",
+    "Severity": 3,
+    "Scope": "Measure, CalculatedColumn, CalculatedTable, CalculationItem",
+    "Expression": "Tokenize().Any(Type == EVALUATEANDLOG)"
+  },
+  {
+    "ID": "TESS_CALCULATED_COLUMN_AS_MEASURE",
+    "Name": "Consider a measure instead of this calculated column",
+    "Category": "Performance",
+    "Description": "This numeric calculated column is only ever aggregated: it isn't used in relationships, sorting, hierarchies or other DAX. Calculated columns are stored for every row; a measure computing the same aggregate costs no memory.",
+    "Severity": 1,
+    "Scope": "CalculatedColumn",
+    "Expression": "IsVisible && SummarizeBy != \"None\" && (DataType == DataType.Int64 || DataType == DataType.Decimal || DataType == DataType.Double) && ReferencedBy.Count == 0 && !UsedInRelationships.Any() && !UsedInSortBy.Any() && !UsedInHierarchies.Any()"
+  },
+  {
+    "ID": "TESS_EMPTY_EXPRESSION",
+    "Name": "Objects that are defined by DAX need an expression",
+    "Category": "Errors",
+    "Description": "This object has no expression, so it can't be calculated and the model may fail to process.",
+    "Severity": 3,
+    "Scope": "Measure, CalculatedColumn, CalculatedTable, CalculationItem",
+    "Expression": "string.IsNullOrWhiteSpace(Expression)"
+  },
+  {
+    "ID": "TESS_EMPTY_CALCULATION_GROUP",
+    "Name": "Calculation groups need calculation items",
+    "Category": "Errors",
+    "Description": "A calculation group without calculation items has no effect; add items or remove the group.",
+    "Severity": 2,
+    "Scope": "CalculationGroup",
+    "Expression": "CalculationItems.Count == 0"
+  },
+  {
+    "ID": "TESS_NAME_WHITESPACE",
+    "Name": "Trim leading and trailing spaces from names",
+    "Category": "Naming",
+    "Description": "Names that start or end with a space look identical to their trimmed form in the field list but must be referenced with the spaces in DAX.",
+    "Severity": 2,
+    "Scope": "Model, Table, Measure, Hierarchy, Level, Perspective, Partition, DataColumn, CalculatedColumn, CalculatedTable, CalculatedTableColumn, CalculationGroup, CalculationItem, NamedExpression, ModelRole",
+    "Expression": "Name != Name.Trim()"
+  },
+  {
+    "ID": "TESS_TODO_COMMENT",
+    "Name": "Resolve TODO comments",
+    "Category": "Maintenance",
+    "Description": "A comment in this expression contains TODO, which usually marks unfinished work.",
+    "Severity": 1,
+    "Scope": "Measure, CalculatedColumn, CalculatedTable, CalculationItem",
+    "Expression": "Tokenize().Any(Type in (SINGLE_LINE_COMMENT, DELIMITED_COMMENT) && Text.IndexOf(\"TODO\", StringComparison.OrdinalIgnoreCase) >= 0)"
+  },
+  {
+    "ID": "TESS_EMPTY_PERSPECTIVE",
+    "Name": "Remove empty perspectives",
+    "Category": "Model layout",
+    "Description": "This perspective contains no tables, so it shows report users an empty field list.",
+    "Severity": 1,
+    "Scope": "Perspective",
+    "Expression": "!Model.Tables.Any(InPerspective[outerIt])"
+  }
+]

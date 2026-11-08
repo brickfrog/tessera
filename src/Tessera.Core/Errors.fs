@@ -20,6 +20,8 @@ type TessError =
     | NameCollision of name: string * existing: string
     | UnsupportedRename of objectRef: string * reason: string
     | RenameConflict of objectRef: string * newName: string * details: string list
+    /// A Best Practice Analyzer rule file that can't be read as rules.
+    | InvalidRules of path: string * reason: string
 
 module TessError =
 
@@ -43,6 +45,7 @@ module TessError =
         | NameCollision _ -> "name-collision"
         | UnsupportedRename _ -> "unsupported-rename"
         | RenameConflict _ -> "rename-conflict"
+        | InvalidRules _ -> "invalid-rules"
 
     let message =
         function
@@ -70,3 +73,4 @@ module TessError =
         | RenameConflict(objectRef, newName, details) ->
             let list = details |> List.map (fun d -> $"  {d}") |> String.concat "\n"
             $"Renaming {objectRef} to '{newName}' would change what other references mean:\n{list}"
+        | InvalidRules(path, reason) -> $"Invalid BPA rules in {path}: {reason}"

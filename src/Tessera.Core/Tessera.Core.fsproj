@@ -20,10 +20,20 @@
     <Compile Include="Deps.fs" />
     <Compile Include="Validate.fs" />
     <Compile Include="Rename.fs" />
+    <Compile Include="BpaRules.fs" />
+    <Compile Include="BpaDaxToken.fs" />
+    <Compile Include="BpaObjects.fs" />
+    <Compile Include="Bpa.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="BpaRules.json" LogicalName="Tessera.BpaRules.json" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AnalysisServices" Version="19.118.3" />
+    <!-- Apache-2.0. Evaluates BPA rule expressions (Dynamic LINQ, as Tabular Editor uses). -->
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.4" />
   </ItemGroup>
 
 </Project>
