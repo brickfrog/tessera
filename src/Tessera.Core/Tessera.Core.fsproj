@@ -27,6 +27,7 @@
     <Compile Include="ChangeSet.fs" />
     <Compile Include="Mutation.fs" />
     <Compile Include="RemoveObject.fs" />
+    <Compile Include="MoveObject.fs" />
   </ItemGroup>
 
   <ItemGroup>

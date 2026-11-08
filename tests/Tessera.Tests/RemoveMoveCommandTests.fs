@@ -126,4 +126,54 @@ let tests =
             Expect.equal p.Code ExitCode.input ""
             Expect.equal (errorCode (json p)) "unsupported-remove" ""
             Expect.equal (tess [ "remove"; t.Path ]).Code ExitCode.usage ""
+
+        testCase "move: a dry run shows a move, not a delete and a create"
+        <| fun () ->
+            use t = project ()
+            let before = snapshot t.Path
+            let r = tess [ "move"; t.Path; "[Total]"; "Date"; "--json" ]
+            Expect.equal r.Code ExitCode.ok r.Out
+            let doc = json r
+            Expect.equal (changes doc) [ "measure:Date/Total", "moved" ] ""
+            let change = doc.RootElement.GetProperty("changes").[0]
+            Expect.equal (change.GetProperty("movedFromObjectPath").GetString()) "measure:Sales/Total" ""
+            Expect.equal (snapshot t.Path) before "nothing written"
+
+        testCase "move --save --display-folder round-trips"
+        <| fun () ->
+            use t = project ()
+
+            let r =
+                tess [
+                    "move"
+                    t.Path
+                    "'Sales'[Total]"
+                    "Date"
+                    "--display-folder"
+                    "KPIs"
+                    "--save"
+                ]
+
+            Expect.equal r.Code ExitCode.ok r.Err
+            Expect.stringContains r.Out "> measure:Sales/Total -> measure:Date/Total" ""
+            Expect.stringContains r.Err "Moved measure:Sales/Total -> measure:Date/Total" ""
+            let db = load t.Path
+            let moved = db.Model.Tables.["Date"].Measures.["Total"]
+            Expect.equal moved.DisplayFolder "KPIs" ""
+            Expect.equal moved.Expression "SUM(Sales[Amount])" ""
+            Expect.isFalse (db.Model.Tables.["Sales"].Measures.Contains "Total") ""
+            Expect.equal db.Model.Tables.["Sales"].Measures.["Total (hidden)"].Expression "[Total]" ""
+
+        testCase "move: refusals exit 3; the same table is a no-op"
+        <| fun () ->
+            use t = project ()
+            let cg = tess [ "move"; t.Path; "[Total]"; "Time Intelligence"; "--json" ]
+            Expect.equal cg.Code ExitCode.input ""
+            Expect.equal (errorCode (json cg)) "unsupported-move" ""
+            Expect.equal (tess [ "move"; t.Path; "[Total]"; "Nope" ]).Code ExitCode.input ""
+            Expect.equal (tess [ "move"; t.Path; "Sales[Amount]"; "Date" ]).Code ExitCode.input ""
+            let same = tess [ "move"; t.Path; "[Total]"; "Sales" ]
+            Expect.equal same.Code ExitCode.ok same.Err
+            Expect.stringContains same.Out "No changes." ""
+            Expect.stringContains same.Err "already in table 'Sales'" ""
     ]

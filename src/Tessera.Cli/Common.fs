@@ -32,7 +32,9 @@ module ExitCode =
         | UnsupportedRename _
         | RenameConflict _ -> input
         | RemoveBlocked _
-        | UnsupportedRemove _ -> input
+        | UnsupportedRemove _
+        | UnsupportedMove _
+        | MoveConflict _ -> input
         | InvalidRules _ -> input
         | ChangeIntroducesErrors _ -> findings
         | DestinationNotEmpty _

@@ -4,6 +4,7 @@ open Expecto
 open Microsoft.AnalysisServices.Tabular
 open Tessera
 open Tessera.RemoveObject
+open Tessera.MoveObject
 open Tessera.Tests.Fixtures
 
 /// The sample model plus the structural links removal has to clean up.
@@ -376,5 +377,175 @@ let private removeTests =
             | other -> failtestf "expected UnsupportedRemove, got %A" other
     ]
 
+let private moveSpec measure table = {
+    Measure = measure
+    Table = table
+    DisplayFolder = None
+}
+
+let private moveOk db measure table = move db (moveSpec measure table) |> ok
+
+let private moveTests =
+    testList "move" [
+        testCase "rewrites references qualified with the old table; nothing else"
+        <| fun () ->
+            let db = model ()
+
+            let uses =
+                "CALCULATE ( [Total], 'Sales'[Amount] > 0 ) // 'Sales'[Total] in a comment\n"
+                + "    + LEN ( \"Sales[Total]\" ) /* Sales[Total] */ + Sales [Total] + 'Sales'[Total]"
+
+            db.Model.Tables.["Date"].Measures.Add(new Measure(Name = "Uses", Expression = uses))
+            let effect = moveOk db "[Total]" "Date"
+
+            Expect.equal
+                db.Model.Tables.["Date"].Measures.["Uses"].Expression
+                ("CALCULATE ( [Total], 'Sales'[Amount] > 0 ) // 'Sales'[Total] in a comment\n"
+                 + "    + LEN ( \"Sales[Total]\" ) /* Sales[Total] */ + Date [Total] + 'Date'[Total]")
+                "unquoted stays unquoted, quoted stays quoted; comments and strings untouched"
+
+            Expect.equal db.Model.Tables.["Sales"].Measures.["Total (hidden)"].Expression "[Total]" "unqualified stays"
+            Expect.isTrue (db.Model.Tables.["Date"].Measures.Contains "Total") ""
+            Expect.isFalse (db.Model.Tables.["Sales"].Measures.Contains "Total") ""
+
+            Expect.equal
+                effect.Renamed
+                [
+                    ObjectRef.parse "measure:Sales/Total" |> ok, ObjectRef.parse "measure:Date/Total" |> ok
+                ]
+                ""
+
+            hasNote effect "Moved measure:Sales/Total -> measure:Date/Total; updated 2 qualified references in 1 object"
+            tomValid db
+
+        testCase "a table name that isn't an identifier is quoted"
+        <| fun () ->
+            let db = model ()
+            let fact = new Table(Name = "Fact Sales")
+            fact.Partitions.Add(new Partition(Name = "Fact Sales", Source = new MPartitionSource(Expression = "1")))
+            db.Model.Tables.Add fact
+            db.Model.Tables.["Sales"].Measures.["Total (hidden)"].Expression <- "Sales[Total]"
+            moveOk db "[Total]" "Fact Sales" |> ignore
+            Expect.equal db.Model.Tables.["Sales"].Measures.["Total (hidden)"].Expression "'Fact Sales'[Total]" ""
+
+        testCase "keeps its properties, translations and perspectives; sets a display folder"
+        <| fun () ->
+            let db = model ()
+            let total = db.Model.Tables.["Sales"].Measures.["Total"]
+            total.LineageTag <- "tag-total"
+            let pt = db.Model.Perspectives.["Sales View"].PerspectiveTables.["Sales"]
+            pt.PerspectiveMeasures.Add(new PerspectiveMeasure(Measure = total))
+            // Date isn't in a second perspective that has the measure: it joins it.
+            let other = new Perspective(Name = "Other")
+            let otherSales = new PerspectiveTable(Table = db.Model.Tables.["Sales"])
+            otherSales.PerspectiveMeasures.Add(new PerspectiveMeasure(Measure = total))
+            other.PerspectiveTables.Add otherSales
+            db.Model.Perspectives.Add other
+
+            let effect =
+                move db {
+                    moveSpec "[Total]" "Date" with
+                        DisplayFolder = Some "KPIs"
+                }
+                |> ok
+
+            let moved = db.Model.Tables.["Date"].Measures.["Total"]
+            Expect.equal moved.Expression "SUM(Sales[Amount])" ""
+            Expect.equal moved.FormatString "#,0" ""
+            Expect.equal moved.LineageTag "tag-total" ""
+            Expect.equal moved.DisplayFolder "KPIs" ""
+
+            Expect.equal
+                (db.Model.Cultures.["da-DK"].ObjectTranslations.[moved, TranslatedProperty.Caption]).Value
+                "I alt"
+                ""
+
+            let view = db.Model.Perspectives.["Sales View"]
+            Expect.isNull (view.PerspectiveTables.["Sales"].PerspectiveMeasures.Find "Total") ""
+            Expect.isNotNull (view.PerspectiveTables.["Date"].PerspectiveMeasures.Find "Total") ""
+            Expect.isNotNull (other.PerspectiveTables.["Date"].PerspectiveMeasures.Find "Total") ""
+            hasNote effect "Added table 'Date' to perspective 'Other' (with just this measure)"
+            hasNote effect "Set its display folder to 'KPIs'"
+            tomValid db
+
+        testCase "in the pipeline: a move, not a delete and a create"
+        <| fun () ->
+            let a = applied (model ()) (fun db -> move db (moveSpec "[Total]" "Date"))
+
+            // Translations are keyed by the object's path, so the culture's entry moves too.
+            Expect.equal
+                (a.Changes |> List.map (fun c -> ObjectRef.format c.Ref, c.ChangeKind))
+                [
+                    "measure:Date/Total", ChangeSet.ChangeKind.Moved
+                    "culture:da-DK", ChangeSet.ChangeKind.Modified
+                ]
+                ""
+
+            Expect.isEmpty a.IntroducedErrors ""
+
+        testCase "refuses a move that would change what its own DAX means"
+        <| fun () ->
+            let db = model ()
+
+            db.Model.Tables.["Sales"].Measures.Add(
+                new Measure(Name = "Row Sum", Expression = "SUMX ( Sales, [Amount] )")
+            )
+
+            match move db (moveSpec "[Row Sum]" "Date") with
+            | Error(MoveConflict("measure:Sales/Row Sum", "Date", [ detail ])) ->
+                Expect.stringContains detail "[Amount] would refer to nothing instead of column:Sales/Amount" ""
+            | other -> failtestf "expected MoveConflict, got %A" other
+
+            Expect.isTrue (db.Model.Tables.["Sales"].Measures.Contains "Row Sum") "nothing moved"
+
+        testCase "refuses a move that would let a column in the new table capture a reference"
+        <| fun () ->
+            let db = model ()
+            // [Budget] is the measure; in Date, the column Date[Budget] would come first.
+            db.Model.Tables.["Sales"].Measures.Add(new Measure(Name = "Budget", Expression = "1"))
+            db.Model.Tables.["Sales"].Measures.Add(new Measure(Name = "Ratio", Expression = "[Budget] * 2"))
+
+            db.Model.Tables.["Date"].Columns.Add(
+                new DataColumn(Name = "Budget", DataType = DataType.Int64, SourceColumn = "Budget")
+            )
+
+            match move db (moveSpec "[Ratio]" "Date") with
+            | Error(MoveConflict(_, _, [ detail ])) ->
+                Expect.stringContains
+                    detail
+                    "[Budget] would refer to column:Date/Budget instead of measure:Sales/Budget"
+                    ""
+            | other -> failtestf "expected MoveConflict, got %A" other
+
+        testCase "refuses a same-named column or hierarchy in the target table"
+        <| fun () ->
+            let db = model ()
+            db.Model.Tables.["Sales"].Measures.Add(new Measure(Name = "year", Expression = "1"))
+
+            match move db (moveSpec "[year]" "Date") with
+            | Error(NameCollision("year", "column:Date/Year")) -> ()
+            | other -> failtestf "expected NameCollision, got %A" other
+
+        testCase "refuses what isn't a measure, a missing table and a calculation group"
+        <| fun () ->
+            let db = model ()
+
+            let refused measure table =
+                match move db (moveSpec measure table) with
+                | Error(UnsupportedMove(_, reason)) -> reason
+                | other -> failtestf "expected UnsupportedMove, got %A" other
+
+            Expect.stringContains (refused "Sales[Amount]" "Date") "column" ""
+            Expect.stringContains (refused "calcitem:Time Intelligence/YTD" "Date") "calculation group" ""
+            Expect.stringContains (refused "[Total]" "Nope") "there is no table 'Nope'" ""
+            Expect.stringContains (refused "[Total]" "Time Intelligence") "calculation group" ""
+
+        testCase "the same table is a no-op"
+        <| fun () ->
+            let a = applied (model ()) (fun db -> move db (moveSpec "[Total]" "Sales"))
+            Expect.isEmpty a.Changes ""
+            hasNote a.Effect "is already in table 'Sales'; nothing moved"
+    ]
+
 [<Tests>]
-let tests = testList "RemoveObject / MoveObject" [ removeTests ]
+let tests = testList "RemoveObject / MoveObject" [ removeTests; moveTests ]

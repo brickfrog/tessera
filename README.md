@@ -6,8 +6,8 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `remove` and
-`bpa` work.
+Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `remove`, `move`
+and `bpa` work.
 
 ## Install
 
@@ -51,6 +51,7 @@ tess validate ./model.bim --fail-on warning --rule unresolved-reference --json
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue"          # preview: the rename + every DAX reference it fixes
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue" --save   # ... and write it back
 tess remove ./MyReport.pbip "Sales[Old Key]" "[Unused]" --save  # refused while other DAX uses them
+tess move   ./MyReport.pbip "[Revenue]" "Measures" --save       # rewrites 'Sales'[Revenue] references
 tess bpa   ./MyReport.pbip                       # Best Practice Analyzer: built-in rules + the model's own
 tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE rule files, CI output
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
@@ -267,7 +268,7 @@ Options:
 errors. `--ci github|azdo` also writes CI annotations to stderr.
 ### Editing commands
 
-`rename` and `remove` (and the coming `set`, `add` and `move`) follow one set of conventions, the same as the
+`rename`, `remove` and `move` (and the coming `set` and `add`) follow one set of conventions, the same as the
 Tabular Editor CLI's.
 
 **Saving:**
@@ -383,6 +384,27 @@ twice). An ambiguous object is still an error.
 
 Not updated: M (Power Query) that mentions a removed table, expression or data source by name (listed as a warning),
 the linguistic schema, and report visuals.
+
+### Moving measures (`move`)
+
+`tess move <model> <measure> <table> [--display-folder <folder>]` moves a measure to another table. It keeps its name,
+lineage tag and every other property, and it follows the [editing conventions](#editing-commands). The change set
+shows it as `moved` (`measure:Sales/Revenue -> measure:Measures/Revenue`).
+
+Measure names are unique across the model, so unqualified `[Revenue]` references stay as they are. References that
+qualify it with its old table, `'Sales'[Revenue]` and `Sales[Revenue]`, are rewritten to the new table token by
+token, quoted as `rename` quotes table names, with every other character untouched. Comments and strings are never
+rewritten. As with `rename`, tess applies the move to a copy and refuses (exit 3) if any reference would then mean
+something else. The usual case is the measure's own unqualified column reference, such as `SUMX(Sales, [Amount])`,
+since `[Amount]` resolves against the measure's own table. Qualify it first (`Sales[Amount]`).
+
+The measure's translations follow it. So do its perspective memberships: if the new table isn't in a perspective the
+measure is in, the table is added to it with just that measure, so the measure stays visible (noted on stderr).
+`--display-folder` sets the folder in the same change.
+
+`move` refuses (exit 3) a column (its data comes from its table's partitions), a calculation item, a table that
+doesn't exist, a calculation group table, and a target table with a column or hierarchy of the same name. Moving to
+the table it's already in changes nothing. Report visuals, which refer to fields by table and name, are not updated.
 
 ### Best Practice Analyzer (`bpa`)
 
@@ -616,7 +638,7 @@ the code as its title.
 | 0 | success |
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
 | 2 | usage error (including an invalid new name for `rename`) |
-| 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references; for `remove`, an object others still refer to, or one that can't be removed) |
+| 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references; for `remove`, an object others still refer to, or one that can't be removed; for `move`, a move that's refused or would change other references) |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |
 

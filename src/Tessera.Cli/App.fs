@@ -53,6 +53,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Validate args) -> ValidateCommand.run ctx args
                 | Some(Rename args) -> RenameCommand.run ctx args
                 | Some(Remove args) -> RemoveCommand.run ctx args
+                | Some(Move args) -> MoveCommand.run ctx args
                 | Some(Bpa args) -> BpaCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
