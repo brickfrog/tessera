@@ -361,7 +361,7 @@ let private details (args: ParseResults<Args>) (kind: ObjectKind) : Result<Detai
                 |> sequence
                 |> Result.map (fun filters -> Details.Role(defaultArg p ModelPermission.Read, filters)))
             (opt permission (args.TryGetResult Args.Permission))
-    | ObjectKind.Perspective -> Ok(Details.Perspective(parseList (args.GetResults Args.Include)))
+    | ObjectKind.Perspective -> Ok(Details.Perspective(args.GetResults Args.Include))
     | ObjectKind.Culture -> Ok Details.Culture
     | ObjectKind.Expression -> need "-m/--m-expression <M>" m |> Result.map Details.Expression
     | ObjectKind.Function -> need "-e/--expression <DAX>" dax |> Result.map Details.Function

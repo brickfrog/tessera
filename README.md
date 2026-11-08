@@ -389,9 +389,11 @@ Values:
 - `--permission`: `read`, `readrefresh`, `refresh`, `administrator` or `none`.
 
 Wherever `add` takes an object (`--from`, `--to`, `--include`), any form `get` accepts works. `--include` takes
-tables, columns, measures and hierarchies.
+tables, columns, measures and hierarchies, one per option. `--levels` splits on commas, so for a column whose name
+contains one, add that level with `add level:T/H/N --column <name>`. DAX that starts with `-` or `--` works as a separate argument
+(`-e "-- comment ..."`). The `--expression=<value>` form isn't supported.
 
-What new objects get, as Power BI Desktop creates them:
+What new objects get (Power BI Desktop's defaults, where the spaceparts-analytics sample shows them):
 - **Lineage tags:** a fresh `lineageTag` (a lowercase GUID) on every table, column, measure, hierarchy, level,
   named expression and function.
 - **Data columns:** `summarizeBy: sum` for `int64`, `double` and `decimal`, otherwise `none`, plus the annotation
@@ -399,8 +401,8 @@ What new objects get, as Power BI Desktop creates them:
 - **Tables:** an M or calculated table gets one partition named after it, with `mode: import` unless you pass
   `--mode`. An M table starts with no columns: add data columns, or let Power BI read them from the query on refresh.
   A calculated table's columns are inferred by the engine.
-- **Calculation groups:** a `Name` column (rename it with `--column`) sorted by a hidden `Ordinal` column, and a
-  `calculationGroup` partition. The precedence is one more than the highest in the model, unless you pass
+- **Calculation groups:** tess's own default, the shape Tabular Editor uses: a `Name` column (rename it with
+  `--column`) sorted by a hidden `Ordinal` column, and a `calculationGroup` partition with no explicit mode. The precedence is one more than the highest in the model, unless you pass
   `--precedence`. A new group has no calculation items. If the model doesn't have `discourageImplicitMeasures`
   set, `add` sets it, since calculation groups require it, and the change shows on `model`.
 - **Levels and calculation items** are added last, unless you pass `--ordinal` (0 is first). The items after the
