@@ -190,6 +190,29 @@ let private runFind (ctx: Ctx) (args: ParseResults<FindArgs>) =
 
             if hits.IsEmpty then DoneWith ExitCode.findings else Done
 
+let private runDiff (ctx: Ctx) (args: ParseResults<DiffArgs>) =
+    let beforePath, afterPath = args.GetResult DiffArgs.Models
+
+    let opts: Diff.Options = {
+        Ignore = parseList (args.GetResults DiffArgs.Ignore)
+    }
+
+    let result =
+        ModelIO.loadPath beforePath
+        |> Result.bind (fun (_, a) -> ModelIO.loadPath afterPath |> Result.map (fun (_, b) -> a, b))
+
+    match result with
+    | Error e -> Failed e
+    | Ok(a, b) ->
+        let changes = Diff.compare opts a b
+
+        if ctx.Json then
+            Render.writeJson ctx.Out (Render.diffJson changes)
+        else
+            Render.diffText ctx.Out changes
+
+        if changes.IsEmpty then Done else DoneWith ExitCode.findings
+
 let private runConvert (ctx: Ctx) (args: ParseResults<ConvertArgs>) =
     let source, destination = args.GetResult ConvertArgs.Paths
 
@@ -283,6 +306,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(List args) -> runList ctx args
                 | Some(Get args) -> runGet ctx args
                 | Some(Find args) -> runFind ctx args
+                | Some(Diff args) -> runDiff ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with

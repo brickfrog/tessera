@@ -81,6 +81,18 @@ type FindArgs =
                 "only these properties: path wildcards, repeatable or comma-separated, e.g. expression, "
                 + "description, annotations.*. Default: all except lineage tags."
 
+type DiffArgs =
+    | [<MainCommand; ExactlyOnce>] Models of before: string * after: string
+    | Ignore of properties: string
+
+    interface IArgParserTemplate with
+        member this.Usage =
+            match this with
+            | Models _ -> "the two models to compare (any path tess accepts)."
+            | Ignore _ ->
+                "leave these properties out: path wildcards, repeatable or comma-separated, e.g. lineageTag, "
+                + "annotations.PBI_*."
+
 [<HelpFlags("--help", "-h")>]
 type CliArgs =
     | [<Inherit; AltCommandLine("-j")>] Json
@@ -90,6 +102,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] List of ParseResults<ListArgs>
     | [<CliPrefix(CliPrefix.None)>] Get of ParseResults<GetArgs>
     | [<CliPrefix(CliPrefix.None)>] Find of ParseResults<FindArgs>
+    | [<CliPrefix(CliPrefix.None)>] Diff of ParseResults<DiffArgs>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -101,3 +114,4 @@ type CliArgs =
             | List _ -> "list the objects in a model."
             | Get _ -> "show one object (TMDL, or its JSON with --json)."
             | Find _ -> "search names, expressions, descriptions and other properties (exit 1: no matches)."
+            | Diff _ -> "compare two models object by object (exit 1: they differ)."

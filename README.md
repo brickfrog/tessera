@@ -4,7 +4,7 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `convert`, `info`, `list`, `get` and `find` work.
+Status: early. `convert`, `info`, `list`, `get`, `find` and `diff` work.
 
 ## Usage
 
@@ -17,6 +17,8 @@ tess get   ./MyReport.pbip "'Sales'[Total]" -p expression   # just the DAX
 tess get   ./MyReport.pbip Sales --json          # TOM JSON (add --children for columns etc.)
 tess find  ./MyReport.pbip "Budget Rate"          # names, DAX, M, descriptions, annotations...
 tess find  ./MyReport.pbip 'CALCULATE\s*\(' -E -k measure --in expression
+tess diff  ./main/Sales.SemanticModel ./branch/Sales.SemanticModel   # object-level changes
+tess diff  ./server-export.bim ./Sales.pbip --ignore lineageTag --json
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
 tess convert ./Sales.SemanticModel ./model.bim   # PBIP -> .bim
 tess convert ./tmdl ./tmdl --force                # re-serialize in place (keeps its line endings)
@@ -99,6 +101,35 @@ passwords is never printed.
 `find --in` takes path wildcards. A wildcard matches if it matches the whole path or just the last segment, so
 `--in expression` covers both `expression` and `source.expression`. `find` searches every property except
 lineage tags, and prints `ref  property[:line]  text`, one hit per matching line.
+
+### Comparing models (`diff`)
+
+`diff` compares two models object by object, in any mix of formats, and prints:
+
+```
+~ measure:Sales/Total
+    formatString: "#,0" -> "0.00"
+    expression:
+      - SUM(Sales[Amount])
+      + SUMX(Sales, Sales[Amount])
+> measure:Sales/Margin -> measure:Sales/Margin %
++ column:Sales/Discount
+- role:Readers
+```
+
+How objects are matched:
+- Objects are matched by reference.
+- Relationships are matched by their endpoints (`Sales[DateKey] -> Date[DateKey]`), because their names are
+  GUIDs in Power BI.
+- A removed and an added object of the same kind that share a `lineageTag` are reported as a rename, with any
+  other property changes listed under it.
+- Renaming a table renames every child's reference, so children that have lineage tags show up as renames too.
+
+What is compared:
+- Properties are compared using the same paths as `get -p`. `--ignore` takes path wildcards, e.g.
+  `--ignore lineageTag,annotations.PBI_*`.
+- A change of compatibility level shows up on `model`.
+- The order of child objects is not compared.
 
 ### JSON and exit codes
 

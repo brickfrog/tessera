@@ -271,4 +271,51 @@ let tests =
         <| fun () ->
             use t = project ()
             Expect.equal (tess [ "find"; t.Path; "("; "-E" ]).Code App.ExitCode.usage ""
+
+        testCase "diff: identical exits 0, different exits 1"
+        <| fun () ->
+            use t = project ()
+            let bim = t.Combine "m.bim"
+            Expect.equal (tess [ "convert"; t.Path; bim ]).Code App.ExitCode.ok ""
+            let sm = t.Combine "Sales.SemanticModel"
+            let same = tess [ "diff"; sm; bim ]
+            Expect.equal same.Code App.ExitCode.ok same.Err
+            Expect.stringContains same.Out "No differences." ""
+
+            let edited = t.Combine "edited"
+            Expect.equal (tess [ "convert"; sm; edited ]).Code App.ExitCode.ok ""
+            let salesFile = Path.Combine(edited, "tables", "Sales.tmdl")
+
+            File.WriteAllText(
+                salesFile,
+                File.ReadAllText(salesFile).Replace("SUM(Sales[Amount])", "SUMX(Sales, Sales[Amount])")
+            )
+
+            let diff = tess [ "diff"; sm; edited ]
+            Expect.equal diff.Code App.ExitCode.findings diff.Err
+            Expect.stringContains diff.Out "~ measure:Sales/Total" ""
+            Expect.stringContains diff.Out "expression: \"SUM(Sales[Amount])\" -> \"SUMX(Sales, Sales[Amount])\"" ""
+            Expect.stringContains diff.Out "1 modified" ""
+
+            let ignored = tess [ "diff"; sm; edited; "--ignore"; "expression"; "--json" ]
+            Expect.equal ignored.Code App.ExitCode.ok ignored.Err
+            use doc = json ignored
+            Expect.equal (doc.RootElement.GetProperty("summary").GetProperty("modified").GetInt32()) 0 ""
+
+        testCase "diff shows multi-line changes as a line diff"
+        <| fun () ->
+            use t = project ()
+            let edited = t.Combine "edited"
+            Expect.equal (tess [ "convert"; t.Path; edited ]).Code App.ExitCode.ok ""
+            let salesFile = Path.Combine(edited, "tables", "Sales.tmdl")
+
+            File.WriteAllText(
+                salesFile,
+                File
+                    .ReadAllText(salesFile)
+                    .Replace("= SUM(Sales[Amount])", "=\n\t\t\tSUMX(\n\t\t\t\tSales,\n\t\t\t\tSales[Amount])")
+            )
+
+            let diff = tess [ "diff"; t.Path; edited ]
+            Expect.stringContains diff.Out "    expression:\n      - SUM(Sales[Amount])\n      + SUMX(" diff.Out
     ]
