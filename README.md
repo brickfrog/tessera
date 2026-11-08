@@ -6,7 +6,7 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename` and `bpa` work.
+Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set` and `bpa` work.
 
 ## Install
 
@@ -49,6 +49,7 @@ tess validate ./MyReport.pbip                     # broken references, cycles, .
 tess validate ./model.bim --fail-on warning --rule unresolved-reference --json
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue"          # preview: the rename + every DAX reference it fixes
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue" --save   # ... and write it back
+tess set   ./MyReport.pbip "[Revenue]" -p formatString='#,0.00' -p isHidden=true --save   # set properties
 tess bpa   ./MyReport.pbip                       # Best Practice Analyzer: built-in rules + the model's own
 tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE rule files, CI output
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
@@ -160,6 +161,12 @@ candidates.
 A path that names a group, such as `-p source`, prints everything under it. Restricted information like
 passwords is never printed.
 
+An object's own sub-objects are part of it: `kpi.targetExpression`, `formatStringDefinition.expression`,
+`detailRowsDefinition.expression`, `calculationGroup.precedence`, `alternateOf.summarization` and
+`extendedProperties.<name>` are properties of the measure, table or column, in `get -p`, `find` and `diff` alike.
+Child objects that have their own reference (columns, measures, calculation items, ...) and a role's members are
+not.
+
 `find --in` takes path wildcards. A wildcard matches if it matches the whole path or just the last segment, so
 `--in expression` covers both `expression` and `source.expression`. `find` searches every property except
 lineage tags, and prints `ref  property[:line]  text`, one hit per matching line.
@@ -265,7 +272,7 @@ Options:
 errors. `--ci github|azdo` also writes CI annotations to stderr.
 ### Editing commands
 
-`rename` (and the coming `set`, `add`, `remove` and `move`) follow one set of conventions, the same as the
+`rename` and `set` (and the coming `add`, `remove` and `move`) follow one set of conventions, the same as the
 Tabular Editor CLI's.
 
 **Saving:**
@@ -332,6 +339,84 @@ Not rewritten:
   uses bare, such as `NOT`, `IN` or `RETURN`.
 
 The same name is a no-op. A case-only rename (`Sales` to `SALES`) is allowed and rewrites references to match.
+### Setting properties (`set`)
+
+`tess set <model> <object> -p <path>=<value> ...` sets properties on one object. It follows the
+[editing conventions](#editing-commands): a dry run unless `--save` or `--save-to`, the change shown as a diff,
+and new errors refused unless `--force`. `-p` is repeatable, and all assignments apply as one change.
+
+```sh
+tess set ./Sales.pbip "[Revenue]" -p formatString='#,0.00' -p displayFolder=KPIs --save
+tess set ./Sales.pbip "Date[Month]" -p sortByColumn=MonthNo -p summarizeBy=none --save
+tess set ./Sales.pbip "[Revenue]" -p formatStringDefinition.expression='"#,0." & REPT("0", 2)'
+tess set ./Sales.pbip "[Revenue]" -p kpi.targetExpression='[Budget]' -p kpi.statusGraphic='Traffic Light'
+tess set ./Sales.pbip Sales -p annotations.Owner=finance -p isHidden=true
+tess set ./Sales.pbip "[Revenue]" -p expression=- < revenue.dax      # the value from stdin
+tess set ./Sales.pbip "[Revenue]" --unset description --unset annotations.Owner
+```
+
+**Paths** are the ones `get -p` prints: TOM's JSON property names, such as `formatString`, `isHidden`,
+`displayFolder`, `expression`, `dataCategory`, `summarizeBy` and `sortByColumn`. They match case-insensitively.
+- **Nested paths** reach into sub-objects: `formatStringDefinition.expression`, `detailRowsDefinition.expression`,
+  `kpi.targetExpression`, `calculationGroup.precedence`, `source.expression` (a partition's M or DAX).
+  A missing sub-object is created, except a calculation group: that would make the table a calculation group.
+  Unsetting a sub-object's last property, or the sub-object itself (`--unset kpi`), removes it.
+- **Named items:** `annotations.<name>` and `extendedProperties.<name>`. Everything after the first dot is the
+  name, so it may contain dots. Setting one adds or updates it; an existing one matches case-insensitively. A new
+  extended property is a string one. An existing JSON one stays JSON and takes the whole value as JSON text, even
+  though `get -p` flattens it into `extendedProperties.<name>.value...`.
+
+`tess get <model> <object> --properties` lists every path `set` accepts on that object.
+
+**Values** are read according to the property's type:
+
+| Type | Accepted |
+|---|---|
+| string, expression | the text as-is (quote it for the shell) |
+| bool | `true` or `false`, any case |
+| int, number | `42`, `-1`, `0.25` (invariant culture) |
+| enum | a member's TOM name, any case: `summarizeBy=none`, `dataType=int64`, `crossFilteringBehavior=bothDirections`. Members the model's compatibility level lacks are refused |
+| reference | an object, in any form `get` accepts |
+| `-` | read the value from stdin, taken literally (minus one trailing line break). Only one `-p` can use stdin |
+| `null` | clear a string or reference, reset anything else to TOM's default (`isAvailableInMdx` goes back to `true`, `summarizeBy` to `default`), remove a sub-object, annotation or extended property. `--unset <path>` does the same. To store the text `null`, pass it on stdin |
+
+Reference properties:
+
+| Object | Property | Refers to |
+|---|---|---|
+| column | `sortByColumn` | a column of the same table: a bare name (`MonthNo`) is looked up there first |
+| level | `column` | a column of the hierarchy's table |
+| relationship | `fromColumn`, `toColumn` | a column; a bare name is looked up in that end's current table first |
+| model | `defaultMeasure` | a measure |
+| partition (legacy query source) | `source.dataSource` | a data source |
+| named expression | `parameterValuesColumn`, `expressionSource` | a column; a named expression |
+| column | `alternateOf.baseColumn`, `alternateOf.baseTable` | a column; a table (aggregations) |
+
+A reference to an object of the wrong kind is refused ("that is measure:Sales/Total, not a column").
+
+`set` refuses, with exit code 2 unless noted:
+- unknown properties (`unknown-property`), suggesting close matches: `did you mean 'formatString'?`
+- `name`: use [`rename`](#renaming-rename), which also fixes DAX references (`read-only-property`)
+- properties that hold child objects, like `columns` or `measures`: point `set` at the child itself
+  (`read-only-property`)
+- read-only properties (`read-only-property`):
+  - what TOM computes, like a column's `type`
+  - properties the model's compatibility level or mode doesn't support (the reason names the level needed)
+  - a partition's `source` itself (its properties can be set)
+  - passwords, which TOM's JSON masks so a change couldn't be shown
+  - a Power Query data source's `credential`, `connectionDetails` and `options`
+  - query-group references
+- values that don't fit the type, the same path twice, a reference to the wrong kind or to a column of another
+  table where the same table is required, or a value TOM rejects (`invalid-property-value`)
+- a reference to an object that doesn't exist or is ambiguous (exit code 3, `object-not-found` /
+  `ambiguous-object`)
+
+Nothing is written unless every assignment is valid. A value that is valid but breaks the model, such as DAX that
+refers to a missing table, is shown along with the errors it introduces, and `--save` refuses it unless `--force`.
+
+A relationship whose `fromColumn` or `toColumn` changes is shown as the same relationship, modified, under its new
+endpoints.
+
 ### Best Practice Analyzer (`bpa`)
 
 `bpa` checks a model against Best Practice Analyzer rules in Tabular Editor's JSON format. Existing TE2/TE3
@@ -563,7 +648,7 @@ the code as its title.
 |---|---|
 | 0 | success |
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
-| 2 | usage error (including an invalid new name for `rename`) |
+| 2 | usage error (including an invalid new name for `rename`, or a property `set` can't write or a value it can't take) |
 | 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references) |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |

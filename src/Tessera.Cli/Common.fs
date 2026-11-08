@@ -37,6 +37,9 @@ module ExitCode =
         | SaveFailed _ -> output
         | InvalidPattern _
         | InvalidName _ -> usage
+        | UnknownProperty _
+        | ReadOnlyProperty _
+        | InvalidPropertyValue _ -> usage
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()

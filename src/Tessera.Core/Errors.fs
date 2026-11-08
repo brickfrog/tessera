@@ -24,6 +24,12 @@ type TessError =
     | InvalidRules of path: string * reason: string
     /// An edit would leave the model with errors it didn't have (save refused without --force).
     | ChangeIntroducesErrors of count: int
+    /// `set`: a property path the object doesn't have (with close matches).
+    | UnknownProperty of objectRef: string * path: string * suggestions: string list
+    /// `set`: a property that can't be written (read-only, `name`, child collections, ...).
+    | ReadOnlyProperty of objectRef: string * path: string * reason: string
+    /// `set`: a value the property can't take.
+    | InvalidPropertyValue of objectRef: string * path: string * value: string * reason: string
 
 module TessError =
 
@@ -49,6 +55,9 @@ module TessError =
         | RenameConflict _ -> "rename-conflict"
         | InvalidRules _ -> "invalid-rules"
         | ChangeIntroducesErrors _ -> "change-introduces-errors"
+        | UnknownProperty _ -> "unknown-property"
+        | ReadOnlyProperty _ -> "read-only-property"
+        | InvalidPropertyValue _ -> "invalid-property-value"
 
     let message =
         function
@@ -80,3 +89,23 @@ module TessError =
         | ChangeIntroducesErrors n ->
             let errors = if n = 1 then "1 error" else $"{n} errors"
             $"Not saved: the change introduces {errors} (see above; use --force to save anyway)"
+        | UnknownProperty(objectRef, path, suggestions) ->
+            let hint =
+                match suggestions with
+                | [] -> ""
+                | s ->
+                    " - did you mean "
+                    + (s |> List.map (fun p -> $"'{p}'") |> String.concat " or ")
+                    + "?"
+
+            $"{objectRef} has no property '{path}'{hint} (`tess get <model> <object> --properties` lists them)"
+        | ReadOnlyProperty(objectRef, path, reason) -> $"Can't set {path} on {objectRef}: {reason}"
+        | InvalidPropertyValue(objectRef, path, value, reason) ->
+            let first = value.Split('\n').[0]
+
+            let shown =
+                if first.Length > 40 then first.Substring(0, 40) + "..."
+                elif first.Length < value.Length then first + "..."
+                else first
+
+            $"Can't set {path} on {objectRef} to '{shown}': {reason}"
