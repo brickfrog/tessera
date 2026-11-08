@@ -178,4 +178,37 @@ let tests =
             let nodes = tree DependsOn 1 (build db) (refOf "measure:Sales/Twice")
 
             Expect.equal (nodes |> List.map (fun n -> n.Via)) [ [ "expression", Some 1; "expression", Some 2 ] ] ""
+
+        testCase "a calculated table's own columns are local; [X] there isn't a column of its own table"
+        <| fun () ->
+            let db = model ()
+            let cal = new Table(Name = "Cal")
+
+            cal.Partitions.Add(
+                new Partition(
+                    Name = "Cal",
+                    Source =
+                        new CalculatedPartitionSource(
+                            Expression =
+                                "ADDCOLUMNS(CALENDAR(DATE(2020,1,1), DATE(2020,12,31)), \"Year\", YEAR([Date]), \"T\", [Total])"
+                        )
+                )
+            )
+
+            cal.Columns.Add(
+                new CalculatedTableColumn(Name = "Date", SourceColumn = "[Date]", DataType = DataType.DateTime)
+            )
+
+            cal.Columns.Add(
+                new CalculatedTableColumn(Name = "Year", SourceColumn = "[Year]", DataType = DataType.Int64)
+            )
+
+            db.Model.Tables.Add cal
+            let g = build db
+            let deps = dependsOn g (refOf "table:Cal") |> targets
+
+            Expect.equal
+                deps
+                [ "measure:Sales/Total", "expression" ]
+                "only the measure; [Date] is produced, not referenced"
     ]

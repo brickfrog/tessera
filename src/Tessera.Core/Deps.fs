@@ -36,24 +36,33 @@ type DaxSource = {
     Owner: ObjectEntry
     Property: string
     Dax: string
-    /// The table unqualified [Column] references resolve against.
+    /// The table unqualified [Column] references resolve against: the object's own table for
+    /// measures, columns, calculation items and RLS filters. None for table-level expressions
+    /// (calculated tables, detail rows, calculation group expressions) and functions: there, as in
+    /// TE2, [X] is a measure or a column the expression itself produces (CALENDAR(...)[Date]).
     ContextTable: Table option
+    /// Column names the expression itself produces (a calculated table's own columns): an
+    /// unqualified [X] naming one of them is local, not a model reference.
+    ProducedColumns: string list
 }
 
 let private nonEmpty (s: string) = not (String.IsNullOrWhiteSpace s)
 
 /// Every DAX expression in the model, attributed to the object a user would think owns it.
 let daxSources (entries: ObjectEntry list) : DaxSource list =
-    let src owner property dax ctx =
+    let srcProducing owner property dax ctx produced =
         if nonEmpty dax then
             Some {
                 Owner = owner
                 Property = property
                 Dax = dax
                 ContextTable = ctx
+                ProducedColumns = produced
             }
         else
             None
+
+    let src owner property dax ctx = srcProducing owner property dax ctx []
 
     let tableEntries =
         entries
@@ -82,7 +91,7 @@ let daxSources (entries: ObjectEntry list) : DaxSource list =
             | :? CalculatedColumn as c -> src e "expression" c.Expression (Some c.Table)
             | :? Table as t ->
                 if not (isNull t.DefaultDetailRowsDefinition) then
-                    src e "defaultDetailRowsDefinition.expression" t.DefaultDetailRowsDefinition.Expression (Some t)
+                    src e "defaultDetailRowsDefinition.expression" t.DefaultDetailRowsDefinition.Expression None
 
                 if not (isNull t.CalculationGroup) then
                     let cg = t.CalculationGroup
@@ -93,20 +102,22 @@ let daxSources (entries: ObjectEntry list) : DaxSource list =
                             "calculationGroup.multipleOrEmptySelectionExpression", cg.MultipleOrEmptySelectionExpression
                         ] do
                         if not (isNull x) then
-                            src e (name + ".expression") x.Expression (Some t)
+                            src e (name + ".expression") x.Expression None
 
                             if not (isNull x.FormatStringDefinition) then
                                 src
                                     e
                                     (name + ".formatStringDefinition.expression")
                                     x.FormatStringDefinition.Expression
-                                    (Some t)
+                                    None
             | :? Partition as p ->
                 match p.Source with
                 // A calculated table's DAX: attributed to the table, which is what people mean.
                 | :? CalculatedPartitionSource as cps ->
                     match tableEntries.TryGetValue p.Table.Name with
-                    | true, te -> src te "expression" cps.Expression (Some p.Table)
+                    | true, te ->
+                        let produced = [ for c in p.Table.Columns -> c.Name ]
+                        srcProducing te "expression" cps.Expression None produced
                     | _ -> None
                 | _ -> None
             | :? CalculationItem as ci ->
@@ -277,7 +288,11 @@ let private resolveSource (index: Index) (s: DaxSource) : Reference list =
             out.Add(reference target t t)
         // [Name]: a column of the context table, else a measure there, else a measure anywhere.
         | TokenKind.Bracketed, _ ->
-            if not (localColumns.Contains t.Text) then
+            let produced =
+                s.ProducedColumns
+                |> List.exists (fun c -> String.Equals(c, t.Text, StringComparison.OrdinalIgnoreCase))
+
+            if not (localColumns.Contains t.Text) && not produced then
                 let inContext =
                     s.ContextTable |> Option.bind (fun table -> index.Member table.Name t.Text)
 
