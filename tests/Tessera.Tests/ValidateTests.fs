@@ -244,6 +244,10 @@ let tests =
             testCase "unterminated string"
             <| fun () -> Expect.equal (tokens "1 +\n\"open") [ Some 2, "unterminated string: \"open" ] ""
 
+            testCase "unterminated date literal"
+            <| fun () ->
+                Expect.equal (tokens "DT\"2024-01-01") [ Some 1, "unterminated date literal: DT\"2024-01-01" ] ""
+
             testCase "unterminated names, which can't span lines"
             <| fun () ->
                 Expect.equal
