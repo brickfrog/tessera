@@ -1,14 +1,38 @@
 # tessera
 
+[![CI](https://github.com/brickfrog/tessera/actions/workflows/ci.yml/badge.svg)](https://github.com/brickfrog/tessera/actions/workflows/ci.yml)
+
 `tess` is a cross-platform command line for Power BI and Analysis Services semantic models. It reads and writes
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `convert`, `info`, `list`, `get`, `find`, `diff` and `deps` work.
+Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff` and `deps` work.
+
+## Install
+
+Release binaries are self-contained single files and need no .NET install. Download the archive for your platform
+from the [releases page](https://github.com/brickfrog/tessera/releases) (`linux-x64`, `linux-arm64`, `win-x64`,
+`osx-arm64`, `osx-x64`), unpack it, and put `tess` (`tess.exe` on Windows) on your `PATH`:
+
+```sh
+tar -xzf tess-0.2.0-linux-x64.tar.gz && install tess-0.2.0-linux-x64/tess ~/.local/bin/
+```
+
+The Linux binaries are built for glibc-based distributions and need ICU (`libicu`, e.g. `apt install libicu74`),
+because tess uses real culture data rather than invariant globalization. There is no musl/Alpine build yet.
+The macOS binaries are not notarized. If Gatekeeper blocks one, run `xattr -d com.apple.quarantine tess`.
+Each release also lists `SHA256SUMS`.
+
+With the .NET 10 SDK, you can install it as a .NET tool instead. Download `tessera.<version>.nupkg` from the release, then:
+
+```sh
+dotnet tool install -g tessera --add-source ./folder-with-the-nupkg
+```
 
 ## Usage
 
 ```sh
+tess init  ./Sales.SemanticModel                # new, empty model (PBIP; .bim / TMDL by path)
 tess info  ./MyReport.pbip                       # summary: compatibility level, object counts
 tess list  ./MyReport.pbip -k measure -t Sales   # one object reference per line
 tess list  ./model.bim --name '*Margin*' --json  # machine-readable
@@ -59,6 +83,36 @@ don't rewrite every line in git. With nothing there, it matches the source, and 
 Use `--eol lf|crlf`, `--indent-spaces N` or `--include-sensitive` to change these. `convert` won't write over a
 non-empty destination without `--force`. With `--force`, stale `.tmdl` files are removed and unrelated files are
 left alone. Re-saving a PBIP folder keeps its `.platform` `logicalId` and its `definition.pbism` settings.
+
+### New models (`init`)
+
+`init` writes an empty model. It picks the format from the path the way `convert` does, and writes the same
+support files. The model is named after the folder or file, without `.SemanticModel` or `.bim`.
+
+```sh
+tess init ./Sales.SemanticModel                                 # PBIP: definition/ + definition.pbism + .platform
+tess init ./finance.bim --name Finance --culture da-DK
+tess init ./model --compatibility-level 1601 --force            # TMDL folder; replace what's there
+```
+
+The model gets the properties Power BI Desktop puts on a new model:
+- `culture` and `sourceQueryCulture` (`--culture`, default `en-US`)
+- `defaultPowerBIDataSourceVersion: powerBI_V3`
+- `dataAccessOptions` with `legacyRedirects` and `returnErrorValuesAsNull`
+
+It also sets `discourageImplicitMeasures`, because models built in code should use explicit measures, and
+calculation groups require it anyway. The database is left unnamed, as Desktop leaves it. Desktop's UI-state
+annotations, such as `PBI_QueryOrder`, are not written.
+
+The default compatibility level is 1702:
+- current Power BI tooling writes it (the spaceparts-analytics sample uses it)
+- it is the first level with DAX user-defined functions
+- Power BI Desktop raises a model's level when a feature needs a higher one, but never lowers it
+
+Pass `--compatibility-level` for older engines. The minimum is 1520, the lowest level that supports
+`sourceQueryCulture`. `init` won't write over a non-empty destination without `--force`.
+
+To open the model in Power BI Desktop, you also need a `.pbip` file and a `X.Report` folder that points at it.
 
 ### Object references
 
@@ -184,8 +238,27 @@ dotnet tool restore && dotnet fantomas src tests    # format
 dotnet pack src/Tessera.Cli -c Release -o artifacts && dotnet tool install -g tessera --add-source ./artifacts
 ```
 
+CI (`.github/workflows/ci.yml`) checks formatting, then builds and tests on Linux, Windows and macOS. A further job
+runs the suite against a pinned clone of the sample model below.
+
 Set `TESSERA_SAMPLE_MODEL=<path>` to also run a round-trip test against a real model, such as a clone of
 [TabularEditor/spaceparts-analytics](https://github.com/TabularEditor/spaceparts-analytics).
+
+Releases: push a tag such as `v0.2.0`. `.github/workflows/release.yml` then:
+- runs the tests
+- builds the self-contained single-file binaries and the tool package, stamped with the tag's version
+  (`-p:Version=0.2.0`; `Directory.Build.props` holds the default for local builds)
+- attaches them all to a GitHub release
+
+`tess --version` prints that version. The `+<commit>` suffix .NET adds to the informational version is left out.
+To build a binary locally:
+
+```sh
+dotnet publish src/Tessera.Cli -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o publish
+```
+
+Single-file binaries are compressed and not trimmed, because TOM relies on reflection. They leave out MSAL's native
+sign-in broker, which tess never uses.
 
 Layout:
 
