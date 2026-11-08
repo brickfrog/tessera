@@ -491,6 +491,10 @@ let tests =
                 | ReadOnlyProperty(_, "name", reason) -> Expect.stringContains reason "tess rename" ""
                 | e -> failtestf "%A" e
 
+                match fails (sampleDatabase ()) "model" [ p "name" "X" ] with
+                | ReadOnlyProperty(_, "name", reason) -> Expect.equal reason "tess doesn't rename the model" ""
+                | e -> failtestf "%A" e
+
             testCase "properties that hold children"
             <| fun () ->
                 let db = sampleDatabase ()

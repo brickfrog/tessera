@@ -766,7 +766,12 @@ let rec private describe (ctx: Ctx) (depth: int) (node: Node) : Catalog =
                 }
 
                 if p.Name = "Name" && depth = 0 then
-                    single (readOnly i "use `tess rename`, which also updates the DAX that refers to it")
+                    let reason =
+                        match current with
+                        | :? Model -> "tess doesn't rename the model"
+                        | _ -> "use `tess rename`, which also updates the DAX that refers to it"
+
+                    single (readOnly i reason)
                 elif secretNames.Contains p.Name then
                     single (readOnly i "a secret: TOM's JSON masks it, so tess can't show or diff a change")
                 elif not (isSettable p) then
