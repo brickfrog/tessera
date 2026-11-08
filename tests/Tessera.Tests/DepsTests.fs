@@ -129,6 +129,19 @@ let tests =
 
             Expect.equal lines [ Some 2; Some 3 ] "'Date' on line 2, the rest on line 3"
 
+        testCase "DAX references carry their source span; structural links don't"
+        <| fun () ->
+            let db = model ()
+            let dax = db.Model.Tables.["Sales"].Measures.["With Vars"].Expression
+
+            for r in dependsOn g.Value (refOf "measure:Sales/With Vars") do
+                match r.Start, r.Length with
+                | Some start, Some length -> Expect.equal (dax.Substring(start, length)) r.Text ""
+                | _ -> failtest "a DAX reference without a span"
+
+            for r in g.Value.References |> List.filter (fun r -> r.Line.IsNone) do
+                Expect.equal (r.Start, r.Length) (None, None) r.Via
+
         testCase "tree: depth, and cycles are marked not followed"
         <| fun () ->
             let db = model ()

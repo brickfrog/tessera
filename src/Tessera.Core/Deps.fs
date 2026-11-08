@@ -25,6 +25,10 @@ type Reference = {
     Line: int option
     /// How the reference is written in the source (for DAX), or the property value.
     Text: string
+    /// Offset of the reference's first character in the DAX (None for structural links).
+    Start: int option
+    /// Length of the reference in the DAX, so Text = dax.Substring(Start, Length).
+    Length: int option
 }
 
 /// A DAX expression held by an object.
@@ -213,13 +217,18 @@ let private resolveSource (index: Index) (s: DaxSource) : Reference list =
     let tokens = tokenize s.Dax |> significant |> Array.ofList
     let names, localColumns = locals (s.Owner.Ref.Kind = ObjectKind.Function) tokens
 
-    let reference (target: Target) (first: Token) (last: Token) = {
-        From = s.Owner.Ref
-        Target = target
-        Via = s.Property
-        Line = Some(lineOf s.Dax first.Start)
-        Text = s.Dax.Substring(first.Start, last.Start + last.Length - first.Start)
-    }
+    let reference (target: Target) (first: Token) (last: Token) =
+        let length = last.Start + last.Length - first.Start
+
+        {
+            From = s.Owner.Ref
+            Target = target
+            Via = s.Property
+            Line = Some(lineOf s.Dax first.Start)
+            Text = s.Dax.Substring(first.Start, length)
+            Start = Some first.Start
+            Length = Some length
+        }
 
     let resolved (e: ObjectEntry) = Resolved e.Ref
 
@@ -293,6 +302,8 @@ let private structural (index: Index) (entries: ObjectEntry list) : Reference li
             Via = via
             Line = None
             Text = text
+            Start = None
+            Length = None
         })
 
     [
