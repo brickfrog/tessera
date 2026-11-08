@@ -234,4 +234,41 @@ let tests =
                 Expect.equal r.Code App.ExitCode.input (String.concat " " args)
                 use doc = json r
                 Expect.equal (doc.RootElement.GetProperty("error").GetProperty("code").GetString()) code ""
+
+        testCase "find: matches exit 0, nothing found exits 1 (like grep)"
+        <| fun () ->
+            use t = project ()
+            let r = tess [ "find"; t.Path; "SUM(" ]
+            Expect.equal r.Code App.ExitCode.ok r.Err
+            Expect.stringContains r.Out "measure:Sales/Total  expression  SUM(Sales[Amount])" ""
+            Expect.equal (tess [ "find"; t.Path; "no-such-text" ]).Code 1 ""
+
+        testCase "find --json, -k, --in, -E"
+        <| fun () ->
+            use t = project ()
+
+            let r =
+                tess [
+                    "find"
+                    t.Path
+                    "^sum"
+                    "-E"
+                    "-k"
+                    "measure"
+                    "--in"
+                    "expression"
+                    "--json"
+                ]
+
+            Expect.equal r.Code App.ExitCode.ok r.Err
+            use doc = json r
+            let hits = doc.RootElement.EnumerateArray() |> List.ofSeq
+            Expect.hasLength hits 1 ""
+            Expect.equal (hits.[0].GetProperty("ref").GetString()) "measure:Sales/Total" ""
+            Expect.equal (hits.[0].GetProperty("line").GetInt32()) 1 ""
+
+        testCase "find with a bad regex is a usage error"
+        <| fun () ->
+            use t = project ()
+            Expect.equal (tess [ "find"; t.Path; "("; "-E" ]).Code App.ExitCode.usage ""
     ]

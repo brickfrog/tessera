@@ -130,3 +130,29 @@ let select (path: string) (props: (string * string) list) =
             p.StartsWith(path + ".", StringComparison.Ordinal)
             || p.StartsWith(path + "[", StringComparison.Ordinal))
     | exact -> exact
+
+/// The last segment of a property path: "source.expression" -> "expression", "x[2]" -> "x".
+let leafName (path: string) =
+    let last =
+        match path.LastIndexOf '.' with
+        | -1 -> path
+        | i -> path.Substring(i + 1)
+
+    match last.IndexOf '[' with
+    | -1 -> last
+    | i -> last.Substring(0, i)
+
+/// A property-path wildcard (* and ?), case-insensitive. It matches when it matches the whole path,
+/// or just the last segment: "lineageTag" matches "lineageTag" and "source.lineageTag" alike.
+let pathGlob (pattern: string) =
+    let escaped =
+        Text.RegularExpressions.Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".")
+
+    let rx =
+        Text.RegularExpressions.Regex(
+            "^" + escaped + "$",
+            Text.RegularExpressions.RegexOptions.IgnoreCase
+            ||| Text.RegularExpressions.RegexOptions.CultureInvariant
+        )
+
+    fun (path: string) -> rx.IsMatch path || rx.IsMatch(leafName path)

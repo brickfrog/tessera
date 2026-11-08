@@ -4,7 +4,7 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `convert`, `info`, `list` and `get` work.
+Status: early. `convert`, `info`, `list`, `get` and `find` work.
 
 ## Usage
 
@@ -15,6 +15,8 @@ tess list  ./model.bim --name '*Margin*' --json  # machine-readable
 tess get   ./MyReport.pbip "[Total Sales]"         # one object, as TMDL
 tess get   ./MyReport.pbip "'Sales'[Total]" -p expression   # just the DAX
 tess get   ./MyReport.pbip Sales --json          # TOM JSON (add --children for columns etc.)
+tess find  ./MyReport.pbip "Budget Rate"          # names, DAX, M, descriptions, annotations...
+tess find  ./MyReport.pbip 'CALCULATE\s*\(' -E -k measure --in expression
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
 tess convert ./Sales.SemanticModel ./model.bim   # PBIP -> .bim
 tess convert ./tmdl ./tmdl --force                # re-serialize in place (keeps its line endings)
@@ -94,6 +96,10 @@ candidates.
 A path that names a group, such as `-p source`, prints everything under it. Restricted information like
 passwords is never printed.
 
+`find --in` takes path wildcards. A wildcard matches if it matches the whole path or just the last segment, so
+`--in expression` covers both `expression` and `source.expression`. `find` searches every property except
+lineage tags, and prints `ref  property[:line]  text`, one hit per matching line.
+
 ### JSON and exit codes
 
 `--json` (or `-j`) writes one JSON document to stdout, errors included (`{"error": {"code", "message"}}`).
@@ -101,7 +107,7 @@ passwords is never printed.
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | findings reported (reserved for `bpa`, `diff`, `validate`) |
+| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues |
 | 2 | usage error |
 | 3 | input error (model not found, unrecognised, ambiguous, failed to load) |
 | 4 | output error (destination not empty, write failed) |

@@ -153,6 +153,37 @@ let getJson (e: ObjectEntry) (objectJson: string) =
 let propertiesJson (e: ObjectEntry) (leaves: (string * string) list) =
     obj (refFields e @ [ "properties", obj [ for p, v in leaves -> p, str v ] ])
 
+// ---- find ------------------------------------------------------------------
+
+let findJson (hits: Find.Hit list) =
+    arr [
+        for h in hits ->
+            obj [
+                "ref", str (ObjectRef.format h.Ref)
+                "kind", str (ObjectKind.token h.Ref.Kind)
+                "property", str h.Path
+                "line", num h.Line
+                "text", str h.Text
+            ]
+    ]
+
+/// ref  property[:line]  text: the line number only when the value has several lines.
+let findText (out: TextWriter) (hits: Find.Hit list) =
+    let multiLine =
+        hits
+        |> List.filter (fun h -> h.Line > 1)
+        |> List.map (fun h -> h.Ref, h.Path)
+        |> Set.ofList
+
+    for h in hits do
+        let where =
+            if h.Line > 1 || multiLine.Contains(h.Ref, h.Path) then
+                $"{h.Path}:{h.Line}"
+            else
+                h.Path
+
+        out.WriteLine($"{ObjectRef.format h.Ref}  {where}  {h.Text}")
+
 // ---- convert -----------------------------------------------------------------
 
 let convertJson (source: ModelSource) (saved: ModelIO.SavedModel) =

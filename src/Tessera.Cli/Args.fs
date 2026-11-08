@@ -61,6 +61,26 @@ type GetArgs =
                 "print just this property (repeatable), e.g. expression, source.expression, annotations.PBI_FormatHint."
             | Children -> "include child objects (a table's columns, measures, ...)."
 
+type FindArgs =
+    | [<MainCommand; ExactlyOnce>] Target of model: string * text: string
+    | [<AltCommandLine("-E")>] Regex
+    | [<AltCommandLine("-s")>] Case_Sensitive
+    | [<AltCommandLine("-k")>] Kind of kinds: string
+    | [<AltCommandLine("-t")>] Table of table: string
+    | In of properties: string
+
+    interface IArgParserTemplate with
+        member this.Usage =
+            match this with
+            | Target _ -> "model path, and the text to look for."
+            | Regex -> "treat the text as a .NET regular expression."
+            | Case_Sensitive -> "match case (default: case-insensitive)."
+            | Kind _ -> "only these kinds of object (repeatable or comma-separated)."
+            | Table _ -> "only objects in this table (repeatable)."
+            | In _ ->
+                "only these properties: path wildcards, repeatable or comma-separated, e.g. expression, "
+                + "description, annotations.*. Default: all except lineage tags."
+
 [<HelpFlags("--help", "-h")>]
 type CliArgs =
     | [<Inherit; AltCommandLine("-j")>] Json
@@ -69,6 +89,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Info of ParseResults<InfoArgs>
     | [<CliPrefix(CliPrefix.None)>] List of ParseResults<ListArgs>
     | [<CliPrefix(CliPrefix.None)>] Get of ParseResults<GetArgs>
+    | [<CliPrefix(CliPrefix.None)>] Find of ParseResults<FindArgs>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -79,3 +100,4 @@ type CliArgs =
             | Info _ -> "summarise a model."
             | List _ -> "list the objects in a model."
             | Get _ -> "show one object (TMDL, or its JSON with --json)."
+            | Find _ -> "search names, expressions, descriptions and other properties (exit 1: no matches)."

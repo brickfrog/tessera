@@ -15,6 +15,7 @@ type TessError =
     | ObjectNotFound of input: string
     | AmbiguousObject of input: string * candidates: string list
     | PropertyNotFound of objectRef: string * path: string
+    | InvalidPattern of pattern: string * reason: string
 
 module TessError =
 
@@ -33,6 +34,7 @@ module TessError =
         | ObjectNotFound _ -> "object-not-found"
         | AmbiguousObject _ -> "ambiguous-object"
         | PropertyNotFound _ -> "property-not-found"
+        | InvalidPattern _ -> "invalid-pattern"
 
     let message =
         function
@@ -53,3 +55,4 @@ module TessError =
             let list = candidates |> List.map (fun c -> $"  {c}") |> String.concat "\n"
             $"'{input}' matches more than one object; use one of these:\n{list}"
         | PropertyNotFound(objectRef, path) -> $"{objectRef} has no property '{path}'"
+        | InvalidPattern(pattern, reason) -> $"Invalid pattern '{pattern}': {reason}"

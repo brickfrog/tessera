@@ -14,6 +14,7 @@
     <Compile Include="InventoryTests.fs" />
     <Compile Include="SelectorTests.fs" />
     <Compile Include="SerializeTests.fs" />
+    <Compile Include="FindTests.fs" />
     <Compile Include="CliTests.fs" />
     <Compile Include="SampleModelTests.fs" />
     <Compile Include="Main.fs" />

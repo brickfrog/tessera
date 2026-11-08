@@ -11,7 +11,7 @@ open Tessera.Cli.Args
 /// Process exit codes. Stable: scripts and CI may depend on them.
 module ExitCode =
     let ok = 0
-    /// Reserved for commands that report findings (bpa, diff, validate).
+    /// find: no matches; diff: differences; bpa/validate: issues. See README.
     let findings = 1
     let usage = 2
     let input = 3
@@ -32,6 +32,7 @@ module ExitCode =
         | PropertyNotFound _ -> input
         | DestinationNotEmpty _
         | SaveFailed _ -> output
+        | InvalidPattern _ -> usage
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()
@@ -42,6 +43,9 @@ let version () =
 
 type private Outcome =
     | Done
+    /// Completed, but with the "negative" result its Unix counterpart signals with exit 1
+    /// (find: nothing matched; diff: models differ).
+    | DoneWith of exitCode: int
     | Failed of TessError
     | UsageError of string
 
@@ -149,6 +153,43 @@ let private runGet (ctx: Ctx) (args: ParseResults<GetArgs>) =
 
                 Done
 
+let private parseKinds (tokens: string list) =
+    let kinds = parseList tokens |> List.map (fun t -> t, ObjectKind.tryParse t)
+
+    match kinds |> List.tryFind (fun (_, k) -> k.IsNone) with
+    | Some(bad, _) ->
+        let known = ObjectKind.all |> List.map ObjectKind.token |> String.concat ", "
+        Error $"unknown kind '{bad}' (known: {known})"
+    | None -> Ok(kinds |> List.choose snd)
+
+let private runFind (ctx: Ctx) (args: ParseResults<FindArgs>) =
+    let modelPath, text = args.GetResult FindArgs.Target
+
+    match parseKinds (args.GetResults FindArgs.Kind) with
+    | Error e -> UsageError e
+    | Ok kinds ->
+        let opts: Find.Options = {
+            Pattern = text
+            Regex = args.Contains FindArgs.Regex
+            CaseSensitive = args.Contains FindArgs.Case_Sensitive
+            Objects = {
+                Inventory.Filter.none with
+                    Kinds = kinds
+                    Tables = args.GetResults FindArgs.Table
+            }
+            Properties = parseList (args.GetResults FindArgs.In)
+        }
+
+        match ModelIO.loadPath modelPath |> Result.bind (fun (_, db) -> Find.search db opts) with
+        | Error e -> Failed e
+        | Ok hits ->
+            if ctx.Json then
+                Render.writeJson ctx.Out (Render.findJson hits)
+            else
+                Render.findText ctx.Out hits
+
+            if hits.IsEmpty then DoneWith ExitCode.findings else Done
+
 let private runConvert (ctx: Ctx) (args: ParseResults<ConvertArgs>) =
     let source, destination = args.GetResult ConvertArgs.Paths
 
@@ -241,10 +282,12 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Info args) -> runInfo ctx args
                 | Some(List args) -> runList ctx args
                 | Some(Get args) -> runGet ctx args
+                | Some(Find args) -> runFind ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with
             | Done -> ExitCode.ok
+            | DoneWith code -> code
             | UsageError message -> usageError message
             | Failed e ->
                 if ctx.Json then
