@@ -1,302 +1,12 @@
-/// The CLI entry logic, kept separate from Program.main so tests can drive it with captured writers.
+/// The CLI entry point, kept separate from Program.main so tests can drive it with captured writers.
 module Tessera.Cli.App
 
-open System
 open System.IO
-open System.Reflection
 open Argu
 open Tessera
 open Tessera.Cli.Args
-
-/// Process exit codes. Stable: scripts and CI may depend on them.
-module ExitCode =
-    let ok = 0
-    /// find: no matches; diff: differences; bpa/validate: issues. See README.
-    let findings = 1
-    let usage = 2
-    let input = 3
-    let output = 4
-    let internalError = 70
-
-    let ofError =
-        function
-        | PathNotFound _
-        | UnrecognizedModel _
-        | AmbiguousModel _
-        | InvalidPbip _
-        | RemoteModelReference _
-        | LoadFailed _
-        | InvalidObjectRef _
-        | ObjectNotFound _
-        | AmbiguousObject _
-        | PropertyNotFound _ -> input
-        | DestinationNotEmpty _
-        | SaveFailed _ -> output
-        | InvalidPattern _ -> usage
-
-let version () =
-    let asm = Assembly.GetExecutingAssembly()
-
-    match asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>() with
-    | null -> string (asm.GetName().Version)
-    | a -> a.InformationalVersion.Split('+').[0]
-
-type private Outcome =
-    | Done
-    /// Completed, but with the "negative" result its Unix counterpart signals with exit 1
-    /// (find: nothing matched; diff: models differ).
-    | DoneWith of exitCode: int
-    | Failed of TessError
-    | UsageError of string
-
-type private Ctx = {
-    Out: TextWriter
-    Err: TextWriter
-    Json: bool
-}
-
-let private parseList (values: string list) =
-    values
-    |> List.collect (fun v ->
-        v.Split(',', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
-        |> List.ofArray)
-
-let private runInfo (ctx: Ctx) (args: ParseResults<InfoArgs>) =
-    match ModelIO.loadPath (args.GetResult InfoArgs.Model) with
-    | Error e -> Failed e
-    | Ok(source, db) ->
-        let info = Inventory.info source db
-
-        if ctx.Json then
-            Render.writeJson ctx.Out (Render.infoJson info)
-        else
-            Render.infoText ctx.Out info
-
-        Done
-
-let private runList (ctx: Ctx) (args: ParseResults<ListArgs>) =
-    let kindTokens = parseList (args.GetResults ListArgs.Kind)
-    let kinds = kindTokens |> List.map (fun t -> t, ObjectKind.tryParse t)
-
-    match kinds |> List.tryFind (fun (_, k) -> k.IsNone) with
-    | Some(bad, _) ->
-        let known = ObjectKind.all |> List.map ObjectKind.token |> String.concat ", "
-        UsageError $"unknown kind '{bad}' (known: {known})"
-    | None ->
-        match ModelIO.loadPath (args.GetResult ListArgs.Model) with
-        | Error e -> Failed e
-        | Ok(_, db) ->
-            let filter: Inventory.Filter = {
-                Kinds = kinds |> List.choose snd
-                Tables = args.GetResults ListArgs.Table
-                NamePattern = args.TryGetResult ListArgs.Name
-            }
-
-            let entries = Inventory.objects db |> Inventory.Filter.apply filter
-
-            if ctx.Json then
-                Render.writeJson ctx.Out (Render.listJson entries)
-            else
-                Render.listText ctx.Out entries
-
-            Done
-
-let private runGet (ctx: Ctx) (args: ParseResults<GetArgs>) =
-    let modelPath, selector = args.GetResult GetArgs.Target
-    let children = args.Contains GetArgs.Children
-    let wanted = args.GetResults GetArgs.Property
-
-    let result =
-        ModelIO.loadPath modelPath
-        |> Result.bind (fun (_, db) ->
-            Inventory.Selector.resolve (Inventory.objects db) selector
-            |> Result.map (fun e -> db, e))
-
-    match result with
-    | Error e -> Failed e
-    | Ok(db, e) ->
-        let json = Serialize.objectJson db children e.Object
-
-        match wanted with
-        | [] ->
-            if ctx.Json then
-                Render.writeJson ctx.Out (Render.getJson e json)
-            else
-                ctx.Out.Write(Serialize.objectTmdl children e.Object)
-
-            Done
-        | paths ->
-            let props =
-                let own = Serialize.flatten json
-
-                if e.Ref.Kind = ObjectKind.Model then
-                    ("compatibilityLevel", string db.CompatibilityLevel) :: own
-                else
-                    own
-
-            let selected = paths |> List.map (fun p -> p, Serialize.select p props)
-
-            match selected |> List.tryFind (snd >> List.isEmpty) with
-            | Some(missing, _) -> Failed(PropertyNotFound(ObjectRef.format e.Ref, missing))
-            | None ->
-                let leaves = selected |> List.collect snd
-
-                if ctx.Json then
-                    Render.writeJson ctx.Out (Render.propertiesJson e leaves)
-                else
-                    match paths, leaves with
-                    // One exact property: print the bare value, for scripting.
-                    | [ p ], [ (leaf, value) ] when leaf = p -> ctx.Out.WriteLine(value)
-                    | _ ->
-                        for leaf, value in leaves do
-                            ctx.Out.WriteLine($"{leaf}: {value}")
-
-                Done
-
-let private parseKinds (tokens: string list) =
-    let kinds = parseList tokens |> List.map (fun t -> t, ObjectKind.tryParse t)
-
-    match kinds |> List.tryFind (fun (_, k) -> k.IsNone) with
-    | Some(bad, _) ->
-        let known = ObjectKind.all |> List.map ObjectKind.token |> String.concat ", "
-        Error $"unknown kind '{bad}' (known: {known})"
-    | None -> Ok(kinds |> List.choose snd)
-
-let private runFind (ctx: Ctx) (args: ParseResults<FindArgs>) =
-    let modelPath, text = args.GetResult FindArgs.Target
-
-    match parseKinds (args.GetResults FindArgs.Kind) with
-    | Error e -> UsageError e
-    | Ok kinds ->
-        let opts: Find.Options = {
-            Pattern = text
-            Regex = args.Contains FindArgs.Regex
-            CaseSensitive = args.Contains FindArgs.Case_Sensitive
-            Objects = {
-                Inventory.Filter.none with
-                    Kinds = kinds
-                    Tables = args.GetResults FindArgs.Table
-            }
-            Properties = parseList (args.GetResults FindArgs.In)
-        }
-
-        match ModelIO.loadPath modelPath |> Result.bind (fun (_, db) -> Find.search db opts) with
-        | Error e -> Failed e
-        | Ok hits ->
-            if ctx.Json then
-                Render.writeJson ctx.Out (Render.findJson hits)
-            else
-                Render.findText ctx.Out hits
-
-            if hits.IsEmpty then DoneWith ExitCode.findings else Done
-
-let private runDiff (ctx: Ctx) (args: ParseResults<DiffArgs>) =
-    let beforePath, afterPath = args.GetResult DiffArgs.Models
-
-    let opts: Diff.Options = {
-        Ignore = parseList (args.GetResults DiffArgs.Ignore)
-    }
-
-    let result =
-        ModelIO.loadPath beforePath
-        |> Result.bind (fun (_, a) -> ModelIO.loadPath afterPath |> Result.map (fun (_, b) -> a, b))
-
-    match result with
-    | Error e -> Failed e
-    | Ok(a, b) ->
-        let changes = Diff.compare opts a b
-
-        if ctx.Json then
-            Render.writeJson ctx.Out (Render.diffJson changes)
-        else
-            Render.diffText ctx.Out changes
-
-        if changes.IsEmpty then Done else DoneWith ExitCode.findings
-
-let private runDeps (ctx: Ctx) (args: ParseResults<DepsArgs>) =
-    let modelPath, selector = args.GetResult DepsArgs.Target
-    let depth = args.GetResult(DepsArgs.Depth, defaultValue = 1)
-
-    let directions =
-        match args.Contains DepsArgs.Depends_On, args.Contains DepsArgs.Referenced_By with
-        | true, false -> [ Deps.DependsOn ]
-        | false, true -> [ Deps.ReferencedBy ]
-        | _ -> [ Deps.DependsOn; Deps.ReferencedBy ]
-
-    if depth < 0 then
-        UsageError "--depth must be 0 (unlimited) or more"
-    else
-        let result =
-            ModelIO.loadPath modelPath
-            |> Result.bind (fun (_, db) ->
-                let g = Deps.build db
-                Inventory.Selector.resolve g.Entries selector |> Result.map (fun e -> g, e))
-
-        match result with
-        | Error e -> Failed e
-        | Ok(g, e) ->
-            let trees = directions |> List.map (fun d -> d, Deps.tree d depth g e.Ref)
-
-            if ctx.Json then
-                Render.writeJson ctx.Out (Render.depsJson e.Ref trees)
-            else
-                Render.depsText ctx.Out e.Ref trees
-
-            Done
-
-let private runConvert (ctx: Ctx) (args: ParseResults<ConvertArgs>) =
-    let source, destination = args.GetResult ConvertArgs.Paths
-
-    let format =
-        match args.TryGetResult ConvertArgs.Format with
-        | None -> Ok(ModelIO.OutputFormat.infer destination)
-        | Some f ->
-            ModelIO.OutputFormat.tryParse f
-            |> Option.map Ok
-            |> Option.defaultValue (Error $"unknown format '{f}' (expected bim, tmdl or pbip)")
-
-    // None = auto: decided once the source is resolved (see Eol.resolveAuto).
-    let eol =
-        match args.TryGetResult ConvertArgs.Eol |> Option.map (fun s -> s.ToLowerInvariant()) with
-        | None
-        | Some "auto" -> Ok None
-        | Some "lf" -> Ok(Some ModelIO.Lf)
-        | Some "crlf" -> Ok(Some ModelIO.CrLf)
-        | Some other -> Error $"unknown line ending '{other}' (expected auto, lf or crlf)"
-
-    let indent =
-        match args.TryGetResult ConvertArgs.Indent_Spaces with
-        | Some n when n < 1 || n > 16 -> Error "--indent-spaces must be between 1 and 16"
-        | other -> Ok other
-
-    match format, eol, indent with
-    | Error e, _, _
-    | _, Error e, _
-    | _, _, Error e -> UsageError e
-    | Ok format, Ok eol, Ok indent ->
-        let result =
-            ModelIO.loadPath source
-            |> Result.bind (fun (src, db) ->
-                let opts: ModelIO.SaveOptions = {
-                    Eol =
-                        eol
-                        |> Option.defaultWith (fun () -> ModelIO.Eol.resolveAuto src.Path destination)
-                    IncludeSensitive = args.Contains ConvertArgs.Include_Sensitive
-                    IndentSpaces = indent
-                }
-
-                ModelIO.save format opts (args.Contains ConvertArgs.Force) db destination
-                |> Result.map (fun saved -> src, saved))
-
-        match result with
-        | Error e -> Failed e
-        | Ok(src, saved) ->
-            if ctx.Json then
-                Render.writeJson ctx.Out (Render.convertJson src saved)
-            else
-                Render.convertText ctx.Out src saved
-
-            Done
+open Tessera.Cli.Common
+open Tessera.Cli.Output
 
 let private parser = lazy (ArgumentParser.Create<CliArgs>(programName = "tess"))
 
@@ -307,7 +17,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
 
     let usageError (message: string) =
         if jsonRequested then
-            Render.writeJson out (Render.errorJson "usage" message)
+            writeJson out (errorJson "usage" message)
         else
             err.WriteLine(message)
 
@@ -324,7 +34,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
 
         if results.Contains Version then
             if ctx.Json then
-                Render.writeJson out (Render.versionJson (version ()))
+                writeJson out (versionJson (version ()))
             else
                 out.WriteLine($"tess {version ()}")
 
@@ -332,13 +42,13 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
         else
             let outcome =
                 match results.TryGetSubCommand() with
-                | Some(Convert args) -> runConvert ctx args
-                | Some(Info args) -> runInfo ctx args
-                | Some(List args) -> runList ctx args
-                | Some(Get args) -> runGet ctx args
-                | Some(Find args) -> runFind ctx args
-                | Some(Diff args) -> runDiff ctx args
-                | Some(Deps args) -> runDeps ctx args
+                | Some(Convert args) -> ConvertCommand.run ctx args
+                | Some(Info args) -> InfoCommand.run ctx args
+                | Some(List args) -> ListCommand.run ctx args
+                | Some(Get args) -> GetCommand.run ctx args
+                | Some(Find args) -> FindCommand.run ctx args
+                | Some(Diff args) -> DiffCommand.run ctx args
+                | Some(Deps args) -> DepsCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with
@@ -347,7 +57,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
             | UsageError message -> usageError message
             | Failed e ->
                 if ctx.Json then
-                    Render.writeJson out (Render.tessErrorJson e)
+                    writeJson out (tessErrorJson e)
                 else
                     err.WriteLine($"tess: {TessError.message e}")
 
@@ -359,7 +69,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
     | :? ArguParseException as e -> usageError e.Message
     | e ->
         if jsonRequested then
-            Render.writeJson out (Render.errorJson "internal" e.Message)
+            writeJson out (errorJson "internal" e.Message)
         else
             err.WriteLine($"tess: internal error: {e}")
 

@@ -12,8 +12,17 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Output.fs" />
+    <Compile Include="Common.fs" />
+    <Compile Include="Commands/InfoCommand.fs" />
+    <Compile Include="Commands/ListCommand.fs" />
+    <Compile Include="Commands/GetCommand.fs" />
+    <Compile Include="Commands/FindCommand.fs" />
+    <Compile Include="Commands/DiffCommand.fs" />
+    <Compile Include="Commands/DepsCommand.fs" />
+    <Compile Include="Commands/ConvertCommand.fs" />
+    <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
-    <Compile Include="Render.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>

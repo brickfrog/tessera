@@ -191,7 +191,19 @@ Layout:
 
 - `src/Tessera.Core` holds the model logic and never prints anything. Commands return typed results and
   `TessError` values.
-- `src/Tessera.Cli` handles argument parsing (Argu) and text/JSON rendering.
+- `src/Tessera.Cli` handles argument parsing (Argu) and text/JSON rendering:
+  - `Output.fs` holds the JSON helpers.
+  - `Common.fs` holds exit codes, `Outcome`, `Ctx` and argument helpers.
+  - `Commands/<Name>Command.fs` holds one command each: its `summary`, `Args`, renderers and `run`.
+
+To add a command:
+1. Write the logic in Core, with tests.
+2. Add `src/Tessera.Cli/Commands/<Name>Command.fs`, following an existing command.
+3. Add it to `Tessera.Cli.fsproj`, before `Args.fs`.
+4. Add a case to `CliArgs` in `Args.fs`, plus its usage line (`<Name>Command.summary`).
+5. Add a dispatch line in `App.fs`.
+6. Put its CLI tests in `tests/Tessera.Tests/<Name>CommandTests.fs`, using `CliHarness` (`tess`, `json`,
+   `project`).
 
 ## Prior art
 

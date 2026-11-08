@@ -18,6 +18,7 @@
     <Compile Include="DiffTests.fs" />
     <Compile Include="DaxTests.fs" />
     <Compile Include="DepsTests.fs" />
+    <Compile Include="CliHarness.fs" />
     <Compile Include="CliTests.fs" />
     <Compile Include="SampleModelTests.fs" />
     <Compile Include="Main.fs" />
