@@ -30,6 +30,10 @@ type TessError =
     | ReadOnlyProperty of objectRef: string * path: string * reason: string
     /// `set`: a value the property can't take.
     | InvalidPropertyValue of objectRef: string * path: string * value: string * reason: string
+    /// `add` can't create this object here (e.g. a column of a calculated table).
+    | CannotAdd of objectRef: string * reason: string
+    /// No object matches, but some are named similarly.
+    | ObjectNotFoundSuggest of input: string * candidates: string list
 
 module TessError =
 
@@ -58,6 +62,8 @@ module TessError =
         | UnknownProperty _ -> "unknown-property"
         | ReadOnlyProperty _ -> "read-only-property"
         | InvalidPropertyValue _ -> "invalid-property-value"
+        | CannotAdd _ -> "cannot-add"
+        | ObjectNotFoundSuggest _ -> "object-not-found"
 
     let message =
         function
@@ -109,3 +115,7 @@ module TessError =
                 else first
 
             $"Can't set {path} on {objectRef} to '{shown}': {reason}"
+        | CannotAdd(objectRef, reason) -> $"Can't add {objectRef}: {reason}"
+        | ObjectNotFoundSuggest(input, candidates) ->
+            let list = candidates |> String.concat ", "
+            $"No object matches '{input}'; did you mean {list}?"

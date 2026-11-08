@@ -87,7 +87,9 @@ let private isFunctionName (s: string) =
     && not (s.EndsWith ".")
     && not (s.Contains "..")
 
-let private validateName (kind: ObjectKind) (name: string) =
+/// Check a name for an object of this kind: not empty, no surrounding whitespace or control
+/// characters; functions must be identifiers. Shared with `add`.
+let validateName (kind: ObjectKind) (name: string) =
     let invalid reason =
         Error(InvalidName(defaultArg (Option.ofObj name) "", reason))
 
@@ -134,6 +136,19 @@ let private siblings (entries: ObjectEntry list) (target: ObjectEntry) =
         not (obj.ReferenceEquals(e.Object, target.Object))
         && scopes
            |> List.exists (fun (kinds, inScope) -> List.contains e.Ref.Kind kinds && inScope e))
+
+/// The object a new object at `r` would clash with, case-insensitively: the same sibling rules as a
+/// rename. Shared with `add`.
+let collision (entries: ObjectEntry list) (r: ObjectRef) =
+    let placeholder = {
+        Ref = r
+        Object = null
+        IsHidden = None
+        Detail = None
+    }
+
+    siblings entries placeholder
+    |> List.tryFind (fun e -> eqCi (ObjectEntry.name e) (ObjectRef.name r))
 
 /// The ref an object (or one of its children) has after the target is renamed.
 let private mapRef (target: ObjectRef) (newRef: ObjectRef) (r: ObjectRef) =

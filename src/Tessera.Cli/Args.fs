@@ -19,6 +19,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Rename of ParseResults<RenameCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Bpa of ParseResults<BpaCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Set of ParseResults<SetCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -37,3 +38,4 @@ type CliArgs =
             | Rename _ -> RenameCommand.summary
             | Bpa _ -> BpaCommand.summary
             | Set _ -> SetCommand.summary
+            | Add _ -> AddCommand.summary

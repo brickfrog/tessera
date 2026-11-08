@@ -6,7 +6,7 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set` and `bpa` work.
+Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set`, `add` and `bpa` work.
 
 ## Install
 
@@ -51,6 +51,8 @@ tess rename ./MyReport.pbip "[Revenue]" "Net Revenue"          # preview: the re
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue" --save   # ... and write it back
 tess set   ./MyReport.pbip "[Revenue]" -p formatString='#,0.00' -p isHidden=true --save   # set properties
 tess get   ./MyReport.pbip "[Revenue]" --properties   # what `set` can write there, with types and values
+tess add   ./MyReport.pbip measure:Sales/Margin -e "[Revenue] - [Cost]" --save   # create an object
+tess add   ./MyReport.pbip relationship --from "'Sales'[DateKey]" --to "'Date'[DateKey]" --save
 tess bpa   ./MyReport.pbip                       # Best Practice Analyzer: built-in rules + the model's own
 tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE rule files, CI output
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
@@ -455,6 +457,117 @@ refers to a missing table, is shown along with the errors it introduces, and `--
 A relationship whose `fromColumn` or `toColumn` changes is shown as the same relationship, modified, under its new
 endpoints.
 
+
+### Adding objects (`add`)
+
+`tess add <model> <ref> [options]` creates one object. The [reference](#object-references) says what it is,
+where it goes and its name. `add` follows the [editing conventions](#editing-commands), so it is a dry run unless
+you pass `--save` or `--save-to`. A save is refused if the new object introduces errors, such as a measure whose
+DAX names a missing table, unless you pass `--force`.
+
+```sh
+tess add ./Sales.pbip measure:Sales/Margin -e "[Revenue] - [Cost]" --format-string "#,0" --save
+tess add ./Sales.pbip column:Sales/Profit -e "Sales[Amount] - Sales[Cost]"           # calculated column
+tess add ./Sales.pbip column:Sales/Region --data-type string --source-column region   # data column
+tess add ./Sales.pbip table:Budget -m "let Source = ... in Source" --mode import
+tess add ./Sales.pbip table:Numbers -e "GENERATESERIES(1, 10)"                        # calculated table
+tess add ./Sales.pbip "table:Time Intelligence" --calculation-group
+tess add ./Sales.pbip "calcitem:Time Intelligence/YTD" -e "CALCULATE(SELECTEDMEASURE(), DATESYTD('Date'[Date]))"
+tess add ./Sales.pbip hierarchy:Date/Calendar --levels Year,Quarter,Month
+tess add ./Sales.pbip level:Date/Calendar/Day --column Date
+tess add ./Sales.pbip relationship --from "'Sales'[DateKey]" --to "'Date'[DateKey]"
+tess add ./Sales.pbip role:Denmark --filter "'Customer'=Customer[Country] = \"DK\""
+tess add ./Sales.pbip perspective:Finance --include Sales --include "'Date'[Year]"
+tess add ./Sales.pbip culture:da-DK
+tess add ./Sales.pbip expression:Server -m '"localhost" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]'
+tess add ./Sales.pbip function:My.Double -e "(x: INT64) => x * 2"
+tess add ./Sales.pbip "partition:Sales/Sales 2024" -m "let Source = ... in Source"
+cat margin.dax | tess add ./Sales.pbip measure:Sales/Margin -e - --save            # DAX from stdin
+```
+
+| Kind | Needs | Optional |
+|---|---|---|
+| `measure:T/N` | `-e <DAX>` | `--format-string`, `--display-folder`, `--description`, `--hidden` |
+| `column:T/N` | `-e <DAX>` (calculated), or `--data-type <type>` (data column) | `--source-column` (data; default: the column's name), `--format-string`, `--display-folder`, `--description`, `--hidden` |
+| `table:N` | one of `-e <DAX>` (calculated), `-m <M>` (Power Query) or `--calculation-group` | `--mode` (M), `--precedence` and `--column` (calculation group), `--description`, `--hidden` |
+| `hierarchy:T/N` | `--levels <col,col,...>`, top level first | `--display-folder`, `--description`, `--hidden` |
+| `level:T/H/N` | | `--column` (default: the column named like the level), `--ordinal`, `--description` |
+| `calcitem:T/N` | `-e <DAX>` | `--format-string-expression <DAX>`, `--ordinal`, `--description` |
+| `relationship[:N]` | `--from <column> --to <column>` | `--cardinality`, `--cross-filter`, `--inactive` |
+| `role:N` | | `--permission`, `--filter 'Table'=<DAX>` (repeatable), `--description` |
+| `perspective:N` | | `--include <object>` (repeatable), `--description` |
+| `culture:N` | | |
+| `expression:N` | `-m <M>` | `--description` |
+| `function:N` | `-e <DAX>` | `--description`, `--hidden` |
+| `partition:T/N` | `-m <M>` | `--mode`, `--description` |
+
+An option a kind doesn't take, such as `--levels` on a measure, is a usage error. `-e -` or `-m -` reads the
+expression from stdin, without its trailing line break. Only one option per command can read stdin.
+
+Values:
+- `--data-type`: `string`, `int64`, `double`, `decimal`, `datetime`, `boolean` or `binary`.
+- `--mode`: `import`, `directquery` or `dual`.
+- `--cardinality`: `many-to-one`, `one-to-one` or `many-to-many`. `--from` is the many side.
+- `--cross-filter`: `single` or `both`.
+- `--permission`: `read`, `readrefresh`, `refresh`, `administrator` or `none`.
+
+Wherever `add` takes an object (`--from`, `--to`, `--include`), any form `get` accepts works. `--include` takes
+tables, columns, measures and hierarchies, one per option. `--levels` splits on commas, so for a column whose name
+contains one, add that level with `add level:T/H/N --column <name>`. DAX that starts with `-` or `--` works as a separate argument
+(`-e "-- comment ..."`). The `--expression=<value>` form isn't supported.
+
+What new objects get (Power BI Desktop's defaults, where the spaceparts-analytics sample shows them):
+- **Lineage tags:** a fresh `lineageTag` (a lowercase GUID) on every table, column, measure, hierarchy, level,
+  named expression and function.
+- **Data columns:** `summarizeBy: sum` for `int64`, `double` and `decimal`, otherwise `none`, plus the annotation
+  `SummarizationSetBy = Automatic`. The source column defaults to the column's name.
+- **Tables:** an M or calculated table gets one partition named after it, with `mode: import` unless you pass
+  `--mode`. An M table starts with no columns: add data columns, or let Power BI read them from the query on refresh.
+  A calculated table's columns are inferred by the engine.
+- **Calculation groups:** tess's own default, the shape Tabular Editor uses: a `Name` column (rename it with
+  `--column`) sorted by a hidden `Ordinal` column, and a `calculationGroup` partition with no explicit mode. The precedence is one more than the highest in the model, unless you pass
+  `--precedence`. A new group has no calculation items. If the model doesn't have `discourageImplicitMeasures`
+  set, `add` sets it, since calculation groups require it, and the change shows on `model`.
+- **Levels and calculation items** are added last, unless you pass `--ordinal` (0 is first). The items after the
+  new one move down a place.
+- **Relationships:**
+  - The name is a new GUID, as in Power BI. Write `relationship:<name>` to choose one, or just `relationship` for the
+    GUID.
+  - The defaults are many-to-one, a single cross-filter direction, and active. One-to-one relationships default to
+    `both`, as in Desktop.
+  - If an active relationship already joins the same two tables, the new one is made inactive, as Desktop does,
+    and `add` warns. Use it with `USERELATIONSHIP`. Other ambiguous paths, through third tables, aren't detected.
+  - Columns of different data types are added, with a warning.
+- **Roles** have `read` permission unless you pass `--permission`.
+- **Partitions** take the mode of the table's existing partitions.
+- **Power BI's `PBI_QueryOrder`** model annotation, if present, lists a new M table or named expression at the end.
+
+Names are checked as [`rename`](#renaming-rename) checks them: no empty names, no leading or trailing spaces, no
+control characters. Function names must be identifiers. Taken names are refused, case-insensitively: by a column,
+measure or hierarchy in the same table, by any measure (for a measure), by any table or calendar (for a table), by
+any function (for a function), or by a sibling otherwise. A table and a named expression can't share a name,
+because both are Power Query queries. Cultures must be specific culture names, such as `da-DK`, and are written in
+their canonical case. The table, hierarchy or column an object goes into must exist. Names match case-insensitively,
+and the new reference uses the real name, so `measure:sales/X` adds `measure:Sales/X`. If nothing matches, `add`
+suggests close names.
+
+`add` refuses:
+- columns in calculated tables, because their columns come from the DAX, and in calculation groups, whose columns
+  are fixed
+- a second partition for a calculated table or a calculation group, or an M partition in a table whose partitions
+  have another source type
+- calculation items outside calculation groups, and a level on a column that's already in the hierarchy
+- relationships from a table to itself, or over columns another relationship already joins (in either direction)
+- calculation groups below compatibility level 1470, calculation item ordinals below 1500, and functions below 1702
+- data sources and calendars, which `add` doesn't create
+
+**`--if-not-exists`:** if an object with that reference already exists, in any case, `add` does nothing, notes
+it, and exits 0. For a relationship, an existing relationship over the same columns counts too. A different kind
+of object holding the name is still a collision.
+
+Not supported: column data types for calculated columns (inferred), KPIs, detail rows, translations, role members,
+object-level security, and the Power Query parameter metadata of named expressions (write the `meta [...]` record
+in the M yourself).
 ### Best Practice Analyzer (`bpa`)
 
 `bpa` checks a model against Best Practice Analyzer rules in Tabular Editor's JSON format. Existing TE2/TE3
@@ -688,6 +801,8 @@ the code as its title.
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
 | 2 | usage error (including an invalid new name for `rename`, or a property `set` can't write or a value it can't take) |
 | 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references) |
+| 2 | usage error (including an invalid new name for `rename` or `add`, and an option `add` doesn't take for that kind) |
+| 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references; for `add`, a name that's taken, a missing parent, or an object `add` can't create there) |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |
 

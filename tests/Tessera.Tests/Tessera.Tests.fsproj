@@ -24,12 +24,14 @@
     <Compile Include="BpaTests.fs" />
     <Compile Include="MutationTests.fs" />
     <Compile Include="SetTests.fs" />
+    <Compile Include="AddTests.fs" />
     <Compile Include="CliHarness.fs" />
     <Compile Include="ValidateCommandTests.fs" />
     <Compile Include="CliTests.fs" />
     <Compile Include="InitCommandTests.fs" />
     <Compile Include="RenameCommandTests.fs" />
     <Compile Include="SetCommandTests.fs" />
+    <Compile Include="AddCommandTests.fs" />
     <Compile Include="BpaCommandTests.fs" />
     <Compile Include="SampleModelTests.fs" />
     <Compile Include="Main.fs" />

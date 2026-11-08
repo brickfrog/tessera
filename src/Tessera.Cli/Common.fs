@@ -40,6 +40,8 @@ module ExitCode =
         | UnknownProperty _
         | ReadOnlyProperty _
         | InvalidPropertyValue _ -> usage
+        | CannotAdd _
+        | ObjectNotFoundSuggest _ -> input
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()
