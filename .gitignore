@@ -1,0 +1,15 @@
+bin/
+obj/
+artifacts/
+TestResults/
+*.user
+.vs/
+.idea/
+.vscode/
+.ionide/
+*.swp
+
+# Power BI machine-local files (if sample models are ever dropped in here)
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+**/*.abf

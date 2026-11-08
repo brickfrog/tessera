@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Tessera</RootNamespace>
+    <Description>Core library for tessera: load, inspect and save Power BI / Analysis Services semantic models.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Errors.fs" />
+    <Compile Include="ObjectRef.fs" />
+    <Compile Include="Pbip.fs" />
+    <Compile Include="ModelSource.fs" />
+    <Compile Include="ModelIO.fs" />
+    <Compile Include="Inventory.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AnalysisServices" Version="19.118.3" />
+  </ItemGroup>
+
+</Project>
