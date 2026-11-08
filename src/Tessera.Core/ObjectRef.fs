@@ -79,6 +79,26 @@ module ObjectKind =
         |> List.tryFind (fun k -> token k = s)
         |> Option.orElse (aliases |> List.tryFind (fun (a, _) -> a = s) |> Option.map snd)
 
+    /// PascalCase type name, as the Tabular Editor CLI's JSON uses (Measure, NamedExpression, ...).
+    let typeName =
+        function
+        | ObjectKind.Model -> "Model"
+        | ObjectKind.Table -> "Table"
+        | ObjectKind.Column -> "Column"
+        | ObjectKind.Measure -> "Measure"
+        | ObjectKind.Hierarchy -> "Hierarchy"
+        | ObjectKind.Level -> "Level"
+        | ObjectKind.Partition -> "Partition"
+        | ObjectKind.CalculationItem -> "CalculationItem"
+        | ObjectKind.Calendar -> "Calendar"
+        | ObjectKind.Relationship -> "Relationship"
+        | ObjectKind.Role -> "Role"
+        | ObjectKind.Perspective -> "Perspective"
+        | ObjectKind.Culture -> "Culture"
+        | ObjectKind.Expression -> "NamedExpression"
+        | ObjectKind.Function -> "Function"
+        | ObjectKind.DataSource -> "DataSource"
+
     /// How many name segments a reference of this kind carries.
     /// e.g. a measure is addressed by table and measure name: measure:Sales/Total
     let arity =

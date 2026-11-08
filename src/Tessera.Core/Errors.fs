@@ -22,6 +22,8 @@ type TessError =
     | RenameConflict of objectRef: string * newName: string * details: string list
     /// A Best Practice Analyzer rule file that can't be read as rules.
     | InvalidRules of path: string * reason: string
+    /// An edit would leave the model with errors it didn't have (save refused without --force).
+    | ChangeIntroducesErrors of count: int
 
 module TessError =
 
@@ -46,6 +48,7 @@ module TessError =
         | UnsupportedRename _ -> "unsupported-rename"
         | RenameConflict _ -> "rename-conflict"
         | InvalidRules _ -> "invalid-rules"
+        | ChangeIntroducesErrors _ -> "change-introduces-errors"
 
     let message =
         function
@@ -74,3 +77,6 @@ module TessError =
             let list = details |> List.map (fun d -> $"  {d}") |> String.concat "\n"
             $"Renaming {objectRef} to '{newName}' would change what other references mean:\n{list}"
         | InvalidRules(path, reason) -> $"Invalid BPA rules in {path}: {reason}"
+        | ChangeIntroducesErrors n ->
+            let errors = if n = 1 then "1 error" else $"{n} errors"
+            $"Not saved: the change introduces {errors} (see above; use --force to save anyway)"

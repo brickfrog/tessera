@@ -77,10 +77,13 @@ type Change = {
 type Options = {
     /// Property-path globs to leave out of the comparison (see Serialize.pathGlob).
     Ignore: string list
+    /// Renames the caller already knows about (old ref, new ref), e.g. from the edit that made
+    /// them; paired even without lineage tags. A renamed table's children follow it.
+    KnownRenames: (ObjectRef * ObjectRef) list
 }
 
 module Options =
-    let none = { Ignore = [] }
+    let none = { Ignore = []; KnownRenames = [] }
 
 type Summary = {
     Added: int
@@ -194,9 +197,62 @@ let private renames (a: Side) (b: Side) (removed: ObjectEntry list) (added: Obje
     let removedByTag =
         tagged a removed |> List.filter (fun (k, _) -> okA.Contains k) |> Map.ofList
 
-    tagged b added
-    |> List.filter (fun (k, _) -> okB.Contains k)
-    |> List.choose (fun (k, after) -> Map.tryFind k removedByTag |> Option.map (fun before -> before, after))
+    let byTag =
+        tagged b added
+        |> List.filter (fun (k, _) -> okB.Contains k)
+        |> List.choose (fun (k, after) -> Map.tryFind k removedByTag |> Option.map (fun before -> before, after))
+
+    byTag
+
+/// Where a known rename sends a reference: the renamed object itself, or (for a renamed table) any
+/// object inside it, whose first path segment is the table name.
+let private renamedTo (known: (ObjectRef * ObjectRef) list) (r: ObjectRef) =
+    known
+    |> List.tryPick (fun (oldRef, newRef) ->
+        if r = oldRef then
+            Some newRef
+        else
+            match oldRef.Kind, oldRef.Path, newRef.Path, r.Path with
+            | ObjectKind.Table, [ oldTable ], [ newTable ], head :: rest when
+                head = oldTable && r.Kind <> ObjectKind.Table
+                ->
+                Some { r with Path = newTable :: rest }
+            | _ -> None)
+
+/// Pair removed with added objects, in three passes:
+///   1. known renames (and the very same reference under a new key, e.g. a relationship whose
+///      table was renamed);
+///   2. unique lineage tags;
+///   3. children of any table renamed in 1-2, which follow their table even without tags.
+let private allRenames (opts: Options) (a: Side) (b: Side) (removed: ObjectEntry list) (added: ObjectEntry list) =
+    let pairBy (mapping: (ObjectRef * ObjectRef) list) (sameRef: bool) (removed: ObjectEntry list) added =
+        let addedByRef = added |> List.map (fun (e: ObjectEntry) -> e.Ref, e) |> Map.ofList
+
+        removed
+        |> List.choose (fun (before: ObjectEntry) ->
+            renamedTo mapping before.Ref
+            |> Option.orElse (if sameRef then Some before.Ref else None)
+            |> Option.bind (fun target -> Map.tryFind target addedByRef)
+            |> Option.map (fun after -> before, after))
+
+    let without (pairs: (ObjectEntry * ObjectEntry) list) (removed: ObjectEntry list) (added: ObjectEntry list) =
+        let before = pairs |> List.map (fun (x, _) -> x.Ref) |> Set.ofList
+        let after = pairs |> List.map (fun (_, y) -> y.Ref) |> Set.ofList
+
+        removed |> List.filter (fun e -> not (before.Contains e.Ref)),
+        added |> List.filter (fun e -> not (after.Contains e.Ref))
+
+    let first = pairBy opts.KnownRenames true removed added
+    let removed, added = without first removed added
+    let tagged = renames a b removed added
+    let removed, added = without tagged removed added
+
+    let tableRenames =
+        first @ tagged
+        |> List.filter (fun (x, _) -> x.Ref.Kind = ObjectKind.Table)
+        |> List.map (fun (x, y) -> x.Ref, y.Ref)
+
+    first @ tagged @ pairBy tableRenames false removed added
 
 let compare (opts: Options) (before: Database) (after: Database) : Change list =
     let a = side before
@@ -207,7 +263,7 @@ let compare (opts: Options) (before: Database) (after: Database) : Change list =
         a.Entries |> List.filter (fun e -> not (b.Keys.ContainsKey(keyFor a e)))
 
     let added = b.Entries |> List.filter (fun e -> not (a.Keys.ContainsKey(keyFor b e)))
-    let renamePairs = renames a b removed added
+    let renamePairs = allRenames opts a b removed added
     let renamedFrom = renamePairs |> List.map (fst >> keyFor a) |> Set.ofList
     let renamedTo = renamePairs |> List.map (fun (x, y) -> keyFor b y, x) |> Map.ofList
 
@@ -217,6 +273,19 @@ let compare (opts: Options) (before: Database) (after: Database) : Change list =
 
             match Map.tryFind k a.Keys, Map.tryFind k renamedTo with
             | Some old, _ ->
+                let changes = propertyChanges (props opts a old) (props opts b e)
+
+                if not changes.IsEmpty then
+                    yield {
+                        Kind = Modified
+                        Before = Some old.Ref
+                        After = Some e.Ref
+                        Label = label b e
+                        Properties = changes
+                    }
+            // Same reference, different key (a relationship whose table was renamed): the same
+            // object, modified, not a rename.
+            | None, Some old when old.Ref = e.Ref ->
                 let changes = propertyChanges (props opts a old) (props opts b e)
 
                 if not changes.IsEmpty then

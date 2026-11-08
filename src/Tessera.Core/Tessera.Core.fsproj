@@ -24,6 +24,8 @@
     <Compile Include="BpaDaxToken.fs" />
     <Compile Include="BpaObjects.fs" />
     <Compile Include="Bpa.fs" />
+    <Compile Include="ChangeSet.fs" />
+    <Compile Include="Mutation.fs" />
   </ItemGroup>
 
   <ItemGroup>

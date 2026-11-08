@@ -32,6 +32,7 @@ module ExitCode =
         | UnsupportedRename _
         | RenameConflict _ -> input
         | InvalidRules _ -> input
+        | ChangeIntroducesErrors _ -> findings
         | DestinationNotEmpty _
         | SaveFailed _ -> output
         | InvalidPattern _

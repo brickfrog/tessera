@@ -147,10 +147,57 @@ let tests =
             m.Annotations.Add(new Annotation(Name = "PBI_FormatHint", Value = "{}"))
 
             let opts = {
-                Ignore = [ "formatString"; "annotations.PBI_*" ]
+                Diff.Options.none with
+                    Ignore = [ "formatString"; "annotations.PBI_*" ]
             }
 
             Expect.isEmpty (compare opts (sampleDatabase ()) after) ""
+
+        testCase "known renames pair without lineage tags, and a renamed table's children follow"
+        <| fun () ->
+            let after = sampleDatabase ()
+            after.Model.Tables.["Sales"].Name <- "Fact Sales"
+
+            let opts = {
+                Options.none with
+                    KnownRenames = [ ObjectRef.table "Sales", ObjectRef.table "Fact Sales" ]
+            }
+
+            let cs = compare opts (sampleDatabase ()) after
+            Expect.isFalse (cs |> List.exists (fun c -> c.Kind = Added || c.Kind = Removed)) "no add/remove pairs"
+
+            let renamed =
+                cs |> List.filter (fun c -> c.Kind = Renamed) |> List.map (fun c -> c.Label)
+
+            Expect.contains renamed "table:Sales -> table:Fact Sales" ""
+            Expect.contains renamed "measure:Sales/Total -> measure:Fact Sales/Total" ""
+            Expect.contains renamed "column:Sales/Amount -> column:Fact Sales/Amount" ""
+
+        testCase "a relationship keyed by endpoints whose table was renamed is modified, not added + removed"
+        <| fun () ->
+            let tag (db: Database) =
+                db.Model.Tables.["Date"].LineageTag <- "tag-date"
+
+            let before = sampleDatabase ()
+            tag before
+            let after = sampleDatabase ()
+            tag after
+            after.Model.Tables.["Date"].Name <- "Calendar"
+            let cs = compare Options.none before after
+
+            let rel =
+                cs
+                |> List.find (fun c -> c.After |> Option.exists (fun r -> r.Kind = ObjectKind.Relationship))
+
+            Expect.equal rel.Kind Modified ""
+            Expect.equal rel.Label "relationship:Sales[DateKey] -> Calendar[DateKey]" ""
+            // And the table's untagged children follow its (lineage-tag) rename.
+            Expect.isFalse (cs |> List.exists (fun c -> c.Kind = Added || c.Kind = Removed)) "no adds or removes"
+
+            Expect.contains
+                (cs |> List.filter (fun c -> c.Kind = Renamed) |> List.map (fun c -> c.Label))
+                "level:Date/Calendar/Year -> level:Calendar/Calendar/Year"
+                ""
 
         testCase "a table with its children removed"
         <| fun () ->

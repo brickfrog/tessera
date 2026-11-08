@@ -47,7 +47,8 @@ tess deps  ./MyReport.pbip "[Gross Margin %]"     # what it uses, and what uses 
 tess deps  ./MyReport.pbip "Date[Date]" --referenced-by --depth 0
 tess validate ./MyReport.pbip                     # broken references, cycles, ... (exit 1 on errors)
 tess validate ./model.bim --fail-on warning --rule unresolved-reference --json
-tess rename ./MyReport.pbip "[Revenue]" "Net Revenue" --dry-run   # rename, rewriting every DAX reference
+tess rename ./MyReport.pbip "[Revenue]" "Net Revenue"          # preview: the rename + every DAX reference it fixes
+tess rename ./MyReport.pbip "[Revenue]" "Net Revenue" --save   # ... and write it back
 tess bpa   ./MyReport.pbip                       # Best Practice Analyzer: built-in rules + the model's own
 tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE rule files, CI output
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
@@ -184,7 +185,23 @@ How objects are matched:
   GUIDs in Power BI.
 - A removed and an added object of the same kind that share a `lineageTag` are reported as a rename, with any
   other property changes listed under it.
-- Renaming a table renames every child's reference, so children that have lineage tags show up as renames too.
+- When a table is renamed, its columns, measures, levels and partitions follow it, even without lineage tags.
+  So does a relationship into it: same relationship, new endpoints, so it shows as modified.
+
+`--stat` prints one line per changed object, and `--name-only` just their references. `--json` writes the
+change set:
+
+```json
+{ "command": "diff", "summary": { "created": 0, "deleted": 0, "modified": 1, "moved": 1, "total": 2 },
+  "changes": [ { "objectPath": "measure:Sales/Net Revenue", "objectType": "Measure", "changeKind": "moved",
+                 "movedFromObjectPath": "measure:Sales/Revenue", "label": "...", "properties": [] },
+               { "objectPath": "measure:Sales/Margin", "objectType": "Measure", "changeKind": "modified",
+                 "label": "measure:Sales/Margin",
+                 "properties": [ { "property": "expression", "before": "...", "after": "..." } ] } ] }
+```
+
+`changeKind` is `created`, `deleted`, `modified` or `moved` (renamed). The editing commands use the same shape,
+the one the Tabular Editor CLI uses.
 
 What is compared:
 - Properties are compared using the same paths as `get -p`. `--ignore` takes path wildcards, e.g.
@@ -246,13 +263,36 @@ Options:
 
 `--json` writes the [findings envelope](#findings-json-and-ci-annotations), with `"valid": false` when there are
 errors. `--ci github|azdo` also writes CI annotations to stderr.
+### Editing commands
+
+`rename` (and the coming `set`, `add`, `remove` and `move`) follow one set of conventions, the same as the
+Tabular Editor CLI's.
+
+**Saving:**
+- **A dry run by default.** The command shows what would change and writes nothing; stderr says
+  `Dry run - nothing saved. Add --save to persist.`
+- **`--save`** writes the model back in place: its own format, location and line endings, with restricted
+  information kept.
+- **`--save-to <path>`** writes elsewhere, like `convert` (add `--force` to overwrite a non-empty destination).
+
+**Output:**
+- The change as a line diff, like `diff`.
+- `--stat` prints one line per object.
+- `--name-only` prints just the changed references.
+- Notes and warnings go to stderr, so stdout is only the change.
+- `--json` writes the change set (see `diff`) plus `dryRun`, `introducedErrors` (findings), `warnings`, `notes`
+  and `saved` (the format and path written, or `null`).
+
+**Safety:** a change that introduces new errors is shown, but `--save` refuses it (exit 1) unless `--force`.
+The checks are the `validate` rules an edit can break: unresolved and circular references, duplicate names,
+invalid tokens, and TOM's validation. Errors the model already had don't count, even on an object the edit
+renamed.
+
 ### Renaming (`rename`)
 
 `tess rename <model> <object> <new name>` renames an object and rewrites every DAX reference to it. Only the
-reference tokens change; every other character of every expression stays as it was. `--dry-run` prints the plan
-(each edited expression as a line diff, like `diff`) and writes nothing. Otherwise the model is saved in place, in
-its own format and line endings, keeping restricted information; `--output <path>` writes elsewhere instead,
-like `convert` (add `--force` to overwrite).
+reference tokens change; every other character of every expression stays as it was. It follows the
+[editing conventions](#editing-commands): a dry run unless `--save` or `--save-to`.
 
 What is rewritten, in all the DAX `deps` reads, resolved the same way (`VAR`s and parameters shadow tables):
 
@@ -522,7 +562,7 @@ the code as its title.
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`) |
+| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
 | 2 | usage error (including an invalid new name for `rename`) |
 | 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references) |
 | 4 | output error (destination not empty, write failed) |

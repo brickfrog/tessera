@@ -22,6 +22,7 @@
     <Compile Include="ValidateTests.fs" />
     <Compile Include="RenameTests.fs" />
     <Compile Include="BpaTests.fs" />
+    <Compile Include="MutationTests.fs" />
     <Compile Include="CliHarness.fs" />
     <Compile Include="ValidateCommandTests.fs" />
     <Compile Include="CliTests.fs" />

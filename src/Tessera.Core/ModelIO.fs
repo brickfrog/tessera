@@ -392,3 +392,34 @@ let save (format: OutputFormat) (opts: SaveOptions) (force: bool) (db: Database)
         | BimFile -> saveBim opts db destination
         | TmdlFolder -> saveTmdl opts db destination
         | PbipFolder -> savePbip opts db destination
+
+/// Where an in-place save of a loaded model goes: back to its own format and location (a .bim inside
+/// a PBIP folder stays a .bim).
+let inPlace (source: ModelSource) =
+    match source.Format, source.SemanticModelFolder with
+    | Bim, _ -> BimFile, source.Path
+    | Tmdl, Some folder -> PbipFolder, folder
+    | Tmdl, None -> TmdlFolder, source.Path
+
+/// Save a model back where it came from: same format and line endings, restricted information kept
+/// (it's the user's own model, not an export).
+let saveBack (source: ModelSource) (db: Database) =
+    let format, destination = inPlace source
+
+    let opts = {
+        SaveOptions.defaults with
+            Eol = Eol.resolveAuto source.Path destination
+            IncludeSensitive = true
+    }
+
+    save format opts true db destination
+
+/// Save a model somewhere else, like `convert` (format inferred from the path, restricted information
+/// stripped, a non-empty destination only with force).
+let saveTo (source: ModelSource) (force: bool) (db: Database) (destination: string) =
+    let opts = {
+        SaveOptions.defaults with
+            Eol = Eol.resolveAuto source.Path destination
+    }
+
+    save (OutputFormat.infer destination) opts force db destination

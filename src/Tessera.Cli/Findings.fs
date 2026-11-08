@@ -52,24 +52,7 @@ type Finding = {
 }
 
 /// PascalCase object types, one per ObjectKind.
-let objectType =
-    function
-    | ObjectKind.Model -> "Model"
-    | ObjectKind.Table -> "Table"
-    | ObjectKind.Column -> "Column"
-    | ObjectKind.Measure -> "Measure"
-    | ObjectKind.Hierarchy -> "Hierarchy"
-    | ObjectKind.Level -> "Level"
-    | ObjectKind.Partition -> "Partition"
-    | ObjectKind.CalculationItem -> "CalculationItem"
-    | ObjectKind.Calendar -> "Calendar"
-    | ObjectKind.Relationship -> "Relationship"
-    | ObjectKind.Role -> "Role"
-    | ObjectKind.Perspective -> "Perspective"
-    | ObjectKind.Culture -> "Culture"
-    | ObjectKind.Expression -> "NamedExpression"
-    | ObjectKind.Function -> "Function"
-    | ObjectKind.DataSource -> "DataSource"
+let objectType = ObjectKind.typeName
 
 /// A finding about an object, with its name, type and path filled in from the reference.
 let about (r: ObjectRef) severity source code message = {
