@@ -26,7 +26,10 @@ module ExitCode =
         | InvalidPbip _
         | RemoteModelReference _
         | LoadFailed _
-        | InvalidObjectRef _ -> input
+        | InvalidObjectRef _
+        | ObjectNotFound _
+        | AmbiguousObject _
+        | PropertyNotFound _ -> input
         | DestinationNotEmpty _
         | SaveFailed _ -> output
 
@@ -93,6 +96,58 @@ let private runList (ctx: Ctx) (args: ParseResults<ListArgs>) =
                 Render.listText ctx.Out entries
 
             Done
+
+let private runGet (ctx: Ctx) (args: ParseResults<GetArgs>) =
+    let modelPath, selector = args.GetResult GetArgs.Target
+    let children = args.Contains GetArgs.Children
+    let wanted = args.GetResults GetArgs.Property
+
+    let result =
+        ModelIO.loadPath modelPath
+        |> Result.bind (fun (_, db) ->
+            Inventory.Selector.resolve (Inventory.objects db) selector
+            |> Result.map (fun e -> db, e))
+
+    match result with
+    | Error e -> Failed e
+    | Ok(db, e) ->
+        let json = Serialize.objectJson db children e.Object
+
+        match wanted with
+        | [] ->
+            if ctx.Json then
+                Render.writeJson ctx.Out (Render.getJson e json)
+            else
+                ctx.Out.Write(Serialize.objectTmdl children e.Object)
+
+            Done
+        | paths ->
+            let props =
+                let own = Serialize.flatten json
+
+                if e.Ref.Kind = ObjectKind.Model then
+                    ("compatibilityLevel", string db.CompatibilityLevel) :: own
+                else
+                    own
+
+            let selected = paths |> List.map (fun p -> p, Serialize.select p props)
+
+            match selected |> List.tryFind (snd >> List.isEmpty) with
+            | Some(missing, _) -> Failed(PropertyNotFound(ObjectRef.format e.Ref, missing))
+            | None ->
+                let leaves = selected |> List.collect snd
+
+                if ctx.Json then
+                    Render.writeJson ctx.Out (Render.propertiesJson e leaves)
+                else
+                    match paths, leaves with
+                    // One exact property: print the bare value, for scripting.
+                    | [ p ], [ (leaf, value) ] when leaf = p -> ctx.Out.WriteLine(value)
+                    | _ ->
+                        for leaf, value in leaves do
+                            ctx.Out.WriteLine($"{leaf}: {value}")
+
+                Done
 
 let private runConvert (ctx: Ctx) (args: ParseResults<ConvertArgs>) =
     let source, destination = args.GetResult ConvertArgs.Paths
@@ -185,6 +240,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Convert args) -> runConvert ctx args
                 | Some(Info args) -> runInfo ctx args
                 | Some(List args) -> runList ctx args
+                | Some(Get args) -> runGet ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with

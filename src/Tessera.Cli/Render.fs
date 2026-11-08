@@ -140,6 +140,19 @@ let listText (out: TextWriter) (entries: ObjectEntry list) =
         | [] -> out.WriteLine(ObjectRef.format e.Ref)
         | xs -> out.WriteLine(ObjectRef.format e.Ref + "  " + String.concat "  " xs)
 
+// ---- get -------------------------------------------------------------------
+
+let private refFields (e: ObjectEntry) = [
+    "ref", str (ObjectRef.format e.Ref)
+    "kind", str (ObjectKind.token e.Ref.Kind)
+]
+
+let getJson (e: ObjectEntry) (objectJson: string) =
+    obj (refFields e @ [ "object", JsonNode.Parse objectJson ])
+
+let propertiesJson (e: ObjectEntry) (leaves: (string * string) list) =
+    obj (refFields e @ [ "properties", obj [ for p, v in leaves -> p, str v ] ])
+
 // ---- convert -----------------------------------------------------------------
 
 let convertJson (source: ModelSource) (saved: ModelIO.SavedModel) =

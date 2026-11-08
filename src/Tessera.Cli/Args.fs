@@ -46,6 +46,21 @@ type ListArgs =
             | Table _ -> "only objects in this table (repeatable)."
             | Name _ -> "only objects whose name matches this wildcard (* and ?), case-insensitive."
 
+type GetArgs =
+    | [<MainCommand; ExactlyOnce>] Target of model: string * object: string
+    | [<AltCommandLine("-p")>] Property of path: string
+    | Children
+
+    interface IArgParserTemplate with
+        member this.Usage =
+            match this with
+            | Target _ ->
+                "model path, and the object: a ref (measure:Sales/Total), DAX style ('Sales'[Total], [Total]) "
+                + "or a bare name."
+            | Property _ ->
+                "print just this property (repeatable), e.g. expression, source.expression, annotations.PBI_FormatHint."
+            | Children -> "include child objects (a table's columns, measures, ...)."
+
 [<HelpFlags("--help", "-h")>]
 type CliArgs =
     | [<Inherit; AltCommandLine("-j")>] Json
@@ -53,6 +68,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Convert of ParseResults<ConvertArgs>
     | [<CliPrefix(CliPrefix.None)>] Info of ParseResults<InfoArgs>
     | [<CliPrefix(CliPrefix.None)>] List of ParseResults<ListArgs>
+    | [<CliPrefix(CliPrefix.None)>] Get of ParseResults<GetArgs>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -62,3 +78,4 @@ type CliArgs =
             | Convert _ -> "convert a model between .bim, TMDL and PBIP."
             | Info _ -> "summarise a model."
             | List _ -> "list the objects in a model."
+            | Get _ -> "show one object (TMDL, or its JSON with --json)."

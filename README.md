@@ -4,7 +4,7 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `convert`, `info` and `list` work. See the roadmap below.
+Status: early. `convert`, `info`, `list` and `get` work.
 
 ## Usage
 
@@ -12,6 +12,9 @@ Status: early. `convert`, `info` and `list` work. See the roadmap below.
 tess info  ./MyReport.pbip                       # summary: compatibility level, object counts
 tess list  ./MyReport.pbip -k measure -t Sales   # one object reference per line
 tess list  ./model.bim --name '*Margin*' --json  # machine-readable
+tess get   ./MyReport.pbip "[Total Sales]"         # one object, as TMDL
+tess get   ./MyReport.pbip "'Sales'[Total]" -p expression   # just the DAX
+tess get   ./MyReport.pbip Sales --json          # TOM JSON (add --children for columns etc.)
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
 tess convert ./Sales.SemanticModel ./model.bim   # PBIP -> .bim
 tess convert ./tmdl ./tmdl --force                # re-serialize in place (keeps its line endings)
@@ -65,6 +68,31 @@ calendar:Date/Fiscal           relationship:<name>          role:Readers
 perspective:Sales View         culture:da-DK                expression:ServerName
 function:DaxLib.Format         datasource:SQL
 ```
+
+### Pointing at objects
+
+Commands that take an object accept any of these forms:
+
+| Form | Example | Resolves to |
+|---|---|---|
+| reference | `measure:Sales/Total` | exactly that object |
+| DAX, qualified | `'Sales'[Total]`, `Sales[Total]` | the column, measure or hierarchy with that name in that table |
+| DAX, unqualified | `[Total]` | the measure with that name; failing that, a uniquely named column or hierarchy |
+| bare name | `Sales`, `Readers` | the table with that name; failing that, any uniquely named object |
+
+Names match exact-case first, then case-insensitively, since Tabular treats names case-insensitively. Inside
+DAX quoting, `''` escapes a quote and `]]` escapes a bracket. If more than one object matches, tess lists the
+candidates.
+
+### Property paths
+
+`get -p` takes paths into an object's TOM JSON:
+- nested properties are joined with dots, e.g. `source.expression`
+- annotations and other named items use their name, e.g. `annotations.PBI_FormatHint`
+- other arrays use an index, e.g. `[0]`
+
+A path that names a group, such as `-p source`, prints everything under it. Restricted information like
+passwords is never printed.
 
 ### JSON and exit codes
 

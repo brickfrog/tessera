@@ -12,6 +12,9 @@ type TessError =
     | DestinationNotEmpty of path: string
     | SaveFailed of path: string * message: string
     | InvalidObjectRef of input: string * reason: string
+    | ObjectNotFound of input: string
+    | AmbiguousObject of input: string * candidates: string list
+    | PropertyNotFound of objectRef: string * path: string
 
 module TessError =
 
@@ -27,6 +30,9 @@ module TessError =
         | DestinationNotEmpty _ -> "destination-not-empty"
         | SaveFailed _ -> "save-failed"
         | InvalidObjectRef _ -> "invalid-object-ref"
+        | ObjectNotFound _ -> "object-not-found"
+        | AmbiguousObject _ -> "ambiguous-object"
+        | PropertyNotFound _ -> "property-not-found"
 
     let message =
         function
@@ -42,3 +48,8 @@ module TessError =
         | DestinationNotEmpty path -> $"Destination exists and is not empty: {path} (use --force to overwrite)"
         | SaveFailed(path, msg) -> $"Failed to write {path}: {msg}"
         | InvalidObjectRef(input, reason) -> $"Invalid object reference '{input}': {reason}"
+        | ObjectNotFound input -> $"No object matches '{input}'"
+        | AmbiguousObject(input, candidates) ->
+            let list = candidates |> List.map (fun c -> $"  {c}") |> String.concat "\n"
+            $"'{input}' matches more than one object; use one of these:\n{list}"
+        | PropertyNotFound(objectRef, path) -> $"{objectRef} has no property '{path}'"

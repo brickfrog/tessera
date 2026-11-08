@@ -181,4 +181,57 @@ let tests =
             use doc = json r
             Expect.equal (doc.RootElement.GetProperty("output").GetProperty("eol").GetString()) "crlf" ""
             Expect.stringContains (File.ReadAllText(Path.Combine(dest, "model.tmdl"))) "\r\n" ""
+
+        testCase "get prints TMDL by default"
+        <| fun () ->
+            use t = project ()
+            let r = tess [ "get"; t.Path; "[Total]" ]
+            Expect.equal r.Code App.ExitCode.ok r.Err
+            Expect.stringStarts r.Out "measure Total = SUM(Sales[Amount])" ""
+
+        testCase "get -p prints a bare value"
+        <| fun () ->
+            use t = project ()
+            let r = tess [ "get"; t.Path; "'Sales'[Total]"; "-p"; "expression" ]
+            Expect.equal r.Code App.ExitCode.ok r.Err
+            Expect.equal r.Out "SUM(Sales[Amount])\n" ""
+
+        testCase "get -p with several paths prints path: value lines"
+        <| fun () ->
+            use t = project ()
+            let r = tess [ "get"; t.Path; "[Total]"; "-p"; "expression"; "-p"; "formatString" ]
+            Expect.equal r.Out "expression: SUM(Sales[Amount])\nformatString: #,0\n" ""
+
+        testCase "get --json"
+        <| fun () ->
+            use t = project ()
+            let r = tess [ "get"; t.Path; "Sales"; "--json" ]
+            Expect.equal r.Code App.ExitCode.ok r.Err
+            use doc = json r
+            Expect.equal (doc.RootElement.GetProperty("ref").GetString()) "table:Sales" ""
+            Expect.equal (doc.RootElement.GetProperty("object").GetProperty("name").GetString()) "Sales" ""
+
+            let mutable columns = Unchecked.defaultof<JsonElement>
+            Expect.isFalse (doc.RootElement.GetProperty("object").TryGetProperty("columns", &columns)) "no children"
+
+        testCase "get --children includes child objects"
+        <| fun () ->
+            use t = project ()
+            let r = tess [ "get"; t.Path; "Sales"; "--children" ]
+            Expect.stringContains r.Out "measure Total" ""
+
+        testCase "get errors: unknown object, ambiguous object, unknown property"
+        <| fun () ->
+            use t = project ()
+
+            for args, code in
+                [
+                    [ "[Nope]" ], "object-not-found"
+                    [ "[DateKey]" ], "ambiguous-object"
+                    [ "[Total]"; "-p"; "nope" ], "property-not-found"
+                ] do
+                let r = tess ([ "get"; t.Path ] @ args @ [ "--json" ])
+                Expect.equal r.Code App.ExitCode.input (String.concat " " args)
+                use doc = json r
+                Expect.equal (doc.RootElement.GetProperty("error").GetProperty("code").GetString()) code ""
     ]

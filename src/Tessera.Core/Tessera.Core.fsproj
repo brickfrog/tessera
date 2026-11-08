@@ -12,6 +12,7 @@
     <Compile Include="ModelSource.fs" />
     <Compile Include="ModelIO.fs" />
     <Compile Include="Inventory.fs" />
+    <Compile Include="Serialize.fs" />
   </ItemGroup>
 
   <ItemGroup>
