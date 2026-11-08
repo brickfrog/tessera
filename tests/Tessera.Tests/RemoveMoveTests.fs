@@ -275,13 +275,29 @@ let private removeTests =
         testCase "a calculated table's or calculation group's columns can't be removed on their own"
         <| fun () ->
             let db = model ()
+            let summary = new Table(Name = "Summary")
 
-            match remove db (spec [ "'Time Intelligence'[Period]" ]) with
-            | Error(UnsupportedRemove _) -> ()
-            | other -> failtestf "expected UnsupportedRemove, got %A" other
+            summary.Partitions.Add(
+                new Partition(Name = "Summary", Source = new CalculatedPartitionSource(Expression = "{ 1 }"))
+            )
 
-            removeOk db [ "'Time Intelligence'" ] |> ignore
+            summary.Columns.Add(
+                new CalculatedTableColumn(Name = "Value", DataType = DataType.Int64, SourceColumn = "[Value]")
+            )
+
+            db.Model.Tables.Add summary
+
+            let refused selector =
+                match remove db (spec [ selector ]) with
+                | Error(UnsupportedRemove(_, reason)) -> reason
+                | other -> failtestf "expected UnsupportedRemove, got %A" other
+
+            Expect.stringContains (refused "Summary[Value]") "come from its expression" ""
+            Expect.stringContains (refused "'Time Intelligence'[Period]") "calculation group" ""
+
+            removeOk db [ "'Time Intelligence'"; "Summary" ] |> ignore
             Expect.isFalse (db.Model.Tables.Contains "Time Intelligence") "the whole group is fine"
+            Expect.isFalse (db.Model.Tables.Contains "Summary") "so is the whole calculated table"
 
         testCase "--cascade removes DAX dependents, transitively"
         <| fun () ->
