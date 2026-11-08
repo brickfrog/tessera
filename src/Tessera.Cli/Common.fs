@@ -27,10 +27,14 @@ module ExitCode =
         | InvalidObjectRef _
         | ObjectNotFound _
         | AmbiguousObject _
-        | PropertyNotFound _ -> input
+        | PropertyNotFound _
+        | NameCollision _
+        | UnsupportedRename _
+        | RenameConflict _ -> input
         | DestinationNotEmpty _
         | SaveFailed _ -> output
-        | InvalidPattern _ -> usage
+        | InvalidPattern _
+        | InvalidName _ -> usage
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()

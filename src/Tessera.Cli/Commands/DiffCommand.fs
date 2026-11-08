@@ -69,7 +69,7 @@ let private quote (v: string option) =
 /// Changed lines with this many unchanged lines of context around them.
 let private context = 2
 
-let private lineDiffText (out: TextWriter) (before: string) (after: string) =
+let lineDiffText (out: TextWriter) (before: string) (after: string) =
     let ops = Diff.LineDiff.diff (before.Split '\n') (after.Split '\n') |> Array.ofList
 
     let changed i =

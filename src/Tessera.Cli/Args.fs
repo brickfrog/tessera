@@ -14,6 +14,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Find of ParseResults<FindCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Diff of ParseResults<DiffCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Deps of ParseResults<DepsCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Rename of ParseResults<RenameCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -27,3 +28,4 @@ type CliArgs =
             | Find _ -> FindCommand.summary
             | Diff _ -> DiffCommand.summary
             | Deps _ -> DepsCommand.summary
+            | Rename _ -> RenameCommand.summary

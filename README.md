@@ -4,7 +4,7 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `convert`, `info`, `list`, `get`, `find`, `diff` and `deps` work.
+Status: early. `convert`, `info`, `list`, `get`, `find`, `diff`, `deps` and `rename` work.
 
 ## Usage
 
@@ -21,6 +21,7 @@ tess diff  ./main/Sales.SemanticModel ./branch/Sales.SemanticModel   # object-le
 tess diff  ./server-export.bim ./Sales.pbip --ignore lineageTag --json
 tess deps  ./MyReport.pbip "[Gross Margin %]"     # what it uses, and what uses it
 tess deps  ./MyReport.pbip "Date[Date]" --referenced-by --depth 0
+tess rename ./MyReport.pbip "[Revenue]" "Net Revenue" --dry-run   # rename, rewriting every DAX reference
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
 tess convert ./Sales.SemanticModel ./model.bim   # PBIP -> .bim
 tess convert ./tmdl ./tmdl --force                # re-serialize in place (keeps its line endings)
@@ -160,6 +161,53 @@ Comments and strings are never treated as references. A reference that names not
 `? <text>`. Each link shows the property and line it comes from, e.g. `expression:5`. `--depth` follows links
 further (0 means all the way), and circular references are marked rather than followed.
 
+### Renaming (`rename`)
+
+`tess rename <model> <object> <new name>` renames an object and rewrites every DAX reference to it. Only the
+reference tokens change; every other character of every expression stays as it was. `--dry-run` prints the plan
+(each edited expression as a line diff, like `diff`) and writes nothing. Otherwise the model is saved in place, in
+its own format and line endings, keeping restricted information; `--output <path>` writes elsewhere instead,
+like `convert` (add `--force` to overwrite).
+
+What is rewritten, in all the DAX `deps` reads, resolved the same way (`VAR`s and parameters shadow tables):
+
+| Renaming | Rewrites |
+|---|---|
+| a measure | `[Old]`, `'T'[Old]`, `T[Old]` that resolve to it, as `[New]` (`]]` escaped) |
+| a column | qualified and unqualified references that resolve to it |
+| a table (also calculated and calculation-group tables) | the table in `Old`, `'Old'`, `Old[X]`, `'Old'[X]` |
+| a calendar | `Old`, `'Old'` where they resolve to it |
+| a function | calls, `Old(...)` |
+
+Unquoted table references stay unquoted only if the new name is a plain identifier (letters, digits, `_`), isn't a
+DAX keyword, and isn't already used as a name in that expression; otherwise they're written `'New'` (`''`
+escaped). Function names must be identifiers (dots allowed).
+
+Hierarchies, levels, partitions, calculation items, roles, perspectives, cultures, relationships and data sources
+are renamed only: DAX can't refer to them by name. Sort-by columns, hierarchy levels, relationships, perspectives
+and translations point at objects, not names, so they follow any rename. Power BI's `PBI_QueryOrder` model
+annotation, which lists queries by name, is kept in step.
+
+Not rewritten:
+- comments and string literals, even ones that look like references (`// [Old]`, `"Old"`)
+- M: named expressions (Power Query parameters and queries) are renamed, with a warning listing the M that
+  mentions the old name; the same warning appears for tables and data sources whose name appears in M
+- `sourceColumn` of calculated-table columns (reported in a warning when it names the object)
+- report visuals, which refer to fields by name
+
+`rename` refuses:
+- empty names, names with leading or trailing spaces, and names with line breaks or other control characters
+- names already taken, case-insensitively: by a column, measure or hierarchy in the same table; by any measure (for
+  a measure); by any table or calendar (for a table); by any function (for a function); by a sibling, otherwise
+- the model object
+- a new name that would change what another reference means. For example, a column named like a measure in another
+  table would capture that table's unqualified `[Name]` references. tess checks this by applying the rename to a
+  copy and comparing every reference. References that named nothing and now resolve are reported as warnings.
+  Because `deps` doesn't know DAX keywords, this also refuses renaming a table to a word an expression already
+  uses bare, such as `NOT`, `IN` or `RETURN`.
+
+The same name is a no-op. A case-only rename (`Sales` to `SALES`) is allowed and rewrites references to match.
+
 ### JSON and exit codes
 
 `--json` (or `-j`) writes one JSON document to stdout, errors included (`{"error": {"code", "message"}}`).
@@ -168,8 +216,8 @@ further (0 means all the way), and circular references are marked rather than fo
 |---|---|
 | 0 | success |
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues |
-| 2 | usage error |
-| 3 | input error (model not found, unrecognised, ambiguous, failed to load) |
+| 2 | usage error (including an invalid new name for `rename`) |
+| 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references) |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |
 
