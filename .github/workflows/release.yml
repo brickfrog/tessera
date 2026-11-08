@@ -1,0 +1,181 @@
+name: Release
+
+# Push a tag like v0.2.0 to build and publish a GitHub release. A manual run builds the same assets
+# as workflow artifacts; run it on a tag ref to (re)publish that tag's release.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to stamp when not run on a tag (default: the one in Directory.Build.props)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          elif [[ -n "$INPUT_VERSION" ]]; then
+            version="${INPUT_VERSION#v}"
+          else
+            version="$(dotnet msbuild src/Tessera.Cli -getProperty:Version)"
+          fi
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$version' is not a version like 1.2.3 or 1.2.3-beta.1"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet build -c Release
+      - run: dotnet test -c Release --no-build
+
+  binaries:
+    name: Binary (${{ matrix.rid }})
+    needs: [version, test]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { rid: linux-x64, os: ubuntu-latest, smoke: true }
+          - { rid: linux-arm64, os: ubuntu-latest, smoke: false }
+          - { rid: win-x64, os: windows-latest, smoke: true }
+          - { rid: osx-arm64, os: macos-latest, smoke: true }
+          - { rid: osx-x64, os: macos-latest, smoke: false }
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RID: ${{ matrix.rid }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - name: Publish
+        run: >
+          dotnet publish src/Tessera.Cli -c Release -r "$RID" --self-contained
+          -p:PublishSingleFile=true -p:Version="$VERSION" -o "publish/$RID"
+      - name: Smoke test
+        if: matrix.smoke
+        run: |
+          exe="publish/$RID/tess"
+          [[ "$RID" == win-* ]] && exe="$exe.exe"
+          out="$("$exe" --version | tr -d '\r')"
+          echo "$out"
+          [[ "$out" == "tess $VERSION" ]]
+          git clone --depth 1 https://github.com/TabularEditor/spaceparts-analytics "$RUNNER_TEMP/spaceparts"
+          "$exe" info "$RUNNER_TEMP/spaceparts"
+          "$exe" convert "$RUNNER_TEMP/spaceparts" "$RUNNER_TEMP/sample.bim"
+      - name: Archive
+        run: |
+          name="tess-$VERSION-$RID"
+          mkdir -p "dist/$name"
+          if [[ "$RID" == win-* ]]; then
+            cp "publish/$RID/tess.exe" "dist/$name/"
+          else
+            cp "publish/$RID/tess" "dist/$name/"
+            chmod +x "dist/$name/tess"
+          fi
+          cp LICENSE README.md "dist/$name/"
+          cd dist
+          if [[ "$RID" == win-* ]]; then
+            7z a -tzip "$name.zip" "$name" > /dev/null
+          else
+            tar -czf "$name.tar.gz" "$name"
+          fi
+          rm -rf "$name"
+          ls -la
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tess-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+
+  package:
+    name: dotnet tool package
+    needs: [version, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - run: dotnet pack src/Tessera.Cli -c Release -p:Version="$VERSION" -o dist
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tess-nupkg
+          path: dist/*.nupkg
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [version, binaries, package]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: tess-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          sha256sum -- * > SHA256SUMS
+          cat SHA256SUMS
+      - name: Create or update the release
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            flags=()
+            [[ "$VERSION" == *-* ]] && flags+=(--prerelease)
+            gh release create "$TAG" dist/* --title "tess $VERSION" --generate-notes --verify-tag "${flags[@]}"
+          fi
