@@ -4,7 +4,7 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `convert`, `info`, `list`, `get`, `find`, `diff` and `deps` work.
+Status: early. `convert`, `info`, `list`, `get`, `find`, `diff`, `deps` and `validate` work.
 
 ## Usage
 
@@ -21,6 +21,8 @@ tess diff  ./main/Sales.SemanticModel ./branch/Sales.SemanticModel   # object-le
 tess diff  ./server-export.bim ./Sales.pbip --ignore lineageTag --json
 tess deps  ./MyReport.pbip "[Gross Margin %]"     # what it uses, and what uses it
 tess deps  ./MyReport.pbip "Date[Date]" --referenced-by --depth 0
+tess validate ./MyReport.pbip                     # broken references, cycles, ... (exit 1 on errors)
+tess validate ./model.bim --fail-on warning --rule unresolved-reference --json
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
 tess convert ./Sales.SemanticModel ./model.bim   # PBIP -> .bim
 tess convert ./tmdl ./tmdl --force                # re-serialize in place (keeps its line endings)
@@ -159,6 +161,34 @@ Some names belong to the expression itself and are not model references:
 Comments and strings are never treated as references. A reference that names nothing in the model is listed as
 `? <text>`. Each link shows the property and line it comes from, e.g. `expression:5`. `--depth` follows links
 further (0 means all the way), and circular references are marked rather than followed.
+
+### Validation (`validate`)
+
+`validate` checks for structural problems: things Analysis Services or Power BI would reject, or that can't
+work. It doesn't check style. Each issue prints as `severity  ref  property:line  message  [rule]`, followed by a
+summary line such as `2 errors, 1 warning`.
+
+| Rule | Severity | Reports |
+|---|---|---|
+| `unresolved-reference` | error | a DAX reference to a table, `'T'[X]` or `T[X]` that doesn't exist (as `deps` resolves it) |
+| | warning | an unqualified `[X]` that matches nothing, since it may be a column of a table expression |
+| `circular-reference` | error | measures, calculated columns, calculated tables, calculation items or functions that depend on themselves, through their DAX expressions. Each loop is reported once, e.g. `measure:Sales/A -> measure:Sales/B -> measure:Sales/A` |
+| `invalid-token` | error | an unterminated string, quoted name, `[name]`, date literal or `/*` comment, or a character DAX doesn't use, in any DAX property |
+| `empty-expression` | warning | a measure, calculated column, calculated table, calculation item or function with no DAX |
+| `duplicate-name` | error | a column, measure and hierarchy that share a name in one table, or measures that share a name across tables (ignoring case). TOM itself rejects duplicate tables, and duplicate columns or measures within one table, when it loads a model |
+| `relationship-datatype-mismatch` | warning | a relationship between columns of different data types |
+| `relationship-self-join` | error | a relationship from a table to itself |
+| `invalid-sort-by` | warning | a column sorted by itself, or by a column that has its own sort-by column |
+| `tom-validation` | error | TOM's own validation, e.g. a sort-by column, level or relationship that names a column that doesn't exist |
+
+Options:
+- `--rule` picks rules (repeatable or comma-separated).
+- `--min-severity error|warning|info` hides less severe issues.
+- `--fail-on error|warning|info` sets the exit code: 1 if any issue is this severe or more. The default is
+  `error`. Issues hidden by `--min-severity` still count, so hiding warnings can't turn a failing check green.
+
+`--json` writes `{"summary": {"errors", "warnings", "infos"}, "issues": [{"rule", "severity", "ref",
+"property", "line", "message"}]}`, where `property` and `line` may be `null`.
 
 ### JSON and exit codes
 
