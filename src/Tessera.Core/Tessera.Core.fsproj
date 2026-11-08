@@ -28,6 +28,8 @@
     <Compile Include="Mutation.fs" />
     <Compile Include="SetProperty.fs" />
     <Compile Include="AddObject.fs" />
+    <Compile Include="RemoveObject.fs" />
+    <Compile Include="MoveObject.fs" />
   </ItemGroup>
 
   <ItemGroup>

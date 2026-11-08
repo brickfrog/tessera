@@ -159,7 +159,9 @@ let statText (out: TextWriter) (changes: ObjectChange list) =
         |> List.filter (fun (n, _) -> n > 0)
         |> List.map (fun (n, w) -> $"{n} {w}")
 
-    if not parts.IsEmpty then
+    if parts.IsEmpty then
+        out.WriteLine("No differences.")
+    else
         out.WriteLine(String.concat ", " parts)
 
 /// The changed objects' references, one per line (pipe-friendly).

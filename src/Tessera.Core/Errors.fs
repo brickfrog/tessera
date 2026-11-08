@@ -34,6 +34,12 @@ type TessError =
     | CannotAdd of objectRef: string * reason: string
     /// No object matches, but some are named similarly.
     | ObjectNotFoundSuggest of input: string * candidates: string list
+    /// Objects can't be removed: others still refer to them (dependents as "ref  via  text -> target").
+    | RemoveBlocked of objects: string list * dependents: string list
+    | UnsupportedRemove of objectRef: string * reason: string
+    | UnsupportedMove of objectRef: string * reason: string
+    /// Moving a measure would change what references (its own, or others') mean.
+    | MoveConflict of objectRef: string * table: string * details: string list
 
 module TessError =
 
@@ -64,6 +70,10 @@ module TessError =
         | InvalidPropertyValue _ -> "invalid-property-value"
         | CannotAdd _ -> "cannot-add"
         | ObjectNotFoundSuggest _ -> "object-not-found"
+        | RemoveBlocked _ -> "remove-blocked"
+        | UnsupportedRemove _ -> "unsupported-remove"
+        | UnsupportedMove _ -> "unsupported-move"
+        | MoveConflict _ -> "move-conflict"
 
     let message =
         function
@@ -119,3 +129,17 @@ module TessError =
         | ObjectNotFoundSuggest(input, candidates) ->
             let list = candidates |> String.concat ", "
             $"No object matches '{input}'; did you mean {list}?"
+        | RemoveBlocked(objects, dependents) ->
+            let list = dependents |> List.map (fun d -> $"  {d}") |> String.concat "\n"
+            let it = if objects.Length = 1 then "it" else "them"
+            let names = String.concat ", " objects
+
+            $"Can't remove {names}: other objects refer to {it}:\n{list}\n"
+            + $"Remove those too (or use --cascade), or use --force to remove {it} anyway and leave these references broken."
+        | UnsupportedRemove(objectRef, reason) -> $"Can't remove {objectRef}: {reason}"
+        | UnsupportedMove(objectRef, reason) -> $"Can't move {objectRef}: {reason}"
+        | MoveConflict(objectRef, table, details) ->
+            let list = details |> List.map (fun d -> $"  {d}") |> String.concat "\n"
+
+            $"Moving {objectRef} to '{table}' would change what references mean:\n{list}\n"
+            + "Qualify those references with their table ('Table'[Column]) first."

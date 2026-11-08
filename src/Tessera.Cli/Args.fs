@@ -17,6 +17,8 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Init of ParseResults<InitCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Validate of ParseResults<ValidateCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Rename of ParseResults<RenameCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Remove of ParseResults<RemoveCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Move of ParseResults<MoveCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Bpa of ParseResults<BpaCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Set of ParseResults<SetCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddCommand.Args>
@@ -36,6 +38,8 @@ type CliArgs =
             | Init _ -> InitCommand.summary
             | Validate _ -> ValidateCommand.summary
             | Rename _ -> RenameCommand.summary
+            | Remove _ -> RemoveCommand.summary
+            | Move _ -> MoveCommand.summary
             | Bpa _ -> BpaCommand.summary
             | Set _ -> SetCommand.summary
             | Add _ -> AddCommand.summary

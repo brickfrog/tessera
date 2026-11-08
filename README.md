@@ -6,7 +6,8 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set`, `add` and `bpa` work.
+Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set`,
+`add`, `remove`, `move` and `bpa` work.
 
 ## Install
 
@@ -53,6 +54,8 @@ tess set   ./MyReport.pbip "[Revenue]" -p formatString='#,0.00' -p isHidden=true
 tess get   ./MyReport.pbip "[Revenue]" --properties   # what `set` can write there, with types and values
 tess add   ./MyReport.pbip measure:Sales/Margin -e "[Revenue] - [Cost]" --save   # create an object
 tess add   ./MyReport.pbip relationship --from "'Sales'[DateKey]" --to "'Date'[DateKey]" --save
+tess remove ./MyReport.pbip "Sales[Old Key]" "[Unused]" --save  # refused while other DAX uses them
+tess move   ./MyReport.pbip "[Revenue]" "Measures" --save       # rewrites 'Sales'[Revenue] references
 tess bpa   ./MyReport.pbip                       # Best Practice Analyzer: built-in rules + the model's own
 tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE rule files, CI output
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
@@ -312,7 +315,7 @@ Options:
 errors. `--ci github|azdo` also writes CI annotations to stderr.
 ### Editing commands
 
-`rename` and `set` (and the coming `add`, `remove` and `move`) follow one set of conventions, the same as the
+The editing commands (`rename`, `set`, `add`, `remove` and `move`) follow one set of conventions, the same as the
 Tabular Editor CLI's.
 
 **Saving:**
@@ -568,6 +571,77 @@ of object holding the name is still a collision.
 Not supported: column data types for calculated columns (inferred), KPIs, detail rows, translations, role members,
 object-level security, and the Power Query parameter metadata of named expressions (write the `meta [...]` record
 in the M yourself).
+### Removing objects (`remove`)
+
+`tess remove <model> <object>... [--cascade] [--if-exists]` removes one or more objects, as one change, with
+everything inside them: a table's columns, measures, hierarchies and partitions, a hierarchy's levels. It follows
+the [editing conventions](#editing-commands): a dry run unless `--save` or `--save-to`.
+
+**Dependents first.** If DAX outside what's being removed still refers to it (as `deps --referenced-by` shows), the
+removal is refused (exit 3) and the references are listed:
+
+```
+tess: Can't remove measure:Sales/Revenue: other objects refer to it:
+  measure:Sales/Margin %  expression:5  [Revenue]  -> measure:Sales/Revenue
+```
+
+- References from inside the removed set don't count, so a table can go together with the measures that use it.
+  Neither does a role's row filter on a removed table: the filter goes with the table.
+- **`--cascade`** also removes the dependents, and theirs, as long as they're objects whose definition is their DAX:
+  measures, calculated columns, calculated tables, calculation items and functions. A role or a table-level
+  expression (detail rows, calculation group defaults) that refers to it is never removed for that; it still blocks.
+- **`--force`** removes it anyway and leaves those references broken. Each is reported as a warning, and the
+  qualified ones (`'T'[X]`) also as `introducedErrors`. An unqualified `[X]` that names nothing is only a `validate`
+  warning, since it may be a column of a table expression.
+
+**Structural fallout.** TOM itself doesn't clean up when an object goes; links to it would dangle and the model
+couldn't be saved. tess handles each case, and says what it did on stderr (`notes` in JSON):
+
+| When this goes | What happens |
+|---|---|
+| a column | relationships that use it are removed (any DAX that relies on a relationship, like `USERELATIONSHIP`, names the column and so blocks); hierarchy levels on it are removed, the other levels renumbered (so they show as modified) and a hierarchy with no levels left is removed; sort-by columns pointing at it are cleared; so are `alternateOf`, group-by columns, calendar associations and a parameter's values column |
+| a table | the same for each of its columns; its relationships, perspective entry and roles' permissions on it (row filter and object-level security) go; it's taken out of Power BI's `PBI_QueryOrder` annotation |
+| a relationship or hierarchy | variations that use it are removed |
+| anything | its perspective memberships, object-level security entries and translations go |
+
+Relationships are removed rather than refused because one can't exist without its columns, and DAX that depends on a
+particular relationship refers to its columns, so it is caught by the dependents check.
+
+`remove` refuses (exit 3):
+- the model itself
+- a table's last partition (remove the table instead)
+- a column of a calculated table (it comes from the table's expression) or of a calculation group
+- a data source or shared expression a partition still uses
+- anything that would still leave TOM with a link to a removed object (a safety net: tess checks TOM's own
+  validation after the removal)
+
+**`--if-exists`** skips objects that don't exist, with a note, and exits 0 (so a script can run the same removal
+twice). An ambiguous object is still an error.
+
+Not updated: M (Power Query) that mentions a removed table, expression or data source by name (listed as a warning),
+the linguistic schema, and report visuals.
+
+### Moving measures (`move`)
+
+`tess move <model> <measure> <table> [--display-folder <folder>]` moves a measure to another table. It keeps its name,
+lineage tag and every other property, and it follows the [editing conventions](#editing-commands). The change set
+shows it as `moved` (`measure:Sales/Revenue -> measure:Measures/Revenue`).
+
+Measure names are unique across the model, so unqualified `[Revenue]` references stay as they are. References that
+qualify it with its old table, `'Sales'[Revenue]` and `Sales[Revenue]`, are rewritten to the new table token by
+token, quoted as `rename` quotes table names, with every other character untouched. Comments and strings are never
+rewritten. As with `rename`, tess applies the move to a copy and refuses (exit 3) if any reference would then mean
+something else. The usual case is the measure's own unqualified column reference, such as `SUMX(Sales, [Amount])`,
+since `[Amount]` resolves against the measure's own table. Qualify it first (`Sales[Amount]`).
+
+The measure's translations follow it. So do its perspective memberships: if the new table isn't in a perspective the
+measure is in, the table is added to it with just that measure, so the measure stays visible (noted on stderr).
+`--display-folder` sets the folder in the same change.
+
+`move` refuses (exit 3) a column (its data comes from its table's partitions), a calculation item, a table that
+doesn't exist, a calculation group table, and a target table with a column or hierarchy of the same name. Moving to
+the table it's already in changes nothing. Report visuals, which refer to fields by table and name, are not updated.
+
 ### Best Practice Analyzer (`bpa`)
 
 `bpa` checks a model against Best Practice Analyzer rules in Tabular Editor's JSON format. Existing TE2/TE3
@@ -799,10 +873,8 @@ the code as its title.
 |---|---|
 | 0 | success |
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
-| 2 | usage error (including an invalid new name for `rename`, or a property `set` can't write or a value it can't take) |
-| 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references) |
-| 2 | usage error (including an invalid new name for `rename` or `add`, and an option `add` doesn't take for that kind) |
-| 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references; for `add`, a name that's taken, a missing parent, or an object `add` can't create there) |
+| 2 | usage error, including invalid arguments for an editing command: an invalid new name (`rename`, `add`), a property `set` can't write or a value it can't take, or an option `add` doesn't take for that kind |
+| 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), or an edit that would change what other references mean (`rename`, `move`) |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |
 

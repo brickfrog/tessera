@@ -176,32 +176,33 @@ let private mapVia (target: ObjectEntry) (newName: string) (via: string) =
         $"tablePermissions.{newName}.filterExpression"
     | _ -> via
 
-/// Rewrite one expression: the references to the target, right to left so offsets stay valid.
-let private rewrite (target: ObjectEntry) (newName: string) (dax: string) (refs: Deps.Reference list) =
-    let oldName = ObjectEntry.name target
-    let isTarget (r: Deps.Reference) = r.Target = Deps.Resolved target.Ref
-
-    let allTokens = tokenize dax
-
-    // An unquoted name the expression already uses for something else (a VAR, a parameter, a
-    // function) would be captured by it; quote instead.
+/// How to write a reference to table `newName` in place of `original`, a reference to `oldName`
+/// in an expression with these tokens: unquoted only if it was, the new name is a plain
+/// identifier and no keyword, and the expression doesn't already use it bare for something else
+/// (a VAR, a parameter, a function), which would capture it. Otherwise 'quoted'.
+let tableReferenceText (tokens: Token list) (oldName: string) (newName: string) (original: Token) =
     let usedElsewhere =
-        allTokens
+        tokens
         |> List.exists (fun t ->
             t.Kind = TokenKind.Identifier
             && eqCi t.Text newName
             && not (eqCi t.Text oldName))
 
-    let tableText (original: Token) =
-        if
-            original.Kind = TokenKind.Identifier
-            && isPlainIdentifier newName
-            && not (keywords.Contains newName)
-            && not usedElsewhere
-        then
-            newName
-        else
-            quoteTable newName
+    if
+        original.Kind = TokenKind.Identifier
+        && isPlainIdentifier newName
+        && not (keywords.Contains newName)
+        && not usedElsewhere
+    then
+        newName
+    else
+        quoteTable newName
+
+/// Rewrite one expression: the references to the target, right to left so offsets stay valid.
+let private rewrite (target: ObjectEntry) (newName: string) (dax: string) (refs: Deps.Reference list) =
+    let oldName = ObjectEntry.name target
+    let isTarget (r: Deps.Reference) = r.Target = Deps.Resolved target.Ref
+    let tableText = tableReferenceText (tokenize dax) oldName newName
 
     let replacements =
         refs
@@ -268,7 +269,7 @@ let private queryOrderEdit (db: Database) (entries: ObjectEntry list) (oldName: 
             None
 
 /// Objects holding M (partitions, named expressions) that mention a name.
-let private mMentions (entries: ObjectEntry list) (target: ObjectEntry) (name: string) =
+let mMentions (entries: ObjectEntry list) (target: ObjectEntry) (name: string) =
     entries
     |> List.filter (fun e ->
         not (obj.ReferenceEquals(e.Object, target.Object))
@@ -396,17 +397,21 @@ let private setName (o: MetadataObject) (name: string) =
     | :? NamedMetadataObject as n -> n.Name <- name
     | _ -> invalidOp $"cannot rename a {o.GetType().Name}"
 
-/// Apply a plan to a database, finding each object with `find` (identity, or by ref in a copy).
-let private applyWith (find: ObjectEntry -> MetadataObject) (plan: RenamePlan) =
-    // Edits first: RLS property paths embed the table name as it is before the rename.
-    for e in plan.Edits do
+/// Apply expression edits, finding each owner with `find` (identity, or by ref in a copy).
+let applyEdits (find: ObjectEntry -> MetadataObject) (edits: Edit list) =
+    for e in edits do
         match accessor (find e.Owner) e.Property with
         | Some(get, set) ->
             if get () <> e.Before then
-                invalidOp $"{ObjectRef.format e.Owner.Ref} {e.Property} changed since the rename was planned"
+                invalidOp $"{ObjectRef.format e.Owner.Ref} {e.Property} changed since the edit was planned"
 
             set e.After
         | None -> invalidOp $"{ObjectRef.format e.Owner.Ref} has no property {e.Property}"
+
+/// Apply a plan to a database, finding each object with `find` (identity, or by ref in a copy).
+let private applyWith (find: ObjectEntry -> MetadataObject) (plan: RenamePlan) =
+    // Edits first: RLS property paths embed the table name as it is before the rename.
+    applyEdits find plan.Edits
 
     if not (RenamePlan.isNoOp plan) then
         setName (find plan.Target) plan.NewName
@@ -414,18 +419,21 @@ let private applyWith (find: ObjectEntry -> MetadataObject) (plan: RenamePlan) =
 /// Carry out a plan on the database it was made from.
 let apply (plan: RenamePlan) = applyWith (fun e -> e.Object) plan
 
-/// Check that, after the rename, every DAX reference means what it meant before: references to the
-/// target now resolve to its new ref, and nothing else was captured by the new name. Applies the
-/// plan to a copy of the database. Returns conflicts, and references that were unresolved before
-/// and now resolve to the renamed object.
-let private verify (db: Database) (before: Deps.Graph) (plan: RenamePlan) =
+/// Check that, after an edit, every DAX reference means what it meant before. `change` applies the
+/// edit to a copy of the database, finding objects by their refs as they are before the edit;
+/// `mapR` and `mapV` say what refs and property paths become. Returns conflicts (references that
+/// would mean something else), and references that were unresolved before and now resolve.
+let verifyWith
+    (db: Database)
+    (before: Deps.Graph)
+    (change: (ObjectRef -> MetadataObject) -> unit)
+    (mapR: ObjectRef -> ObjectRef)
+    (mapV: string -> string)
+    =
     let copy = db.Clone()
     let copyEntries = objects copy |> List.map (fun e -> e.Ref, e.Object) |> dict
-    applyWith (fun e -> copyEntries.[e.Ref]) plan
+    change (fun r -> copyEntries.[r])
     let after = Deps.build copy
-
-    let mapR = mapRef plan.Target.Ref plan.NewRef
-    let mapV = mapVia plan.Target plan.NewName
 
     let mapTarget =
         function
@@ -476,6 +484,18 @@ let private verify (db: Database) (before: Deps.Graph) (plan: RenamePlan) =
                 | _ -> conflicts.Add $"{where}{at}: {yr.Text} would refer to {describe y} instead of {describe x}"
 
     List.ofSeq conflicts, List.ofSeq resolvedNow
+
+/// Check that, after the rename, every DAX reference means what it meant before: references to the
+/// target now resolve to its new ref, and nothing else was captured by the new name. Applies the
+/// plan to a copy of the database. Returns conflicts, and references that were unresolved before
+/// and now resolve to the renamed object.
+let private verify (db: Database) (before: Deps.Graph) (plan: RenamePlan) =
+    verifyWith
+        db
+        before
+        (fun find -> applyWith (fun e -> find e.Ref) plan)
+        (mapRef plan.Target.Ref plan.NewRef)
+        (mapVia plan.Target plan.NewName)
 
 /// Plan renaming an object: validate the new name and work out every expression edit.
 let plan (db: Database) (target: ObjectEntry) (newName: string) : Result<RenamePlan, TessError> =
