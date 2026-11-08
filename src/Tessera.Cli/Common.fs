@@ -27,7 +27,8 @@ module ExitCode =
         | InvalidObjectRef _
         | ObjectNotFound _
         | AmbiguousObject _
-        | PropertyNotFound _ -> input
+        | PropertyNotFound _
+        | InvalidRules _ -> input
         | DestinationNotEmpty _
         | SaveFailed _ -> output
         | InvalidPattern _ -> usage

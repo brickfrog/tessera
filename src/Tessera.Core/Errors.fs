@@ -16,6 +16,8 @@ type TessError =
     | AmbiguousObject of input: string * candidates: string list
     | PropertyNotFound of objectRef: string * path: string
     | InvalidPattern of pattern: string * reason: string
+    /// A Best Practice Analyzer rule file that can't be read as rules.
+    | InvalidRules of path: string * reason: string
 
 module TessError =
 
@@ -35,6 +37,7 @@ module TessError =
         | AmbiguousObject _ -> "ambiguous-object"
         | PropertyNotFound _ -> "property-not-found"
         | InvalidPattern _ -> "invalid-pattern"
+        | InvalidRules _ -> "invalid-rules"
 
     let message =
         function
@@ -56,3 +59,4 @@ module TessError =
             $"'{input}' matches more than one object; use one of these:\n{list}"
         | PropertyNotFound(objectRef, path) -> $"{objectRef} has no property '{path}'"
         | InvalidPattern(pattern, reason) -> $"Invalid pattern '{pattern}': {reason}"
+        | InvalidRules(path, reason) -> $"Invalid BPA rules in {path}: {reason}"
