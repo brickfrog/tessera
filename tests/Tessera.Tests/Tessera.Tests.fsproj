@@ -19,7 +19,9 @@
     <Compile Include="DaxTests.fs" />
     <Compile Include="DepsTests.fs" />
     <Compile Include="InitTests.fs" />
+    <Compile Include="ValidateTests.fs" />
     <Compile Include="CliHarness.fs" />
+    <Compile Include="ValidateCommandTests.fs" />
     <Compile Include="CliTests.fs" />
     <Compile Include="InitCommandTests.fs" />
     <Compile Include="SampleModelTests.fs" />

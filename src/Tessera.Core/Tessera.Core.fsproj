@@ -18,6 +18,7 @@
     <Compile Include="Diff.fs" />
     <Compile Include="Dax.fs" />
     <Compile Include="Deps.fs" />
+    <Compile Include="Validate.fs" />
   </ItemGroup>
 
   <ItemGroup>

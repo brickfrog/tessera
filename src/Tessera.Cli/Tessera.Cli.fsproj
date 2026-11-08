@@ -22,6 +22,7 @@
     <Compile Include="Commands/DepsCommand.fs" />
     <Compile Include="Commands/ConvertCommand.fs" />
     <Compile Include="Commands/InitCommand.fs" />
+    <Compile Include="Commands/ValidateCommand.fs" />
     <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
     <Compile Include="App.fs" />

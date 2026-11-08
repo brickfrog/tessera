@@ -15,6 +15,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Diff of ParseResults<DiffCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Deps of ParseResults<DepsCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Init of ParseResults<InitCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Validate of ParseResults<ValidateCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -29,3 +30,4 @@ type CliArgs =
             | Diff _ -> DiffCommand.summary
             | Deps _ -> DepsCommand.summary
             | Init _ -> InitCommand.summary
+            | Validate _ -> ValidateCommand.summary
