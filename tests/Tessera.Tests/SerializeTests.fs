@@ -36,6 +36,43 @@ let tests =
             let withChildren = Serialize.flatten (Serialize.objectJson db true t)
             Expect.isTrue (withChildren |> List.exists (fun (p, _) -> p.StartsWith "columns.Amount")) ""
 
+        testCase "without children, an object's own sub-objects and extended properties are kept"
+        <| fun () ->
+            let db = sampleDatabase ()
+            let m = db.Model.Tables.["Sales"].Measures.["Total"]
+            m.KPI <- new KPI(TargetExpression = "2")
+            m.FormatStringDefinition <- new FormatStringDefinition(Expression = "\"0\"")
+            m.DetailRowsDefinition <- new DetailRowsDefinition(Expression = "Sales")
+            m.ExtendedProperties.Add(new JsonExtendedProperty(Name = "J", Value = """{"a":1}"""))
+            m.ExtendedProperties.Add(new StringExtendedProperty(Name = "S", Value = "v"))
+            let props = Serialize.flatten (Serialize.objectJson db false m)
+            Expect.contains props ("kpi.targetExpression", "2") ""
+            Expect.contains props ("formatStringDefinition.expression", "\"0\"") ""
+            Expect.contains props ("detailRowsDefinition.expression", "Sales") ""
+            Expect.contains props ("extendedProperties.J.value.a", "1") ""
+            Expect.contains props ("extendedProperties.S", "v") ""
+
+            let ti = db.Model.Tables.["Time Intelligence"]
+            ti.CalculationGroup.Precedence <- 3
+
+            ti.CalculationGroup.MultipleOrEmptySelectionExpression <-
+                new CalculationGroupExpression(Expression = "BLANK()")
+
+            let paths = Serialize.flatten (Serialize.objectJson db false ti) |> List.map fst
+            Expect.contains paths "calculationGroup.precedence" ""
+            Expect.contains paths "calculationGroup.multipleOrEmptySelectionExpression.expression" ""
+
+            for child in [ "columns"; "measures"; "partitions"; "calculationGroup.calculationItems" ] do
+                Expect.isFalse (paths |> List.exists (fun p -> p.StartsWith child)) child
+
+            let role = db.Model.Roles.["Readers"]
+            role.Members.Add(new ExternalModelRoleMember(MemberName = "a@b.c", IdentityProvider = "AzureAD"))
+
+            let rolePaths =
+                Serialize.flatten (Serialize.objectJson db false role) |> List.map fst
+
+            Expect.isFalse (rolePaths |> List.exists (fun p -> p.StartsWith "members")) "role members stay out"
+
         testCase "flatten: nested objects, named arrays, plain arrays, scalars"
         <| fun () ->
             let json =

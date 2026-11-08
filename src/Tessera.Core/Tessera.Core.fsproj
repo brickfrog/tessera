@@ -26,6 +26,7 @@
     <Compile Include="Bpa.fs" />
     <Compile Include="ChangeSet.fs" />
     <Compile Include="Mutation.fs" />
+    <Compile Include="SetProperty.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -28,6 +28,7 @@
     <Compile Include="Commands/ValidateCommand.fs" />
     <Compile Include="Commands/RenameCommand.fs" />
     <Compile Include="Commands/BpaCommand.fs" />
+    <Compile Include="Commands/SetCommand.fs" />
     <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
     <Compile Include="App.fs" />
