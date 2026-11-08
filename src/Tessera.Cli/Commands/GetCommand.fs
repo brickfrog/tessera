@@ -142,6 +142,58 @@ let private runProperties (ctx: Ctx) (modelPath: string) (selector: string) (all
 
         Done
 
+let private show (ctx: Ctx) (args: ParseResults<Args>) =
+    let modelPath, selector = args.GetResult Args.Target
+    let children = args.Contains Args.Children
+    let wanted = args.GetResults Args.Property
+
+    let result =
+        ModelIO.loadPath modelPath
+        |> Result.bind (fun (_, db) ->
+            Inventory.Selector.resolve (Inventory.objects db) selector
+            |> Result.map (fun e -> db, e))
+
+    match result with
+    | Error e -> Failed e
+    | Ok(db, e) ->
+        let json = Serialize.objectJson db children e.Object
+
+        match wanted with
+        | [] ->
+            if ctx.Json then
+                writeJson ctx.Out (getJson e json)
+            else
+                ctx.Out.Write(Serialize.objectTmdl children e.Object)
+
+            Done
+        | paths ->
+            let props =
+                let own = Serialize.flatten json
+
+                if e.Ref.Kind = ObjectKind.Model then
+                    ("compatibilityLevel", string db.CompatibilityLevel) :: own
+                else
+                    own
+
+            let selected = paths |> List.map (fun p -> p, Serialize.select p props)
+
+            match selected |> List.tryFind (snd >> List.isEmpty) with
+            | Some(missing, _) -> Failed(PropertyNotFound(ObjectRef.format e.Ref, missing))
+            | None ->
+                let leaves = selected |> List.collect snd
+
+                if ctx.Json then
+                    writeJson ctx.Out (propertiesJson e leaves)
+                else
+                    match paths, leaves with
+                    // One exact property: print the bare value, for scripting.
+                    | [ p ], [ (leaf, value) ] when leaf = p -> ctx.Out.WriteLine(value)
+                    | _ ->
+                        for leaf, value in leaves do
+                            ctx.Out.WriteLine($"{leaf}: {value}")
+
+                Done
+
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let modelPath, selector = args.GetResult Args.Target
 
@@ -153,52 +205,4 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     elif args.Contains Args.All then
         UsageError "--all only goes with --properties"
     else
-        let children = args.Contains Args.Children
-        let wanted = args.GetResults Args.Property
-
-        let result =
-            ModelIO.loadPath modelPath
-            |> Result.bind (fun (_, db) ->
-                Inventory.Selector.resolve (Inventory.objects db) selector
-                |> Result.map (fun e -> db, e))
-
-        match result with
-        | Error e -> Failed e
-        | Ok(db, e) ->
-            let json = Serialize.objectJson db children e.Object
-
-            match wanted with
-            | [] ->
-                if ctx.Json then
-                    writeJson ctx.Out (getJson e json)
-                else
-                    ctx.Out.Write(Serialize.objectTmdl children e.Object)
-
-                Done
-            | paths ->
-                let props =
-                    let own = Serialize.flatten json
-
-                    if e.Ref.Kind = ObjectKind.Model then
-                        ("compatibilityLevel", string db.CompatibilityLevel) :: own
-                    else
-                        own
-
-                let selected = paths |> List.map (fun p -> p, Serialize.select p props)
-
-                match selected |> List.tryFind (snd >> List.isEmpty) with
-                | Some(missing, _) -> Failed(PropertyNotFound(ObjectRef.format e.Ref, missing))
-                | None ->
-                    let leaves = selected |> List.collect snd
-
-                    if ctx.Json then
-                        writeJson ctx.Out (propertiesJson e leaves)
-                    else
-                        match paths, leaves with
-                        // One exact property: print the bare value, for scripting.
-                        | [ p ], [ (leaf, value) ] when leaf = p -> ctx.Out.WriteLine(value)
-                        | _ ->
-                            for leaf, value in leaves do
-                                ctx.Out.WriteLine($"{leaf}: {value}")
-
-                    Done
+        show ctx args
