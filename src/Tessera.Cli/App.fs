@@ -49,6 +49,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Find args) -> FindCommand.run ctx args
                 | Some(Diff args) -> DiffCommand.run ctx args
                 | Some(Deps args) -> DepsCommand.run ctx args
+                | Some(Bpa args) -> BpaCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with
