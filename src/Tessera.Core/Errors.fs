@@ -24,6 +24,9 @@ type TessError =
     | InvalidRules of path: string * reason: string
     /// An edit would leave the model with errors it didn't have (save refused without --force).
     | ChangeIntroducesErrors of count: int
+    /// Objects can't be removed: others still refer to them (dependents as "ref  via  text -> target").
+    | RemoveBlocked of objects: string list * dependents: string list
+    | UnsupportedRemove of objectRef: string * reason: string
 
 module TessError =
 
@@ -49,6 +52,8 @@ module TessError =
         | RenameConflict _ -> "rename-conflict"
         | InvalidRules _ -> "invalid-rules"
         | ChangeIntroducesErrors _ -> "change-introduces-errors"
+        | RemoveBlocked _ -> "remove-blocked"
+        | UnsupportedRemove _ -> "unsupported-remove"
 
     let message =
         function
@@ -80,3 +85,11 @@ module TessError =
         | ChangeIntroducesErrors n ->
             let errors = if n = 1 then "1 error" else $"{n} errors"
             $"Not saved: the change introduces {errors} (see above; use --force to save anyway)"
+        | RemoveBlocked(objects, dependents) ->
+            let list = dependents |> List.map (fun d -> $"  {d}") |> String.concat "\n"
+            let it = if objects.Length = 1 then "it" else "them"
+            let names = String.concat ", " objects
+
+            $"Can't remove {names}: other objects refer to {it}:\n{list}\n"
+            + $"Remove those too (or use --cascade), or use --force to remove {it} anyway and leave these references broken."
+        | UnsupportedRemove(objectRef, reason) -> $"Can't remove {objectRef}: {reason}"

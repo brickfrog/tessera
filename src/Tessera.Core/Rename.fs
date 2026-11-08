@@ -253,7 +253,7 @@ let private queryOrderEdit (db: Database) (entries: ObjectEntry list) (oldName: 
             None
 
 /// Objects holding M (partitions, named expressions) that mention a name.
-let private mMentions (entries: ObjectEntry list) (target: ObjectEntry) (name: string) =
+let mMentions (entries: ObjectEntry list) (target: ObjectEntry) (name: string) =
     entries
     |> List.filter (fun e ->
         not (obj.ReferenceEquals(e.Object, target.Object))

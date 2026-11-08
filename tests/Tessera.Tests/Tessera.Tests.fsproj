@@ -23,11 +23,13 @@
     <Compile Include="RenameTests.fs" />
     <Compile Include="BpaTests.fs" />
     <Compile Include="MutationTests.fs" />
+    <Compile Include="RemoveMoveTests.fs" />
     <Compile Include="CliHarness.fs" />
     <Compile Include="ValidateCommandTests.fs" />
     <Compile Include="CliTests.fs" />
     <Compile Include="InitCommandTests.fs" />
     <Compile Include="RenameCommandTests.fs" />
+    <Compile Include="RemoveMoveCommandTests.fs" />
     <Compile Include="BpaCommandTests.fs" />
     <Compile Include="SampleModelTests.fs" />
     <Compile Include="Main.fs" />

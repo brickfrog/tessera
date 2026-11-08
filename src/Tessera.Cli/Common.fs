@@ -31,6 +31,8 @@ module ExitCode =
         | NameCollision _
         | UnsupportedRename _
         | RenameConflict _ -> input
+        | RemoveBlocked _
+        | UnsupportedRemove _ -> input
         | InvalidRules _ -> input
         | ChangeIntroducesErrors _ -> findings
         | DestinationNotEmpty _
