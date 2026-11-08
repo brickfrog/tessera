@@ -19,13 +19,54 @@ let private jsonOptions (children: bool) =
         IncludeRestrictedInformation = false
     )
 
-/// TOM's JSON for one object. Without children, child collections are left out but annotations kept.
+let private serialize (db: Database) (children: bool) (o: MetadataObject) =
+    JsonSerializer.SerializeObject(
+        o,
+        jsonOptions children,
+        db.CompatibilityLevel,
+        ModelIO.effectiveCompatibilityMode db
+    )
+
+/// Items kept inside a sub-object: they belong to it, not to a child object of their own.
+let private ownLists = set [ "annotations"; "extendedProperties" ]
+
+/// Drop child collections (arrays other than annotations and extended properties) from a sub-object.
+let rec private pruneSubObject (o: JsonObject) =
+    for KeyValue(k, v) in List.ofSeq o do
+        match v with
+        | :? JsonArray when not (ownLists.Contains k) -> o.Remove k |> ignore
+        | :? JsonObject as sub -> pruneSubObject sub
+        | _ -> ()
+
+/// TOM's JSON for one object. Without children, child collections (columns, measures, a role's
+/// members, ...) are left out, but the object's own sub-objects (kpi, formatStringDefinition,
+/// detailRowsDefinition, calculationGroup without its items, alternateOf, ...), annotations and
+/// extended properties are kept: TOM's IgnoreChildrenExceptAnnotations would drop those too.
 /// The level and mode must be passed explicitly: the defaults (AS mode) reject Power BI-only
 /// properties such as relatedColumnDetails, even when serializing an unrelated object.
 let objectJson (db: Database) (children: bool) (o: MetadataObject) =
-    JsonSerializer
-        .SerializeObject(o, jsonOptions children, db.CompatibilityLevel, ModelIO.effectiveCompatibilityMode db)
-        .Replace("\r\n", "\n")
+    let json =
+        if children then
+            serialize db true o
+        else
+            let plain = JsonNode.Parse(serialize db false o) :?> JsonObject
+            let full = JsonNode.Parse(serialize db true o) :?> JsonObject
+
+            for KeyValue(k, v) in List.ofSeq full do
+                match v with
+                | _ when plain.ContainsKey k -> full.[k] <- plain.[k].DeepClone()
+                | :? JsonArray when k = "extendedProperties" -> ()
+                | :? JsonObject as sub -> pruneSubObject sub
+                | _ -> full.Remove k |> ignore
+
+            full.ToJsonString(
+                JsonSerializerOptions(
+                    WriteIndented = true,
+                    Encoder = Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+                )
+            )
+
+    json.Replace("\r\n", "\n")
 
 /// TMDL for one object, as it would appear in its file (unqualified, tabs, LF).
 let objectTmdl (children: bool) (o: MetadataObject) =
