@@ -16,6 +16,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Deps of ParseResults<DepsCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Init of ParseResults<InitCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Validate of ParseResults<ValidateCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Rename of ParseResults<RenameCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -31,3 +32,4 @@ type CliArgs =
             | Deps _ -> DepsCommand.summary
             | Init _ -> InitCommand.summary
             | Validate _ -> ValidateCommand.summary
+            | Rename _ -> RenameCommand.summary

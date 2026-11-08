@@ -51,6 +51,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Deps args) -> DepsCommand.run ctx args
                 | Some(Init args) -> InitCommand.run ctx args
                 | Some(Validate args) -> ValidateCommand.run ctx args
+                | Some(Rename args) -> RenameCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with

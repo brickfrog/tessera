@@ -20,10 +20,12 @@
     <Compile Include="DepsTests.fs" />
     <Compile Include="InitTests.fs" />
     <Compile Include="ValidateTests.fs" />
+    <Compile Include="RenameTests.fs" />
     <Compile Include="CliHarness.fs" />
     <Compile Include="ValidateCommandTests.fs" />
     <Compile Include="CliTests.fs" />
     <Compile Include="InitCommandTests.fs" />
+    <Compile Include="RenameCommandTests.fs" />
     <Compile Include="SampleModelTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

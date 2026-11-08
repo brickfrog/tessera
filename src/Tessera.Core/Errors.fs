@@ -16,6 +16,10 @@ type TessError =
     | AmbiguousObject of input: string * candidates: string list
     | PropertyNotFound of objectRef: string * path: string
     | InvalidPattern of pattern: string * reason: string
+    | InvalidName of name: string * reason: string
+    | NameCollision of name: string * existing: string
+    | UnsupportedRename of objectRef: string * reason: string
+    | RenameConflict of objectRef: string * newName: string * details: string list
 
 module TessError =
 
@@ -35,6 +39,10 @@ module TessError =
         | AmbiguousObject _ -> "ambiguous-object"
         | PropertyNotFound _ -> "property-not-found"
         | InvalidPattern _ -> "invalid-pattern"
+        | InvalidName _ -> "invalid-name"
+        | NameCollision _ -> "name-collision"
+        | UnsupportedRename _ -> "unsupported-rename"
+        | RenameConflict _ -> "rename-conflict"
 
     let message =
         function
@@ -56,3 +64,9 @@ module TessError =
             $"'{input}' matches more than one object; use one of these:\n{list}"
         | PropertyNotFound(objectRef, path) -> $"{objectRef} has no property '{path}'"
         | InvalidPattern(pattern, reason) -> $"Invalid pattern '{pattern}': {reason}"
+        | InvalidName(name, reason) -> $"Invalid name '{name}': {reason}"
+        | NameCollision(name, existing) -> $"'{name}' is already taken by {existing} (names are case-insensitive)"
+        | UnsupportedRename(objectRef, reason) -> $"Can't rename {objectRef}: {reason}"
+        | RenameConflict(objectRef, newName, details) ->
+            let list = details |> List.map (fun d -> $"  {d}") |> String.concat "\n"
+            $"Renaming {objectRef} to '{newName}' would change what other references mean:\n{list}"

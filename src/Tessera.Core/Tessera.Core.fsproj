@@ -19,6 +19,7 @@
     <Compile Include="Dax.fs" />
     <Compile Include="Deps.fs" />
     <Compile Include="Validate.fs" />
+    <Compile Include="Rename.fs" />
   </ItemGroup>
 
   <ItemGroup>
