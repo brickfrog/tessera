@@ -15,7 +15,7 @@ from the [releases page](https://github.com/brickfrog/tessera/releases) (`linux-
 `osx-arm64`, `osx-x64`), unpack it, and put `tess` (`tess.exe` on Windows) on your `PATH`:
 
 ```sh
-tar -xzf tess-0.2.0-linux-x64.tar.gz && install tess-0.2.0-linux-x64/tess ~/.local/bin/
+tar -xzf tess-<version>-linux-x64.tar.gz && install tess-<version>-linux-x64/tess ~/.local/bin/
 ```
 
 The Linux binaries are built for glibc-based distributions and need ICU (`libicu`, e.g. `apt install libicu74`),
@@ -551,4 +551,6 @@ To add a command:
 
 ## License
 
-MIT
+tessera's source is MIT (`LICENSE`). Release binaries and the tool package also bundle third-party
+components under their own terms, notably Microsoft's Analysis Management Objects (TOM) under the Microsoft
+Software License Terms. See [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md).
