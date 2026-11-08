@@ -93,6 +93,20 @@ type DiffArgs =
                 "leave these properties out: path wildcards, repeatable or comma-separated, e.g. lineageTag, "
                 + "annotations.PBI_*."
 
+type DepsArgs =
+    | [<MainCommand; ExactlyOnce>] Target of model: string * object: string
+    | [<AltCommandLine("-d")>] Depth of levels: int
+    | Depends_On
+    | Referenced_By
+
+    interface IArgParserTemplate with
+        member this.Usage =
+            match this with
+            | Target _ -> "model path, and the object (a ref, 'Table'[Name], [Name] or a bare name)."
+            | Depth _ -> "how many levels to follow (default 1; 0 = all the way)."
+            | Depends_On -> "only what the object depends on."
+            | Referenced_By -> "only what refers to the object."
+
 [<HelpFlags("--help", "-h")>]
 type CliArgs =
     | [<Inherit; AltCommandLine("-j")>] Json
@@ -103,6 +117,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Get of ParseResults<GetArgs>
     | [<CliPrefix(CliPrefix.None)>] Find of ParseResults<FindArgs>
     | [<CliPrefix(CliPrefix.None)>] Diff of ParseResults<DiffArgs>
+    | [<CliPrefix(CliPrefix.None)>] Deps of ParseResults<DepsArgs>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -115,3 +130,4 @@ type CliArgs =
             | Get _ -> "show one object (TMDL, or its JSON with --json)."
             | Find _ -> "search names, expressions, descriptions and other properties (exit 1: no matches)."
             | Diff _ -> "compare two models object by object (exit 1: they differ)."
+            | Deps _ -> "what an object depends on, and what refers to it."

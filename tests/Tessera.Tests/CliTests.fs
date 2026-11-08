@@ -318,4 +318,36 @@ let tests =
 
             let diff = tess [ "diff"; t.Path; edited ]
             Expect.stringContains diff.Out "    expression:\n      - SUM(Sales[Amount])\n      + SUMX(" diff.Out
+
+        testCase "deps: both directions by default"
+        <| fun () ->
+            use t = project ()
+            let r = tess [ "deps"; t.Path; "Sales[DateKey]" ]
+            Expect.equal r.Code App.ExitCode.ok r.Err
+            Expect.stringContains r.Out "depends on\n    (nothing)" ""
+            Expect.stringContains r.Out "relationship:Sales-Date  fromColumn" ""
+
+        testCase "deps --json --depends-on"
+        <| fun () ->
+            use t = project ()
+
+            let r =
+                tess [ "deps"; t.Path; "calcitem:Time Intelligence/YTD"; "--depends-on"; "--json" ]
+
+            Expect.equal r.Code App.ExitCode.ok r.Err
+            use doc = json r
+            let mutable referencedBy = Unchecked.defaultof<JsonElement>
+            Expect.isFalse (doc.RootElement.TryGetProperty("referencedBy", &referencedBy)) ""
+
+            let refs =
+                doc.RootElement.GetProperty("dependsOn").EnumerateArray()
+                |> Seq.map (fun n -> n.GetProperty("ref").GetString())
+                |> List.ofSeq
+
+            Expect.equal refs [ "column:Date/DateKey" ] ""
+
+        testCase "deps rejects a negative depth"
+        <| fun () ->
+            use t = project ()
+            Expect.equal (tess [ "deps"; t.Path; "[Total]"; "-d"; "-1" ]).Code App.ExitCode.usage ""
     ]

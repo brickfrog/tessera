@@ -213,6 +213,37 @@ let private runDiff (ctx: Ctx) (args: ParseResults<DiffArgs>) =
 
         if changes.IsEmpty then Done else DoneWith ExitCode.findings
 
+let private runDeps (ctx: Ctx) (args: ParseResults<DepsArgs>) =
+    let modelPath, selector = args.GetResult DepsArgs.Target
+    let depth = args.GetResult(DepsArgs.Depth, defaultValue = 1)
+
+    let directions =
+        match args.Contains DepsArgs.Depends_On, args.Contains DepsArgs.Referenced_By with
+        | true, false -> [ Deps.DependsOn ]
+        | false, true -> [ Deps.ReferencedBy ]
+        | _ -> [ Deps.DependsOn; Deps.ReferencedBy ]
+
+    if depth < 0 then
+        UsageError "--depth must be 0 (unlimited) or more"
+    else
+        let result =
+            ModelIO.loadPath modelPath
+            |> Result.bind (fun (_, db) ->
+                let g = Deps.build db
+                Inventory.Selector.resolve g.Entries selector |> Result.map (fun e -> g, e))
+
+        match result with
+        | Error e -> Failed e
+        | Ok(g, e) ->
+            let trees = directions |> List.map (fun d -> d, Deps.tree d depth g e.Ref)
+
+            if ctx.Json then
+                Render.writeJson ctx.Out (Render.depsJson e.Ref trees)
+            else
+                Render.depsText ctx.Out e.Ref trees
+
+            Done
+
 let private runConvert (ctx: Ctx) (args: ParseResults<ConvertArgs>) =
     let source, destination = args.GetResult ConvertArgs.Paths
 
@@ -307,6 +338,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Get args) -> runGet ctx args
                 | Some(Find args) -> runFind ctx args
                 | Some(Diff args) -> runDiff ctx args
+                | Some(Deps args) -> runDeps ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with

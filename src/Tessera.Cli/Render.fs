@@ -297,6 +297,87 @@ let diffText (out: TextWriter) (changes: Diff.Change list) =
         out.WriteLine()
         out.WriteLine(String.concat ", " parts)
 
+// ---- deps ------------------------------------------------------------------
+
+let private targetText =
+    function
+    | Deps.Resolved r -> ObjectRef.format r
+    | Deps.Unresolved text -> $"? {text}"
+
+/// expression:2,5  sortByColumn
+let private viaText (via: (string * int option) list) =
+    via
+    |> List.groupBy fst
+    |> List.map (fun (property, xs) ->
+        match xs |> List.choose snd |> List.distinct with
+        | [] -> property
+        | lines -> property + ":" + (lines |> List.map string |> String.concat ","))
+    |> String.concat "  "
+
+let rec private nodeJson (n: Deps.Node) : JsonNode =
+    obj [
+        match n.Target with
+        | Deps.Resolved r -> yield "ref", str (ObjectRef.format r)
+        | Deps.Unresolved text -> yield "unresolved", str text
+
+        yield
+            "via",
+            arr [
+                for property, line in n.Via ->
+                    obj [
+                        "property", str property
+                        "line",
+                        (match line with
+                         | Some l -> num l
+                         | None -> null)
+                    ]
+            ]
+        if n.Cycle then
+            yield "cycle", bool true
+
+        if not n.Children.IsEmpty then
+            yield "children", arr (n.Children |> List.map nodeJson)
+    ]
+
+let private directionKey =
+    function
+    | Deps.DependsOn -> "dependsOn"
+    | Deps.ReferencedBy -> "referencedBy"
+
+let depsJson (root: ObjectRef) (trees: (Deps.Direction * Deps.Node list) list) =
+    obj [
+        yield "ref", str (ObjectRef.format root)
+
+        for direction, nodes in trees do
+            yield directionKey direction, arr (nodes |> List.map nodeJson)
+    ]
+
+let depsText (out: TextWriter) (root: ObjectRef) (trees: (Deps.Direction * Deps.Node list) list) =
+    out.WriteLine(ObjectRef.format root)
+
+    let rec write (indent: string) (nodes: Deps.Node list) =
+        let width =
+            nodes |> List.map (fun n -> (targetText n.Target).Length) |> List.fold max 0
+
+        for n in nodes do
+            let label = targetText n.Target
+            let cycle = if n.Cycle then "  (circular)" else ""
+            out.WriteLine($"{indent}{label.PadRight width}  {viaText n.Via}{cycle}")
+            write (indent + "    ") n.Children
+
+    for direction, nodes in trees do
+        let heading =
+            match direction with
+            | Deps.DependsOn -> "depends on"
+            | Deps.ReferencedBy -> "referenced by"
+
+        out.WriteLine($"  {heading}")
+
+        if nodes.IsEmpty then
+            out.WriteLine("    (nothing)")
+        else
+            write "    " nodes
+
 // ---- convert -----------------------------------------------------------------
 
 let convertJson (source: ModelSource) (saved: ModelIO.SavedModel) =

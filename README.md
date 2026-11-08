@@ -4,7 +4,7 @@
 `.bim`, TMDL folders, and Power BI Project (PBIP) folders, and is built in F# on Microsoft's own TOM library
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
-Status: early. `convert`, `info`, `list`, `get`, `find` and `diff` work.
+Status: early. `convert`, `info`, `list`, `get`, `find`, `diff` and `deps` work.
 
 ## Usage
 
@@ -19,6 +19,8 @@ tess find  ./MyReport.pbip "Budget Rate"          # names, DAX, M, descriptions,
 tess find  ./MyReport.pbip 'CALCULATE\s*\(' -E -k measure --in expression
 tess diff  ./main/Sales.SemanticModel ./branch/Sales.SemanticModel   # object-level changes
 tess diff  ./server-export.bim ./Sales.pbip --ignore lineageTag --json
+tess deps  ./MyReport.pbip "[Gross Margin %]"     # what it uses, and what uses it
+tess deps  ./MyReport.pbip "Date[Date]" --referenced-by --depth 0
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
 tess convert ./Sales.SemanticModel ./model.bim   # PBIP -> .bim
 tess convert ./tmdl ./tmdl --force                # re-serialize in place (keeps its line endings)
@@ -130,6 +132,33 @@ What is compared:
   `--ignore lineageTag,annotations.PBI_*`.
 - A change of compatibility level shows up on `model`.
 - The order of child objects is not compared.
+
+### Dependencies (`deps`)
+
+`deps` reads every DAX expression in the model:
+- measure expressions, plus their format string, detail rows and KPI expressions
+- calculated columns and calculated tables
+- calculation items and calculation group expressions
+- row-level security filters
+- user-defined functions
+
+It adds structural links: sort-by columns, hierarchy levels, and relationship columns. How a reference resolves:
+
+| Written as | Resolves to |
+|---|---|
+| `'Sales'[X]`, `Sales[X]` | a column named X in Sales, otherwise a measure |
+| `[X]` | a column in the expression's own table, then a measure in it, then a measure anywhere |
+| `Sales`, `'Sales'` | the table (or calendar) |
+| `Name(...)` | a user-defined function, if one has that name (built-in functions aren't objects) |
+
+Some names belong to the expression itself and are not model references:
+- `VAR` names and function parameters, which shadow tables of the same name
+- columns created inside the expression, like `"Local"` in `ADDCOLUMNS(t, "Local", ...)`
+- `''[X]` columns of anonymous tables
+
+Comments and strings are never treated as references. A reference that names nothing in the model is listed as
+`? <text>`. Each link shows the property and line it comes from, e.g. `expression:5`. `--depth` follows links
+further (0 means all the way), and circular references are marked rather than followed.
 
 ### JSON and exit codes
 
