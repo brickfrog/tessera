@@ -46,27 +46,51 @@ let tests =
                 |]
                 ""
 
-        testCase "--json: summary and issues"
+        testCase "--json: the shared findings envelope"
         <| fun () ->
             use t = new TempDir()
             let r = tess [ "validate"; brokenModel t; "--json" ]
             Expect.equal r.Code ExitCode.findings r.Err
             use doc = json r
             let root = doc.RootElement
+            Expect.equal (root.GetProperty("command").GetString()) "validate" ""
+            Expect.isTrue (root.GetProperty("durationMs").GetInt32() >= 0) ""
+            Expect.isFalse (root.GetProperty("valid").GetBoolean()) "an error makes the model invalid"
             let summary = root.GetProperty "summary"
             Expect.equal (summary.GetProperty("errors").GetInt32()) 1 ""
             Expect.equal (summary.GetProperty("warnings").GetInt32()) 1 ""
-            Expect.equal (summary.GetProperty("infos").GetInt32()) 0 ""
-            let issues = root.GetProperty("issues").EnumerateArray() |> List.ofSeq
-            Expect.equal issues.Length 2 ""
-            let first = issues.[0]
-            Expect.equal (first.GetProperty("rule").GetString()) "unresolved-reference" ""
+            Expect.equal (summary.GetProperty("info").GetInt32()) 0 ""
+            Expect.equal (summary.GetProperty("total").GetInt32()) 2 ""
+            let findings = root.GetProperty("findings").EnumerateArray() |> List.ofSeq
+            Expect.equal findings.Length 2 ""
+            let first = findings.[0]
+            Expect.equal (first.GetProperty("code").GetString()) "unresolved-reference" ""
+            Expect.equal (first.GetProperty("source").GetString()) "validate" ""
             Expect.equal (first.GetProperty("severity").GetString()) "error" ""
-            Expect.equal (first.GetProperty("ref").GetString()) "measure:Sales/Broken" ""
-            Expect.equal (first.GetProperty("property").GetString()) "expression" ""
-            Expect.equal (first.GetProperty("line").GetInt32()) 2 ""
+            Expect.equal (first.GetProperty("objectPath").GetString()) "measure:Sales/Broken" ""
+            Expect.equal (first.GetProperty("object").GetString()) "Broken" ""
+            Expect.equal (first.GetProperty("objectType").GetString()) "Measure" ""
+            let position = first.GetProperty "expressionPosition"
+            Expect.equal (position.GetProperty("property").GetString()) "expression" ""
+            Expect.equal (position.GetProperty("lineNumber").GetInt32()) 2 ""
+            Expect.isTrue (position.GetProperty("column").GetInt32() >= 1) ""
             Expect.stringContains (first.GetProperty("message").GetString()) "'Nope'[X]" ""
-            Expect.equal (issues.[1].GetProperty("line").ValueKind) JsonValueKind.Null ""
+            Expect.isFalse (first.GetProperty("fixable").GetBoolean()) ""
+            // Optional keys are absent, not null.
+            let mutable none = Unchecked.defaultof<JsonElement>
+            Expect.isFalse (findings.[1].TryGetProperty("expressionPosition", &none)) "no position: key left out"
+            Expect.isFalse (first.TryGetProperty("ruleName", &none)) ""
+
+        testCase "--ci writes annotations to stderr"
+        <| fun () ->
+            use t = new TempDir()
+            let path = brokenModel t
+            let gh = tess [ "validate"; path; "--ci"; "github" ]
+            Expect.stringContains gh.Err "::error title=unresolved-reference::measure:Sales/Broken: " ""
+            Expect.stringContains gh.Err "::warning title=empty-expression::" ""
+            let azdo = tess [ "validate"; path; "--ci"; "azdo" ]
+            Expect.stringContains azdo.Err "##vso[task.logissue type=error;code=unresolved-reference]" ""
+            Expect.equal (tess [ "validate"; path; "--ci"; "jenkins" ]).Code ExitCode.usage ""
 
         testCase "--rule picks rules; warnings alone exit 0 unless --fail-on warning"
         <| fun () ->
@@ -91,7 +115,7 @@ let tests =
                 ]
 
             use doc = json both
-            Expect.equal (doc.RootElement.GetProperty("issues").GetArrayLength()) 2 ""
+            Expect.equal (doc.RootElement.GetProperty("findings").GetArrayLength()) 2 ""
 
         testCase "--min-severity hides issues, but --fail-on still sees them"
         <| fun () ->

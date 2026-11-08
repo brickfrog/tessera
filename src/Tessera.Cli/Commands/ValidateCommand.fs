@@ -1,5 +1,6 @@
 module Tessera.Cli.ValidateCommand
 
+open System
 open System.IO
 open System.Text.Json.Nodes
 open Argu
@@ -17,6 +18,7 @@ type Args =
     | Min_Severity of level: string
     | Fail_On of level: string
     | Rule of rules: string
+    | Ci of system: string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -28,6 +30,7 @@ type Args =
             | Rule _ ->
                 let ids = rules |> List.map fst |> String.concat ", "
                 $"only these rules (repeatable or comma-separated): {ids}."
+            | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
 
 /// "2 errors, 1 warning"; zero counts are left out.
 let private summaryText (issues: Issue list) =
@@ -53,32 +56,34 @@ let private location (i: Issue) =
     | Some p, None -> p
     | None, _ -> ""
 
-let validateJson (issues: Issue list) =
-    let count s =
-        issues |> List.filter (fun i -> i.Severity = s) |> List.length
+/// An issue as a finding in the shared envelope (see Findings.fs).
+let toFinding (i: Issue) : Findings.Finding = {
+    Findings.about
+        i.Ref
+        (match i.Severity with
+         | Severity.Error -> Findings.Severity.Error
+         | Severity.Warning -> Findings.Severity.Warning
+         | Severity.Info -> Findings.Severity.Info)
+        "validate"
+        i.Rule
+        i.Message with
+        Position =
+            match i.Property, i.Line with
+            | Some p, Some l ->
+                Some {
+                    Property = p
+                    Line = l
+                    Column = i.Column
+                }
+            | _ -> None
+}
 
-    obj [
-        "summary",
-        obj [
-            "errors", num (count Severity.Error)
-            "warnings", num (count Severity.Warning)
-            "infos", num (count Severity.Info)
-        ]
-        "issues",
-        arr [
-            for i in issues ->
-                obj [
-                    "rule", str i.Rule
-                    "severity", str (Severity.token i.Severity)
-                    "ref", str (ObjectRef.format i.Ref)
-                    "property", optStr i.Property
-                    "line",
-                    (match i.Line with
-                     | Some l -> num l
-                     | None -> (null: JsonNode))
-                    "message", str i.Message
-                ]
-        ]
+/// The findings envelope, plus "valid": no errors among the issues.
+let validateJson (duration: TimeSpan) (issues: Issue list) =
+    let findings = issues |> List.map toFinding
+
+    Findings.envelope "validate" duration findings [
+        "valid", bool (issues |> List.forall (fun i -> i.Severity <> Severity.Error))
     ]
 
 /// severity  ref  property:line  message  [rule], aligned; then a summary line.
@@ -127,9 +132,20 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
                 severityArg "--fail-on" (args.TryGetResult Args.Fail_On) Severity.Error
                 |> Result.map (fun failOn -> minimum, failOn))
 
-    match options with
-    | Error message -> UsageError message
-    | Ok(minimum, failOn) ->
+    let ci =
+        match args.TryGetResult Args.Ci with
+        | None -> Ok Findings.NoCi
+        | Some c ->
+            Findings.Ci.tryParse c
+            |> Option.map Ok
+            |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
+
+    match options, ci with
+    | Error message, _
+    | _, Error message -> UsageError message
+    | Ok(minimum, failOn), Ok ci ->
+        let clock = Diagnostics.Stopwatch.StartNew()
+
         match ModelIO.loadPath modelPath with
         | Error e -> Failed e
         | Ok(_, db) ->
@@ -140,9 +156,11 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             let shown = issues |> List.filter (fun i -> Severity.atLeast minimum i.Severity)
 
             if ctx.Json then
-                writeJson ctx.Out (validateJson shown)
+                writeJson ctx.Out (validateJson clock.Elapsed shown)
             else
                 validateText ctx.Out shown
+
+            Findings.annotate ci ctx.Err (shown |> List.map toFinding)
 
             // --fail-on looks at every selected issue, so hiding warnings can't turn a failing check green.
             if issues |> List.exists (fun i -> Severity.atLeast failOn i.Severity) then

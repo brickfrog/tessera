@@ -28,7 +28,7 @@ let private rulesFile (t: TempDir) (json: string) =
 
 let private ids (doc: JsonDocument) (property: string) =
     [
-        for f in doc.RootElement.GetProperty(property).EnumerateArray() -> f.GetProperty("ruleId").GetString()
+        for f in doc.RootElement.GetProperty(property).EnumerateArray() -> f.GetProperty("code").GetString()
     ]
     |> List.distinct
 
@@ -62,27 +62,33 @@ let tests =
             let root = doc.RootElement
             let first = root.GetProperty("findings").[0]
 
+            Expect.equal (root.GetProperty("command").GetString()) "bpa" ""
+
             for p in
                 [
-                    "ruleId"
-                    "ruleName"
-                    "category"
                     "severity"
-                    "ref"
-                    "kind"
+                    "source"
+                    "code"
+                    "message"
                     "object"
                     "objectType"
+                    "objectPath"
+                    "ruleName"
+                    "category"
+                    "fixable"
                 ] do
                 Expect.isTrue (fst (first.TryGetProperty p)) p
 
-            let unsupported = root.GetProperty("unsupported").[0]
-            Expect.equal (unsupported.GetProperty("ruleId").GetString()) "BROKEN" ""
-            Expect.equal (unsupported.GetProperty("stage").GetString()) "compile" ""
-            Expect.stringContains (unsupported.GetProperty("error").GetString()) "Nope" ""
+            Expect.equal (first.GetProperty("source").GetString()) "bpa" ""
+            let ruleError = root.GetProperty("ruleErrors").[0]
+            Expect.equal (ruleError.GetProperty("ruleId").GetString()) "BROKEN" ""
+            Expect.equal (ruleError.GetProperty("stage").GetString()) "compile" ""
+            Expect.stringContains (ruleError.GetProperty("error").GetString()) "Nope" ""
+            Expect.equal (root.GetProperty("rules").GetProperty("errors").GetInt32()) 1 ""
             let summary = root.GetProperty "summary"
-            Expect.equal (summary.GetProperty("unsupported").GetInt32()) 1 ""
 
-            Expect.equal (summary.GetProperty("findings").GetInt32()) (root.GetProperty("findings").GetArrayLength()) ""
+            Expect.equal (summary.GetProperty("total").GetInt32()) (root.GetProperty("findings").GetArrayLength()) ""
+            Expect.equal (root.GetProperty("violations").GetInt32()) (summary.GetProperty("total").GetInt32()) ""
 
         testCase "unsupported rules are reported on stderr in text mode"
         <| fun () ->
@@ -118,7 +124,7 @@ let tests =
             use doc = json r
 
             for f in doc.RootElement.GetProperty("findings").EnumerateArray() do
-                Expect.equal (f.GetProperty("severity").GetInt32()) 3 ""
+                Expect.equal (f.GetProperty("severity").GetString()) "error" ""
 
             let r = tess [ "bpa"; t.Combine "model.bim"; "-c"; "dax,naming"; "--json" ]
             use doc = json r
@@ -178,7 +184,7 @@ let tests =
             use doc = json r
             Expect.isFalse (ids doc "findings" |> List.contains "TESS_DIVIDE") ""
             Expect.equal (ids doc "ignored") [ "TESS_DIVIDE" ] ""
-            Expect.equal (doc.RootElement.GetProperty("summary").GetProperty("ignored").GetInt32()) 1 ""
+            Expect.equal (doc.RootElement.GetProperty("rules").GetProperty("ignoredFindings").GetInt32()) 1 ""
 
         testCase "rules embedded in the model run too, unless --no-model-rules"
         <| fun () ->
@@ -242,6 +248,8 @@ let tests =
                     rules
                     "--trx"
                     trx
+                    "--fail-on"
+                    "info"
                 ]
 
             Expect.equal r.Code ExitCode.findings r.Err
@@ -271,10 +279,41 @@ let tests =
         <| fun () ->
             use p = project ()
             let r = tess [ "bpa"; p.Path; "--json" ]
-            Expect.equal r.Code ExitCode.findings r.Err
+            // The fixture project has warnings and info but no errors, so the default --fail-on passes.
+            Expect.equal r.Code ExitCode.ok r.Err
             use doc = json r
-            Expect.isGreaterThan (doc.RootElement.GetProperty("summary").GetProperty("rules").GetInt32()) 0 ""
+            Expect.isGreaterThan (doc.RootElement.GetProperty("rules").GetProperty("total").GetInt32()) 0 ""
 
         testCase "help lists bpa"
         <| fun () -> Expect.stringContains (tess [ "--help" ]).Out "bpa" ""
+
+        testCase "--fail-on: by default only errors fail the run"
+        <| fun () ->
+            use t = model ignore
+
+            let rules =
+                rulesFile
+                    t
+                    (ruleJson [
+                        [
+                            "ID", box "WARN"
+                            "Scope", box "Measure"
+                            "Expression", box "true"
+                            "Severity", box 2
+                        ]
+                    ])
+
+            let run extra =
+                (tess ([ "bpa"; t.Combine "model.bim"; "--no-default-rules"; "-r"; rules ] @ extra)).Code
+
+            Expect.equal (run []) ExitCode.ok "warnings alone pass"
+            Expect.equal (run [ "--fail-on"; "warning" ]) ExitCode.findings ""
+            Expect.equal (run [ "--fail-on"; "nope" ]) ExitCode.usage ""
+
+        testCase "--ci annotations, most severe first"
+        <| fun () ->
+            use t = model ignore
+            let r = tess [ "bpa"; t.Combine "model.bim"; "--ci"; "github" ]
+            let first = r.Err.Split('\n') |> Array.find (fun l -> l.StartsWith "::")
+            Expect.stringStarts first "::error title=TESS_" ""
     ]

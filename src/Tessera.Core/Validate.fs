@@ -50,6 +50,8 @@ type Issue = {
     Property: string option
     /// 1-based line in that property's DAX.
     Line: int option
+    /// 1-based column on that line, where the position is known exactly.
+    Column: int option
     Message: string
 }
 
@@ -74,6 +76,7 @@ let private issue rule severity (r: ObjectRef) property line message = {
     Ref = r
     Property = property
     Line = line
+    Column = None
     Message = message
 }
 
@@ -87,6 +90,17 @@ let private columnText (c: Column) =
 // --- unresolved-reference ------------------------------------------------------------------------
 
 let private unresolvedReferences (g: Deps.Graph) =
+    let daxOf =
+        Deps.daxSources g.Entries
+        |> List.map (fun s -> (s.Owner.Ref, s.Property), s.Dax)
+        |> List.distinctBy fst
+        |> dict
+
+    let columnOf (r: Deps.Reference) =
+        match r.Start, daxOf.TryGetValue((r.From, r.Via)) with
+        | Some start, (true, dax) -> Some(columnOf dax start)
+        | _ -> None
+
     let tableExists name =
         g.Entries
         |> List.exists (fun e ->
@@ -98,8 +112,10 @@ let private unresolvedReferences (g: Deps.Graph) =
             match r.Target with
             | Deps.Resolved _ -> ()
             | Deps.Unresolved text ->
-                let at severity message =
-                    issue "unresolved-reference" severity r.From (Some r.Via) r.Line message
+                let at severity message = {
+                    issue "unresolved-reference" severity r.From (Some r.Via) r.Line message with
+                        Column = columnOf r
+                }
 
                 match tokenize text |> significant with
                 | [ t; n ] when Token.isName t && n.Kind = TokenKind.Bracketed ->
@@ -315,8 +331,10 @@ let private invalidTokens (g: Deps.Graph) = [
                 | _ -> None
 
             match problem with
-            | Some message ->
-                issue "invalid-token" Severity.Error s.Owner.Ref (Some s.Property) (Some(lineOf s.Dax t.Start)) message
+            | Some message -> {
+                issue "invalid-token" Severity.Error s.Owner.Ref (Some s.Property) (Some(lineOf s.Dax t.Start)) message with
+                    Column = Some(columnOf s.Dax t.Start)
+              }
             | None -> ()
 ]
 

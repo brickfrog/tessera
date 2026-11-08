@@ -14,6 +14,7 @@
   <ItemGroup>
     <Compile Include="Output.fs" />
     <Compile Include="Common.fs" />
+    <Compile Include="Findings.fs" />
     <Compile Include="Commands/InfoCommand.fs" />
     <Compile Include="Commands/ListCommand.fs" />
     <Compile Include="Commands/GetCommand.fs" />

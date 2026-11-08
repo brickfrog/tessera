@@ -244,8 +244,8 @@ Options:
 - `--fail-on error|warning|info` sets the exit code: 1 if any issue is this severe or more. The default is
   `error`. Issues hidden by `--min-severity` still count, so hiding warnings can't turn a failing check green.
 
-`--json` writes `{"summary": {"errors", "warnings", "infos"}, "issues": [{"rule", "severity", "ref",
-"property", "line", "message"}]}`, where `property` and `line` may be `null`.
+`--json` writes the [findings envelope](#findings-json-and-ci-annotations), with `"valid": false` when there are
+errors. `--ci github|azdo` also writes CI annotations to stderr.
 ### Renaming (`rename`)
 
 `tess rename <model> <object> <new name>` renames an object and rewrites every DAX reference to it. Only the
@@ -302,7 +302,7 @@ tess bpa ./Sales.pbip                              # built-in rules, plus rules 
 tess bpa ./Sales.pbip -r BPARules.json -r team.json --no-default-rules
 tess bpa ./Sales.pbip --category DAX,Performance --min-severity 2
 tess bpa ./Sales.pbip --list-rules                 # what would run, and whether each rule is supported
-tess bpa ./Sales.pbip --json                       # findings, ignored findings, unsupported rules, summary
+tess bpa ./Sales.pbip --json                       # the findings envelope, plus ignored findings and rule errors
 tess bpa ./Sales.pbip --trx bpa.trx                # VSTest results, one test per rule (Azure DevOps etc.)
 ```
 
@@ -315,9 +315,18 @@ info     measure:Sales/Total         TESS_MEASURE_DESCRIPTION  Describe visible 
 3 findings (1 error, 1 warning, 1 info); 25 rules checked
 ```
 
-Severity 1 is info, 2 a warning and 3 (or more) an error. `bpa` exits 1 when there are findings from the rules
-it ran. `--min-severity` and `--category` (case-insensitive, repeatable) choose which rules run. Rules that
-can't run are listed on stderr (in JSON, under `unsupported`). They don't change the exit code.
+Severity 1 is info, 2 a warning and 3 (or more) an error. `bpa` exits 1 when a finding is at least as severe
+as `--fail-on` (`error`, `warning` or `info`; default `error`). `--min-severity` and `--category`
+(case-insensitive, repeatable) choose which rules run. Rules that can't run are listed on stderr (in JSON, under
+`ruleErrors`). They don't change the exit code. `--json` writes the
+[findings envelope](#findings-json-and-ci-annotations) with these extra keys:
+- `model`, `rulesEvaluated`, `violations`
+- `ignored`: findings suppressed by annotations
+- `ruleErrors`: `{ruleId, ruleName, stage, error}`
+- `skippedRules`, `warnings`
+- `rules`: counts
+
+`--ci github|azdo` writes CI annotations to stderr.
 
 Which rules run, lowest precedence first (a later rule replaces an earlier one with the same ID):
 1. tessera's built-in rules (unless `--no-default-rules`)
@@ -474,6 +483,38 @@ analyzer. Known differences:
 - Object names in the output use tess references, e.g. `table:Sales`.
 - Only read-only members are available, so rules can't call TE's methods that change the model.
 
+### Findings JSON and CI annotations
+
+`validate` and `bpa` (and later `test` and `schemacheck`) report findings in one shape, the one the Tabular
+Editor CLI uses, so tooling written for one reads the other:
+
+```json
+{ "command": "validate", "durationMs": 361,
+  "summary": { "errors": 1, "warnings": 0, "info": 0, "total": 1 },
+  "findings": [ { "severity": "error", "source": "validate", "code": "unresolved-reference",
+                  "message": "'Nope'[Revenue] does not exist: there is no table 'Nope'",
+                  "object": "Gross Margin %", "objectType": "Measure",
+                  "objectPath": "measure:Invoiced Sales/Gross Margin %",
+                  "expressionPosition": { "property": "expression", "lineNumber": 5, "column": 26 },
+                  "fixable": false } ],
+  "valid": false }
+```
+
+How the fields work:
+- **Severity:** `error`, `warning` or `info`.
+- **`code`:** stable. It's the `validate` rule id or the BPA rule ID.
+- **`objectPath`:** a tessera reference, so it pastes into any command.
+- **`objectType`:** one of `Model`, `Table`, `Column`, `Measure`, `Hierarchy`, `Level`, `Partition`,
+  `CalculationItem`, `Calendar`, `Relationship`, `Role`, `Perspective`, `Culture`, `NamedExpression`, `Function`,
+  `DataSource`.
+- **Optional keys** (`objectPath`, `expressionPosition`, `ruleName`, `category`) are left out rather than written
+  as `null`. Where the position is only known to the line, `expressionPosition` has no `column`.
+- **`fixable`:** always `false` for now, because no command applies fixes yet.
+
+`--ci github` writes one `::error` / `::warning` / `::notice` line per finding to stderr. `--ci azdo` writes
+`##vso[task.logissue ...]` lines, with info findings as plain lines so info-only runs stay green. Each line carries
+the code as its title.
+
 ### JSON and exit codes
 
 `--json` (or `-j`) writes one JSON document to stdout, errors included (`{"error": {"code", "message"}}`).
@@ -481,7 +522,7 @@ analyzer. Known differences:
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues |
+| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`) |
 | 2 | usage error (including an invalid new name for `rename`) |
 | 3 | input error (model not found, unrecognised, ambiguous, failed to load; for `rename`, a name that's taken or a rename that would change other references) |
 | 4 | output error (destination not empty, write failed) |

@@ -200,6 +200,15 @@ let lineOf (text: string) (offset: int) =
 
     line
 
+/// 1-based column of an offset in a text (characters since the last line break).
+let columnOf (text: string) (offset: int) =
+    let offset = min offset text.Length
+
+    match text.LastIndexOf('\n', max 0 (offset - 1)) with
+    | _ when offset = 0 -> 1
+    | -1 -> offset + 1
+    | nl -> offset - nl
+
 /// Quote a table name for DAX: 'Sales Table' (always quoted, '' escaped).
 let quoteTable (name: string) = "'" + name.Replace("'", "''") + "'"
 

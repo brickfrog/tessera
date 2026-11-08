@@ -25,6 +25,8 @@ type Args =
     | [<AltCommandLine("-c")>] Category of category: string
     | List_Rules
     | Trx of path: string
+    | Fail_On of level: string
+    | Ci of system: string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -37,6 +39,8 @@ type Args =
             | Category _ -> "only run rules in this category (repeatable or comma-separated)."
             | List_Rules -> "list the rules that would run, and whether each is supported, instead of running them."
             | Trx _ -> "also write the results as a VSTest .trx file (one test per rule), e.g. for Azure DevOps."
+            | Fail_On _ -> "exit 1 if any finding is this severe or more: error, warning or info (default: error)."
+            | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
 
 let private severityName (s: int) =
     if s >= 3 then "error"
@@ -55,17 +59,20 @@ let private problems (results: Bpa.RuleResult list) =
         | Bpa.Failed e -> Some(r.Rule, "evaluate", e)
         | _ -> None)
 
-let private findingJson (f: Bpa.Finding) =
-    obj [
-        "ruleId", str f.Rule.Id
-        "ruleName", str f.Rule.Name
-        "category", str f.Rule.Category
-        "severity", num f.Rule.Severity
-        "ref", str (ObjectRef.format f.Ref)
-        "kind", str (ObjectKind.token f.Ref.Kind)
-        "object", str f.ObjectName
-        "objectType", str f.ObjectType
-    ]
+let private severityOf (s: int) =
+    if s >= 3 then Findings.Severity.Error
+    elif s = 2 then Findings.Severity.Warning
+    else Findings.Severity.Info
+
+/// A BPA finding in the shared envelope (see Findings.fs): code = rule ID, message = rule name.
+let toFinding (f: Bpa.Finding) : Findings.Finding = {
+    Findings.about f.Ref (severityOf f.Rule.Severity) "bpa" f.Rule.Id f.Rule.Name with
+        Object = f.ObjectName
+        RuleName = Some f.Rule.Name
+        Category = Option.ofObj f.Rule.Category |> Option.filter (String.IsNullOrWhiteSpace >> not)
+}
+
+let private findingJson (f: Bpa.Finding) = Findings.findingJson (toFinding f)
 
 let private ruleJson (r: Rule) (support: Result<unit, string>) =
     obj [
@@ -115,13 +122,15 @@ let private summarize (results: Bpa.RuleResult list) = {
 let private countSeverity (s: Summary) (pred: int -> bool) =
     s.Findings |> List.filter (fun f -> pred f.Rule.Severity) |> List.length
 
-let private resultsJson (results: Bpa.RuleResult list) (warnings: string list) =
+let private resultsJson (duration: TimeSpan) (model: string) (results: Bpa.RuleResult list) (warnings: string list) =
     let s = summarize results
 
-    obj [
-        "findings", arr (s.Findings |> List.map findingJson)
+    Findings.envelope "bpa" duration (s.Findings |> List.map toFinding) [
+        "model", str model
+        "rulesEvaluated", num s.Evaluated
+        "violations", num s.Findings.Length
         "ignored", arr (results |> List.collect (fun r -> r.Ignored) |> List.map findingJson)
-        "unsupported",
+        "ruleErrors",
         arr [
             for rule, stage, error in problems results ->
                 obj [
@@ -131,7 +140,7 @@ let private resultsJson (results: Bpa.RuleResult list) (warnings: string list) =
                     "error", str error
                 ]
         ]
-        "skipped",
+        "skippedRules",
         arr [
             for r in results do
                 match r.Status with
@@ -150,16 +159,12 @@ let private resultsJson (results: Bpa.RuleResult list) (warnings: string list) =
                 | _ -> ()
         ]
         "warnings", arr (warnings |> List.map str)
-        "summary",
+        "rules",
         obj [
-            "rules", num s.Rules
+            "total", num s.Rules
             "evaluated", num s.Evaluated
-            "findings", num s.Findings.Length
-            "errors", num (countSeverity s (fun x -> x >= 3))
-            "warnings", num (countSeverity s (fun x -> x = 2))
-            "info", num (countSeverity s (fun x -> x <= 1))
-            "ignored", num s.Ignored
-            "unsupported", num s.Unsupported
+            "ignoredFindings", num s.Ignored
+            "errors", num s.Unsupported
             "skipped", num s.Skipped
         ]
     ]
@@ -367,6 +372,7 @@ let trx (modelPath: string) (started: DateTime) (results: Bpa.RuleResult list) =
 
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let started = DateTime.Now
+    let clock = Diagnostics.Stopwatch.StartNew()
     let modelPath = args.GetResult Args.Model
     let categories = parseList (args.GetResults Args.Category) |> Set.ofList
     let minSeverity = args.TryGetResult Args.Min_Severity |> Option.defaultValue 0
@@ -383,45 +389,76 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             || categories
                |> Set.exists (fun c -> String.Equals(c, r.Category, StringComparison.OrdinalIgnoreCase)))
 
-    match
-        ModelIO.loadPath modelPath
-        |> Result.bind (fun (source, db) -> Bpa.collectRules source db opts |> Result.map (fun x -> db, x))
-    with
-    | Error e -> Failed e
-    | Ok(db, (rules, warnings)) ->
-        let rules = rules |> List.filter selected
+    let failOn =
+        match
+            args.TryGetResult Args.Fail_On
+            |> Option.map (fun s -> s.Trim().ToLowerInvariant())
+        with
+        | None
+        | Some "error" -> Ok 3
+        | Some "warning" -> Ok 2
+        | Some "info" -> Ok 1
+        | Some other -> Error $"--fail-on: unknown severity '{other}' (known: error, warning, info)"
 
-        if args.Contains Args.List_Rules then
-            let checkedRules = rules |> List.map (fun r -> r, Bpa.compile r)
+    let ci =
+        match args.TryGetResult Args.Ci with
+        | None -> Ok Findings.NoCi
+        | Some c ->
+            Findings.Ci.tryParse c
+            |> Option.map Ok
+            |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
 
-            if ctx.Json then
-                writeJson ctx.Out (arr [ for r, support in checkedRules -> ruleJson r support ])
-            else
-                rulesText ctx.Out checkedRules
+    match failOn, ci with
+    | Error message, _
+    | _, Error message -> UsageError message
+    | Ok failOn, Ok ci ->
 
-            Done
-        else
-            let results = Bpa.analyze db rules
+        match
+            ModelIO.loadPath modelPath
+            |> Result.bind (fun (source, db) -> Bpa.collectRules source db opts |> Result.map (fun x -> db, x))
+        with
+        | Error e -> Failed e
+        | Ok(db, (rules, warnings)) ->
+            let rules = rules |> List.filter selected
 
-            let written =
-                match args.TryGetResult Args.Trx with
-                | None -> Ok()
-                | Some path ->
-                    try
-                        File.WriteAllText(path, trx modelPath started results)
-                        Ok()
-                    with e ->
-                        Error(SaveFailed(path, e.Message))
+            if args.Contains Args.List_Rules then
+                let checkedRules = rules |> List.map (fun r -> r, Bpa.compile r)
 
-            match written with
-            | Error e -> Failed e
-            | Ok() ->
                 if ctx.Json then
-                    writeJson ctx.Out (resultsJson results warnings)
+                    writeJson ctx.Out (arr [ for r, support in checkedRules -> ruleJson r support ])
                 else
-                    resultsText ctx results warnings
+                    rulesText ctx.Out checkedRules
 
-                if results |> List.exists (fun r -> not r.Findings.IsEmpty) then
-                    DoneWith ExitCode.findings
-                else
-                    Done
+                Done
+            else
+                let results = Bpa.analyze db rules
+
+                let written =
+                    match args.TryGetResult Args.Trx with
+                    | None -> Ok()
+                    | Some path ->
+                        try
+                            File.WriteAllText(path, trx modelPath started results)
+                            Ok()
+                        with e ->
+                            Error(SaveFailed(path, e.Message))
+
+                match written with
+                | Error e -> Failed e
+                | Ok() ->
+                    if ctx.Json then
+                        writeJson ctx.Out (resultsJson clock.Elapsed modelPath results warnings)
+                    else
+                        resultsText ctx results warnings
+
+                    let findings =
+                        results
+                        |> List.collect (fun r -> r.Findings)
+                        |> List.sortBy (fun f -> -f.Rule.Severity)
+
+                    Findings.annotate ci ctx.Err (findings |> List.map toFinding)
+
+                    if findings |> List.exists (fun f -> f.Rule.Severity >= failOn) then
+                        DoneWith ExitCode.findings
+                    else
+                        Done

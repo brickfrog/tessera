@@ -123,6 +123,14 @@ let tests =
             Expect.equal (lineOf "a\nb\nc" 2) 2 ""
             Expect.equal (lineOf "a\nb\nc" 4) 3 ""
 
+        testCase "columnOf"
+        <| fun () ->
+            Expect.equal (columnOf "abc" 0) 1 ""
+            Expect.equal (columnOf "abc" 2) 3 ""
+            Expect.equal (columnOf "ab\ncd" 3) 1 "first character after a line break"
+            Expect.equal (columnOf "ab\ncd" 4) 2 ""
+            Expect.equal (columnOf "ab\n\ncd" 4) 1 ""
+
         testCase "quoteTable / bracket escape"
         <| fun () ->
             Expect.equal (quoteTable "O'Brien") "'O''Brien'" ""
