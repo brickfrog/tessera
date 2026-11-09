@@ -19,6 +19,7 @@ type Args =
     | Fail_On of level: string
     | Rule of rules: string
     | Ci of system: string
+    | No_Group
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -31,6 +32,7 @@ type Args =
                 let ids = rules |> List.map fst |> String.concat ", "
                 $"only these rules (repeatable or comma-separated): {ids}."
             | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
+            | No_Group -> "list every issue on its own, instead of folding issues with one root cause into the first."
 
 /// "2 errors, 1 warning"; zero counts are left out.
 let private summaryText (issues: Issue list) =
@@ -109,6 +111,81 @@ let validateText (out: TextWriter) (issues: Issue list) =
 
     out.WriteLine(summaryText issues)
 
+/// "+2 more for 'Date'[DateKey]" after a root issue; nothing for others.
+let private groupSuffix =
+    function
+    | Root(cause, dependents) -> Some $"+{dependents.Length} more for {cause}"
+    | Alone
+    | Dependent _ -> None
+
+/// Like validateText, but a group of issues with one root cause shows as its first issue, with a count.
+let validateTextGrouped (out: TextWriter) (grouped: (Issue * Grouping) list) =
+    let shown =
+        grouped
+        |> List.filter (fun (_, g) ->
+            match g with
+            | Dependent _ -> false
+            | _ -> true)
+
+    let issues = shown |> List.map fst
+
+    let width f =
+        issues |> List.map (fun i -> String.length (f i)) |> List.fold max 0
+
+    let severityWidth = width (fun i -> Severity.token i.Severity)
+    let refWidth = width (fun i -> ObjectRef.format i.Ref)
+    let locationWidth = width location
+
+    for i, g in shown do
+        let columns = [
+            (Severity.token i.Severity).PadRight severityWidth
+            (ObjectRef.format i.Ref).PadRight refWidth
+            if locationWidth > 0 then
+                (location i).PadRight locationWidth
+            i.Message
+            $"[{i.Rule}]"
+            yield! Option.toList (groupSuffix g)
+        ]
+
+        out.WriteLine(String.concat "  " columns)
+
+    let folded = grouped.Length - shown.Length
+    let all = grouped |> List.map fst
+
+    if folded = 0 then
+        out.WriteLine(summaryText all)
+    else
+        out.WriteLine($"{summaryText all} ({folded} grouped under their root cause; --no-group lists them)")
+
+/// The findings envelope with root-cause grouping: every issue stays a finding; a root gets
+/// "dependents" (the other findings' objects) and each of those gets "rootCause" (the root's object).
+let validateJsonGrouped (duration: TimeSpan) (grouped: (Issue * Grouping) list) =
+    let path (i: Issue) = ObjectRef.format i.Ref
+
+    let keys =
+        function
+        | Alone -> []
+        | Root(_, dependents) -> [
+            "dependents", arr (dependents |> List.map path |> List.distinct |> List.map str)
+          ]
+        | Dependent(_, root) -> [ "rootCause", str (path root) ]
+
+    Findings.envelopeWith "validate" duration (grouped |> List.map (fun (i, g) -> toFinding i, keys g)) [
+        "valid", bool (grouped |> List.forall (fun (i, _) -> i.Severity <> Severity.Error))
+    ]
+
+/// CI annotations for grouped issues: one per root, with the count in its message.
+let private groupedAnnotations (grouped: (Issue * Grouping) list) = [
+    for i, g in grouped do
+        match g, groupSuffix g with
+        | Dependent _, _ -> ()
+        | _, Some suffix -> {
+            toFinding i with
+                Message = $"{i.Message} ({suffix})"
+          }
+        | _, None -> toFinding i
+]
+
 let private severityArg (name: string) (value: string option) (fallback: Severity) =
     match value with
     | None -> Ok fallback
@@ -149,18 +226,30 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         match ModelIO.loadPath modelPath with
         | Error e -> Failed e
         | Ok(_, db) ->
+            let g = Deps.build db
+
             let issues =
-                validate db
+                validateGraph g db
                 |> List.filter (fun i -> selected.IsEmpty || List.contains i.Rule selected)
 
             let shown = issues |> List.filter (fun i -> Severity.atLeast minimum i.Severity)
 
-            if ctx.Json then
-                writeJson ctx.Out (validateJson clock.Elapsed shown)
-            else
-                validateText ctx.Out shown
+            if args.Contains Args.No_Group then
+                if ctx.Json then
+                    writeJson ctx.Out (validateJson clock.Elapsed shown)
+                else
+                    validateText ctx.Out shown
 
-            Findings.annotate ci ctx.Err (shown |> List.map toFinding)
+                Findings.annotate ci ctx.Err (shown |> List.map toFinding)
+            else
+                let grouped = group g shown
+
+                if ctx.Json then
+                    writeJson ctx.Out (validateJsonGrouped clock.Elapsed grouped)
+                else
+                    validateTextGrouped ctx.Out grouped
+
+                Findings.annotate ci ctx.Err (groupedAnnotations grouped)
 
             // --fail-on looks at every selected issue, so hiding warnings can't turn a failing check green.
             if issues |> List.exists (fun i -> Severity.atLeast failOn i.Severity) then

@@ -38,6 +38,7 @@
     <Compile Include="SampleModelTests.fs" />
     <Compile Include="UnusedTests.fs" />
     <Compile Include="UnusedCommandTests.fs" />
+    <Compile Include="ValidateGroupTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

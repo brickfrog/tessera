@@ -154,6 +154,23 @@ let envelope (command: string) (duration: TimeSpan) (findings: Finding list) (ex
         yield! extra
     ]
 
+/// The envelope, with extra keys on individual findings (e.g. validate's root-cause grouping).
+let envelopeWith
+    (command: string)
+    (duration: TimeSpan)
+    (findings: (Finding * (string * JsonNode) list) list)
+    (extra: (string * JsonNode) list)
+    =
+    let node = envelope command duration (List.map fst findings) extra
+    let items = node.["findings"].AsArray()
+
+    findings
+    |> List.iteri (fun i (_, keys) ->
+        for key, value in keys do
+            items.[i].AsObject().Add(key, value))
+
+    node
+
 // ---- CI annotations ---------------------------------------------------------------------------
 
 type Ci =

@@ -347,9 +347,35 @@ Options:
 - `--min-severity error|warning|info` hides less severe issues.
 - `--fail-on error|warning|info` sets the exit code: 1 if any issue is this severe or more. The default is
   `error`. Issues hidden by `--min-severity` still count, so hiding warnings can't turn a failing check green.
+- `--no-group` lists issues that share a root cause one by one (see below).
 
 `--json` writes the [findings envelope](#findings-json-and-ci-annotations), with `"valid": false` when there are
 errors. `--ci github|azdo` also writes CI annotations to stderr.
+
+Issues with one root cause are grouped. In practice that means a name many expressions use but that nothing
+has, such as a column renamed or removed outside tess: every `unresolved-reference` naming it is one group, and
+so is every reference to a missing table or its columns. Names match ignoring case. The first issue stands for
+the group, with a count and the missing name, and the summary still counts every issue:
+
+```
+error  measure:Sales/A  expression:1  'Old'[X] does not exist: there is no table 'Old'  [unresolved-reference]  +2 more for 'Old'
+3 errors (2 grouped under their root cause; --no-group lists them)
+```
+
+How grouped issues are reported:
+- **JSON** keeps every finding. The group's first finding gets `dependents` (the other findings' `objectPath`s,
+  each listed once), and the others get `rootCause` (the first finding's `objectPath`). Findings outside a group
+  have neither key. `rootCause` says which finding stands for the group: fixing that one object doesn't fix the
+  others, but restoring the missing name fixes them all.
+- **CI annotations** are written once per group, with the count in the message.
+- **`--no-group`** lists every issue on its own, and the JSON has no grouping keys.
+
+Exit codes don't change. Grouping applies after `--rule` and `--min-severity`.
+
+Other rules don't cascade, so they aren't grouped. Every rule checks an object's own definition: a measure
+that uses a broken measure isn't reported, and TOM's validation doesn't read DAX. To see what a broken object affects, use
+`tess deps <model> <object> --referenced-by --depth 0`. TOM also doesn't say which name it couldn't find, so its
+own errors (e.g. a relationship to a missing column) aren't grouped with the DAX that names that column.
 ### Editing commands
 
 The editing commands (`rename`, `set`, `add`, `remove` and `move`) follow one set of conventions, the same as the

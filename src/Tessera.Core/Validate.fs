@@ -510,9 +510,8 @@ let private tomValidation (db: Database) (g: Deps.Graph) =
             $"TOM's validation could not run: {ex.Message}"
     ]
 
-/// Every issue in the model, in model-tree order.
-let validate (db: Database) : Issue list =
-    let g = Deps.build db
+/// Every issue in the model, in model-tree order, given its dependency graph (`Deps.build db`).
+let validateGraph (g: Deps.Graph) (db: Database) : Issue list =
     let order = g.Entries |> List.mapi (fun i e -> e.Ref, i) |> dict
 
     let position (i: Issue) =
@@ -532,3 +531,111 @@ let validate (db: Database) : Issue list =
     ]
     // Stable: issues on one object keep rule order.
     |> List.sortBy position
+
+/// Every issue in the model, in model-tree order.
+let validate (db: Database) : Issue list = validateGraph (Deps.build db) db
+
+// --- grouping by root cause ----------------------------------------------------------------------
+
+/// How an issue relates to others with the same root cause.
+type Grouping =
+    /// No other issue shares its cause.
+    | Alone
+    /// The first issue with this cause; the others are its dependents. `Cause` is the missing name,
+    /// as DAX writes it ('Sales'[Amount], 'Sales' or [Amount]).
+    | Root of cause: string * dependents: Issue list
+    /// Shares its cause with an earlier issue, `root`.
+    | Dependent of cause: string * root: Issue
+
+/// What a reference that names nothing is missing: a table (also for 'T'[X] when there is no T),
+/// a member of an existing table, or an unqualified [X].
+[<RequireQualifiedAccess>]
+type private Missing =
+    | Table of string
+    | Member of table: string * name: string
+    | Name of string
+
+/// The missing name behind each unresolved-reference issue, keyed as the issue locates it.
+let private missingNames (g: Deps.Graph) =
+    let daxOf =
+        Deps.daxSources g.Entries
+        |> List.map (fun s -> (s.Owner.Ref, s.Property), s.Dax)
+        |> List.distinctBy fst
+        |> dict
+
+    let tableName name =
+        g.Entries
+        |> List.tryPick (fun e ->
+            match e.Ref.Kind with
+            | ObjectKind.Table
+            | ObjectKind.Calendar when sameName (ObjectEntry.name e) name -> Some(ObjectEntry.name e)
+            | _ -> None)
+
+    let upper (s: string) = s.ToUpperInvariant()
+
+    let missing =
+        Dictionary<ObjectRef * string * int option * int option, Missing * string>()
+
+    for r in Deps.unresolved g do
+        match r.Target, r.Start, daxOf.TryGetValue((r.From, r.Via)) with
+        | Deps.Unresolved text, Some start, (true, dax) ->
+            let cause =
+                match tokenize text |> significant with
+                | [ t; n ] when Token.isName t && n.Kind = TokenKind.Bracketed ->
+                    match tableName t.Text with
+                    | Some table -> Some(Missing.Member(upper table, upper n.Text), quoteTable table + bracket n.Text)
+                    | None -> Some(Missing.Table(upper t.Text), quoteTable t.Text)
+                | [ t ] when t.Kind = TokenKind.QuotedTable -> Some(Missing.Table(upper t.Text), quoteTable t.Text)
+                | [ n ] when n.Kind = TokenKind.Bracketed -> Some(Missing.Name(upper n.Text), bracket n.Text)
+                | _ -> None
+
+            cause
+            |> Option.iter (fun c -> missing.[(r.From, r.Via, r.Line, Some(columnOf dax start))] <- c)
+        | _ -> ()
+
+    missing
+
+/// Group issues that share one root cause, keeping their order. In practice that is a name many
+/// expressions use but nothing has, e.g. a column renamed or removed outside tess: every
+/// unresolved-reference issue naming it, or naming any member of a missing table, is one group.
+/// (No rule reports issues on an object because something it depends on is broken, so issues don't
+/// cascade along dependencies. TOM's own validation doesn't say which name it couldn't find.)
+let group (g: Deps.Graph) (issues: Issue list) : (Issue * Grouping) list =
+    let missing = missingNames g
+
+    let causeOf (i: Issue) =
+        if i.Rule = "unresolved-reference" then
+            match i.Property with
+            | Some p ->
+                match missing.TryGetValue((i.Ref, p, i.Line, i.Column)) with
+                | true, c -> Some c
+                | _ -> None
+            | None -> None
+        else
+            None
+
+    let keyed = issues |> List.map (fun i -> i, causeOf i)
+
+    let groups =
+        keyed
+        |> List.choose (fun (i, c) -> c |> Option.map (fun (key, _) -> key, i))
+        |> List.groupBy fst
+        |> List.map (fun (key, xs) -> key, List.map snd xs)
+        |> dict
+
+    [
+        for i, c in keyed ->
+            match c with
+            | None -> i, Alone
+            | Some(key, _) ->
+                match groups.[key] with
+                | [ _ ] -> i, Alone
+                | root :: dependents ->
+                    let _, cause = (causeOf root).Value
+
+                    if obj.ReferenceEquals(root, i) then
+                        i, Root(cause, dependents)
+                    else
+                        i, Dependent(cause, root)
+                | [] -> i, Alone
+    ]
