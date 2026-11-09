@@ -152,10 +152,103 @@ let flatten (json: string) : (string * string) list =
     walk "" (JsonNode.Parse json)
     List.ofSeq out
 
+/// The properties of an object that a culture can translate, as TOM stores them. TOM accepts a
+/// translation of any property on any object, but its serializers keep only these (and a calculation
+/// item's translations break TMDL round-trips), so these are the ones that exist.
+let translatableProperties (o: MetadataObject) : TranslatedProperty list =
+    let all = [
+        TranslatedProperty.Caption
+        TranslatedProperty.Description
+        TranslatedProperty.DisplayFolder
+    ]
+
+    match o with
+    | :? Column as c when c.Type = ColumnType.RowNumber -> []
+    | :? Column
+    | :? Measure
+    | :? Hierarchy -> all
+    | :? Model
+    | :? Table
+    | :? Level
+    | :? Perspective
+    | :? NamedExpression
+    | :? Function
+    | :? Calendar -> [ TranslatedProperty.Caption; TranslatedProperty.Description ]
+    | :? ModelRole -> [ TranslatedProperty.Description ]
+    | _ -> []
+
+/// "caption", "description", "displayFolder": a translated property's segment in property paths.
+let translatedPropertyToken =
+    function
+    | TranslatedProperty.Caption -> "caption"
+    | TranslatedProperty.Description -> "description"
+    | TranslatedProperty.DisplayFolder -> "displayFolder"
+    | p -> string p
+
+/// An object's translations as `translations.<culture>.<property>` paths, culture by culture.
+let private translations (m: Model) (o: MetadataObject) = [
+    match translatableProperties o with
+    | [] -> ()
+    | props ->
+        for c in m.Cultures do
+            for p in props do
+                match c.ObjectTranslations.[o, p] with
+                | null -> ()
+                | t -> $"translations.{c.Name}.{translatedPropertyToken p}", t.Value
+]
+
+/// A perspective's members, one reference per line, in model order: each table, then its columns,
+/// measures and hierarchies that are in the perspective.
+let perspectiveMembers (p: Perspective) : ObjectRef list =
+    let model = p.Model
+
+    [
+        for t in model.Tables do
+            match p.PerspectiveTables.Find t.Name with
+            | null -> ()
+            | pt ->
+                ObjectRef.table t.Name
+
+                for c in t.Columns do
+                    if not (isNull (pt.PerspectiveColumns.Find c.Name)) then
+                        ObjectRef.inTable ObjectKind.Column t.Name c.Name
+
+                for x in t.Measures do
+                    if not (isNull (pt.PerspectiveMeasures.Find x.Name)) then
+                        ObjectRef.inTable ObjectKind.Measure t.Name x.Name
+
+                for h in t.Hierarchies do
+                    if not (isNull (pt.PerspectiveHierarchies.Find h.Name)) then
+                        ObjectRef.inTable ObjectKind.Hierarchy t.Name h.Name
+    ]
+
 /// Flattened properties of an entry, without children. The model entry also carries the
 /// database's compatibilityLevel, so level changes show up in diffs.
+///
+/// Translations are shown on the object they translate (`translations.da-DK.caption`), not on
+/// their culture, so a rename or a removal doesn't also show as a change to every culture. A
+/// perspective's members are one multi-line `members` value (one reference per line), so a
+/// membership change diffs line by line.
 let properties (db: Database) (e: Inventory.ObjectEntry) =
     let own = flatten (objectJson db false e.Object)
+
+    let own =
+        match e.Object with
+        | :? Culture ->
+            own
+            |> List.filter (fun (p, _) ->
+                p <> "translations"
+                && not (p.StartsWith("translations.", StringComparison.Ordinal)))
+        | :? Perspective as p ->
+            match perspectiveMembers p with
+            | [] -> own
+            | members -> own @ [ "members", members |> List.map ObjectRef.format |> String.concat "\n" ]
+        | _ -> own
+
+    let own =
+        match db.Model with
+        | null -> own
+        | m -> own @ translations m e.Object
 
     if e.Ref.Kind = ObjectKind.Model then
         ("compatibilityLevel", string db.CompatibilityLevel) :: own

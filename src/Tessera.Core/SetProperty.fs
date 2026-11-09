@@ -1046,7 +1046,26 @@ let private build (db: Database) (target: ObjectEntry) =
         |> List.distinctBy (fun e -> e.Info.Path)
         |> List.sortBy (fun e -> e.Info.Path.ToLowerInvariant())
 
-    ctx, { c with Entries = entries }
+    // Paths `get -p` shows that other commands edit.
+    let elsewhere = [
+        if not (Serialize.translatableProperties target.Object).IsEmpty then
+            {
+                Path = "translations"
+                Reason = "translations are edited with `tess translations import` (export a file to fill in first)"
+            }
+        if target.Ref.Kind = ObjectKind.Perspective then
+            {
+                Path = "members"
+                Reason = "use `tess perspective add` or `tess perspective remove`"
+            }
+    ]
+
+    ctx,
+    {
+        c with
+            Entries = entries
+            Refusals = c.Refusals @ elsewhere
+    }
 
 /// Every property `set` knows on an object, writable or not, sorted by path.
 let catalog (db: Database) (target: ObjectEntry) : Descriptor list =
