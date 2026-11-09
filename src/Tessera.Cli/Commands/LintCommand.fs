@@ -167,7 +167,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | Ok(selected, minimum, failOn, ci) ->
         let clock = Diagnostics.Stopwatch.StartNew()
 
-        match ModelIO.loadPath modelPath with
+        match Source.load ctx modelPath with
         | Error e -> Failed e
         | Ok(_, db) ->
             let findings = Lint.lint db |> List.filter (isSelected selected)

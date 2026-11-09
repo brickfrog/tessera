@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>Tessera.Xmla</RootNamespace>
+    <Description>Connected mode for tessera: talk to an Analysis Services / Power BI XMLA endpoint. The only assembly that opens connections.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Secrets.fs" />
+    <Compile Include="Credentials.fs" />
+    <Compile Include="Session.fs" />
+    <Compile Include="Failures.fs" />
+    <Compile Include="Remote.fs" />
+    <Compile Include="ConnectionString.fs" />
+    <Compile Include="TokenCache.fs" />
+    <Compile Include="ResultReader.fs" />
+    <!-- Live.fs is the only file that uses the client libraries' connection types (AMO Server,
+         ADOMD, MSAL). Everything else works through the interfaces in Session.fs. -->
+    <Compile Include="Live.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- DAX queries. Same version as Microsoft.AnalysisServices (TOM/AMO) in Tessera.Core. -->
+    <PackageReference Include="Microsoft.AnalysisServices.AdomdClient" Version="19.118.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Tessera.Core/Tessera.Core.fsproj" />
+  </ItemGroup>
+
+</Project>

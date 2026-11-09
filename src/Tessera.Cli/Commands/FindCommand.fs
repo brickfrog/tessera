@@ -81,7 +81,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             Properties = parseList (args.GetResults Args.In)
         }
 
-        match ModelIO.loadPath modelPath |> Result.bind (fun (_, db) -> Find.search db opts) with
+        match Source.load ctx modelPath |> Result.bind (fun (_, db) -> Find.search db opts) with
         | Error e -> Failed e
         | Ok hits ->
             if ctx.Json then

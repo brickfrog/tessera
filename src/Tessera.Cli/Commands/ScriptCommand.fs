@@ -77,7 +77,7 @@ let private export (ctx: Ctx) (args: ParseResults<ExportArgs>) =
 
         UsageError $"a DAX script holds only these kinds: {allowed}"
     | model :: selectors, Ok kinds ->
-        match ModelIO.loadPath model with
+        match Source.load ctx model with
         | Error e -> Failed e
         | Ok(_, db) ->
             let selection: ExportScript.Selection = {

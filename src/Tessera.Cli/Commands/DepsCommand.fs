@@ -130,7 +130,7 @@ let private runDeps (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) (s
         UsageError "--depth must be 0 (unlimited) or more"
     else
         let result =
-            ModelIO.loadPath modelPath
+            Source.load ctx modelPath
             |> Result.bind (fun (_, db) ->
                 let g = Deps.build db
                 Inventory.Selector.resolve g.Entries selector |> Result.map (fun e -> g, e))
@@ -204,7 +204,7 @@ let private runUnused (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) 
     | Error message, _ -> UsageError message
     | _, flag :: _ -> UsageError $"{flag} can't be combined with --unused"
     | Ok kinds, [] ->
-        match ModelIO.loadPath modelPath with
+        match Source.load ctx modelPath with
         | Error e -> Failed e
         | Ok(_, db) ->
             let options: Unused.Options = {

@@ -586,6 +586,7 @@ let private baseFolders (source: ModelSource) = [
     match source.Format with
     | Bim -> Path.GetDirectoryName(Path.GetFullPath source.Path)
     | Tmdl -> Path.GetFullPath source.Path
+    | Xmla -> ()
     yield! Option.toList source.SemanticModelFolder
 ]
 
@@ -642,8 +643,6 @@ module RuleConfig =
     /// root of the git repository it is in (the first folder holding .git); outside a repository,
     /// only the model's own folders.
     let searchFolders (source: ModelSource) : string list =
-        let start = baseFolders source |> List.head
-
         let rec up (dir: string) acc =
             let acc = dir :: acc
 
@@ -655,9 +654,13 @@ module RuleConfig =
                 | parent when parent = dir -> None
                 | parent -> up parent acc
 
-        match up start [] with
-        | Some dirs -> dirs
-        | None -> modelFolders source |> List.distinct
+        match baseFolders source with
+        // A remote model has no folder, so no project config.
+        | [] -> []
+        | start :: _ ->
+            match up start [] with
+            | Some dirs -> dirs
+            | None -> modelFolders source |> List.distinct
 
     /// The nearest project config file, if any.
     let projectFileFor (source: ModelSource) : string option =

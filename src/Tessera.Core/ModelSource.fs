@@ -6,11 +6,15 @@ open System.IO
 type ModelFormat =
     | Bim
     | Tmdl
+    /// A database on a server (`xmla:<server>;<database>`). Core never loads these itself: only a
+    /// command given a connection does (Tessera.Xmla).
+    | Xmla
 
-/// A located, loadable model on disk.
+/// A located, loadable model: on disk, or (Format = Xmla) on a server.
 type ModelSource = {
     Format: ModelFormat
     /// The .bim file, or the TMDL root folder (the one holding database.tmdl / model.tmdl).
+    /// For a remote model, its address as `xmla:<server>;<database>`: not a file path.
     Path: string
     /// The enclosing PBIP "X.SemanticModel" folder, when the model lives in one.
     SemanticModelFolder: string option
@@ -21,6 +25,7 @@ module ModelFormat =
         function
         | Bim -> "bim"
         | Tmdl -> "tmdl"
+        | Xmla -> "xmla"
 
 module ModelSource =
 
@@ -121,11 +126,7 @@ module ModelSource =
             )
         | sms, _, bs -> Error(AmbiguousModel(dir, sms @ bs))
 
-    /// Work out what model a user-supplied path refers to. Accepts:
-    /// a .bim file; a TMDL folder (or any .tmdl file inside one); a PBIP "X.SemanticModel" folder or
-    /// its definition.pbism; a .pbip file; a "X.Report" folder or its definition.pbir; or a project
-    /// folder containing exactly one of those.
-    let resolve (input: string) : Result<ModelSource, TessError> =
+    let private resolveLocal (input: string) : Result<ModelSource, TessError> =
         let full = Path.GetFullPath input
 
         if File.Exists full then
@@ -156,3 +157,27 @@ module ModelSource =
                 fromProjectRoot full
         else
             Error(PathNotFound full)
+
+    /// Work out what model a user-supplied path refers to. Accepts:
+    /// a .bim file; a TMDL folder (or any .tmdl file inside one); a PBIP "X.SemanticModel" folder or
+    /// its definition.pbism; a .pbip file; a "X.Report" folder or its definition.pbir; or a project
+    /// folder containing exactly one of those.
+    /// A remote model (`xmla:...`) is refused here: only commands that open a connection load one,
+    /// and they do so before coming here.
+    let resolve (input: string) : Result<ModelSource, TessError> =
+        if XmlaAddress.isRemote input then
+            Error(
+                RemoteSourceUnsupported(
+                    input,
+                    "this command works on model files only (copy the model first: `tess convert <xmla:...> <folder>`)"
+                )
+            )
+        else
+            resolveLocal input
+
+    /// The source describing a remote model (nothing is contacted).
+    let remote (address: XmlaAddress) : ModelSource = {
+        Format = Xmla
+        Path = XmlaAddress.display address
+        SemanticModelFolder = None
+    }

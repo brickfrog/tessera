@@ -13,10 +13,12 @@ type Run = { Code: int; Out: string; Err: string }
 /// developer's TESS_BPA_RULES or ~/.config/tessera/bpa.json can't change results.
 let private configVariables =
     set [ "TESS_BPA_RULES"; "XDG_CONFIG_HOME"; "HOME"; "APPDATA" ]
+    // A developer's real server credentials never reach a test either.
+    + set Tessera.Xmla.Credentials.Var.all
 
-/// Run `tess <args>` in-process with these environment variables (and none of the real
-/// configuration variables).
-let tessWithEnv (env: (string * string) list) (args: string list) =
+/// Run `tess <args>` in-process, with server connections going to `connector`, with these
+/// environment variables (and none of the real configuration variables).
+let tessOn (connector: Tessera.Xmla.IXmlaConnector) (env: (string * string) list) (args: string list) =
     let env = Map.ofList env
 
     let getEnv (name: string) =
@@ -27,7 +29,7 @@ let tessWithEnv (env: (string * string) list) (args: string list) =
 
     use out = new StringWriter()
     use err = new StringWriter()
-    let code = App.runWith getEnv out err (Array.ofList args)
+    let code = App.runWithConnector connector getEnv out err (Array.ofList args)
 
     // WriteLine uses the platform newline (CRLF on Windows); tests compare against LF.
     let lf (s: string) = s.Replace("\r\n", "\n")
@@ -37,6 +39,17 @@ let tessWithEnv (env: (string * string) list) (args: string list) =
         Out = lf (out.ToString())
         Err = lf (err.ToString())
     }
+
+/// Run `tess <args>` in-process with these environment variables (and none of the real
+/// configuration variables). The command must not open a server connection: the test fails if it tries.
+let tessWithEnv (env: (string * string) list) (args: string list) =
+    let offline = XmlaFakes.NoConnections()
+    let run = tessOn offline env args
+
+    if offline.Attempts > 0 then
+        failtestf "tess %s tried to open a server connection" (String.concat " " args)
+
+    run
 
 /// Run `tess <args>` in-process (without the real configuration variables).
 let tess (args: string list) = tessWithEnv [] args
@@ -52,6 +65,22 @@ let tessWithStdin (input: string) (args: string list) =
 
         try
             tess args
+        finally
+            System.Console.SetIn original)
+
+/// `tessWithStdin`, with server connections going to `connector`.
+let tessWithStdinOn
+    (connector: Tessera.Xmla.IXmlaConnector)
+    (env: (string * string) list)
+    (input: string)
+    (args: string list)
+    =
+    lock stdinLock (fun () ->
+        let original = System.Console.In
+        System.Console.SetIn(new StringReader(input))
+
+        try
+            tessOn connector env args
         finally
             System.Console.SetIn original)
 

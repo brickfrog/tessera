@@ -265,8 +265,13 @@ let load (source: ModelSource) : Result<Database, TessError> =
         match source.Format with
         | Bim -> Ok(deserializeBim (File.ReadAllText source.Path))
         | Tmdl -> Ok(TmdlSerializer.DeserializeDatabaseFromFolder source.Path)
+        | Xmla ->
+            Error(RemoteSourceUnsupported(source.Path, "a remote model is loaded over a connection, not from files"))
     with e ->
         Error(LoadFailed(source.Path, e.Message))
+
+/// Read a model from .bim (TMSL database) JSON text. Throws on JSON that isn't a model.
+let parseBim (json: string) : Database = deserializeBim json
 
 /// Resolve and load in one step.
 let loadPath (path: string) : Result<ModelSource * Database, TessError> =
@@ -503,6 +508,7 @@ let inPlace (source: ModelSource) =
     | Bim, _ -> BimFile, source.Path
     | Tmdl, Some folder -> PbipFolder, folder
     | Tmdl, None -> TmdlFolder, source.Path
+    | Xmla, _ -> invalidOp "a remote model has no file location to save to"
 
 /// Save a model back where it came from: same format and line endings, restricted information kept
 /// (it's the user's own model, not an export).
