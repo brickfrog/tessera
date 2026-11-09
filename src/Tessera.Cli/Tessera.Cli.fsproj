@@ -32,6 +32,7 @@
     <Compile Include="Commands/BpaCommand.fs" />
     <Compile Include="Commands/SetCommand.fs" />
     <Compile Include="Commands/AddCommand.fs" />
+    <Compile Include="Commands/LintCommand.fs" />
     <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
     <Compile Include="App.fs" />

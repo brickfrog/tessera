@@ -425,3 +425,9 @@ let tree (direction: Direction) (depth: int) (g: Graph) (root: ObjectRef) : Node
               })
 
     expand (Set.singleton root) 1 root
+
+/// Resolve DAX as if it were a source's expression, against a fixed set of entries: for checking
+/// what a rewritten expression would refer to before applying it (lint fixes).
+let resolver (entries: ObjectEntry list) : DaxSource -> Reference list =
+    let index = Index entries
+    resolveSource index
