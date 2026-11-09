@@ -46,6 +46,7 @@ tess diff  ./main/Sales.SemanticModel ./branch/Sales.SemanticModel   # object-le
 tess diff  ./server-export.bim ./Sales.pbip --ignore lineageTag --json
 tess deps  ./MyReport.pbip "[Gross Margin %]"     # what it uses, and what uses it
 tess deps  ./MyReport.pbip "Date[Date]" --referenced-by --depth 0
+tess deps  ./MyReport.pbip --unused               # hidden objects nothing uses
 tess validate ./MyReport.pbip                     # broken references, cycles, ... (exit 1 on errors)
 tess validate ./model.bim --fail-on warning --rule unresolved-reference --json
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue"          # preview: the rename + every DAX reference it fixes
@@ -285,6 +286,42 @@ Some names belong to the expression itself and are not model references:
 Comments and strings are never treated as references. A reference that names nothing in the model is listed as
 `? <text>`. Each link shows the property and line it comes from, e.g. `expression:5`. `--depth` follows links
 further (0 means all the way), and circular references are marked rather than followed.
+
+#### Unused objects (`deps --unused`)
+
+`tess deps <model> --unused` lists the tables, columns, measures, hierarchies and functions that nothing uses.
+Reports can use any visible object, and tess can't see reports, so by default only hidden objects are listed:
+hidden and unused means dead. An object counts as hidden if it, or its table, is hidden or private.
+`--include-visible` checks visible objects too: what nothing *in the model* uses.
+
+```
+$ tess deps ./Sales.pbip --unused
+measure:Sales/Old Margin
+column:Sales/Legacy Key  used only by unused measure:Sales/Old Margin
+```
+
+Usage is transitive: something used only by unused objects is unused too, and is listed with them (`used only
+by unused ...`), so removing those first frees it. An object is used if any of these use it:
+- the DAX of a used object (as `deps` reads it), including a used measure's format string, detail rows and KPI
+- a used column's sort-by column, variations (their hierarchy and column) and group-by columns (field parameters)
+- a used hierarchy's levels
+- a calculation item of a used calculation group
+- a relationship, row-level security filter, calendar or aggregation column (`alternateOf`): these always
+  count as used
+- its own parts: a used column, measure or hierarchy keeps its table, and a used table keeps its key column
+
+Some rules of thumb:
+- A table reference, such as `COUNTROWS(Sales)`, uses the table but not its columns.
+- Perspectives and translations don't count: they list objects, they don't use them.
+- Calculated-table columns are listed with a note, since removing one means changing the table's DAX.
+- Calculation items, levels, partitions, roles, relationships, M expressions and data sources are never
+  listed. tess doesn't read M, so it can't tell which M expressions are used.
+- Power BI's auto date/time template table counts as used.
+- When in doubt, an object counts as used. For example, a hidden table that only a relationship touches is
+  never listed.
+
+`-k` and `-t` narrow the list, as in `list`. `--json` writes an array of `{ ref, kind, name, table, hidden,
+usedBy, note }`. The exit code is 0, unless `--fail-on-unused` is given and something is listed (then 1).
 
 ### Validation (`validate`)
 

@@ -36,6 +36,8 @@
     <Compile Include="RemoveMoveCommandTests.fs" />
     <Compile Include="BpaCommandTests.fs" />
     <Compile Include="SampleModelTests.fs" />
+    <Compile Include="UnusedTests.fs" />
+    <Compile Include="UnusedCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
