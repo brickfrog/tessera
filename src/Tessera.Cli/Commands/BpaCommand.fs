@@ -511,10 +511,11 @@ let private analyze (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
                         Done
 
 let run (ctx: Ctx) (args: ParseResults<Args>) =
-    match args.TryGetResult Args.Rules_Cmd, args.TryGetResult Args.Model with
-    | Some sub, None when args.GetAllResults().Length = 1 -> BpaRulesCommand.run ctx sub
+    match args.TryGetResult Args.Rules_Cmd, args.GetResults Args.Model with
+    | Some sub, [] when args.GetAllResults().Length = 1 -> BpaRulesCommand.run ctx sub
     | Some _, _ ->
         UsageError
             "`tess bpa rules` takes its own options after the subcommand, e.g. `tess bpa rules list <model> --rules x.json`"
-    | None, None -> UsageError(args.Parser.PrintUsage(message = "missing the model path"))
-    | None, Some modelPath -> analyze ctx args modelPath
+    | None, [] -> UsageError(args.Parser.PrintUsage(message = "missing the model path"))
+    | None, [ modelPath ] -> analyze ctx args modelPath
+    | None, _ -> UsageError "bpa takes one model path"

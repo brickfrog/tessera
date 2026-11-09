@@ -131,6 +131,7 @@ let tests =
         <| fun () ->
             use t = model ignore
             Expect.equal (tess [ "bpa" ]).Code ExitCode.usage ""
+            Expect.equal (tess [ "bpa"; t.Combine "model.bim"; t.Combine "model.bim" ]).Code ExitCode.usage "one model"
 
             let r = tess [ "bpa"; "--no-builtin"; "rules"; "list"; t.Combine "model.bim" ]
             Expect.equal r.Code ExitCode.usage ""
