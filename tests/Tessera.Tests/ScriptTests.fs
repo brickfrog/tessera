@@ -465,6 +465,20 @@ let tests =
                     a.Changes.IsEmpty)
         ]
 
+        testCase "TESSERA_SAMPLE_MODEL: export then apply changes nothing"
+        <| fun () ->
+            match Environment.GetEnvironmentVariable "TESSERA_SAMPLE_MODEL" with
+            | null
+            | "" -> skiptest "TESSERA_SAMPLE_MODEL is not set"
+            | path ->
+                let load () = ModelIO.loadPath path |> ok |> snd
+                let e = exportAll (load ())
+                Expect.isEmpty e.Warnings "every object reads back"
+                // Compared with an edit that does nothing, so differences the snapshot itself shows don't count.
+                let baseline = Mutation.apply (load ()) (fun _ -> Ok Mutation.Effect.none) |> ok
+                let a = applyOk (load ()) e.Text
+                Expect.equal (changed a) (changed baseline) ""
+
         testList "apply" [
             testCase "creates and updates what the script names, and leaves the rest alone"
             <| fun () ->
