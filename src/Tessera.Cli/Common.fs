@@ -54,6 +54,7 @@ module ExitCode =
         | RuleNotFound _
         | RuleExists _
         | CannotIgnore _ -> input
+        | InvalidFixture _ -> input
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()

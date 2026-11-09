@@ -63,6 +63,7 @@ let runWith (getEnv: string -> string option) (out: TextWriter) (err: TextWriter
                 | Some(Script args) -> ScriptCommand.run ctx args
                 | Some(Lint args) -> LintCommand.run ctx args
                 | Some(Format args) -> FormatCommand.run ctx args
+                | Some(Data args) -> DataCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with

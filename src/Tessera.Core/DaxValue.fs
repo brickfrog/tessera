@@ -427,25 +427,39 @@ module DaxValue =
 
     let private timeFormats = [| "hh\\:mm"; "hh\\:mm\\:ss"; "hh\\:mm\\:ss\\.FFFFFFF" |]
 
+    /// The serial number of ISO 8601 text; see `parseIsoDateTime`.
+    let parseIsoSerial (text: ReadOnlySpan<char>) : float voption =
+        let t = text.Trim()
+
+        let t =
+            if t.Length > 11 && (t.[t.Length - 1] = 'Z' || t.[t.Length - 1] = 'z') then
+                t.Slice(0, t.Length - 1)
+            else
+                t
+
+        let mutable dt = DateTime.MinValue
+
+        if DateTime.TryParseExact(t, isoFormats, inv, DateTimeStyles.None, &dt) then
+            ValueSome(serialOfDateTime dt)
+        else
+            let mutable ts = TimeSpan.Zero
+
+            if
+                TimeSpan.TryParseExact(t, timeFormats, inv, &ts)
+                && ts >= TimeSpan.Zero
+                && ts < TimeSpan.FromDays 1.0
+            then
+                ValueSome(float ts.Ticks / float TimeSpan.TicksPerDay)
+            else
+                ValueNone
+
     /// An ISO 8601 date, date and time (`T` or a space between; an optional trailing `Z`, which is
     /// dropped: values are not shifted between time zones) or time of day (which lands on
     /// 1899-12-30, as the engine stores a time). None for anything else, including UTC offsets.
     let parseIsoDateTime (s: string) : DaxValue option =
-        let t = s.Trim()
-
-        let t =
-            if t.Length > 11 && (t.EndsWith('Z') || t.EndsWith('z')) then
-                t.Substring(0, t.Length - 1)
-            else
-                t
-
-        match DateTime.TryParseExact(t, isoFormats, inv, DateTimeStyles.None) with
-        | true, dt -> Some(ofDateTime dt)
-        | _ ->
-            match TimeSpan.TryParseExact(t, timeFormats, inv) with
-            | true, ts when ts >= TimeSpan.Zero && ts < TimeSpan.FromDays 1.0 ->
-                Some(DaxValue.DateTime(float ts.Ticks / float TimeSpan.TicksPerDay))
-            | _ -> None
+        match parseIsoSerial (s.AsSpan()) with
+        | ValueSome serial -> Some(DaxValue.DateTime serial)
+        | ValueNone -> None
 
     /// A date written as text. ASSUMPTION: the engine reads the model culture's date formats; this
     /// reads ISO 8601 and then whatever .NET's invariant culture reads ("1/31/2024", "Jan 1 2009").

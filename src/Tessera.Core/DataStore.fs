@@ -114,8 +114,6 @@ type ColumnBuilder(name: string, dataType: DaxType, collation: Collation) =
         values.Add v
         values.Count - 1
 
-    let variant = (dataType = DaxType.Variant)
-
     let addAny (v: DaxValue) =
         let d = any.Value
 
@@ -191,22 +189,60 @@ type ColumnBuilder(name: string, dataType: DaxType, collation: Collation) =
 
             ids.Add falseId
 
+    member private _.Reject(kind: string) =
+        invalidOp $"A {DaxType.name dataType} column can't hold {kind}"
+
+    /// Add a row holding an Integer (the column must be Integer or Variant).
+    member this.AddInteger(i: int64) =
+        match dataType with
+        | DaxType.Integer -> this.AddInt64(i, DaxValue.Integer)
+        | DaxType.Variant -> addAny (DaxValue.Integer i)
+        | _ -> this.Reject "an Integer"
+
+    /// Add a row holding a Currency, as its scaled integer (value x 10000).
+    member this.AddCurrency(scaled: int64) =
+        match dataType with
+        | DaxType.Currency -> this.AddInt64(scaled, DaxValue.Currency)
+        | DaxType.Variant -> addAny (DaxValue.Currency scaled)
+        | _ -> this.Reject "a Currency"
+
+    member this.AddDecimal(d: float) =
+        match dataType with
+        | DaxType.Decimal -> this.AddFloat(d, DaxValue.Decimal)
+        | DaxType.Variant -> addAny (DaxValue.Decimal d)
+        | _ -> this.Reject "a Decimal"
+
+    /// Add a row holding a date and time, as its serial number.
+    member this.AddDateTime(serial: float) =
+        match dataType with
+        | DaxType.DateTime -> this.AddFloat(serial, DaxValue.DateTime)
+        | DaxType.Variant -> addAny (DaxValue.DateTime serial)
+        | _ -> this.Reject "a DateTime"
+
+    member this.AddBoolean(b: bool) =
+        match dataType with
+        | DaxType.Boolean -> this.AddBool b
+        | DaxType.Variant -> addAny (DaxValue.Boolean b)
+        | _ -> this.Reject "a Boolean"
+
+    /// Add a row holding text. Trailing spaces are dropped, as the engine does.
+    member this.AddString(s: string) =
+        match dataType with
+        | DaxType.String -> this.AddText s
+        | DaxType.Variant -> addAny (DaxValue.String(Collation.trimTrailing s))
+        | _ -> this.Reject "a String"
+
     /// Add a row. The value must be BLANK or of the column's type (anything, for a Variant column):
     /// convert with `DaxValue.convertTo` first. Trailing spaces of text are dropped, as the engine does.
     member this.Add(v: DaxValue) =
-        if not (DaxValue.fits dataType v) then
-            invalidArg (nameof v) $"A {DaxType.name dataType} column can't hold {v}"
-
         match v with
         | DaxValue.Blank -> this.AddBlank()
-        | DaxValue.String s when variant -> addAny (DaxValue.String(Collation.trimTrailing s))
-        | _ when variant -> addAny v
-        | DaxValue.Integer i -> this.AddInt64(i, DaxValue.Integer)
-        | DaxValue.Currency c -> this.AddInt64(c, DaxValue.Currency)
-        | DaxValue.Decimal d -> this.AddFloat(d, DaxValue.Decimal)
-        | DaxValue.DateTime d -> this.AddFloat(d, DaxValue.DateTime)
-        | DaxValue.String s -> this.AddText s
-        | DaxValue.Boolean b -> this.AddBool b
+        | DaxValue.Integer i -> this.AddInteger i
+        | DaxValue.Currency c -> this.AddCurrency c
+        | DaxValue.Decimal d -> this.AddDecimal d
+        | DaxValue.DateTime d -> this.AddDateTime d
+        | DaxValue.String s -> this.AddString s
+        | DaxValue.Boolean b -> this.AddBoolean b
 
     member _.Build() : StoreColumn =
         StoreColumn(name, dataType, collation, ids.ToArray(), values.ToArray())

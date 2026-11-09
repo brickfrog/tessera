@@ -27,6 +27,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Script of ParseResults<ScriptCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Lint of ParseResults<LintCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Format of ParseResults<FormatCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Data of ParseResults<DataCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -53,3 +54,4 @@ type CliArgs =
             | Script _ -> ScriptCommand.summary
             | Lint _ -> LintCommand.summary
             | Format _ -> FormatCommand.summary
+            | Data _ -> DataCommand.summary

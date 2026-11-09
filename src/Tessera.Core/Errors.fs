@@ -57,6 +57,8 @@ type TessError =
     | RuleExists of ruleId: string * where: string
     /// `bpa rules ignore`: an object that can't carry an ignore annotation.
     | CannotIgnore of objectRef: string * reason: string
+    /// A fixture data directory that can't be used at all (problems inside one are findings).
+    | InvalidFixture of path: string * reason: string
 
 module TessError =
 
@@ -99,6 +101,7 @@ module TessError =
         | RuleNotFound _ -> "rule-not-found"
         | RuleExists _ -> "rule-exists"
         | CannotIgnore _ -> "cannot-ignore"
+        | InvalidFixture _ -> "invalid-fixture"
 
     let rec message =
         function
@@ -184,3 +187,4 @@ module TessError =
             $"No BPA rule '{ruleId}' in {where}{hint}"
         | RuleExists(ruleId, where) -> $"{where} already has a BPA rule '{ruleId}' (use --replace to replace it)"
         | CannotIgnore(objectRef, reason) -> $"Can't ignore rules on {objectRef}: {reason}"
+        | InvalidFixture(path, reason) -> $"Can't use {path} as fixture data: {reason}"

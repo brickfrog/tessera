@@ -38,6 +38,7 @@
     <Compile Include="Commands/ScriptCommand.fs" />
     <Compile Include="Commands/LintCommand.fs" />
     <Compile Include="Commands/FormatCommand.fs" />
+    <Compile Include="Commands/DataCommand.fs" />
     <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
     <Compile Include="App.fs" />
