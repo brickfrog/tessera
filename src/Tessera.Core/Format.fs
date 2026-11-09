@@ -461,10 +461,12 @@ let private tidySeparators (items: Item list) (close: Tok option) =
                     else
                         None
 
+                // The comma's own comments go along, so the comments keep their order.
                 match target |> Option.orElse close with
                 | Some t ->
-                    t.Leading <- s.Leading @ t.Leading
+                    t.Leading <- s.Leading @ s.Trailing @ t.Leading
                     s.Leading <- []
+                    s.Trailing <- []
                 | None -> ()
 
             match items.[i].Arg with
