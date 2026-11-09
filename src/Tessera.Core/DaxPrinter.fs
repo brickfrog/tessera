@@ -78,7 +78,7 @@ type private Printer(options: PrintOptions) =
 
         match e.Kind with
         | Unary(op, x) -> p.Unary(op, x)
-        | Binary(op, l, r) -> p.Binary(op, l, r)
+        | Binary _ -> p.Binary e
         | VarBlock(vars, body) -> p.VarBlock(vars, body)
         | Call(name, args) -> struct (p.Call(name, args), closed)
         | Paren x -> struct ("(" + p.Text x + ")", closed)
@@ -124,21 +124,35 @@ type private Printer(options: PrintOptions) =
 
         struct (unaryText op + gap + text, min bp tail)
 
-    member private p.Binary(op: BinaryOp, l: Expr, r: Expr) : struct (string * int) =
-        let bp = bindingPower op
-        let struct (left, leftTail) = p.Expr l
+    /// A chain `((a + b) - c) * d` is written from its leftmost operand outward, in a loop: a long
+    /// chain costs no stack.
+    member private p.Binary(e: Expr) : struct (string * int) =
+        let first, rest = leftSpine e
+        let struct (firstText, firstTail) = p.Expr first
+        let mutable text = firstText
+        let mutable tail = firstTail
+        // The binding power of the operator that made `text`, if an operator did.
+        let mutable inner = closed
 
-        let left =
-            match l.Kind with
-            | Binary(o, _, _) when bindingPower o < bp -> "(" + left + ")"
-            | _ when leftTail <= bp -> "(" + left + ")"
-            | _ -> left
+        for op, r in rest do
+            let bp = bindingPower op
 
-        let struct (right, rightTail) = p.Expr r
+            if inner < bp || tail <= bp then
+                text <- "(" + text + ")"
 
-        match r.Kind with
-        | Binary(o, _, _) when bindingPower o <= bp -> struct (left + " " + binaryText op + " (" + right + ")", closed)
-        | _ -> struct (left + " " + binaryText op + " " + right, rightTail)
+            let struct (right, rightTail) = p.Expr r
+
+            match r.Kind with
+            | Binary(o, _, _) when bindingPower o <= bp ->
+                text <- text + " " + binaryText op + " (" + right + ")"
+                tail <- closed
+            | _ ->
+                text <- text + " " + binaryText op + " " + right
+                tail <- rightTail
+
+            inner <- bp
+
+        struct (text, tail)
 
     member private p.VarBlock(vars: VarDecl list, body: Expr) : struct (string * int) =
         let sb = StringBuilder()

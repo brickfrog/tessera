@@ -408,6 +408,24 @@ let rec fold (f: 'State -> Expr -> 'State) (state: 'State) (e: Expr) : 'State =
 let descendants (e: Expr) : Expr list =
     fold (fun acc x -> x :: acc) [] e |> List.rev
 
+/// A chain of binary operators as it reads from left to right: `((a + b) - c) * d` is `a`, then
+/// `+ b`, `- c`, `* d`. (For anything but a `Binary`, the node itself and nothing after it.) The
+/// parser builds chains left-deep, so a walker that loops over this, instead of recursing into the
+/// left operand, spends no stack on a long chain. Does not recurse.
+let leftSpine (e: Expr) : Expr * (BinaryOp * Expr) list =
+    let mutable current = e
+    let mutable rest = []
+    let mutable go = true
+
+    while go do
+        match current.Kind with
+        | Binary(op, l, r) ->
+            rest <- (op, r) :: rest
+            current <- l
+        | _ -> go <- false
+
+    current, rest
+
 /// How many levels deep a tree is (a leaf is 1). Does not recurse, so it is safe on any tree.
 let depth (e: Expr) : int =
     let stack = Stack<struct (Expr * int)>()
@@ -432,20 +450,30 @@ let rec stripSpans (e: Expr) : Expr =
     let kind =
         match e.Kind with
         | Qualified(t, name) -> Qualified({ t with Span = Span.none }, name)
-        | Call(name, args) -> Call({ name with Span = Span.none }, List.map stripSpans args)
+        | Call(name, args) -> Call({ name with Span = Span.none }, stripSpansOfAll args)
+        | Unary(op, x) -> Unary(op, stripSpans x)
+        | Binary(op, l, r) ->
+            let l = stripSpans l
+            Binary(op, l, stripSpans r)
         | VarBlock(vars, body) ->
-            let vars =
-                vars
-                |> List.map (fun v -> {
-                    Name = { v.Name with Span = Span.none }
-                    Value = stripSpans v.Value
-                    Span = Span.none
-                })
+            let vars = [
+                for v in vars ->
+                    {
+                        Name = { v.Name with Span = Span.none }
+                        Value = stripSpans v.Value
+                        Span = Span.none
+                    }
+            ]
 
             VarBlock(vars, stripSpans body)
-        | _ -> (mapChildren stripSpans e).Kind
+        | TableConstructor rows -> TableConstructor(stripSpansOfAll rows)
+        | Tuple items -> Tuple(stripSpansOfAll items)
+        | Paren x -> Paren(stripSpans x)
+        | leaf -> leaf
 
     { Kind = kind; Span = Span.none }
+
+and private stripSpansOfAll (items: Expr list) : Expr list = [ for x in items -> stripSpans x ]
 
 /// The same tree without its `Paren` nodes: what is left is the meaning, without the grouping the
 /// source happened to spell out. `(a)` becomes `a`; a tuple stays a tuple.
@@ -454,7 +482,39 @@ let rec stripParens (e: Expr) : Expr =
 
     match e.Kind with
     | Paren x -> stripParens x
-    | _ -> mapChildren stripParens e
+    | Call(name, args) -> {
+        e with
+            Kind = Call(name, stripParensOfAll args)
+      }
+    | Unary(op, x) -> {
+        e with
+            Kind = Unary(op, stripParens x)
+      }
+    | Binary(op, l, r) ->
+        let l = stripParens l
+
+        {
+            e with
+                Kind = Binary(op, l, stripParens r)
+        }
+    | VarBlock(vars, body) ->
+        let vars = [ for v in vars -> { v with Value = stripParens v.Value } ]
+
+        {
+            e with
+                Kind = VarBlock(vars, stripParens body)
+        }
+    | TableConstructor rows -> {
+        e with
+            Kind = TableConstructor(stripParensOfAll rows)
+      }
+    | Tuple items -> {
+        e with
+            Kind = Tuple(stripParensOfAll items)
+      }
+    | _ -> e
+
+and private stripParensOfAll (items: Expr list) : Expr list = [ for x in items -> stripParens x ]
 
 module FunctionDef =
     let stripSpans (f: FunctionDef) : FunctionDef = {

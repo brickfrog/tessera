@@ -393,6 +393,30 @@ let treeTests =
             Expect.equal (errorsOf "= = 1") [ "1:3: expected an expression, found '='" ] "only one"
             Expect.equal (errorsOf "=") [ "1:2: expected an expression, found the end of the text" ] ""
 
+        testCase "== is one token for the parser, and still two = for BPA rules, as in Tabular Editor 2"
+        <| fun () ->
+            Expect.equal
+                (tokenize "a == b"
+                 |> significant
+                 |> List.map (fun t -> t.Kind, t.Text, t.Start, t.Length))
+                [
+                    TokenKind.Identifier, "a", 0, 1
+                    TokenKind.Operator, "==", 2, 2
+                    TokenKind.Identifier, "b", 5, 1
+                ]
+                ""
+
+            let assignment = (BpaDaxToken.tokenize false "x = 1").[1].Type
+
+            Expect.equal
+                (BpaDaxToken.tokenize false "a == b"
+                 |> Seq.map (fun t -> t.Text, t.Type, t.StartIndex, t.StopIndex, t.TokenIndex)
+                 |> List.ofSeq
+                 |> List.tail
+                 |> List.take 2)
+                [ "=", assignment, 2, 2, 1; "=", assignment, 3, 3, 2 ]
+                ""
+
         testCase "comments and layout are not part of the tree"
         <| fun () ->
             Expect.equal
@@ -473,6 +497,15 @@ let treeTests =
                 "parents first, in source order"
 
             Expect.equal (stripParens e) (shape "IF(a + 1 > 2, {b})") ""
+
+            let first, rest = leftSpine (shape "a + b * 2 - c & (d & e)")
+
+            Expect.equal
+                (printExpression first, rest |> List.map (fun (op, r) -> binaryText op, printExpression r))
+                ("a", [ "+", "b * 2"; "-", "c"; "&", "(d & e)" ])
+                "a chain, left to right"
+
+            Expect.equal (leftSpine (int' 1)) (int' 1, []) "not a chain"
             Expect.equal (stripParens (shape "((a, b))")) (shape "(a, b)") "a tuple stays"
     ]
 
@@ -995,7 +1028,14 @@ let private typos = [
     "VAR without a name", "VAR = 1 RETURN 2", "1:5: expected a variable name after VAR, found '='"
     "!= for <>", "IF(a != b, 1)", "1:6: DAX has no '!=': write '<>' for \"not equal\""
     "| for ||", "a | b", "1:3: DAX has no '|': write '||' for \"or\""
+    // SQLBI, "The IN operator in DAX" (https://www.sqlbi.com/articles/the-in-operator-in-dax/): "You need
+    // to write NOT before the first argument of IN, and not just before the IN operator as you would
+    // do in SQL."
     "NOT IN", "a NOT IN {1}", "1:3: DAX has no NOT IN: write NOT (value IN table)"
+    // Microsoft, ORDERBY: the order ("ASC BLANKS LAST") is an argument of its own.
+    "an order without its comma",
+    "ORDERBY([x] ASC BLANKS LAST)",
+    "1:13: expected ',' or ')' after the argument of the '(' at 1:8, found 'ASC'"
     "a table name with a space, unquoted",
     "SUM(Sales Amount[x])",
     "1:11: expected ',' or ')' after the argument of the '(' at 1:4, found 'Amount' (a name with a space in it needs quotes: 'Sales Amount')"
