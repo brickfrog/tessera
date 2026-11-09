@@ -42,6 +42,7 @@
     <Compile Include="Commands/ConnectCommand.fs" />
     <Compile Include="Commands/QueryCommand.fs" />
     <Compile Include="Commands/DeployCommand.fs" />
+    <Compile Include="Commands/DataCommand.fs" />
     <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
     <Compile Include="App.fs" />

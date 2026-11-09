@@ -47,6 +47,10 @@
     <Compile Include="Format.fs" />
     <Compile Include="QueryResult.fs" />
     <Compile Include="Deploy.fs" />
+    <Compile Include="DaxValue.fs" />
+    <Compile Include="DataStore.fs" />
+    <Compile Include="Fixture.fs" />
+    <Compile Include="FixtureInit.fs" />
   </ItemGroup>
 
   <ItemGroup>

@@ -83,6 +83,8 @@ type TessError =
     | DeployIntroducesErrors of count: int
     /// `deploy`: the server rejected the script, or reported errors running it.
     | DeployFailed of server: string * database: string * messages: string list
+    /// A fixture data directory that can't be used at all (problems inside one are findings).
+    | InvalidFixture of path: string * reason: string
 
 module TessError =
 
@@ -139,6 +141,7 @@ module TessError =
         | DatabaseExists _ -> "database-exists"
         | DeployIntroducesErrors _ -> "deploy-introduces-errors"
         | DeployFailed _ -> "deploy-failed"
+        | InvalidFixture _ -> "invalid-fixture"
 
     let rec message =
         function
@@ -260,3 +263,4 @@ module TessError =
         | DeployFailed(server, database, messages) ->
             let list = messages |> List.map (fun m -> $"  {m}") |> String.concat "\n"
             $"Deploying '{database}' to {server} failed:\n{list}"
+        | InvalidFixture(path, reason) -> $"Can't use {path} as fixture data: {reason}"

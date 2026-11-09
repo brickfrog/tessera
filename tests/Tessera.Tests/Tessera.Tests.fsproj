@@ -70,6 +70,10 @@
     <Compile Include="OfflineTests.fs" />
     <Compile Include="XmlaIntegrationTests.fs" />
     <Compile Include="DaxParserTests.fs" />
+    <Compile Include="DaxValueTests.fs" />
+    <Compile Include="DataStoreTests.fs" />
+    <Compile Include="FixtureTests.fs" />
+    <Compile Include="DataCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
