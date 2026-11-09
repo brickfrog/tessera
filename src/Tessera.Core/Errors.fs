@@ -43,6 +43,8 @@ type TessError =
     /// `translations import`: a file that can't be read, or a row that can't be applied (with the
     /// line it starts on, or the item number in a JSON file).
     | InvalidTranslationFile of path: string * line: int option * reason: string
+    /// `perspective add/remove`: an object that can't be added to or removed from a perspective.
+    | UnsupportedPerspectiveChange of perspective: string * reason: string
 
 module TessError =
 
@@ -78,6 +80,7 @@ module TessError =
         | UnsupportedMove _ -> "unsupported-move"
         | MoveConflict _ -> "move-conflict"
         | InvalidTranslationFile _ -> "invalid-translation-file"
+        | UnsupportedPerspectiveChange _ -> "unsupported-perspective-change"
 
     let message =
         function
@@ -154,3 +157,4 @@ module TessError =
                 | None -> ""
 
             $"{path}{at}: {reason}"
+        | UnsupportedPerspectiveChange(perspective, reason) -> $"Can't change {perspective}: {reason}"

@@ -46,7 +46,8 @@ module ExitCode =
         | InvalidPropertyValue _ -> usage
         | CannotAdd _
         | ObjectNotFoundSuggest _ -> input
-        | InvalidTranslationFile _ -> input
+        | InvalidTranslationFile _
+        | UnsupportedPerspectiveChange _ -> input
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()

@@ -58,6 +58,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Set args) -> SetCommand.run ctx args
                 | Some(Add args) -> AddCommand.run ctx args
                 | Some(Translations args) -> TranslationsCommand.run ctx args
+                | Some(Perspective args) -> PerspectiveCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with

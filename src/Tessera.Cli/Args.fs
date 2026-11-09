@@ -23,6 +23,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Set of ParseResults<SetCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Translations of ParseResults<TranslationsCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Perspective of ParseResults<PerspectiveCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -45,3 +46,4 @@ type CliArgs =
             | Set _ -> SetCommand.summary
             | Add _ -> AddCommand.summary
             | Translations _ -> TranslationsCommand.summary
+            | Perspective _ -> PerspectiveCommand.summary
