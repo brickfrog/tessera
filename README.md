@@ -302,6 +302,9 @@ Some names belong to the expression itself and are not model references:
 - columns created inside the expression, like `"Local"` in `ADDCOLUMNS(t, "Local", ...)`
 - `''[X]` columns of anonymous tables
 
+The argument of `NAMEOF([X])` and `TABLEOF([X])` is always a model reference, even when the expression has a
+string `"X"` (as a field parameter's label often is).
+
 Comments and strings are never treated as references. A reference that names nothing in the model is listed as
 `? <text>`. Each link shows the property and line it comes from, e.g. `expression:5`. `--depth` follows links
 further (0 means all the way), and circular references are marked rather than followed.
@@ -437,6 +440,19 @@ What is rewritten, in all the DAX `deps` reads, resolved the same way (`VAR`s an
 | a calendar | `Old`, `'Old'` where they resolve to it |
 | a function | calls, `Old(...)` |
 
+The arguments of `NAMEOF` and `TABLEOF` are references like any other, so field parameters
+(`{ ("Revenue", NAMEOF('Sales'[Revenue]), 0) }`) follow a rename. Their labels are text and stay as they are; a
+warning names a field parameter whose label still shows the old name.
+
+Renaming a table or column also updates the `sourceColumn` of calculated-table columns that map to it, such as
+`Sales[Amount]` in a table defined as `FILTER(Sales, ...)`: the table's DAX now returns `Sales[Net]`, so its column
+must map to that. The column keeps its own name. A `sourceColumn` like `[Value1]` names a column the table's own DAX
+makes, and stays.
+
+A measure qualified with a table other than its own (`'Date'[Revenue]` for a measure in `Sales`) isn't rewritten:
+tess, like Tabular Editor 2, resolves a qualified name only in the table it names, so that reference doesn't resolve
+to the measure (`validate` reports it). A warning names each one.
+
 Unquoted table references stay unquoted only if the new name is a plain identifier (letters, digits, `_`), isn't a
 DAX keyword, and isn't already used as a name in that expression; otherwise they're written `'New'` (`''`
 escaped). Function names must be identifiers (dots allowed).
@@ -451,7 +467,6 @@ Not rewritten:
 - comments and string literals, even ones that look like references (`// [Old]`, `"Old"`)
 - M: named expressions (Power Query parameters and queries) are renamed, with a warning listing the M that
   mentions the old name; the same warning appears for tables and data sources whose name appears in M
-- `sourceColumn` of calculated-table columns (reported in a warning when it names the object)
 - reports, except the field references of PBIR reports in the same PBIP project (see [Reports](#reports-pbir))
 
 `rename` refuses:

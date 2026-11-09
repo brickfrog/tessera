@@ -228,6 +228,10 @@ let private locals (isFunction: bool) (tokens: Token array) =
 let private operandKeywords =
     HashSet<string>([ "RETURN"; "NOT"; "IN" ], StringComparer.OrdinalIgnoreCase)
 
+/// Functions whose argument is a reference to a model object.
+let private nameOfFunctions =
+    HashSet<string>([ "NAMEOF"; "TABLEOF" ], StringComparer.OrdinalIgnoreCase)
+
 let private resolveSource (index: Index) (s: DaxSource) : Reference list =
     let tokens = tokenize s.Dax |> significant |> Array.ofList
     let names, localColumns = locals (s.Owner.Ref.Kind = ObjectKind.Function) tokens
@@ -299,7 +303,15 @@ let private resolveSource (index: Index) (s: DaxSource) : Reference list =
                 s.ProducedColumns
                 |> List.exists (fun c -> String.Equals(c, t.Text, StringComparison.OrdinalIgnoreCase))
 
-            if not (localColumns.Contains t.Text) && not produced then
+            // NAMEOF([X]) and TABLEOF([X]) take a model column or measure, never a local name (in a
+            // field parameter, the label next to it is often the same text).
+            let modelArgument =
+                i >= 2
+                && isOpenParen tokens.[i - 1]
+                && tokens.[i - 2].Kind = TokenKind.Identifier
+                && nameOfFunctions.Contains tokens.[i - 2].Text
+
+            if modelArgument || (not (localColumns.Contains t.Text) && not produced) then
                 let inContext =
                     s.ContextTable |> Option.bind (fun table -> index.Member table.Name t.Text)
 
