@@ -7,7 +7,7 @@
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
 Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set`,
-`add`, `remove`, `move`, `bpa`, `lint`, `script`, `translations` and `perspective` work.
+`add`, `remove`, `move`, `bpa`, `lint`, `script`, `translations`, `perspective` and `format` work.
 
 ## Install
 
@@ -70,6 +70,8 @@ tess perspective add ./MyReport.pbip Finance Sales "[Budget]" --save   # perspec
 tess perspective list ./MyReport.pbip Finance
 tess lint  ./MyReport.pbip                       # DAX code actions: unused VARs, unqualified columns, ...
 tess lint  ./MyReport.pbip --fix --save          # ... and rewrite what can be fixed safely
+tess format --expr "calculate(sum(Sales[Amount]),all('Date'))"   # format DAX, SQLBI style, offline
+tess format ./MyReport.pbip --save               # ... every DAX expression in a model (--check for CI)
 ```
 
 ### Accepted model paths
@@ -398,7 +400,8 @@ own errors (e.g. a relationship to a missing column) aren't grouped with the DAX
 ### Editing commands
 
 The editing commands (`rename`, `set`, `add`, `remove`, `move`, `script apply`, `translations import`,
-`perspective add|remove` and `lint --fix`) follow one set of conventions, the same as the Tabular Editor CLI's.
+`perspective add|remove`, `lint --fix` and `format` on a model) follow one set of conventions, the same as the
+Tabular Editor CLI's.
 
 **Saving:**
 - **A dry run by default.** The command shows what would change and writes nothing; stderr says
@@ -1204,6 +1207,123 @@ With `--fix`, `lint` is an [editing command](#editing-commands):
 
 Findings can't be suppressed on individual objects yet.
 
+### Formatting DAX (`format`)
+
+`format` lays DAX out in the style of SQLBI's
+[Rules for DAX code formatting](https://www.sqlbi.com/articles/rules-for-dax-code-formatting/), the style
+[DAX Formatter](https://www.daxformatter.com) popularised. It runs entirely offline: nothing is sent anywhere.
+
+```
+tess format --expr "calculate(sum(Sales[Amount]),all('Date'))"   # loose DAX, to stdout
+tess format - < measure.dax                                     # stdin
+tess format query.dax --json                                    # {success, formatted, errors}
+tess format ./Sales.pbip                                        # every DAX expression in a model (a dry run)
+tess format ./Sales.pbip "[Revenue]" -t Date --save             # some of them, and save
+tess format ./Sales.pbip --check                                # CI: exit 1 if anything isn't formatted
+```
+
+Before and after:
+
+```
+calculate(sumx(Orders,Orders[Amount]),filter(all(Customers),calculate(countrows(Sales),all(Calendar[Date]))>42+8-25*(3-1)+2-1+2-1+calculate(2+2-2+2-2)-calculate(4)))
+```
+
+```
+CALCULATE (
+    SUMX ( Orders, Orders[Amount] ),
+    FILTER (
+        ALL ( Customers ),
+        CALCULATE ( COUNTROWS ( Sales ), ALL ( Calendar[Date] ) )
+            > 42 + 8 - 25 * ( 3 - 1 ) + 2 - 1 + 2 - 1
+                + CALCULATE ( 2 + 2 - 2 + 2 - 2 )
+                - CALCULATE ( 4 )
+    )
+)
+```
+
+```
+var total = sum(Sales[Amount]) // all rows
+var top = calculate(sum(Sales[Amount]), topn(10, values(Product[Name]), [Revenue]))
+return if(total > 0, divide(top, total))
+```
+
+```
+VAR total = SUM ( Sales[Amount] ) // all rows
+VAR top = CALCULATE ( SUM ( Sales[Amount] ), TOPN ( 10, VALUES ( Product[Name] ), [Revenue] ) )
+RETURN
+    IF ( total > 0, DIVIDE ( top, total ) )
+```
+
+The style:
+- **Calls:** built-in function names in upper case, with a space before `(` and spaces inside the parentheses:
+  `SUM ( Sales[Amount] )`, `BLANK ()`. A call that fits on its line stays on one line. Otherwise each argument
+  goes on a line of its own, indented 4 from where the call starts, with the comma at the end of the line and
+  `)` under the function name. `SWITCH` keeps each value and its result on one line when they fit.
+- **Operators** are spaced. A chain of operators that doesn't fit is split before an operator, and continues
+  one indent in. Arithmetic and `&` keep as many operands on a line as fit, but an operand containing a function
+  call starts a line of its own. `&&`, `||` and comparisons put each operand on a line. After a multi-line
+  operand, the next operator follows its closing bracket: `) / 'Budget Rate'[Rate]`.
+- **VAR/RETURN:** a `VAR`'s value stays on the `VAR` line if it fits, otherwise it goes on the next line,
+  indented. `RETURN` is on a line of its own, with its expression indented below it.
+- **Queries:** `DEFINE`, `EVALUATE`, `ORDER BY` and `START AT` start lines. Definitions are indented under
+  `DEFINE`, and a `MEASURE`, `COLUMN`, `TABLE` or `FUNCTION` definition is on the line before its expression,
+  as SQLBI's rules say.
+- **Keywords** (`VAR`, `RETURN`, `IN`, `NOT`, `TRUE`, `ASC`, `DEFINE`, ...) are upper case. So are words that
+  are only sometimes keywords (`YEAR`, `DESC`, `ROWS`, `BLANKS FIRST`, UDF types like `TABLE EXPR`), but only
+  where they're in a keyword's place: a whole argument of a built-in function, words side by side, or a type
+  after `:`. Calls to user-defined functions, and the model's table, calendar and variable names, keep their
+  case.
+- **Kept as written:** strings, quoted and bracketed names, numbers, how tables are quoted (`Sales[x]` stays
+  unquoted, `'Sales'[x]` stays quoted), and comments. A comment on a token's line stays on that line, and a
+  comment on a line of its own stays on a line of its own. A comment after an argument moves past its comma.
+  One blank line is kept where the source had blank lines between `VAR`s, definitions and comments.
+- Line endings follow the input (CRLF in, CRLF out).
+
+Options:
+- `--width N`: the line width to fit (default 100; the article doesn't give one).
+- `--long`: SQLBI's strict rule. A call with two or more arguments, or whose only argument is a function call,
+  always has its arguments on separate lines, even when it would fit.
+- `--no-space-after-function`: `SUM( x )` rather than `SUM ( x )`.
+- `--semicolons` (loose DAX only): the input separates arguments with `;` and writes decimals with `,`
+  (`IF ( [a] > 1,5; 2; 3 )`). The output keeps that dialect. Without the option, a `;` is an error, so
+  semicolon-separated DAX is never silently read as comma-separated (where `1,5` would be two arguments).
+  A model's DAX is always comma-separated.
+
+What it reads:
+- `-` reads stdin, `--expr` takes the DAX as an argument, and any file that isn't a model file is read as DAX.
+  Model files (`.bim`, `.pbip`, `.pbism`, `.pbir`, `.tmdl`) and folders are [models](#accepted-model-paths).
+  Loose DAX can be an expression, a function (`(x: INT64) => x * 2`) or a query (`DEFINE` / `EVALUATE`).
+- In a model: measures (with their format string, detail rows and KPI expressions), calculated columns, calculated
+  tables, calculation items and calculation group expressions, detail rows expressions, row filters and functions.
+  M (partitions and named expressions) is left alone.
+- With a model, objects after the path limit what's formatted (any form `get` accepts; a table stands for every
+  expression in it, row filters on it included), and so do `-k` and `-t`, as for `list`.
+
+Safety: the formatter changes only whitespace and the case of keywords and built-in function names. Before it
+returns anything, it lexes the result and checks that it has the input's tokens in the input's order (keywords
+and built-in function names may differ in case), with the same comments in the same order, and that lexemes the
+lexer splits (`==`, a `1,5` decimal) weren't pulled apart. In a model, it also checks that every reference
+resolves to the same object as before. A result that fails a check is refused, never written, and reported as a
+tessera bug (exit 70 for loose DAX; a warning for an expression in a model). Formatting is idempotent: formatting formatted DAX changes nothing.
+
+Output and exit codes:
+- Loose DAX: the formatted DAX on stdout. `--json` writes `{"success", "formatted", "errors"}`, like
+  `te util format-dax`. Each error has `line`, `column` (1-based) and `message`. DAX that can't be read
+  (unbalanced brackets, an unterminated string, an operator without an operand, `VAR` without `RETURN`, ...) exits
+  3 with its errors on stderr, nothing on stdout, and the input file left alone.
+- A model is an [editing command](#editing-commands): a dry run unless `--save` or `--save-to`, the change shown
+  as a diff (`--stat`, `--name-only`, `--json` as usual). Expressions that can't be read are left as they are,
+  with a warning each.
+- `--check` changes nothing. It exits 1 if anything would change, like `prettier --check` or `fantomas --check`.
+  For a model it lists the expressions that would change, one `<ref> <property>` per line. With `--json` it
+  writes `{"check": true, "expressions", "unformatted": [{ref, kind, property}], "failed", "warnings"}`. For loose
+  DAX, `--json` adds `"changed"`.
+
+Not done: the formatter doesn't rewrite code. It doesn't qualify column references or remove table names from
+measure references, as SQLBI's rules also ask; `lint` does those. It doesn't add or remove quotes around table
+names either. Comments laid out as a column to the right of the code (`--|` boxes) keep their text and order,
+but not their alignment.
+
 ### Findings JSON and CI annotations
 
 `validate`, `bpa` and `lint` (and later `test` and `schemacheck`) report findings in one shape, the one the Tabular
@@ -1244,10 +1364,10 @@ the code as its title.
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate`/`lint` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
+| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate`/`lint` found issues at or above `--fail-on` (default `error`); `format --check` found DAX that isn't formatted; an edit's `--save` refused because it would introduce errors |
 | 2 | usage error, including invalid arguments for an editing command: an invalid new name (`rename`, `add`), a property `set` can't write or a value it can't take, or an option `add` doesn't take for that kind |
 | 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), an edit that would change what other references mean (`rename`, `move`), a translation file that can't be applied (`translations import`), or an object a perspective can't hold |
-| 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), or an edit that would change what other references mean (`rename`, `move`). For `script`, also a script that can't be read or applied, or an object a script can't hold |
+| 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), or an edit that would change what other references mean (`rename`, `move`). For `script`, also a script that can't be read or applied, or an object a script can't hold. For `format`, DAX that can't be read (malformed) |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |
 
