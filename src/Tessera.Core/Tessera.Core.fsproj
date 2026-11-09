@@ -17,6 +17,9 @@
     <Compile Include="Find.fs" />
     <Compile Include="Diff.fs" />
     <Compile Include="Dax.fs" />
+    <Compile Include="DaxAst.fs" />
+    <Compile Include="DaxParser.fs" />
+    <Compile Include="DaxPrinter.fs" />
     <Compile Include="Deps.fs" />
     <Compile Include="Validate.fs" />
     <Compile Include="Rename.fs" />

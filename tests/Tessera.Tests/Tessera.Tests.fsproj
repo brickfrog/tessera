@@ -59,6 +59,7 @@
     <Compile Include="RenameEdgeCommandTests.fs" />
     <Compile Include="FormatTests.fs" />
     <Compile Include="FormatCommandTests.fs" />
+    <Compile Include="DaxParserTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
