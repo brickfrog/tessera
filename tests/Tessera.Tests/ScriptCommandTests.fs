@@ -68,6 +68,13 @@ let tests =
                 Expect.stringContains r.Err "Wrote 6 objects to" ""
                 Expect.stringContains (File.ReadAllText file) "FUNCTION Double = (x: INT64) => x * 2\n" ""
 
+                File.WriteAllText(file, "edited")
+                let again = tess [ "script"; "export"; t.Path; "-o"; file ]
+                Expect.equal again.Code ExitCode.output "won't overwrite without --force"
+                Expect.equal (File.ReadAllText file) "edited" "the file is kept"
+                Expect.equal (tess [ "script"; "export"; t.Path; "-o"; file; "--force" ]).Code ExitCode.ok ""
+                Expect.stringContains (File.ReadAllText file) "FUNCTION Double" ""
+
                 let r = tess [ "script"; "export"; t.Path; "[Total]"; "--json" ]
                 Expect.equal r.Code ExitCode.ok r.Err
                 use doc = json r

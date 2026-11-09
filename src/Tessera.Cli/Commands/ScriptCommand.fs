@@ -19,6 +19,7 @@ type ExportArgs =
     | [<AltCommandLine("-k")>] Kind of kinds: string
     | [<AltCommandLine("-t")>] Table of table: string
     | [<AltCommandLine("-o")>] Output of path: string
+    | Force
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -29,6 +30,7 @@ type ExportArgs =
             | Kind _ -> "only these kinds (repeatable or comma-separated): measure, column, table, calcitem, function."
             | Table _ -> "only objects in this table (repeatable)."
             | Output _ -> "write the script to this file (default: stdout)."
+            | Force -> "overwrite an existing --output file."
 
 type ApplyArgs =
     | [<MainCommand; ExactlyOnce>] Files of model: string * script: string
@@ -92,6 +94,8 @@ let private export (ctx: Ctx) (args: ParseResults<ExportArgs>) =
                 let written =
                     match output with
                     | None -> Ok()
+                    | Some path when File.Exists path && not (args.Contains ExportArgs.Force) ->
+                        Error(DestinationNotEmpty(Path.GetFullPath path))
                     | Some path ->
                         try
                             File.WriteAllText(path, exported.Text, utf8) |> Ok

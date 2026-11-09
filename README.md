@@ -1054,7 +1054,7 @@ CALCULATIONGROUP 'Time Intelligence'[Period]
 
 ```sh
 tess script export ./Sales.pbip                          # every DAX object, to stdout
-tess script export ./Sales.pbip "[Total]" Sales -o x.dax  # a table stands for its measures, calculated columns and own DAX
+tess script export ./Sales.pbip "[Total]" Sales -o x.dax  # a table stands for its measures, calculated columns and own DAX; an existing file needs --force
 tess script export ./Sales.pbip -k measure,calcitem -t Sales --json
 tess script apply  ./Sales.pbip x.dax                    # dry run: the changes, as `diff` shows them
 tess script apply  ./Sales.pbip - --save < x.dax         # from stdin
