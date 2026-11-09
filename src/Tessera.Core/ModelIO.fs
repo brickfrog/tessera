@@ -377,9 +377,80 @@ let private saveBim (opts: SaveOptions) (db: Database) (path: string) =
             Files = [ path ]
         })
 
-/// TOM's folder serializer removes stale .tmdl files it owns and leaves other files alone.
+let private isTmdlFile (relative: string) =
+    relative.EndsWith(".tmdl", StringComparison.OrdinalIgnoreCase)
+
+/// The .tmdl files (relative paths, '/'-separated) of a folder that a new serialization doesn't
+/// write, compared by exact case: on a case-insensitive file system, tables/Sales.tmdl is stale
+/// when the new output has tables/SALES.tmdl, even though both name the same file.
+let staleTmdlFiles (existing: string list) (written: string list) =
+    let keep = Collections.Generic.HashSet<string>(written, StringComparer.Ordinal)
+
+    existing
+    |> List.filter (fun f -> isTmdlFile f && not (keep.Contains f))
+    |> List.sort
+
+let private relativeFiles (dir: string) =
+    if Directory.Exists dir then
+        Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
+        |> Array.map (fun f -> Path.GetRelativePath(dir, f).Replace('\\', '/'))
+        |> List.ofArray
+    else
+        []
+
+/// Write TMDL into a folder the way TOM's folder serializer does (stale .tmdl files removed, with
+/// folders they leave empty; other files left alone), but safe for case-only renames on
+/// case-insensitive file systems. TOM writes SALES.tmdl (which lands on the existing Sales.tmdl
+/// there) and then deletes Sales.tmdl as stale, losing the table. So serialize into a staging
+/// folder, delete stale files first (by exact case), then copy in what changed.
 let private writeTmdl (opts: SaveOptions) (db: Database) (dir: string) =
-    catchIo dir (fun () -> TmdlSerializer.SerializeDatabaseToFolder(db, dir, tmdlOptions opts))
+    catchIo dir (fun () ->
+        let staging =
+            Path.Combine(Path.GetTempPath(), "tessera-tmdl-" + Guid.NewGuid().ToString("N"))
+
+        try
+            TmdlSerializer.SerializeDatabaseToFolder(db, staging, tmdlOptions opts)
+            let written = relativeFiles staging
+
+            let local (relative: string) =
+                Path.Combine(dir, relative.Replace('/', Path.DirectorySeparatorChar))
+
+            for stale in staleTmdlFiles (relativeFiles dir) written do
+                let path = local stale
+                File.Delete path
+
+                // Folders the deletion left empty go too, up to (not including) the root.
+                let root = Path.GetFullPath dir
+                let mutable folder = Path.GetDirectoryName(Path.GetFullPath path)
+
+                while not (isNull folder)
+                      && folder.Length > root.TrimEnd(Path.DirectorySeparatorChar).Length
+                      && Directory.Exists folder
+                      && Seq.isEmpty (Directory.EnumerateFileSystemEntries folder) do
+                    Directory.Delete folder
+                    folder <- Path.GetDirectoryName folder
+
+            for relative in written do
+                let source =
+                    Path.Combine(staging, relative.Replace('/', Path.DirectorySeparatorChar))
+
+                let target = local relative
+                let bytes = File.ReadAllBytes source
+
+                let unchanged =
+                    File.Exists target
+                    && Array.length bytes = int (FileInfo(target).Length)
+                    && File.ReadAllBytes target = bytes
+
+                if not unchanged then
+                    Directory.CreateDirectory(Path.GetDirectoryName target) |> ignore
+                    File.WriteAllBytes(target, bytes)
+        finally
+            try
+                if Directory.Exists staging then
+                    Directory.Delete(staging, true)
+            with _ ->
+                ())
 
 let private saveTmdl opts db dir =
     writeTmdl opts db dir

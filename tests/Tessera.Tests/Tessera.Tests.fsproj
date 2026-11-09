@@ -49,6 +49,7 @@
     <Compile Include="DepsKeywordTests.fs" />
     <Compile Include="LintTests.fs" />
     <Compile Include="LintCommandTests.fs" />
+    <Compile Include="CaseRenameTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

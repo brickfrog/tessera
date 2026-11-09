@@ -464,6 +464,8 @@ Not rewritten:
   uses bare, such as `NOT`, `IN` or `RETURN`.
 
 The same name is a no-op. A case-only rename (`Sales` to `SALES`) is allowed and rewrites references to match.
+In a TMDL or PBIP folder, the object's file (`tables/SALES.tmdl`, `roles/...`) is renamed too, also on
+case-insensitive file systems (Windows, macOS). Saves only rewrite `.tmdl` files whose content changed.
 ### Setting properties (`set`)
 
 `tess set <model> <object> -p <path>=<value> ...` sets properties on one object. It follows the
