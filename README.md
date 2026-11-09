@@ -7,7 +7,7 @@
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
 Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set`,
-`add`, `remove`, `move` and `bpa` work.
+`add`, `remove`, `move`, `bpa`, `translations` and `perspective` work.
 
 ## Install
 
@@ -61,6 +61,10 @@ tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE ru
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
 tess convert ./Sales.SemanticModel ./model.bim   # PBIP -> .bim
 tess convert ./tmdl ./tmdl --force                # re-serialize in place (keeps its line endings)
+tess translations export ./MyReport.pbip --culture da-DK -o da-DK.csv   # a file for the translator
+tess translations import ./MyReport.pbip da-DK.csv --save              # ... and the filled-in file back
+tess perspective add ./MyReport.pbip Finance Sales "[Budget]" --save   # perspective membership
+tess perspective list ./MyReport.pbip Finance
 ```
 
 ### Accepted model paths
@@ -258,6 +262,17 @@ What is compared:
   `--ignore lineageTag,annotations.PBI_*`.
 - A change of compatibility level shows up on `model`.
 - The order of child objects is not compared.
+- Translations show on the object they translate, as `translations.<culture>.caption`, `.description` and
+  `.displayFolder`, not on the culture. So renaming or moving a translated object doesn't show every culture as
+  changed. `get -p` and `find` use the same paths.
+- A perspective's membership is one `members` property, one reference per line, so it diffs line by line:
+
+  ```
+  ~ perspective:Finance
+      members:
+          table:Sales
+        + measure:Sales/Budget
+  ```
 
 ### Dependencies (`deps`)
 
@@ -315,8 +330,8 @@ Options:
 errors. `--ci github|azdo` also writes CI annotations to stderr.
 ### Editing commands
 
-The editing commands (`rename`, `set`, `add`, `remove` and `move`) follow one set of conventions, the same as the
-Tabular Editor CLI's.
+The editing commands (`rename`, `set`, `add`, `remove`, `move`, `translations import` and `perspective add|remove`)
+follow one set of conventions, the same as the Tabular Editor CLI's.
 
 **Saving:**
 - **A dry run by default.** The command shows what would change and writes nothing; stderr says
@@ -568,7 +583,8 @@ suggests close names.
 it, and exits 0. For a relationship, an existing relationship over the same columns counts too. A different kind
 of object holding the name is still a collision.
 
-Not supported: column data types for calculated columns (inferred), KPIs, detail rows, translations, role members,
+Not supported: column data types for calculated columns (inferred), KPIs, detail rows, translations (use
+[`translations import`](#translations-translations)), role members,
 object-level security, and the Power Query parameter metadata of named expressions (write the `meta [...]` record
 in the M yourself).
 ### Removing objects (`remove`)
@@ -833,6 +849,112 @@ analyzer. Known differences:
 - Object names in the output use tess references, e.g. `table:Sales`.
 - Only read-only members are available, so rules can't call TE's methods that change the model.
 
+### Translations (`translations`)
+
+`tess translations export` writes a file for translators: one row for each object, culture and translatable
+property, with the untranslated text next to the translation. `tess translations import` applies the
+filled-in file.
+
+```sh
+tess translations export ./Sales.pbip                          # CSV on stdout, every culture
+tess translations export ./Sales.pbip --culture da-DK -o da-DK.csv
+tess translations export ./Sales.pbip --only-translated --json # just what is translated, as JSON
+tess translations import ./Sales.pbip da-DK.csv                # preview the changes
+tess translations import ./Sales.pbip da-DK.csv --save
+tess translations import ./Sales.pbip fr-FR.csv --create-cultures --save
+tess translations cultures ./Sales.pbip                        # how much of each culture is translated
+```
+
+The CSV file has a header row and RFC 4180 quoting: fields with commas, quotes or line breaks, or with spaces
+at either end, are quoted, with quotes doubled. It is UTF-8 with LF line endings. `--bom` adds a byte-order
+mark, which Excel needs to read it as UTF-8.
+
+```
+object,culture,property,source,translation
+measure:Sales/Total,da-DK,Caption,Total,I alt
+measure:Sales/Total,da-DK,Description,"Net sales, after returns",
+table:Sales,da-DK,Caption,Sales,Salg
+```
+
+- `object` is a [reference](#object-references). On import, any form `get` accepts works.
+- `property` is `Caption`, `Description` or `DisplayFolder`.
+- `source` is the untranslated value: the object's name, description or display folder.
+- `translation` is empty where there isn't one.
+
+`--format json` (or an `-o` file ending in `.json`, or `--json`) writes the same rows as a JSON array of
+`{object, culture, property, source, translation}` objects.
+
+**What's exported:** rows are grouped by culture, in the model's culture order, with objects in model order, so
+re-exported files diff cleanly. Captions are always listed. Descriptions and display folders are listed when the
+object has one, or a translation of it exists, since there is otherwise nothing to translate.
+`--only-translated` lists only rows that have a translation. Objects and properties are the ones TOM keeps
+translations for:
+
+| Object | Properties |
+|---|---|
+| model, table, level, perspective, named expression, function, calendar | Caption, Description |
+| column, measure, hierarchy | Caption, Description, DisplayFolder |
+| role | Description |
+
+Calculation items are left out: TOM writes their translations to TMDL but can't read them back.
+
+**Import** follows the [editing conventions](#editing-commands): a dry run unless you pass `--save` or
+`--save-to`. The change shows on each translated object, e.g. `translations.da-DK.caption: (none) -> "I alt"`.
+- Each row sets its translation. An empty translation removes it.
+- Rows the file doesn't have are left alone, so a file with only some rows or cultures is fine. `--culture` imports
+  only those cultures' rows.
+- The format comes from `--format`, else the file's extension, else its content (`[` means JSON). `-` reads
+  stdin. A byte-order mark is skipped. Header columns can be in any order and any case; `source` is optional, and
+  extra columns are ignored.
+- Cultures match case-insensitively. A culture the model doesn't have is refused unless you pass
+  `--create-cultures`, which adds it (it must be a specific culture name such as `fr-FR`).
+- If a row's `source` no longer matches the model, for example because a description changed after the export,
+  the row is imported with a warning that lists the lines.
+
+Import refuses the whole file (exit 3), naming the file and line, for:
+- an object that doesn't exist, or is ambiguous
+- a property the object can't have translated, such as a table's `DisplayFolder`. TOM accepts it, but drops it
+  on save.
+- an unknown property or culture
+- two rows that give the same property different translations
+- a malformed file: a missing header column, a row with too many or too few fields, or an unclosed quote
+
+The line is where the row starts, counting line breaks inside quoted fields. In JSON files it's the item number.
+`export` writes a file the translator fills in: exporting, then importing that file unchanged, changes nothing.
+
+`get -p translations.da-DK.caption` shows one translation, and `find` searches translations. `set` doesn't
+write them and points at `translations import`. `tess translations cultures` prints each culture's translated
+and total rows per property; `--json` writes `[{ref, name, translated, total, properties: {caption: {translated,
+total}, ...}}]`.
+
+### Perspectives (`perspective`)
+
+`tess perspective add|remove <model> <perspective> <object>...` changes which tables, columns, measures and
+hierarchies a perspective shows. It follows the [editing conventions](#editing-commands). `tess perspective list`
+shows membership.
+
+```sh
+tess perspective add    ./Sales.pbip Finance Sales "'Date'[Year]" "[Budget]" --save
+tess perspective remove ./Sales.pbip Finance "Sales[Internal Key]" --save
+tess perspective list   ./Sales.pbip                # each perspective, with member counts
+tess perspective list   ./Sales.pbip Finance        # its members, one reference per line (--json too)
+```
+
+The perspective is a name, matched case-insensitively, or a `perspective:<name>` reference. The objects can be in
+any form `get` accepts. In TOM a perspective lists its tables, and each table lists the members it shows, so:
+- **Adding a table** adds it with all its columns, measures and hierarchies, like `add perspective:X --include`.
+  Adding a table that's partly in adds the rest.
+- **Adding a column, measure or hierarchy** adds its table too, with just that member.
+- **Removing a table** removes it with all its members.
+- **Removing a table's last member** removes the table too, since a table with no members shows nothing, and says so
+  on stderr.
+- What's already in, or not in, the perspective is noted on stderr. It isn't an error.
+
+`perspective` refuses (exit 3) a perspective that doesn't exist (create it with `tess add <model> perspective:<name>`),
+and levels, calculation items and other objects perspectives don't hold. The change shows as the perspective's
+`members`, line by line. `list --json` writes `[{ref, name, tables, columns, measures, hierarchies}]`, or
+`{perspective, members: [{ref, kind}]}` for one perspective.
+
 ### Findings JSON and CI annotations
 
 `validate` and `bpa` (and later `test` and `schemacheck`) report findings in one shape, the one the Tabular
@@ -874,7 +996,7 @@ the code as its title.
 | 0 | success |
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
 | 2 | usage error, including invalid arguments for an editing command: an invalid new name (`rename`, `add`), a property `set` can't write or a value it can't take, or an option `add` doesn't take for that kind |
-| 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), or an edit that would change what other references mean (`rename`, `move`) |
+| 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), an edit that would change what other references mean (`rename`, `move`), a translation file that can't be applied (`translations import`), or an object a perspective can't hold |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |
 
