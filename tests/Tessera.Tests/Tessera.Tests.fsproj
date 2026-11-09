@@ -69,6 +69,7 @@
     <Compile Include="XmlaCommandTests.fs" />
     <Compile Include="OfflineTests.fs" />
     <Compile Include="XmlaIntegrationTests.fs" />
+    <Compile Include="DaxParserTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

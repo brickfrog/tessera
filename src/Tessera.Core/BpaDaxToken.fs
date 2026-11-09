@@ -184,7 +184,18 @@ let tokenize (includeHidden: bool) (dax: string) : IList<DaxToken> =
 
     if not (String.IsNullOrEmpty dax) then
         for t in Dax.tokenize dax do
-            if includeHidden || not (Token.isTrivia t) then
+            if t.Kind = TokenKind.Operator && t.Text = "==" then
+                // TE2's lexer has no "==": it reads two "=" tokens, and so must rules written for it.
+                for k in 0..1 do
+                    let half = {
+                        t with
+                            Text = "="
+                            Start = t.Start + k
+                            Length = 1
+                    }
+
+                    result.Add(DaxToken(half, typeOf half, result.Count, result))
+            elif includeHidden || not (Token.isTrivia t) then
                 result.Add(DaxToken(t, typeOf t, result.Count, result))
 
     result

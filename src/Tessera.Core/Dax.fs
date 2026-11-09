@@ -18,7 +18,7 @@ type TokenKind =
     /// DT"2024-01-01". Text is the value.
     | DateLiteral
     | Number
-    /// + - * / ^ & = < > <= >= <> && || => :
+    /// + - * / ^ & = == < > <= >= <> && || => :
     | Operator
     /// ( ) { } , ;
     | Punctuation
@@ -50,7 +50,7 @@ let private isIdentStart (c: char) = Char.IsLetter c || c = '_'
 let private isIdentPart (c: char) =
     Char.IsLetterOrDigit c || c = '_' || c = '.'
 
-let private twoCharOperators = [ "&&"; "||"; "<>"; "<="; ">="; "=>" ]
+let private twoCharOperators = [ "&&"; "||"; "<>"; "<="; ">="; "=>"; "==" ]
 
 let private oneCharOperators = "+-*/^&=<>:"
 let private punctuation = "(){},;"
