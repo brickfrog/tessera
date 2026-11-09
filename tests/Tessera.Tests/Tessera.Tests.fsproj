@@ -26,6 +26,7 @@
     <Compile Include="SetTests.fs" />
     <Compile Include="AddTests.fs" />
     <Compile Include="RemoveMoveTests.fs" />
+    <Compile Include="TranslationsTests.fs" />
     <Compile Include="CliHarness.fs" />
     <Compile Include="ValidateCommandTests.fs" />
     <Compile Include="CliTests.fs" />
@@ -36,6 +37,7 @@
     <Compile Include="RemoveMoveCommandTests.fs" />
     <Compile Include="BpaCommandTests.fs" />
     <Compile Include="SampleModelTests.fs" />
+    <Compile Include="TranslationsCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

@@ -40,6 +40,9 @@ type TessError =
     | UnsupportedMove of objectRef: string * reason: string
     /// Moving a measure would change what references (its own, or others') mean.
     | MoveConflict of objectRef: string * table: string * details: string list
+    /// `translations import`: a file that can't be read, or a row that can't be applied (with the
+    /// line it starts on, or the item number in a JSON file).
+    | InvalidTranslationFile of path: string * line: int option * reason: string
 
 module TessError =
 
@@ -74,6 +77,7 @@ module TessError =
         | UnsupportedRemove _ -> "unsupported-remove"
         | UnsupportedMove _ -> "unsupported-move"
         | MoveConflict _ -> "move-conflict"
+        | InvalidTranslationFile _ -> "invalid-translation-file"
 
     let message =
         function
@@ -143,3 +147,10 @@ module TessError =
 
             $"Moving {objectRef} to '{table}' would change what references mean:\n{list}\n"
             + "Qualify those references with their table ('Table'[Column]) first."
+        | InvalidTranslationFile(path, line, reason) ->
+            let at =
+                match line with
+                | Some n -> $" line {n}"
+                | None -> ""
+
+            $"{path}{at}: {reason}"

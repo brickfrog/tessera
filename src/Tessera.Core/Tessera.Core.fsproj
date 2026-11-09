@@ -30,6 +30,7 @@
     <Compile Include="AddObject.fs" />
     <Compile Include="RemoveObject.fs" />
     <Compile Include="MoveObject.fs" />
+    <Compile Include="Translations.fs" />
   </ItemGroup>
 
   <ItemGroup>
