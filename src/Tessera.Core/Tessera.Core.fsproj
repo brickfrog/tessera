@@ -39,6 +39,7 @@
     <Compile Include="Lint.fs" />
     <Compile Include="BpaRuleEdit.fs" />
     <Compile Include="BpaFetch.fs" />
+    <Compile Include="Report.fs" />
   </ItemGroup>
 
   <ItemGroup>

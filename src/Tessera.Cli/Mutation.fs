@@ -104,20 +104,72 @@ let private resultJson
 
     o
 
+/// Report file edits: the changed lines, and whether they were written.
+let private filesJson (files: Report.FileEdit list) (written: bool) : JsonNode =
+    arr [
+        for f in files ->
+            let before = f.Before.Split '\n'
+            let after = f.After.Split '\n'
+
+            obj [
+                "path", str f.Path
+                "display", str f.Display
+                "references", num f.References
+                "written", bool written
+                "lines",
+                arr [
+                    for i in 0 .. (min before.Length after.Length) - 1 do
+                        if before.[i] <> after.[i] then
+                            yield
+                                obj [
+                                    "line", num (i + 1)
+                                    "before", str (before.[i].TrimEnd '\r')
+                                    "after", str (after.[i].TrimEnd '\r')
+                                ]
+                ]
+            ]
+    ]
+
+let private referencesText n =
+    if n = 1 then "1 reference" else $"{n} references"
+
 /// Load the model, apply `edit`, show the changes, and save if asked (and safe).
-let run
+let rec run
     (ctx: Ctx)
     (command: string)
     (opts: Options)
     (modelPath: string)
     (edit: Database -> Result<Mutation.Effect, TessError>)
     : Outcome =
+    runWith ctx command opts modelPath (fun _ db -> edit db |> Result.map (fun e -> e, []))
+
+/// `run`, for edits that also change files next to the model (report files that name its fields).
+/// `edit` gets the model's location. The files are written only when the model is saved in place,
+/// after it; a dry run shows them, and `--save-to` leaves them alone (they point at this model).
+and runWith
+    (ctx: Ctx)
+    (command: string)
+    (opts: Options)
+    (modelPath: string)
+    (edit: ModelSource -> Database -> Result<Mutation.Effect * Report.FileEdit list, TessError>)
+    : Outcome =
     match ModelIO.loadPath modelPath with
     | Error e -> Failed e
     | Ok(source, db) ->
-        match Mutation.apply db edit with
+        let files = ref []
+
+        let applied =
+            Mutation.apply db (fun db ->
+                edit source db
+                |> Result.map (fun (effect, fs) ->
+                    files.Value <- fs
+                    effect))
+
+        match applied with
         | Error e -> Failed e
         | Ok applied ->
+            let files = files.Value
+
             let blocked =
                 opts.Target <> DryRun && not applied.IntroducedErrors.IsEmpty && not opts.Force
 
@@ -127,8 +179,26 @@ let run
                 else
                     match opts.Target with
                     | DryRun -> Ok None
-                    | InPlace -> ModelIO.saveBack source db |> Result.map Some
+                    | InPlace ->
+                        ModelIO.saveBack source db
+                        |> Result.bind (fun s -> Report.write files |> Result.map (fun () -> Some s))
                     | SaveTo path -> ModelIO.saveTo source opts.Force db path |> Result.map Some
+
+            let filesWritten =
+                opts.Target = InPlace && not blocked && not applied.Changes.IsEmpty
+
+            let applied =
+                match opts.Target, files with
+                | SaveTo _, _ :: _ ->
+                    let w =
+                        $"{List.length files} report files are not updated: --save-to writes the model elsewhere, "
+                        + "and the reports still point at this one"
+
+                    {
+                        applied with
+                            Effect.Warnings = applied.Effect.Warnings @ [ w ]
+                    }
+                | _ -> applied
 
             match saved with
             | Error e -> Failed e
@@ -137,6 +207,7 @@ let run
 
                 if ctx.Json then
                     let json = resultJson command opts applied saved :?> JsonObject
+                    json.["files"] <- filesJson files filesWritten
 
                     // One JSON document: a refused save is reported inside the result.
                     if blocked then
@@ -155,6 +226,24 @@ let run
                         | ShowDiff -> Changes.diffText ctx.Out applied.Diff
                         | ShowStat -> Changes.statText ctx.Out applied.Changes
                         | ShowNames -> Changes.namesText ctx.Out applied.Changes
+
+                        if not files.IsEmpty then
+                            match opts.Show with
+                            | ShowDiff ->
+                                for f in files do
+                                    ctx.Out.WriteLine()
+                                    ctx.Out.WriteLine($"~ report {f.Display}  ({referencesText f.References})")
+                                    Changes.lineDiffText ctx.Out f.Before f.After
+                            | ShowStat ->
+                                let width = files |> List.map (fun f -> f.Display.Length) |> List.fold max 0
+
+                                for f in files do
+                                    ctx.Out.WriteLine(
+                                        $"~ report {f.Display.PadRight width}  {referencesText f.References}"
+                                    )
+                            | ShowNames ->
+                                for f in files do
+                                    ctx.Out.WriteLine(f.Display)
 
                     // Notices go to stderr, so stdout stays the change itself.
                     for note in applied.Effect.Notes do
@@ -180,9 +269,56 @@ let run
                         | _, Some s ->
                             let format = ModelIO.OutputFormat.token s.Format
                             ctx.Err.WriteLine($"Saved {format}  {s.Path}  ({ModelIO.Eol.token s.Eol})")
+
+                            if filesWritten && not files.IsEmpty then
+                                let n = files |> List.sumBy (fun f -> f.References)
+
+                                let fileCount =
+                                    if files.Length = 1 then
+                                        "1 file"
+                                    else
+                                        $"{files.Length} files"
+
+                                ctx.Err.WriteLine($"Updated {referencesText n} in {fileCount} of the report")
                         | _, None -> ()
 
                 match blocked, ctx.Json with
                 | true, true -> DoneWith(ExitCode.ofError blockedError)
                 | true, false -> Failed blockedError
                 | false, _ -> Done
+
+/// Make a model edit also update the report files of the model's PBIP project: for each object it
+/// renames or moves (Effect.Renamed), the PBIR field references in report folders whose
+/// definition.pbir points at this semantic model folder.
+let followReports
+    (edit: Database -> Result<Mutation.Effect, TessError>)
+    : ModelSource -> Database -> Result<Mutation.Effect * Report.FileEdit list, TessError> =
+    fun source db ->
+        edit db
+        |> Result.map (fun effect ->
+            let reports =
+                source.SemanticModelFolder
+                |> Option.map Report.reportsOf
+                |> Option.defaultValue []
+
+            let changes = effect.Renamed |> List.choose (fun (o, n) -> Report.Change.ofMove o n)
+
+            match reports, changes with
+            | [], _
+            | _, [] -> effect, []
+            | _, [ change ] ->
+                let files, warnings = Report.plan reports change
+
+                {
+                    effect with
+                        Warnings = effect.Warnings @ warnings
+                },
+                files
+            | _ ->
+                {
+                    effect with
+                        Warnings =
+                            effect.Warnings
+                            @ [ "report files are not updated for edits that rename several objects" ]
+                },
+                [])

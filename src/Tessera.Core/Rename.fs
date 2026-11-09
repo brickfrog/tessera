@@ -36,10 +36,16 @@ type RenamePlan = {
 module RenamePlan =
     let isNoOp (p: RenamePlan) = p.OldName = p.NewName
 
-    /// Edits of DAX expressions (as opposed to annotations).
+    /// Edits of DAX expressions (as opposed to annotations and calculated-table sourceColumns).
     let expressionEdits (p: RenamePlan) =
         p.Edits
-        |> List.filter (fun e -> not (e.Property.StartsWith("annotations.", StringComparison.Ordinal)))
+        |> List.filter (fun e ->
+            not (e.Property.StartsWith("annotations.", StringComparison.Ordinal))
+            && e.Property <> "sourceColumn")
+
+    /// Edits of calculated-table columns' sourceColumn.
+    let sourceColumnEdits (p: RenamePlan) =
+        p.Edits |> List.filter (fun e -> e.Property = "sourceColumn")
 
 let private ci = StringComparison.OrdinalIgnoreCase
 let private eqCi (a: string) (b: string) = String.Equals(a, b, ci)
@@ -282,23 +288,86 @@ let mMentions (entries: ObjectEntry list) (target: ObjectEntry) (name: string) =
            | _ -> false)
     |> List.map (fun e -> ObjectRef.format e.Ref)
 
-/// Calculated-table columns whose sourceColumn ('T'[C]) names the target table or column.
-let private sourceColumnMentions (entries: ObjectEntry list) (target: ObjectEntry) =
+/// Calculated-table columns whose sourceColumn ('T'[C]) names the target table or column. A
+/// calculated table's columns are bound to the columns its DAX returns by that name: a table such as
+/// FILTER(Sales, ...) returns Sales[Amount], so once Sales[Amount] is renamed it returns Sales[Net],
+/// and the column must map to that. The column keeps its own name.
+let private sourceColumnEdits (entries: ObjectEntry list) (target: ObjectEntry) (newName: string) =
     let oldName = ObjectEntry.name target
 
     entries
-    |> List.filter (fun e ->
+    |> List.choose (fun e ->
         match e.Object with
         | :? CalculatedTableColumn as c when not (isNull c.SourceColumn) ->
-            match tokenize c.SourceColumn |> significant with
-            | [ t; col ] when Token.isName t && col.Kind = TokenKind.Bracketed ->
-                match target.Object with
-                | :? Table -> eqCi t.Text oldName
-                | :? Column as tc -> eqCi t.Text tc.Table.Name && eqCi col.Text oldName
-                | _ -> false
-            | _ -> false
-        | _ -> false)
-    |> List.map (fun e -> ObjectRef.format e.Ref)
+            let sc = c.SourceColumn
+            let all = tokenize sc
+
+            let replacement =
+                match significant all with
+                | [ t; col ] when Token.isName t && col.Kind = TokenKind.Bracketed ->
+                    match target.Object with
+                    | :? Table when eqCi t.Text oldName -> Some(t, tableReferenceText all oldName newName t)
+                    | :? Column as tc when eqCi t.Text tc.Table.Name && eqCi col.Text oldName ->
+                        Some(col, bracket newName)
+                    | _ -> None
+                | _ -> None
+
+            replacement
+            |> Option.map (fun (token, text) -> {
+                Owner = e
+                Property = "sourceColumn"
+                Before = sc
+                After = sc.Substring(0, token.Start) + text + sc.Substring(token.Start + token.Length)
+                References = 1
+            })
+        | _ -> None)
+
+/// Field parameters (calculated tables with a ParameterMetadata column) whose rewritten DAX still
+/// shows the old name as a label: labels are text, chosen by the user, and stay as they are.
+let private fieldParameterLabels (edits: Edit list) (oldName: string) =
+    edits
+    |> List.choose (fun e ->
+        match e.Owner.Object with
+        | :? Table as t when
+            e.Property = "expression"
+            && t.Columns
+               |> Seq.exists (fun c -> not (isNull (c.ExtendedProperties.Find "ParameterMetadata")))
+            ->
+            let labelled =
+                tokenize e.After
+                |> List.exists (fun tok -> tok.Kind = TokenKind.String && eqCi tok.Text oldName)
+
+            if labelled then
+                Some
+                    $"field parameter '{t.Name}' still shows the label \"{oldName}\" for it: labels are text and are not renamed"
+            else
+                None
+        | _ -> None)
+
+/// Qualified references that name the measure with a table other than its own ('Date'[Total] for
+/// Sales' Total). tess resolves a qualified name only in the table it names (as TE2 does), so these
+/// stay unresolved, and are not rewritten; `validate` reports them.
+let private foreignQualifiedMeasure (graph: Deps.Graph) (target: ObjectEntry) =
+    match target.Object with
+    | :? Measure as m ->
+        graph.References
+        |> List.choose (fun r ->
+            match r.Target with
+            | Deps.Unresolved text ->
+                match tokenize text |> significant with
+                | [ t; name ] when
+                    Token.isName t
+                    && name.Kind = TokenKind.Bracketed
+                    && eqCi name.Text m.Name
+                    && not (eqCi t.Text m.Table.Name)
+                    ->
+                    let at = r.Line |> Option.map (fun l -> $":{l}") |> Option.defaultValue ""
+
+                    Some
+                        $"{text} in {ObjectRef.format r.From} {r.Via}{at} names it with table '{t.Text}' instead of '{m.Table.Name}'; it doesn't resolve to it, so it isn't rewritten"
+                | _ -> None
+            | Deps.Resolved _ -> None)
+    | _ -> []
 
 let private warnings (entries: ObjectEntry list) (target: ObjectEntry) =
     let oldName = ObjectEntry.name target
@@ -315,14 +384,6 @@ let private warnings (entries: ObjectEntry list) (target: ObjectEntry) =
             match mMentions entries target oldName with
             | [] -> ()
             | refs -> $"M references to '{oldName}' are not updated; these mention it: {listed refs}"
-        | _ -> ()
-
-        match target.Ref.Kind with
-        | ObjectKind.Table
-        | ObjectKind.Column ->
-            match sourceColumnMentions entries target with
-            | [] -> ()
-            | refs -> $"calculated-table columns that map to it by sourceColumn are not updated: {listed refs}"
         | _ -> ()
     ]
 
@@ -386,6 +447,7 @@ let private accessor (o: MetadataObject) (property: string) : ((unit -> string) 
         |> Seq.tryFind (fun tp -> tp.Table.Name = table)
         |> Option.map (fun tp -> (fun () -> tp.FilterExpression), (fun v -> tp.FilterExpression <- v))
     | :? Function as f, "expression" -> Some((fun () -> f.Expression), (fun v -> f.Expression <- v))
+    | :? CalculatedTableColumn as c, "sourceColumn" -> Some((fun () -> c.SourceColumn), (fun v -> c.SourceColumn <- v))
     | :? Model as m, p when p.StartsWith("annotations.", StringComparison.Ordinal) ->
         match m.Annotations.Find(p.Substring 12) with
         | null -> None
@@ -569,11 +631,20 @@ let plan (db: Database) (target: ObjectEntry) (newName: string) : Result<RenameP
                         | ObjectKind.Expression -> queryOrderEdit db entries oldName newName |> Option.toList
                         | _ -> []
 
+                    let columnEdits =
+                        match kind with
+                        | ObjectKind.Table
+                        | ObjectKind.Column -> sourceColumnEdits entries target newName
+                        | _ -> []
+
                     let p = {
                         noOp with
                             NewRef = newRef
-                            Edits = daxEdits @ annotationEdits
-                            Warnings = warnings entries target
+                            Edits = daxEdits @ columnEdits @ annotationEdits
+                            Warnings =
+                                warnings entries target
+                                @ fieldParameterLabels daxEdits oldName
+                                @ foreignQualifiedMeasure graph target
                     }
 
                     match verify db graph p with

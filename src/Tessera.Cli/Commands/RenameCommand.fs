@@ -31,21 +31,26 @@ type Args =
 let private counts (p: RenamePlan) =
     let expressions = RenamePlan.expressionEdits p
     let objects = expressions |> List.map (fun e -> e.Owner.Ref) |> List.distinct
-    expressions.Length, objects.Length, p.Edits.Length - expressions.Length
+    let sourceColumns = (RenamePlan.sourceColumnEdits p).Length
+    expressions.Length, objects.Length, sourceColumns, p.Edits.Length - expressions.Length - sourceColumns
 
 let private plural n (word: string) =
     if n = 1 then $"1 {word}" else $"{n} {word}s"
 
 let private updatedText (p: RenamePlan) =
-    let expressions, objects, others = counts p
+    let expressions, objects, sourceColumns, annotations = counts p
 
-    let annotations =
-        if others > 0 then
-            " and " + plural others "annotation"
-        else
-            ""
+    let extra =
+        [
+            if sourceColumns > 0 then
+                plural sourceColumns "calculated-table sourceColumn"
+            if annotations > 0 then
+                plural annotations "annotation"
+        ]
+        |> List.map (fun s -> " and " + s)
+        |> String.concat ""
 
-    $"""{plural expressions "expression"} in {plural objects "object"}{annotations}"""
+    $"""{plural expressions "expression"} in {plural objects "object"}{extra}"""
 
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let model, selector, newName = args.GetResult Args.Rename
@@ -61,22 +66,27 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     match opts with
     | Error message -> UsageError message
     | Ok opts ->
-        Mutation.run ctx "rename" opts model (fun db ->
-            Selector.resolve (objects db) selector
-            |> Result.bind (fun target -> Rename.plan db target newName)
-            |> Result.map (fun p ->
-                if RenamePlan.isNoOp p then
-                    {
-                        Tessera.Mutation.Effect.none with
-                            Notes = [ $"{ObjectRef.format p.Target.Ref} is already named '{p.NewName}'." ]
-                    }
-                else
-                    Rename.apply p
+        Mutation.runWith
+            ctx
+            "rename"
+            opts
+            model
+            (Mutation.followReports (fun db ->
+                Selector.resolve (objects db) selector
+                |> Result.bind (fun target -> Rename.plan db target newName)
+                |> Result.map (fun p ->
+                    if RenamePlan.isNoOp p then
+                        {
+                            Tessera.Mutation.Effect.none with
+                                Notes = [ $"{ObjectRef.format p.Target.Ref} is already named '{p.NewName}'." ]
+                        }
+                    else
+                        Rename.apply p
 
-                    {
-                        Warnings = p.Warnings
-                        Renamed = [ p.Target.Ref, p.NewRef ]
-                        Notes = [
-                            $"Renamed {ObjectRef.format p.Target.Ref} -> {ObjectRef.format p.NewRef}; updated {updatedText p}"
-                        ]
-                    }))
+                        {
+                            Warnings = p.Warnings
+                            Renamed = [ p.Target.Ref, p.NewRef ]
+                            Notes = [
+                                $"Renamed {ObjectRef.format p.Target.Ref} -> {ObjectRef.format p.NewRef}; updated {updatedText p}"
+                            ]
+                        })))

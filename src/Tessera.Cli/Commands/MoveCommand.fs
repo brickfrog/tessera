@@ -48,4 +48,4 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             DisplayFolder = args.TryGetResult Args.Display_Folder
         }
 
-        Mutation.run ctx "move" opts model (fun db -> MoveObject.move db spec)
+        Mutation.runWith ctx "move" opts model (Mutation.followReports (fun db -> MoveObject.move db spec))

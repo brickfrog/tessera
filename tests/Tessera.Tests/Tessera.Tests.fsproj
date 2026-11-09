@@ -51,6 +51,12 @@
     <Compile Include="LintCommandTests.fs" />
     <Compile Include="BpaLayerTests.fs" />
     <Compile Include="BpaRulesCommandTests.fs" />
+    <Compile Include="CaseRenameTests.fs" />
+    <Compile Include="ReportTests.fs" />
+    <Compile Include="ReportCommandTests.fs" />
+    <Compile Include="SampleReportTests.fs" />
+    <Compile Include="RenameEdgeTests.fs" />
+    <Compile Include="RenameEdgeCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
