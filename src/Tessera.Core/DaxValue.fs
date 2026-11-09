@@ -166,12 +166,15 @@ module DaxError =
 /// How strings compare. One object answers equality, hashing and ordering, so the three always
 /// agree. Trailing spaces never count: the engine drops them when it stores text, and `"a " = "a"`.
 ///
-/// The engine's default is case-insensitive. ASSUMPTION: accent-sensitive, kana- and width-sensitive
-/// (the docs only state case; an Analysis Services model inherits a Windows collation from its
-/// culture, typically `..._CI_AS`). The default here compares by upper-cased UTF-16 code units, not
-/// linguistically, so results are the same on every OS and ICU version: "é" and "e" differ, and
-/// "Z" sorts before "a"-as-"A"... i.e. order is by code unit after upper-casing, which for
-/// non-ASCII text is not the culture's alphabetical order. Pass another `Collation` to change it.
+/// The engine's default is case-insensitive. ASSUMPTION: accents, kana and width count. The docs
+/// fetched state only the case-insensitivity; a tabular model takes a Windows collation from its
+/// culture, and whether that one ignores accents was not found.
+///
+/// The default here compares UTF-16 code units after upper-casing, not linguistically, so results
+/// are the same on every OS and ICU version. So "é" and "e" are different values, and ORDER BY on
+/// text is code-unit order: right for ASCII letters and digits ("apple" < "Banana" < "cherry"), but
+/// not a culture's alphabetical order for other text ("Zebra" sorts before "Ärger"). Pass another
+/// `Collation` (see `Collation.ofCulture`) to change it.
 type Collation = {
     Name: string
     /// Must implement Equals, GetHashCode and Compare consistently.

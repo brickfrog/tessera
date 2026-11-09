@@ -1015,7 +1015,8 @@ module Fixture =
                     sink.Malformed(None, "the array of rows is never closed")
                 elif reader.Read() then
                     sink.Malformed(Some(lineAt (start + int reader.TokenStartIndex)), "text after the array of rows")
-        with :? JsonException as e ->
+        with
+        | :? JsonException as e ->
             let at =
                 if e.LineNumber.HasValue then
                     Some(int e.LineNumber.Value + 1)
@@ -1025,6 +1026,10 @@ module Fixture =
             // System.Text.Json appends its own position to the message.
             let reason = e.Message.Split(" LineNumber:").[0].Trim()
             sink.Malformed(at, $"not valid JSON: {reason}")
+        // The reader checks the bytes of a string only when the string is asked for: bytes that
+        // aren't UTF-8, or a \uD800 escape with no other half.
+        | :? InvalidOperationException ->
+            sink.Malformed(Some line, "the file is not UTF-8, or a string has half a surrogate pair (near this line)")
 
         for b in builders do
             while b.RowCount < rows do

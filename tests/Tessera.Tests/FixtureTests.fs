@@ -1163,6 +1163,24 @@ let tests =
                 Expect.stringContains e.Message "not UTF-8" ""
                 Expect.equal (loaded.Store.TryTable "Customer" |> Option.get).RowCount 0 ""
 
+            testCase "a JSON file that isn't UTF-8, or has half a surrogate pair, is an error too"
+            <| fun () ->
+                for name, bytes in
+                    [
+                        "a value", Encoding.Latin1.GetBytes "[\n{\"Code\":\"C1\"},\n{\"Code\":\"Zoë\"}]"
+                        "a property name", Encoding.Latin1.GetBytes "[{\"Zoë\":\"x\"}]"
+                        "a lone surrogate", Encoding.ASCII.GetBytes "[{\"Code\":\"\\uD800\"}]"
+                        "a lone surrogate in a name", Encoding.ASCII.GetBytes "[{\"\\uDC00\":1}]"
+                    ] do
+                    use t = new TempDir()
+                    File.WriteAllBytes(t.Combine "Customer.json", bytes)
+                    let loaded, issues = Fixture.loadAndCheck (model ()) t.Path |> ok
+                    let e = issues |> List.find (fun i -> i.Rule = "malformed-file")
+                    Expect.equal e.Severity Severity.Error name
+                    Expect.stringContains e.Message "not UTF-8" name
+                    let customer = loaded.Store.TryTable "Customer" |> Option.get
+                    Expect.isTrue (customer.Columns |> Array.forall (fun c -> c.RowCount = customer.RowCount)) name
+
             testCase "issues carry the file's full path"
             <| fun () ->
                 use t = fixture [ "Product.csv", "ProductKey\nx\n" ]
