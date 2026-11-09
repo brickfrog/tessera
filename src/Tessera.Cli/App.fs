@@ -10,8 +10,8 @@ open Tessera.Cli.Output
 
 let private parser = lazy (ArgumentParser.Create<CliArgs>(programName = "tess"))
 
-/// Run the CLI. Returns the process exit code.
-let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
+/// Run the CLI with these environment variables. Returns the process exit code.
+let runWith (getEnv: string -> string option) (out: TextWriter) (err: TextWriter) (argv: string array) : int =
     // Decide JSON mode before parsing so usage errors can be reported as JSON too.
     let jsonRequested = argv |> Array.exists (fun a -> a = "--json" || a = "-j")
 
@@ -30,6 +30,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
             Out = out
             Err = err
             Json = results.Contains Json
+            GetEnv = getEnv
         }
 
         if results.Contains Version then
@@ -86,3 +87,6 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
             err.WriteLine($"tess: internal error: {e}")
 
         ExitCode.internalError
+
+/// Run the CLI. Returns the process exit code.
+let run (out: TextWriter) (err: TextWriter) (argv: string array) : int = runWith processEnv out err argv

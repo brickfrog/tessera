@@ -29,6 +29,7 @@
     <Compile Include="Commands/RenameCommand.fs" />
     <Compile Include="Commands/RemoveCommand.fs" />
     <Compile Include="Commands/MoveCommand.fs" />
+    <Compile Include="Commands/BpaRulesCommand.fs" />
     <Compile Include="Commands/BpaCommand.fs" />
     <Compile Include="Commands/SetCommand.fs" />
     <Compile Include="Commands/AddCommand.fs" />

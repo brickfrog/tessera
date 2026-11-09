@@ -111,6 +111,26 @@ type RuleSource =
     | ExternalRuleFile of path: string
     /// The model's BestPracticeAnalyzer annotation.
     | ModelAnnotation
+    /// A file listed in the TESS_BPA_RULES environment variable.
+    | EnvRuleFile of path: string
+    /// A config file: the project's .tessera/bpa.json or the user's tessera/bpa.json.
+    | ConfigFile of path: string
+    /// A URL the model lists in BestPracticeAnalyzer_ExternalRuleFiles, fetched with --allow-external-rules.
+    | ExternalRuleUrl of url: string
+
+/// The layers rules come from, lowest precedence first. A rule in a higher layer replaces a rule
+/// with the same ID from a lower one.
+[<RequireQualifiedAccess>]
+type RuleLayer =
+    | BuiltIn
+    /// The model's own rules: files and URLs its annotation lists, then the rules embedded in it.
+    | Model
+    /// .tessera/bpa.json files and the user's config file.
+    | Config
+    /// TESS_BPA_RULES.
+    | Env
+    /// --rules files.
+    | CommandLine
 
 module RuleSource =
     let describe =
@@ -119,6 +139,29 @@ module RuleSource =
         | RuleFile path -> path
         | ExternalRuleFile path -> path
         | ModelAnnotation -> "model annotation"
+        | EnvRuleFile path -> path
+        | ConfigFile path -> path
+        | ExternalRuleUrl url -> url
+
+    let layer =
+        function
+        | BuiltIn -> RuleLayer.BuiltIn
+        | ExternalRuleFile _
+        | ExternalRuleUrl _
+        | ModelAnnotation -> RuleLayer.Model
+        | ConfigFile _ -> RuleLayer.Config
+        | EnvRuleFile _ -> RuleLayer.Env
+        | RuleFile _ -> RuleLayer.CommandLine
+
+module RuleLayer =
+    /// The layer's name in output: builtin, model, config, env, cli.
+    let token =
+        function
+        | RuleLayer.BuiltIn -> "builtin"
+        | RuleLayer.Model -> "model"
+        | RuleLayer.Config -> "config"
+        | RuleLayer.Env -> "env"
+        | RuleLayer.CommandLine -> "cli"
 
 type Rule = {
     Id: string
@@ -261,8 +304,8 @@ let parse (source: RuleSource) (json: string) : Result<Rule list, string> =
     with :? JsonException as e ->
         Error e.Message
 
-/// Load a rule file.
-let loadFile (path: string) : Result<Rule list, TessError> =
+/// Load a rule file, tagging its rules with `source path`.
+let loadFileAs (source: string -> RuleSource) (path: string) : Result<Rule list, TessError> =
     if not (File.Exists path) then
         Error(PathNotFound path)
     else
@@ -273,7 +316,10 @@ let loadFile (path: string) : Result<Rule list, TessError> =
                 Error(InvalidRules(path, e.Message))
 
         text
-        |> Result.bind (fun json -> parse (RuleFile path) json |> Result.mapError (fun e -> InvalidRules(path, e)))
+        |> Result.bind (fun json -> parse (source path) json |> Result.mapError (fun e -> InvalidRules(path, e)))
+
+/// Load a rule file.
+let loadFile (path: string) : Result<Rule list, TessError> = loadFileAs RuleFile path
 
 /// Rule IDs listed in an ignore annotation: {"RuleIDs": ["ID", ...]} (a bare array is accepted too).
 let parseIgnoreList (json: string) : string list =

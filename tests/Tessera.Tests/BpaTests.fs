@@ -566,26 +566,26 @@ let sourceTests =
                 | Ok x -> x
                 | Error e -> failtest (TessError.message e)
 
-            let opts: Bpa.RuleOptions = {
-                BuiltIn = false
-                Files = []
-                ModelRules = true
+            let opts = {
+                Bpa.RuleOptions.defaults with
+                    BuiltIn = false
             }
 
             match Bpa.collectRules source loaded opts with
-            | Ok(rules, warnings) ->
-                Expect.equal (rules |> List.map (fun r -> r.Id)) [ "EXTRA"; "EMBEDDED" ] ""
+            | Ok c ->
+                Expect.equal (c.Effective |> List.map (fun r -> r.Id)) [ "EXTRA"; "EMBEDDED" ] ""
 
                 Expect.equal
-                    (rules |> List.map (fun r -> r.Source))
+                    (c.Effective |> List.map (fun r -> r.Source))
                     [ ExternalRuleFile(t.Combine "extra.json"); ModelAnnotation ]
                     ""
 
-                Expect.equal warnings.Length 2 "a missing file and a URL"
+                Expect.equal c.Warnings.Length 1 "a missing file"
+                Expect.equal c.Notes.Length 1 "a URL, not fetched"
             | Error e -> failtest (TessError.message e)
 
             match Bpa.collectRules source loaded { opts with ModelRules = false } with
-            | Ok(rules, _) -> Expect.isEmpty rules ""
+            | Ok c -> Expect.isEmpty c.Effective ""
             | Error e -> failtest (TessError.message e)
     ]
 

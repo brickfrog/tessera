@@ -9,11 +9,25 @@ open Tessera.Tests.Fixtures
 
 type Run = { Code: int; Out: string; Err: string }
 
-/// Run `tess <args>` in-process.
-let tess (args: string list) =
+/// Environment variables tess reads for configuration. Tests never see the real ones, so a
+/// developer's TESS_BPA_RULES or ~/.config/tessera/bpa.json can't change results.
+let private configVariables =
+    set [ "TESS_BPA_RULES"; "XDG_CONFIG_HOME"; "HOME"; "APPDATA" ]
+
+/// Run `tess <args>` in-process with these environment variables (and none of the real
+/// configuration variables).
+let tessWithEnv (env: (string * string) list) (args: string list) =
+    let env = Map.ofList env
+
+    let getEnv (name: string) =
+        match Map.tryFind name env with
+        | Some v -> Some v
+        | None when configVariables.Contains name -> None
+        | None -> Common.processEnv name
+
     use out = new StringWriter()
     use err = new StringWriter()
-    let code = App.run out err (Array.ofList args)
+    let code = App.runWith getEnv out err (Array.ofList args)
 
     // WriteLine uses the platform newline (CRLF on Windows); tests compare against LF.
     let lf (s: string) = s.Replace("\r\n", "\n")
@@ -23,6 +37,9 @@ let tess (args: string list) =
         Out = lf (out.ToString())
         Err = lf (err.ToString())
     }
+
+/// Run `tess <args>` in-process (without the real configuration variables).
+let tess (args: string list) = tessWithEnv [] args
 
 let private stdinLock = obj ()
 

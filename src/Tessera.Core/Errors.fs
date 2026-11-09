@@ -51,6 +51,12 @@ type TessError =
     | ScriptObjectFailed of source: string * line: int * column: int * error: TessError
     /// `script`: an object a DAX script can't hold or change this way (e.g. a data column's expression).
     | CannotScript of objectRef: string * reason: string
+    /// `bpa rules`: no rule with this ID where it was looked for (with a hint where it is, if anywhere).
+    | RuleNotFound of ruleId: string * where: string * hint: string option
+    /// `bpa rules add`: a rule with this ID is already there (without --replace).
+    | RuleExists of ruleId: string * where: string
+    /// `bpa rules ignore`: an object that can't carry an ignore annotation.
+    | CannotIgnore of objectRef: string * reason: string
 
 module TessError =
 
@@ -90,6 +96,9 @@ module TessError =
         | InvalidScript _ -> "invalid-script"
         | ScriptObjectFailed(_, _, _, inner) -> code inner
         | CannotScript _ -> "cannot-script"
+        | RuleNotFound _ -> "rule-not-found"
+        | RuleExists _ -> "rule-exists"
+        | CannotIgnore _ -> "cannot-ignore"
 
     let rec message =
         function
@@ -170,3 +179,8 @@ module TessError =
         | InvalidScript(source, line, column, reason) -> $"{source}:{line}:{column}: {reason}"
         | ScriptObjectFailed(source, line, column, inner) -> $"{source}:{line}:{column}: {message inner}"
         | CannotScript(objectRef, reason) -> $"Can't script {objectRef}: {reason}"
+        | RuleNotFound(ruleId, where, hint) ->
+            let hint = hint |> Option.map (fun h -> $"; {h}") |> Option.defaultValue ""
+            $"No BPA rule '{ruleId}' in {where}{hint}"
+        | RuleExists(ruleId, where) -> $"{where} already has a BPA rule '{ruleId}' (use --replace to replace it)"
+        | CannotIgnore(objectRef, reason) -> $"Can't ignore rules on {objectRef}: {reason}"

@@ -59,6 +59,8 @@ tess remove ./MyReport.pbip "Sales[Old Key]" "[Unused]" --save  # refused while 
 tess move   ./MyReport.pbip "[Revenue]" "Measures" --save       # rewrites 'Sales'[Revenue] references
 tess bpa   ./MyReport.pbip                       # Best Practice Analyzer: built-in rules + the model's own
 tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE rule files, CI output
+tess bpa rules list ./MyReport.pbip              # the rules in effect, and where each comes from
+tess bpa rules ignore ./MyReport.pbip TESS_DIVIDE "[Ratio]" --save   # suppress one finding (TE's annotation)
 tess script export ./MyReport.pbip -t Sales -o sales.dax   # DAX objects as a DAX script (TE3's format)
 tess script apply  ./MyReport.pbip sales.dax --save        # ... edited, and applied back
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
@@ -398,7 +400,7 @@ own errors (e.g. a relationship to a missing column) aren't grouped with the DAX
 ### Editing commands
 
 The editing commands (`rename`, `set`, `add`, `remove`, `move`, `script apply`, `translations import`,
-`perspective add|remove` and `lint --fix`) follow one set of conventions, the same as the Tabular Editor CLI's.
+`perspective add|remove`, `lint --fix` and `bpa rules add|remove|ignore|unignore`) follow one set of conventions, the same as the Tabular Editor CLI's.
 
 **Saving:**
 - **A dry run by default.** The command shows what would change and writes nothing; stderr says
@@ -735,6 +737,7 @@ tess bpa ./Sales.pbip                              # built-in rules, plus rules 
 tess bpa ./Sales.pbip -r BPARules.json -r team.json --no-default-rules
 tess bpa ./Sales.pbip --category DAX,Performance --min-severity 2
 tess bpa ./Sales.pbip --list-rules                 # what would run, and whether each rule is supported
+tess bpa ./Sales.pbip --path 'measure:Sales/*'     # only findings on matching objects
 tess bpa ./Sales.pbip --json                       # the findings envelope, plus ignored findings and rule errors
 tess bpa ./Sales.pbip --trx bpa.trx                # VSTest results, one test per rule (Azure DevOps etc.)
 ```
@@ -759,16 +762,56 @@ as `--fail-on` (`error`, `warning` or `info`; default `error`). `--min-severity`
 - `skippedRules`, `warnings`
 - `rules`: counts
 
-`--ci github|azdo` writes CI annotations to stderr.
+`--ci github|azdo` writes CI annotations to stderr. In JSON, `warnings` lists rule files the model refers to that
+couldn't be read, `notes` things deliberately not done (URLs not fetched), and `fetched` the URLs requested.
 
-Which rules run, lowest precedence first (a later rule replaces an earlier one with the same ID):
-1. tessera's built-in rules (unless `--no-default-rules`)
-2. `--rules` files, in order
-3. files listed in the model's `BestPracticeAnalyzer_ExternalRuleFiles` annotation (a JSON array of paths,
-   relative to the `.bim` file's folder or the TMDL folder; URLs are not downloaded)
-4. rules stored in the model's `BestPracticeAnalyzer` annotation
+`--path <pattern>` (repeatable or comma-separated) reports only findings on objects whose reference matches: a glob
+over the whole reference (`measure:Sales/*`, `*:Sales/*` for everything in a table), or else a prefix (`column:`,
+`measure:Sales/`). Case-insensitive. Every rule still runs; the exit code, the summary, `--trx` and `--ci` only
+count the matching findings.
 
-`--no-model-rules` skips 3 and 4, like TE2's `-AX`.
+#### Which rules run
+
+Rules come from five layers. They merge by rule ID (case-insensitive): every rule from every layer runs, and where
+two layers define the same ID, the higher layer's definition wins. Highest first:
+
+1. **`--rules` files**, in order (a later file wins).
+2. **`TESS_BPA_RULES`**: a list of rule files separated like `PATH` (`:` on Linux and macOS, `;` on Windows),
+   relative to the current directory; a later file wins.
+3. **Config files**, each a TE rule file:
+   - the project's `.tessera/bpa.json`, the nearest one found walking up from the model's folder to the root of
+     the git repository it's in (the first folder holding `.git`). Outside a repository, only the model's own
+     folders count: the `.bim` file's folder or the TMDL folder, and for PBIP the `X.SemanticModel` folder and the
+     project folder holding it.
+   - the user's `bpa.json`: `$XDG_CONFIG_HOME/tessera/bpa.json`, or `~/.config/tessera/bpa.json`, on Linux and
+     macOS; `%APPDATA%\tessera\bpa.json` on Windows. The project's file wins over the user's.
+4. **The model's own rules:** rules stored in its `BestPracticeAnalyzer` annotation, over the files listed in its
+   `BestPracticeAnalyzer_ExternalRuleFiles` annotation (a JSON array of paths, relative to the `.bim` file's
+   folder or the TMDL folder). Among those files the first listed wins, as in TE.
+5. **tessera's built-in rules.**
+
+A file you name (layers 1 to 3) must exist and be valid, or `bpa` stops (exit 3). A file the model lists that is
+missing or invalid is a warning, so a model can always be analyzed.
+
+Switches: `--no-builtin` (or `--no-default-rules`) drops layer 5, `--no-model-rules` layer 4 (like TE2's `-AX`),
+and `--no-config` layers 2 and 3. `--builtin-only` runs only layer 5 and can't be combined with `--rules` or
+`--no-builtin`. `tess bpa rules list` shows which layer each rule in effect comes from.
+
+How this differs from TE: TE2 merges the same kinds of sources by ID, but gives the model's rules the last word
+and rules passed on its command line the least. tess turns that around, so whoever runs the analysis (a CI job, a
+team's config) decides what a rule means, not the model being checked. To keep a model's own version of a rule,
+give it its own ID.
+
+#### External rule URLs
+
+tess makes no network requests unless asked to. A `BestPracticeAnalyzer_ExternalRuleFiles` entry that is a URL is
+skipped with a note naming it, unless you pass `--allow-external-rules`. With it:
+- only `https://` URLs are fetched, and not ones with a user name or password in them;
+- the request is a plain GET with no cookies, credentials or anything about the model;
+- it times out after 15 seconds, and a file over 4 MB is refused; redirects must stay on `https://`;
+- each URL requested is named on stderr (also with `--json`), and a failed fetch is a warning.
+
+Fetched rules belong to the model's layer, in the position the URL has in the list.
 
 #### Rule format
 
@@ -870,7 +913,49 @@ As in TE, a `BestPracticeAnalyzer_IgnoreRules` annotation holds `{"RuleIDs": ["R
 - On the model, it turns those rules off entirely.
 
 TE's older spelling, `BestPractizeAnalyzer_IgnoreRules`, is read too. TOM calculation items have no
-annotations, so ignore their findings on the model.
+annotations, so ignore their findings on the model. `tess bpa rules ignore` writes these annotations.
+
+#### Managing rules (`bpa rules`)
+
+```sh
+tess bpa rules list <model> [--layer builtin,model,config,env,cli]   # the rules in effect
+tess bpa rules show <model> <rule-id>
+tess bpa rules add <model> --id ID --scope Measure -e 'Name.Length > 40' [--to model|<file>] --save
+tess bpa rules add <model> --from team.json --to model --save        # copy a rule file's rules into the model
+tess bpa rules remove <model> <rule-id>... [--to model|<file>] --save
+tess bpa rules ignore <model> <rule-id>[,<rule-id>...] [<object>...] --save
+tess bpa rules unignore <model> <rule-id>[,<rule-id>...] [<object>...] --save
+```
+
+`list` and `show` take the same rule switches as `bpa` (`--rules`, `--no-builtin`, `--builtin-only`,
+`--no-model-rules`, `--no-config`, `--allow-external-rules`), after the subcommand. Each rule shows its layer, its
+source and the lower layers' definitions it overrides (`overrides` in JSON), and whether the model's ignore
+annotation turns it off (`disabled`).
+
+`add` builds a rule from `--id`, `--name`, `--category`, `--description`, `--severity` (default 1), `--scope`,
+`--expression` (`-e`), `--fix-expression`, `--compatibility-level` (default 1200) and `--learn-more-url`, or
+copies the rules of a TE rule file (`--from`). A rule that doesn't compile is added with a warning, as TE allows.
+An ID that's already there is refused (exit 3) unless `--replace`. `remove` takes one or more IDs (`--from` is
+the same as `--to`); removing a built-in rule is refused, with a pointer to `ignore`.
+
+Where they write, `--to`:
+- `model` (the default): the model's `BestPracticeAnalyzer` annotation, as TE writes it (an indented JSON
+  array; the annotation is removed when it empties). This is a model edit and follows the
+  [editing conventions](#editing-commands): a dry run unless `--save` or `--save-to`. The change shows as a
+  diff of the annotation.
+- a file path: a TE rule file, created if it's missing (`.tessera/bpa.json` is one). A dry run shows the rules
+  added (`+`) and removed (`-`); `--save` writes the file. The file is edited as JSON, so other rules and fields
+  tess doesn't know stay as they were, and its line endings are kept; comments and trailing commas are not
+  (a note says so). `--save-to`, `--force`, `--stat` and `--name-only` are model-only.
+
+`ignore` adds the IDs to each object's `BestPracticeAnalyzer_IgnoreRules` annotation, in TE's format
+(`{"RuleIDs":["A","B"]}`), and `unignore` removes them, removing the annotation when it empties (TE would leave
+`{"RuleIDs":[]}`, which means the same). Objects take any form `get` accepts. Without objects, the rule is
+ignored on the model, which turns it off for the whole model. Both are model edits, as above. IDs that no rule in
+effect has are warned about but still written, since TE accepts any ID. An object with no annotations
+(calculation items) is refused (exit 3).
+
+To manage rules for a model that is literally in a folder named `rules`, write `tess bpa ./rules`.
 
 #### Built-in rules
 
@@ -1247,7 +1332,7 @@ the code as its title.
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate`/`lint` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
 | 2 | usage error, including invalid arguments for an editing command: an invalid new name (`rename`, `add`), a property `set` can't write or a value it can't take, or an option `add` doesn't take for that kind |
 | 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), an edit that would change what other references mean (`rename`, `move`), a translation file that can't be applied (`translations import`), or an object a perspective can't hold |
-| 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), or an edit that would change what other references mean (`rename`, `move`). For `script`, also a script that can't be read or applied, or an object a script can't hold |
+| 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), or an edit that would change what other references mean (`rename`, `move`). For `script`, also a script that can't be read or applied, or an object a script can't hold. For `bpa`, also a rule file you named that can't be read; for `bpa rules`, a rule ID that isn't there (or already is, for `add`) or an object that can't carry an ignore annotation |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |
 
@@ -1265,7 +1350,8 @@ dotnet pack src/Tessera.Cli -c Release -o artifacts && dotnet tool install -g te
 CI (`.github/workflows/ci.yml`) checks formatting, then builds and tests on Linux, Windows and macOS. A further job
 runs the suite against a pinned clone of the sample model below.
 Set `TESSERA_BPA_RULES=<file>[:<file>...]` to run BPA rule files (e.g. from TabularEditor/BestPracticeRules)
-in a test that reports how many rules are supported. It runs against `TESSERA_SAMPLE_MODEL` if that is set,
+in a test that reports how many rules are supported. (This is a test setting; `tess bpa` itself reads
+`TESS_BPA_RULES`, which the CLI tests hide, along with `HOME`, `XDG_CONFIG_HOME` and `APPDATA`.) It runs against `TESSERA_SAMPLE_MODEL` if that is set,
 otherwise against a fixture.
 
 Set `TESSERA_SAMPLE_MODEL=<path>` to also run a round-trip test against a real model, such as a clone of
