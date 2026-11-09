@@ -47,10 +47,14 @@ let tests =
         <| fun () ->
             use t = model (withModelRule "SAME" "from the model")
             let m = t.Combine "model.bim"
-            write (t.Combine("home", ".config", "tessera", "bpa.json")) (ruleJson [ named "SAME" "from config" "true" ])
+            let config = ruleJson [ named "SAME" "from config" "true" ]
+            // The user config: ~/.config/tessera on Linux and macOS, %APPDATA%\tessera on Windows.
+            write (t.Combine("home", ".config", "tessera", "bpa.json")) config
+            write (t.Combine("appdata", "tessera", "bpa.json")) config
             write (t.Combine "env.json") (ruleJson [ named "SAME" "from env" "true" ])
             write (t.Combine "cli.json") (ruleJson [ named "SAME" "from cli" "true" ])
-            let env = [ "HOME", t.Combine "home"; "TESS_BPA_RULES", t.Combine "env.json" ]
+            let userDirs = [ "HOME", t.Combine "home"; "APPDATA", t.Combine "appdata" ]
+            let env = userDirs @ [ "TESS_BPA_RULES", t.Combine "env.json" ]
 
             let nameOf (r: Run) =
                 use doc = json r
@@ -62,10 +66,7 @@ let tests =
             Expect.equal (nameOf (list [ "--rules"; t.Combine "cli.json" ])) "from cli" ""
             Expect.equal (nameOf (list [])) "from env" ""
 
-            Expect.equal
-                (nameOf (tessWithEnv [ "HOME", t.Combine "home" ] [ "bpa"; "rules"; "list"; m; "--json" ]))
-                "from config"
-                ""
+            Expect.equal (nameOf (tessWithEnv userDirs [ "bpa"; "rules"; "list"; m; "--json" ])) "from config" ""
 
             Expect.equal (nameOf (list [ "--no-config" ])) "from the model" ""
 
