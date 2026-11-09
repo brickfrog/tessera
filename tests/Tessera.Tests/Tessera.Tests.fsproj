@@ -50,6 +50,9 @@
     <Compile Include="LintTests.fs" />
     <Compile Include="LintCommandTests.fs" />
     <Compile Include="CaseRenameTests.fs" />
+    <Compile Include="ReportTests.fs" />
+    <Compile Include="ReportCommandTests.fs" />
+    <Compile Include="SampleReportTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

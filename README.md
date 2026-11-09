@@ -412,8 +412,9 @@ The editing commands (`rename`, `set`, `add`, `remove`, `move`, `script apply`, 
 - `--stat` prints one line per object.
 - `--name-only` prints just the changed references.
 - Notes and warnings go to stderr, so stdout is only the change.
-- `--json` writes the change set (see `diff`) plus `dryRun`, `introducedErrors` (findings), `warnings`, `notes`
-  and `saved` (the format and path written, or `null`).
+- `--json` writes the change set (see `diff`) plus `dryRun`, `introducedErrors` (findings), `warnings`, `notes`,
+  `saved` (the format and path written, or `null`) and `files` (report files `rename` and `move` change, see
+  [Reports](#reports-pbir)).
 
 **Safety:** a change that introduces new errors is shown, but `--save` refuses it (exit 1) unless `--force`.
 The checks are the `validate` rules an edit can break: unresolved and circular references, duplicate names,
@@ -441,7 +442,8 @@ DAX keyword, and isn't already used as a name in that expression; otherwise they
 escaped). Function names must be identifiers (dots allowed).
 
 Hierarchies, levels, partitions, calculation items, roles, perspectives, cultures, relationships and data sources
-are renamed only: DAX can't refer to them by name. Sort-by columns, hierarchy levels, relationships, perspectives
+are renamed only: DAX can't refer to them by name (reports can name hierarchies and levels; see
+[Reports](#reports-pbir)). Sort-by columns, hierarchy levels, relationships, perspectives
 and translations point at objects, not names, so they follow any rename. Power BI's `PBI_QueryOrder` model
 annotation, which lists queries by name, is kept in step.
 
@@ -450,7 +452,7 @@ Not rewritten:
 - M: named expressions (Power Query parameters and queries) are renamed, with a warning listing the M that
   mentions the old name; the same warning appears for tables and data sources whose name appears in M
 - `sourceColumn` of calculated-table columns (reported in a warning when it names the object)
-- report visuals, which refer to fields by name
+- reports, except the field references of PBIR reports in the same PBIP project (see [Reports](#reports-pbir))
 
 `rename` refuses:
 - empty names, names with leading or trailing spaces, and names with line breaks or other control characters
@@ -466,6 +468,41 @@ Not rewritten:
 The same name is a no-op. A case-only rename (`Sales` to `SALES`) is allowed and rewrites references to match.
 In a TMDL or PBIP folder, the object's file (`tables/SALES.tmdl`, `roles/...`) is renamed too, also on
 case-insensitive file systems (Windows, macOS). Saves only rewrite `.tmdl` files whose content changed.
+#### Reports (PBIR)
+
+When the model is part of a PBIP project, `rename` and `move` also update the report: every `X.Report` folder
+next to the `X.SemanticModel` folder whose `definition.pbir` points at it (`byPath`). In the PBIR format
+(`X.Report/definition/**/*.json`), visuals, pages, bookmarks and filters name model fields structurally, and
+those names are rewritten in place, so every other byte of each file stays as it was:
+
+| Renaming or moving | Rewrites |
+|---|---|
+| a table | `"Entity"` of `SourceRef`s and of `From` sources |
+| a column | `"Property"` of `Column` (and date-variation) references to it |
+| a measure | `"Property"` of `Measure` references to it |
+| a hierarchy, a level | `"Hierarchy"` of `Hierarchy` references, `"Level"` of `HierarchyLevel` references |
+| a measure, moved | the `"Entity"` of its own `Measure` references |
+
+References resolve as Power BI resolves them: a field's table is its `SourceRef` `Entity`, or the source a
+`Source` alias names in the enclosing `From`. Names match ignoring case. The edits show in the dry run, as a line
+diff per file (`~ report Sales.Report/definition/pages/.../visual.json  (2 references)`), in `--stat` and
+`--name-only`, and in the `--json` `files` array (`path`, `display`, `references`, `written`, and the changed
+`lines` with `line`, `before` and `after`). They are written with `--save`, after the model and only if it saved,
+and never with `--save-to`, since the report still points at the original model (a warning says so).
+
+Not rewritten:
+- `queryRef`, `nativeQueryRef` and formatting selectors (`"metadata"`). These are a visual's own names for its
+  fields: Power BI itself keeps a `queryRef` after a field is renamed, and visual calculations refer to fields by
+  their `nativeQueryRef`. Visuals keep working with them as they are.
+- free text, such as titles, and literal values (filters and slicer selections store data values)
+- report-level measures (`reportExtensions.json`, and fields with `"Schema": "extension"`): a warning lists the
+  file when it mentions the old name
+- a moved measure named in a filter through a `From` alias, which the filter's other fields share: a warning
+  lists the files
+- PBIR-Legacy reports (`X.Report/report.json`), which Power BI doesn't support editing outside Power BI Desktop:
+  a warning lists the file when it mentions the old name. Save the report in PBIR format to have tess update it.
+- reports in other folders, and reports connected to a published model (`byConnection`)
+
 ### Setting properties (`set`)
 
 `tess set <model> <object> -p <path>=<value> ...` sets properties on one object. It follows the
@@ -725,7 +762,8 @@ measure is in, the table is added to it with just that measure, so the measure s
 
 `move` refuses (exit 3) a column (its data comes from its table's partitions), a calculation item, a table that
 doesn't exist, a calculation group table, and a target table with a column or hierarchy of the same name. Moving to
-the table it's already in changes nothing. Report visuals, which refer to fields by table and name, are not updated.
+the table it's already in changes nothing. In a PBIP project, the report's references to the measure follow it (see
+[Reports](#reports-pbir)).
 
 ### Best Practice Analyzer (`bpa`)
 

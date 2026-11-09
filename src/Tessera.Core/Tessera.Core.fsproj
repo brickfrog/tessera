@@ -37,6 +37,7 @@
     <Compile Include="ExportScript.fs" />
     <Compile Include="ApplyScript.fs" />
     <Compile Include="Lint.fs" />
+    <Compile Include="Report.fs" />
   </ItemGroup>
 
   <ItemGroup>

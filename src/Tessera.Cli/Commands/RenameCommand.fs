@@ -61,22 +61,27 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     match opts with
     | Error message -> UsageError message
     | Ok opts ->
-        Mutation.run ctx "rename" opts model (fun db ->
-            Selector.resolve (objects db) selector
-            |> Result.bind (fun target -> Rename.plan db target newName)
-            |> Result.map (fun p ->
-                if RenamePlan.isNoOp p then
-                    {
-                        Tessera.Mutation.Effect.none with
-                            Notes = [ $"{ObjectRef.format p.Target.Ref} is already named '{p.NewName}'." ]
-                    }
-                else
-                    Rename.apply p
+        Mutation.runWith
+            ctx
+            "rename"
+            opts
+            model
+            (Mutation.followReports (fun db ->
+                Selector.resolve (objects db) selector
+                |> Result.bind (fun target -> Rename.plan db target newName)
+                |> Result.map (fun p ->
+                    if RenamePlan.isNoOp p then
+                        {
+                            Tessera.Mutation.Effect.none with
+                                Notes = [ $"{ObjectRef.format p.Target.Ref} is already named '{p.NewName}'." ]
+                        }
+                    else
+                        Rename.apply p
 
-                    {
-                        Warnings = p.Warnings
-                        Renamed = [ p.Target.Ref, p.NewRef ]
-                        Notes = [
-                            $"Renamed {ObjectRef.format p.Target.Ref} -> {ObjectRef.format p.NewRef}; updated {updatedText p}"
-                        ]
-                    }))
+                        {
+                            Warnings = p.Warnings
+                            Renamed = [ p.Target.Ref, p.NewRef ]
+                            Notes = [
+                                $"Renamed {ObjectRef.format p.Target.Ref} -> {ObjectRef.format p.NewRef}; updated {updatedText p}"
+                            ]
+                        })))
