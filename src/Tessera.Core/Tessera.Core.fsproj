@@ -41,6 +41,8 @@
     <Compile Include="BpaFetch.fs" />
     <Compile Include="Report.fs" />
     <Compile Include="Format.fs" />
+    <Compile Include="DaxValue.fs" />
+    <Compile Include="DataStore.fs" />
   </ItemGroup>
 
   <ItemGroup>
