@@ -224,6 +224,10 @@ let private locals (isFunction: bool) (tokens: Token array) =
 
     names, columns
 
+/// Keywords an expression can follow: in `RETURN [Total]` or `NOT [Flag]`, the keyword is not a table.
+let private operandKeywords =
+    HashSet<string>([ "RETURN"; "NOT"; "IN" ], StringComparer.OrdinalIgnoreCase)
+
 let private resolveSource (index: Index) (s: DaxSource) : Reference list =
     let tokens = tokenize s.Dax |> significant |> Array.ofList
     let names, localColumns = locals (s.Owner.Ref.Kind = ObjectKind.Function) tokens
@@ -255,7 +259,10 @@ let private resolveSource (index: Index) (s: DaxSource) : Reference list =
 
         match t.Kind, next with
         // Table[Name]: a column, else a measure, in that table.
-        | (TokenKind.Identifier | TokenKind.QuotedTable), Some n when n.Kind = TokenKind.Bracketed ->
+        | (TokenKind.Identifier | TokenKind.QuotedTable), Some n when
+            n.Kind = TokenKind.Bracketed
+            && not (t.Kind = TokenKind.Identifier && operandKeywords.Contains t.Text)
+            ->
             // ''[Col] names a column of an anonymous table (e.g. rows a function returns): local.
             let isLocal =
                 (t.Kind = TokenKind.Identifier && names.Contains t.Text)
@@ -276,7 +283,7 @@ let private resolveSource (index: Index) (s: DaxSource) : Reference list =
             |> Option.iter (fun f -> out.Add(reference (resolved f) t t))
         // A bare name: a table (or calendar), unless the expression defines it.
         | TokenKind.Identifier, _ ->
-            if not (names.Contains t.Text) then
+            if not (names.Contains t.Text) && not (operandKeywords.Contains t.Text) then
                 index.Table t.Text |> Option.iter (fun e -> out.Add(reference (resolved e) t t))
         // 'Quoted' is always meant as a table.
         | TokenKind.QuotedTable, _ ->
