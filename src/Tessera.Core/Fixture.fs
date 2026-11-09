@@ -172,6 +172,15 @@ type CsvReader(reader: TextReader) =
         record.[recordLength] <- c
         recordLength <- recordLength + 1
 
+    /// Move the next `count` characters of the block to the record.
+    let appendBlock (count: int) =
+        if recordLength + count > record.Length then
+            Array.Resize(&record, max (record.Length * 2) (recordLength + count))
+
+        Array.Copy(block, blockPosition, record, recordLength, count)
+        recordLength <- recordLength + count
+        blockPosition <- blockPosition + count
+
     /// The 1-based line the last record starts on.
     member _.RecordLine = recordLine
 
@@ -256,17 +265,21 @@ type CsvReader(reader: TextReader) =
                             error <-
                                 Some(line, "text after a closing quote (write a quote inside a quoted field as \"\")")
                 else
+                    // Copy up to the next separator a block at a time.
                     let mutable more = true
 
                     while more do
-                        match peek () with
-                        | -1
-                        | 44
-                        | 13
-                        | 10 -> more <- false
-                        | c ->
-                            append (char c)
-                            advance ()
+                        if peek () = -1 then
+                            more <- false
+                        else
+                            let available = blockLength - blockPosition
+
+                            let stop =
+                                ReadOnlySpan<char>(block, blockPosition, available).IndexOfAny(',', '\r', '\n')
+
+                            let take = if stop < 0 then available else stop
+                            appendBlock take
+                            more <- stop < 0
 
                 if error.IsNone then
                     starts.Add start
@@ -458,6 +471,45 @@ module Fixture =
             else
                 ValueSome(Decimal.ToInt64 scaled)
 
+    /// The scaled integer of a plainly written fixed decimal: an optional `-`, 1 to 14 digits, and
+    /// optionally a point and 1 to 4 digits. The common case, read without System.Decimal; anything
+    /// else (None) takes the general path.
+    let private plainScaled (text: ReadOnlySpan<char>) : int64 voption =
+        let negative = text.Length > 0 && text.[0] = '-'
+        let mutable i = if negative then 1 else 0
+        let first = i
+        let mutable value = 0L
+
+        while i < text.Length && Char.IsAsciiDigit text.[i] do
+            value <- value * 10L + int64 (int text.[i] - int '0')
+            i <- i + 1
+
+        let whole = i - first
+
+        if whole < 1 || whole > 14 then
+            ValueNone
+        else
+            let mutable decimals = 0
+
+            if i < text.Length && text.[i] = '.' then
+                i <- i + 1
+
+                while i < text.Length && decimals < 4 && Char.IsAsciiDigit text.[i] do
+                    value <- value * 10L + int64 (int text.[i] - int '0')
+                    decimals <- decimals + 1
+                    i <- i + 1
+
+                if decimals = 0 then
+                    i <- -1
+
+            if i <> text.Length then
+                ValueNone
+            else
+                for _ in decimals + 1 .. 4 do
+                    value <- value * 10L
+
+                ValueSome(if negative then -value else value)
+
     /// Add a field's text to a column as a value of the column's type; false if it isn't one.
     /// An empty (or, outside text columns, all-space) field is BLANK; a quoted empty field in a text
     /// column is the empty string.
@@ -467,7 +519,7 @@ module Fixture =
             if text.Length = 0 && not quoted then
                 b.AddBlank()
             else
-                b.AddString(text.ToString())
+                b.AddString text
 
             true
         | _ when isWhite text ->
@@ -499,9 +551,13 @@ module Fixture =
             else
                 false
         | DaxType.Currency ->
+            let plain = plainScaled text
             let mutable d = 0m
 
-            if Decimal.TryParse(text, numberStyle ||| NumberStyles.AllowDecimalPoint, inv, &d) then
+            if plain.IsSome then
+                b.AddCurrency plain.Value
+                true
+            elif Decimal.TryParse(text, numberStyle ||| NumberStyles.AllowDecimalPoint, inv, &d) then
                 match scaledOfDecimal d with
                 | ValueSome scaled ->
                     b.AddCurrency scaled
@@ -564,6 +620,9 @@ module Fixture =
         Tables: LoadedTable list
         /// Calculated tables and calculation groups: not in the store.
         Computed: string list
+        /// The columns that had invalid values, with how many: those rows are BLANK in the store,
+        /// and `check` doesn't report them again as BLANK or unmatched keys.
+        Invalid: (ColumnName * int) list
     }
 
     let hasErrors (issues: FixtureIssue list) =
@@ -577,14 +636,39 @@ module Fixture =
         else
             oneLine
 
+    /// What a file must match: read from the model once, so files can be read on other threads
+    /// without touching TOM.
+    type private Shape = {
+        Name: string
+        /// The data columns, in model order.
+        Data: (string * DaxType) list
+        /// The table's other columns, with why a file can't supply them.
+        Ignored: (string * string) list
+    }
+
+    let private shapeOf (t: Table) : Shape =
+        let data = dataColumns t
+
+        {
+            Name = t.Name
+            Data = data |> List.map (fun (c, dt) -> c.Name, dt)
+            Ignored = [
+                for c in t.Columns do
+                    if not (data |> List.exists (fun (d, _) -> obj.ReferenceEquals(d, c))) then
+                        match c with
+                        | :? CalculatedColumn -> c.Name, "it is a calculated column, which the engine computes"
+                        | :? RowNumberColumn -> ()
+                        | _ -> c.Name, $"its data type ({c.DataType}) holds no fixture data"
+            ]
+        }
+
     /// Collects the columns of one table while its file is read.
-    type private Sink(table: Table, file: string, collation: Collation, opts: LoadOptions) =
+    type private Sink(table: Shape, file: string, collation: Collation, opts: LoadOptions) =
         let tableRef = ObjectRef.table table.Name
-        let columns = dataColumns table
 
         let builders =
-            columns
-            |> List.map (fun (c, dt) -> ColumnBuilder(c.Name, dt, collation))
+            table.Data
+            |> List.map (fun (name, dt) -> ColumnBuilder(name, dt, collation))
             |> Array.ofList
 
         let invalid = Array.zeroCreate<int> builders.Length
@@ -596,9 +680,15 @@ module Fixture =
             builders |> Array.iteri (fun i b -> d.[b.Name] <- i)
             d
 
-        member _.Table = table
         member _.Builders = builders
         member _.Issues = issues
+
+        /// How many values of each column were invalid (and are BLANK in the store).
+        member _.InvalidCounts =
+            builders
+            |> Array.mapi (fun i b -> b.Name, invalid.[i])
+            |> Array.filter (fun (_, n) -> n > 0)
+            |> List.ofArray
 
         member _.Report(rule, severity, r: ObjectRef, message, line: int option, field: string option) =
             issues.Add {
@@ -628,20 +718,15 @@ module Fixture =
             | _ ->
                 if seen.Add name then
                     let computed =
-                        table.Columns
-                        |> Seq.tryFind (fun c -> String.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+                        table.Ignored
+                        |> List.tryFind (fun (c, _) -> String.Equals(c, name, StringComparison.OrdinalIgnoreCase))
 
                     match computed with
-                    | Some c ->
-                        let why =
-                            match c with
-                            | :? CalculatedColumn -> "it is a calculated column, which the engine computes"
-                            | _ -> $"its data type ({c.DataType}) holds no fixture data"
-
+                    | Some(column, why) ->
                         this.Report(
                             "ignored-column",
                             Sev.Warning,
-                            ObjectRef.inTable ObjectKind.Column table.Name c.Name,
+                            ObjectRef.inTable ObjectKind.Column table.Name column,
                             $"column '{name}' is ignored: {why}",
                             Some line,
                             Some name
@@ -947,15 +1032,15 @@ module Fixture =
 
         sink.Finish(present, rows)
 
-    let private emptyColumns (collation: Collation) (table: Table) =
-        dataColumns table
-        |> List.map (fun (c, dt) -> StoreColumn.blank collation c.Name dt 0)
+    let private emptyColumns (collation: Collation) (table: Shape) =
+        table.Data
+        |> List.map (fun (name, dt) -> StoreColumn.blank collation name dt 0)
         |> Array.ofList
 
     let private strictUtf8 = UTF8Encoding(false, true)
 
     /// Read one table's file. Never throws for what is in the file: every problem is an issue.
-    let private loadFile (collation: Collation) (opts: LoadOptions) (table: Table) (path: string) =
+    let private loadFile (collation: Collation) (opts: LoadOptions) (table: Shape) (path: string) =
         let sink = Sink(table, path, collation, opts)
 
         let columns =
@@ -974,7 +1059,13 @@ module Fixture =
                 sink.Malformed(None, $"can't read the file: {e.Message}")
                 emptyColumns collation table
 
-        columns, List.ofSeq sink.Issues
+        let invalid =
+            if columns.Length > 0 && columns.[0].RowCount > 0 then
+                sink.InvalidCounts
+            else
+                []
+
+        columns, List.ofSeq sink.Issues, invalid
 
     /// Read a table from CSV text (the same reader `load` uses, for tests and tools). `file` only
     /// labels the issues.
@@ -985,7 +1076,7 @@ module Fixture =
         (file: string)
         (reader: TextReader)
         : StoreColumn array * FixtureIssue list =
-        let sink = Sink(table, file, collation, opts)
+        let sink = Sink(shapeOf table, file, collation, opts)
         let columns = readCsv sink reader
         columns, List.ofSeq sink.Issues
 
@@ -997,7 +1088,7 @@ module Fixture =
         (file: string)
         (json: byte array)
         : StoreColumn array * FixtureIssue list =
-        let sink = Sink(table, file, collation, opts)
+        let sink = Sink(shapeOf table, file, collation, opts)
         let columns = readJson sink json
         columns, List.ofSeq sink.Issues
 
@@ -1068,30 +1159,42 @@ module Fixture =
                             (Some path)
                     )
 
-            let loaded =
-                List.zip tables assigned.Tables
-                |> List.map (fun (table, (_, tableFiles)) ->
+            // Files are independent, so they are read in parallel; issues stay in model order.
+            let read =
+                List.zip (tables |> List.map shapeOf) assigned.Tables
+                |> Array.ofList
+                |> Array.Parallel.map (fun (table, (_, tableFiles)) ->
                     match tableFiles with
                     | [ f ] ->
                         let path = Path.Combine(full, f)
-                        let columns, fileIssues = loadFile collation opts table path
-                        issues.AddRange fileIssues
+                        let columns, fileIssues, invalid = loadFile collation opts table path
                         let rows = if columns.Length = 0 then 0 else columns.[0].RowCount
-                        columns, Some path, rows
-                    | [] -> emptyColumns collation table, None, 0
+
+                        let invalid =
+                            invalid
+                            |> List.map (fun (column, n) -> { Table = table.Name; Column = column }, n)
+
+                        (columns, Some path, rows, invalid), fileIssues
+                    | [] -> (emptyColumns collation table, None, 0, []), []
                     | several ->
                         let names = String.concat ", " several
 
-                        issues.Add {
-                            modelIssue
-                                "duplicate-file"
-                                Sev.Error
-                                $"table '{table.Name}' has more than one file ({names}): none is loaded"
-                                (Some(Path.Combine(full, several.Head))) with
-                                Ref = ObjectRef.table table.Name
-                        }
+                        (emptyColumns collation table, None, 0, []),
+                        [
+                            {
+                                modelIssue
+                                    "duplicate-file"
+                                    Sev.Error
+                                    $"table '{table.Name}' has more than one file ({names}): none is loaded"
+                                    (Some(Path.Combine(full, several.Head))) with
+                                    Ref = ObjectRef.table table.Name
+                            }
+                        ])
 
-                        emptyColumns collation table, None, 0)
+            for _, fileIssues in read do
+                issues.AddRange fileIssues
+
+            let loaded = read |> Array.map fst |> List.ofArray
 
             let missing =
                 List.zip tables assigned.Tables
@@ -1106,7 +1209,7 @@ module Fixture =
 
             let storeTables =
                 List.zip tables loaded
-                |> List.map (fun (table, (columns, _, rows)) ->
+                |> List.map (fun (table, (columns, _, rows, _)) ->
                     match StoreTable.Create(table.Name, columns, rows) with
                     | Ok t -> t
                     // Unreachable for a model TOM accepts: its column names are unique.
@@ -1121,12 +1224,13 @@ module Fixture =
                     Issues = List.ofSeq issues
                     Tables =
                         List.zip tables loaded
-                        |> List.map (fun (t, (_, file, rows)) -> {
+                        |> List.map (fun (t, (_, file, rows, _)) -> {
                             Table = t.Name
                             File = file
                             Rows = rows
                         })
                     Computed = computed
+                    Invalid = loaded |> List.collect (fun (_, _, _, invalid) -> invalid)
                 }
 
     /// `loadWith` the default options.
@@ -1169,6 +1273,20 @@ module Fixture =
                 Field = Some name.Column
             }
 
+        /// The rows of a column that are BLANK in the fixture itself, not in place of an invalid value.
+        let blankRows (name: ColumnName) (c: StoreColumn) =
+            if c.BlankId < 0 then
+                0
+            else
+                let invalid =
+                    loaded.Invalid
+                    |> List.filter (fun (n, _) ->
+                        String.Equals(n.Table, name.Table, StringComparison.OrdinalIgnoreCase)
+                        && String.Equals(n.Column, name.Column, StringComparison.OrdinalIgnoreCase))
+                    |> List.sumBy snd
+
+                c.CountOfId c.BlankId - invalid
+
         let duplicated (c: StoreColumn) =
             seq { 0 .. c.DistinctCount - 1 }
             |> Seq.filter (fun id -> id <> c.BlankId && c.CountOfId id > 1)
@@ -1190,12 +1308,12 @@ module Fixture =
                         name
                         $"""{plural repeats.Length "value repeats" "values repeat"} in {where}: {examples column repeats}"""
 
-                if column.BlankId >= 0 then
+                if blankRows name column > 0 then
                     report
                         "blank-key"
                         Sev.Error
                         name
-                        $"""{plural (column.CountOfId column.BlankId) "row is" "rows are"} BLANK in {where}"""
+                        $"""{plural (blankRows name column) "row is" "rows are"} BLANK in {where}"""
 
         let unmatched
             (r: StoreRelationship)
@@ -1205,15 +1323,28 @@ module Fixture =
             (map: int array)
             (rows: int array)
             =
-            if rows.Length > 0 then
+            // BLANKs that stand in for invalid values were reported as such; they aren't orphans to report.
+            let blankOrphan = column.BlankId >= 0 && map.[column.BlankId] < 0
+
+            let standIns =
+                if blankOrphan then
+                    column.CountOfId column.BlankId - blankRows name column
+                else
+                    0
+
+            let rowCount = rows.Length - standIns
+
+            if rowCount > 0 then
                 let ids =
-                    seq { 0 .. map.Length - 1 } |> Seq.filter (fun id -> map.[id] < 0) |> List.ofSeq
+                    seq { 0 .. map.Length - 1 }
+                    |> Seq.filter (fun id -> map.[id] < 0 && not (id = column.BlankId && blankRows name column = 0))
+                    |> List.ofSeq
 
                 report
                     "unmatched-key"
                     Sev.Warning
                     name
-                    ($"""{plural rows.Length "row" "rows"} of '{name.Table}' ({plural ids.Length "value" "values"} of [{name.Column}]) """
+                    ($"""{plural rowCount "row" "rows"} of '{name.Table}' ({plural ids.Length "value" "values"} of [{name.Column}]) """
                      + $"have no match in '{other.Table}'[{other.Column}] (relationship '{r.Name}'): {examples column ids}; "
                      + $"DAX puts them on the blank row of '{other.Table}'")
 
@@ -1268,12 +1399,12 @@ module Fixture =
                                 name
                                 $"""{plural repeats.Length "value repeats" "values repeat"} in '{name.Table}'[{name.Column}], which is {marked}: {examples c repeats}"""
 
-                        if column.IsKey && c.BlankId >= 0 then
+                        if column.IsKey && blankRows name c > 0 then
                             report
                                 "blank-key"
                                 Sev.Error
                                 name
-                                $"""{plural (c.CountOfId c.BlankId) "row is" "rows are"} BLANK in '{name.Table}'[{name.Column}], which is {marked}"""
+                                $"""{plural (blankRows name c) "row is" "rows are"} BLANK in '{name.Table}'[{name.Column}], which is {marked}"""
                     | _ -> ()
 
         List.ofSeq issues

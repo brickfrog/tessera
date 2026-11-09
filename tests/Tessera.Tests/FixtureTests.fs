@@ -812,6 +812,60 @@ let tests =
                     ]
                     ""
 
+            testCase "fixed decimals: every way of writing one"
+            <| fun () ->
+                let read (text: string) =
+                    let columns, issues = readProduct ("Price\n\"" + text + "\"\n")
+                    (col columns "Price").[0], rulesOf issues |> List.contains "invalid-value"
+
+                for text, expected in
+                    [
+                        "0", 0m
+                        "-0", 0m
+                        "7", 7m
+                        "0.0001", 0.0001m
+                        "-0.0001", -0.0001m
+                        "1.5", 1.5m
+                        "12345678901234.5678", 12345678901234.5678m
+                        "123456789012345.5", 123456789012345.5m
+                        "922337203685477.5807", 922337203685477.5807m
+                        "-922337203685477.5808", -922337203685477.5808m
+                        "1.", 1m
+                        ".5", 0.5m
+                        "+1.5", 1.5m
+                        " 1.5 ", 1.5m
+                        "1.50000", 1.5m
+                        "007.10", 7.1m
+                    ] do
+                    Expect.equal (read text) (cur expected, false) text
+
+                for text in
+                    [
+                        "1.23456"
+                        "1.2.3"
+                        "-"
+                        "--1"
+                        "1e3"
+                        "1,5"
+                        "922337203685477.5808"
+                        "1 000"
+                        "$5"
+                        "0x10"
+                    ] do
+                    Expect.equal (read text) (DaxValue.Blank, true) text
+
+            testProperty "fixed decimals: the fast path agrees with System.Decimal"
+            <| fun (scaled: int64) (digits: byte) ->
+                let d = DaxValue.currencyValue scaled
+
+                let text =
+                    d.ToString("F" + string (int digits % 5 + 4), Globalization.CultureInfo.InvariantCulture)
+
+                let columns, issues = readProduct ("Price\n" + text + "\n")
+
+                List.isEmpty (issues |> List.filter (fun i -> i.Rule = "invalid-value"))
+                && (col columns "Price").[0] = DaxValue.Currency scaled
+
             testCase "invariant culture whatever the thread's"
             <| fun () ->
                 let before = Globalization.CultureInfo.CurrentCulture
@@ -1199,6 +1253,57 @@ let tests =
 
                 Expect.equal (orphans "Sales-Product") [ 1; 2; 3; 4 ] ""
                 Expect.equal (orphans "Sales-Customer") [ 2 ] ""
+
+            testCase "an invalid value is reported once, not again as a BLANK or unmatched key"
+            <| fun () ->
+                use t =
+                    fixture [
+                        "Product.csv", "ProductKey\n1\nx\ny\n"
+                        "Customer.csv", "Code\nC1\n"
+                        "Sales.csv", "OrderId,ProductKey,CustomerCode\n1,1,C1\n2,oops,C1\n3,1,C1\n"
+                    ]
+
+                let loaded, issues = Fixture.loadAndCheck (model ()) t.Path |> ok
+
+                let errors =
+                    issues
+                    |> List.filter (fun i -> i.Rule <> "missing-column" && i.Severity <> Severity.Info)
+
+                Expect.equal (rulesOf errors |> List.distinct) [ "invalid-value" ] (sprintf "%A" errors)
+                Expect.equal errors.Length 3 ""
+
+                Expect.equal
+                    loaded.Invalid
+                    [
+                        {
+                            Table = "Product"
+                            Column = "ProductKey"
+                        },
+                        2
+                        {
+                            Table = "Sales"
+                            Column = "ProductKey"
+                        },
+                        1
+                    ]
+                    ""
+
+                // A real BLANK next to an invalid value is still reported, with its own count.
+                use t2 = fixture [ "Product.csv", "ProductKey,Name\n1,a\nx,b\n,c\n" ]
+                let blank = issuesOf (model ()) t2.Path |> List.find (fun i -> i.Rule = "blank-key")
+                Expect.stringContains blank.Message "1 row is BLANK in 'Product'[ProductKey]" ""
+
+                use t3 =
+                    fixture [
+                        "Product.csv", "ProductKey\n1\n"
+                        "Sales.csv", "OrderId,ProductKey\n1,bad\n2,\n3,\n"
+                    ]
+
+                let unmatched =
+                    issuesOf (model ()) t3.Path
+                    |> List.find (fun i -> i.Rule = "unmatched-key" && i.Field = Some "ProductKey")
+
+                Expect.stringContains unmatched.Message "2 rows of 'Sales' (1 value of [ProductKey])" ""
 
             testCase "key and unique columns: repeats and BLANK keys"
             <| fun () ->

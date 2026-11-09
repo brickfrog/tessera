@@ -103,9 +103,10 @@ type ColumnBuilder(name: string, dataType: DaxType, collation: Collation) =
     let mutable falseId = -1
     let ints = lazy Dictionary<int64, int>()
     let floats = lazy Dictionary<float, int>()
-    // Text: an exact-match cache in front of the collation's dictionary, which costs more per lookup.
-    let exact = lazy Dictionary<string, int>(StringComparer.Ordinal)
     let texts = lazy Dictionary<string, int>(collation.Comparer)
+    // The ordinal comparers can look a span of characters up; a culture's comparer can't.
+    let spanLookup =
+        lazy (texts.Value.Comparer :? IAlternateEqualityComparer<ReadOnlySpan<char>, string>)
     // Variant columns hold any type, so they go through the general comparer.
     let any =
         lazy Dictionary<DaxValue, int>(DaxValue.comparer collation :> IEqualityComparer<DaxValue>)
@@ -156,26 +157,32 @@ type ColumnBuilder(name: string, dataType: DaxType, collation: Collation) =
             d.[key] <- id
             ids.Add id
 
-    member private _.AddText(s: string) =
-        let cache = exact.Value
+    member private _.AddText(text: ReadOnlySpan<char>) =
+        // The engine doesn't keep trailing spaces.
+        let trimmed = text.TrimEnd ' '
+        let d = texts.Value
 
-        match cache.TryGetValue s with
-        | true, id -> ids.Add id
-        | _ ->
-            // The engine doesn't keep trailing spaces.
-            let trimmed = Collation.trimTrailing s
-            let d = texts.Value
+        if spanLookup.Value then
+            // Look the characters up as they are: no string is made for a value already seen.
+            let lookup = d.GetAlternateLookup<ReadOnlySpan<char>>()
+            let mutable id = 0
 
-            let id =
-                match d.TryGetValue trimmed with
-                | true, id -> id
-                | _ ->
-                    let id = fresh (DaxValue.String trimmed)
-                    d.[trimmed] <- id
-                    id
+            if lookup.TryGetValue(trimmed, &id) then
+                ids.Add id
+            else
+                let s = trimmed.ToString()
+                let id = fresh (DaxValue.String s)
+                d.[s] <- id
+                ids.Add id
+        else
+            let s = trimmed.ToString()
 
-            cache.[s] <- id
-            ids.Add id
+            match d.TryGetValue s with
+            | true, id -> ids.Add id
+            | _ ->
+                let id = fresh (DaxValue.String s)
+                d.[s] <- id
+                ids.Add id
 
     member private _.AddBool(b: bool) =
         if b then
@@ -226,10 +233,13 @@ type ColumnBuilder(name: string, dataType: DaxType, collation: Collation) =
         | _ -> this.Reject "a Boolean"
 
     /// Add a row holding text. Trailing spaces are dropped, as the engine does.
-    member this.AddString(s: string) =
+    member this.AddString(s: string) = this.AddString(s.AsSpan())
+
+    /// Add a row holding text, from its characters (no string is allocated for a value seen before).
+    member this.AddString(text: ReadOnlySpan<char>) =
         match dataType with
-        | DaxType.String -> this.AddText s
-        | DaxType.Variant -> addAny (DaxValue.String(Collation.trimTrailing s))
+        | DaxType.String -> this.AddText text
+        | DaxType.Variant -> addAny (DaxValue.String(text.TrimEnd(' ').ToString()))
         | _ -> this.Reject "a String"
 
     /// Add a row. The value must be BLANK or of the column's type (anything, for a Variant column):

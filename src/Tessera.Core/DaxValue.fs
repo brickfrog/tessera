@@ -427,6 +427,35 @@ module DaxValue =
 
     let private timeFormats = [| "hh\\:mm"; "hh\\:mm\\:ss"; "hh\\:mm\\:ss\\.FFFFFFF" |]
 
+    /// A plain `yyyy-MM-dd` date: the common case, read without going through the list of formats.
+    let private plainDate (t: ReadOnlySpan<char>) : float voption =
+        if t.Length <> 10 || t.[4] <> '-' || t.[7] <> '-' then
+            ValueNone
+        else
+            let mutable ok = true
+
+            for i in 0..9 do
+                ok <- ok && (i = 4 || i = 7 || Char.IsAsciiDigit t.[i])
+
+            if not ok then
+                ValueNone
+            else
+                let digit (c: char) = int c - int '0'
+                let year = digit t.[0] * 1000 + digit t.[1] * 100 + digit t.[2] * 10 + digit t.[3]
+                let month = digit t.[5] * 10 + digit t.[6]
+                let day = digit t.[8] * 10 + digit t.[9]
+
+                if
+                    year >= 1
+                    && month >= 1
+                    && month <= 12
+                    && day >= 1
+                    && day <= DateTime.DaysInMonth(year, month)
+                then
+                    ValueSome(serialOfDateTime (DateTime(year, month, day)))
+                else
+                    ValueNone
+
     /// The serial number of ISO 8601 text; see `parseIsoDateTime`.
     let parseIsoSerial (text: ReadOnlySpan<char>) : float voption =
         let t = text.Trim()
@@ -438,8 +467,13 @@ module DaxValue =
                 t
 
         let mutable dt = DateTime.MinValue
+        let plain = plainDate t
 
-        if DateTime.TryParseExact(t, isoFormats, inv, DateTimeStyles.None, &dt) then
+        if plain.IsSome then
+            plain
+        elif t.Length = 10 && t.[4] = '-' && t.[7] = '-' then
+            ValueNone
+        elif DateTime.TryParseExact(t, isoFormats, inv, DateTimeStyles.None, &dt) then
             ValueSome(serialOfDateTime dt)
         else
             let mutable ts = TimeSpan.Zero

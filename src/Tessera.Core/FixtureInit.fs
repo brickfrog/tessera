@@ -284,13 +284,18 @@ let private generateTable
 ///
 /// Where a relationship's other end is computed by the engine (a calculated table), its key is
 /// generated on its own and may not match what the engine computes.
-let generate (db: Database) (opts: Options) : StoreTable list =
+///
+/// Each table is generated when the sequence reaches it, so a large fixture is never in memory whole.
+let generateSeq (db: Database) (opts: Options) : StoreTable seq =
     let byTable, rows, groups = plan db opts
     let collation = DataStore.collationOf db
     let seed = mix (uint64 opts.Seed)
 
     byTable
-    |> List.map (fun (t, columns) -> generateTable collation seed rows groups t columns)
+    |> Seq.map (fun (t, columns) -> generateTable collation seed rows groups t columns)
+
+/// `generateSeq`, with every table in memory at once.
+let generate (db: Database) (opts: Options) : StoreTable list = generateSeq db opts |> List.ofSeq
 
 // ---- Writing -----------------------------------------------------------------------------------
 
@@ -312,7 +317,11 @@ let write (db: Database) (directory: string) (opts: Options) (force: bool) : Res
     if File.Exists full then
         Error(InvalidFixture(full, "it is a file; a fixture is a directory"))
     else
-        let tables = generate db opts |> List.filter (fun t -> t.Columns.Length > 0)
+        // The names of the tables that get a file (those with data columns), before generating any.
+        let names =
+            Fixture.dataTables db
+            |> List.filter (fun t -> not (Fixture.dataColumns t).IsEmpty)
+            |> List.map (fun t -> t.Name)
 
         let existing =
             if Directory.Exists full then
@@ -320,9 +329,7 @@ let write (db: Database) (directory: string) (opts: Options) (force: bool) : Res
             else
                 []
 
-        let taken =
-            (Fixture.assign (tables |> List.map (fun t -> t.Name)) existing).Tables
-            |> List.collect snd
+        let taken = (Fixture.assign names existing).Tables |> List.collect snd
 
         match taken with
         | first :: _ when not force -> Error(DestinationNotEmpty(Path.Combine(full, first)))
@@ -337,7 +344,7 @@ let write (db: Database) (directory: string) (opts: Options) (force: bool) : Res
                     File.Delete current
 
                 Ok [
-                    for t in tables do
+                    for t in generateSeq db opts |> Seq.filter (fun t -> t.Columns.Length > 0) do
                         let path = Path.Combine(full, FixtureName.encode t.Name + ".csv")
                         current <- path
                         use writer = new StreamWriter(path, false, UTF8Encoding false, 1 <<< 16)
