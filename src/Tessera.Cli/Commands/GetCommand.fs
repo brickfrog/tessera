@@ -168,12 +168,16 @@ let private show (ctx: Ctx) (args: ParseResults<Args>) =
             Done
         | paths ->
             let props =
-                let own = Serialize.flatten json
-
-                if e.Ref.Kind = ObjectKind.Model then
-                    ("compatibilityLevel", string db.CompatibilityLevel) :: own
+                if not children then
+                    // The same paths `diff` and `find` use, translations and perspective members included.
+                    Serialize.properties db e
                 else
-                    own
+                    let own = Serialize.flatten json
+
+                    if e.Ref.Kind = ObjectKind.Model then
+                        ("compatibilityLevel", string db.CompatibilityLevel) :: own
+                    else
+                        own
 
             let selected = paths |> List.map (fun p -> p, Serialize.select p props)
 

@@ -57,7 +57,9 @@ let private quote (v: string option) =
 let private context = 2
 
 let lineDiffText (out: TextWriter) (before: string) (after: string) =
-    let ops = Diff.LineDiff.diff (before.Split '\n') (after.Split '\n') |> Array.ofList
+    // A missing value has no lines (not one empty line), so "(none) -> text" shows only additions.
+    let lines (s: string) = if s = "" then [||] else s.Split '\n'
+    let ops = Diff.LineDiff.diff (lines before) (lines after) |> Array.ofList
 
     let changed i =
         match ops.[i] with

@@ -22,6 +22,8 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Bpa of ParseResults<BpaCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Set of ParseResults<SetCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Add of ParseResults<AddCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Translations of ParseResults<TranslationsCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Perspective of ParseResults<PerspectiveCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -43,3 +45,5 @@ type CliArgs =
             | Bpa _ -> BpaCommand.summary
             | Set _ -> SetCommand.summary
             | Add _ -> AddCommand.summary
+            | Translations _ -> TranslationsCommand.summary
+            | Perspective _ -> PerspectiveCommand.summary

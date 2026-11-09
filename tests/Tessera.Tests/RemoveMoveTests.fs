@@ -488,13 +488,11 @@ let private moveTests =
         <| fun () ->
             let a = applied (model ()) (fun db -> move db (moveSpec "[Total]" "Date"))
 
-            // Translations are keyed by the object's path, so the culture's entry moves too.
+            // Translations are shown on the object they translate, so they move with it and the
+            // culture doesn't show as changed.
             Expect.equal
                 (a.Changes |> List.map (fun c -> ObjectRef.format c.Ref, c.ChangeKind))
-                [
-                    "measure:Date/Total", ChangeSet.ChangeKind.Moved
-                    "culture:da-DK", ChangeSet.ChangeKind.Modified
-                ]
+                [ "measure:Date/Total", ChangeSet.ChangeKind.Moved ]
                 ""
 
             Expect.isEmpty a.IntroducedErrors ""
