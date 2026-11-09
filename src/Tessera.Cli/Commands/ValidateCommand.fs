@@ -186,13 +186,23 @@ let private groupedAnnotations (grouped: (Issue * Grouping) list) = [
         | _, None -> toFinding i
 ]
 
-let private severityArg (name: string) (value: string option) (fallback: Severity) =
+/// A --min-severity / --fail-on value (shared with `lint`).
+let severityArg (name: string) (value: string option) (fallback: Severity) =
     match value with
     | None -> Ok fallback
     | Some v ->
         match Severity.tryParse v with
         | Some s -> Ok s
         | None -> Error $"{name}: unknown severity '{v}' (known: error, warning, info)"
+
+/// A --ci value (shared with `lint`).
+let ciArg (value: string option) =
+    match value with
+    | None -> Ok Findings.NoCi
+    | Some c ->
+        Findings.Ci.tryParse c
+        |> Option.map Ok
+        |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
 
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let modelPath = args.GetResult Args.Model
@@ -209,13 +219,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
                 severityArg "--fail-on" (args.TryGetResult Args.Fail_On) Severity.Error
                 |> Result.map (fun failOn -> minimum, failOn))
 
-    let ci =
-        match args.TryGetResult Args.Ci with
-        | None -> Ok Findings.NoCi
-        | Some c ->
-            Findings.Ci.tryParse c
-            |> Option.map Ok
-            |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
+    let ci = ciArg (args.TryGetResult Args.Ci)
 
     match options, ci with
     | Error message, _

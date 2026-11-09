@@ -25,6 +25,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Translations of ParseResults<TranslationsCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Perspective of ParseResults<PerspectiveCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Script of ParseResults<ScriptCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Lint of ParseResults<LintCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -49,3 +50,4 @@ type CliArgs =
             | Translations _ -> TranslationsCommand.summary
             | Perspective _ -> PerspectiveCommand.summary
             | Script _ -> ScriptCommand.summary
+            | Lint _ -> LintCommand.summary

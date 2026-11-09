@@ -46,6 +46,9 @@
     <Compile Include="DaxScriptTests.fs" />
     <Compile Include="ScriptTests.fs" />
     <Compile Include="ScriptCommandTests.fs" />
+    <Compile Include="DepsKeywordTests.fs" />
+    <Compile Include="LintTests.fs" />
+    <Compile Include="LintCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

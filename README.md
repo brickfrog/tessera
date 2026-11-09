@@ -7,7 +7,7 @@
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
 Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set`,
-`add`, `remove`, `move`, `bpa`, `script`, `translations` and `perspective` work.
+`add`, `remove`, `move`, `bpa`, `lint`, `script`, `translations` and `perspective` work.
 
 ## Install
 
@@ -68,6 +68,8 @@ tess translations export ./MyReport.pbip --culture da-DK -o da-DK.csv   # a file
 tess translations import ./MyReport.pbip da-DK.csv --save              # ... and the filled-in file back
 tess perspective add ./MyReport.pbip Finance Sales "[Budget]" --save   # perspective membership
 tess perspective list ./MyReport.pbip Finance
+tess lint  ./MyReport.pbip                       # DAX code actions: unused VARs, unqualified columns, ...
+tess lint  ./MyReport.pbip --fix --save          # ... and rewrite what can be fixed safely
 ```
 
 ### Accepted model paths
@@ -395,8 +397,8 @@ that uses a broken measure isn't reported, and TOM's validation doesn't read DAX
 own errors (e.g. a relationship to a missing column) aren't grouped with the DAX that names that column.
 ### Editing commands
 
-The editing commands (`rename`, `set`, `add`, `remove`, `move`, `script apply`, `translations import` and
-`perspective add|remove`) follow one set of conventions, the same as the Tabular Editor CLI's.
+The editing commands (`rename`, `set`, `add`, `remove`, `move`, `script apply`, `translations import`,
+`perspective add|remove` and `lint --fix`) follow one set of conventions, the same as the Tabular Editor CLI's.
 
 **Saving:**
 - **A dry run by default.** The command shows what would change and writes nothing; stderr says
@@ -1121,10 +1123,90 @@ ordinal), then its calculated columns and measures; functions come last. Express
 before writing it. An object whose DAX would not read back exactly is named in a warning. Examples are a line that
 reads like a property (`Visible = TRUE`) or a comma outside parentheses (`1,1`, from a locale that writes decimals
 that way).
+### Linting DAX (`lint`)
+
+`lint` checks every DAX expression in the model for code that can be written better: Tabular Editor 3's
+[code actions](https://docs.tabulareditor.com/te3/features/code-actions.html), offline. Rules that match one of
+TE3's code actions use its id and name; `TS` ids are tessera's own. It reads measures, calculated columns and
+tables, calculation items, KPIs, format string and detail rows expressions, row filters and functions.
+
+```
+tess lint ./Sales.pbip                             # report (exit 1 on errors, like validate)
+tess lint ./Sales.pbip --rule DI003,DI004 --fail-on warning --ci github
+tess lint ./Sales.pbip --fix                       # show the rewrites (a dry run)
+tess lint ./Sales.pbip --fix --rule DI001 --save   # remove unused variables, and save
+```
+
+| ID | Severity | Name | Before | After |
+|---|---|---|---|---|
+| `TS001` | error | Replace non-standard whitespace | `1 + 2`, with U+00A0 before the `+` | `1 + 2` |
+| `DI001` | warning | Remove unused variable | `VAR a = 1 VAR b = 2 RETURN b` | `VAR b = 2 RETURN b` |
+| `DI002` | warning | Remove all unused variables | `VAR a = 1 VAR b = a RETURN 123` | `123` |
+| `DI003` | warning | Remove table name from measure references | `'Sales'[Total] * 1.25` | `[Total] * 1.25` |
+| `DI004` | warning | Add table name to column references | `SUMX(Sales, [Amount])` | `SUMX(Sales, 'Sales'[Amount])` |
+| `DI008` | warning | Remove superfluous CALCULATE | `VAR x = [Total] RETURN CALCULATE(x, 'Date'[Year] = 2025)` | (not fixed) |
+| `DI014` | warning | Replace IFERROR with DIVIDE | `IFERROR(([A] - [B]) / [B], BLANK())` | `DIVIDE([A] - [B], [B])` |
+| `DR014` | info | Simplify using IN | `'Doc'[Type] = "Invoice" \|\| 'Doc'[Type] = "Credit"` | `'Doc'[Type] IN {"Invoice", "Credit"}` |
+
+What each rule reports, and when it doesn't fix:
+- **`TS001`:** no-break, zero-width, typographic and other non-standard spaces (U+00A0, U+200B, U+FEFF, ...)
+  between tokens. Each becomes a regular space. Strings, quoted names, `[names]` and comments are left alone,
+  since names can contain such characters. TE3 3.27.1 rejects these characters, and `validate` reports the
+  zero-width ones as `invalid-token`.
+- **`DI001`, `DI002`:** `DI001` is a `VAR` that nothing refers to. `DI002` is one used only by other unused
+  variables. The fix removes every variable the `RETURN` doesn't need, so fixing either id removes both kinds.
+  A definition on lines of its own is removed with its lines, including a comment at the end of its last line.
+  Comments on other lines stay. When every variable goes, the block becomes its `RETURN` expression. That
+  isn't done where the block is an operand (`2 * VAR a = 1 RETURN 3 + 4`), because it would change how the
+  expression parses. Variables whose name is defined twice in one expression, or is also a function parameter,
+  are not analysed.
+- **`DI003`, `DI004`:** the fix writes `[Measure]` or `'Table'[Column]`. The table is always quoted, like TE's
+  `DaxObjectFullName`. Columns resolve against the expression's own table, as in `deps`. A column isn't fixed
+  when a measure anywhere has the same name, since `[Name]` might mean either. References inside `NAMEOF(...)`
+  are left as written, because field parameters store the name NAMEOF returns. These match `bpa`'s
+  `TESS_QUALIFY_COLUMNS` and `TESS_UNQUALIFIED_MEASURES`, and after `lint --fix` those rules have nothing left to
+  report, except measures inside `NAMEOF`, which `bpa` still flags.
+- **`DI008`:** `CALCULATE(x, ...)` or `CALCULATETABLE(x, ...)` where `x` is a variable. A variable is evaluated
+  where it is defined, so CALCULATE's filters don't change it. That is almost always a mistake, so it is
+  reported, not fixed: the fix TE3 offers (removing CALCULATE) would hide it. UDF parameters are not variables:
+  an `EXPR` parameter is evaluated inside CALCULATE.
+- **`DI014`:** only when `a / b` is the whole first argument, with a single top-level `/` and nothing that binds
+  more loosely around it (`*` before the division, `^` and signs are fine). `IFERROR(..., BLANK())` loses its
+  `BLANK()`, which is DIVIDE's default. **This fix changes edge-case results.** DIVIDE returns `x` when `b` is
+  zero or blank, where `a / b` gives infinity (or NaN for 0/0) and IFERROR passes that through. DIVIDE also
+  doesn't catch errors raised inside `a` or `b`. Usually that is what the IFERROR was meant to do. Use
+  `--rule` to leave `DI014` out if not.
+- **`DR014`:** two or more `=` comparisons of the same column, measure or variable, joined by `||`, as a whole
+  expression or argument. The values must be non-zero numbers or non-empty strings, all of one kind. `=`
+  treats BLANK as equal to `0`, `""` and `FALSE`, but `IN` doesn't, so for these values the two agree.
+  Chains containing comments are reported but not fixed.
+
+Options:
+- `--rule`, `--min-severity`, `--fail-on` and `--ci` work as for [`validate`](#validation-validate).
+  `--rule` ids are case-insensitive.
+- Text output has `validate`'s layout, plus a line saying how many findings `--fix` would fix.
+- `--json` writes the [findings envelope](#findings-json-and-ci-annotations). Each finding has `ruleName`, a
+  `category` (TE3's `Improvement` or `Readability`, or `Correctness` for `TS001`) and `fixable`. The envelope
+  adds a top-level `fixable` count.
+
+With `--fix`, `lint` is an [editing command](#editing-commands):
+- It is a dry run unless `--save` or `--save-to`. `--stat` and `--name-only` work as for the other editing
+  commands, and `--json` writes the change set.
+- It fixes the findings that `--rule` and `--min-severity` select.
+- Only the rewritten tokens change. Fixes repeat until nothing more applies (removing one variable can leave
+  another unused), so a second `--fix` changes nothing.
+- Every fix is checked before it is applied: the rewritten DAX must lex at least as cleanly, keep a VAR
+  structure that parses, and refer to the same objects. A fix that fails the check is reported with
+  `fixable: false`.
+- Findings left unfixed are counted in a warning on stderr. `--fail-on` and `--ci` are for reports, and are
+  refused with `--fix` (exit 2), as are `--save`, `--save-to`, `--force`, `--stat` and `--name-only`
+  without it.
+
+Findings can't be suppressed on individual objects yet.
 
 ### Findings JSON and CI annotations
 
-`validate` and `bpa` (and later `test` and `schemacheck`) report findings in one shape, the one the Tabular
+`validate`, `bpa` and `lint` (and later `test` and `schemacheck`) report findings in one shape, the one the Tabular
 Editor CLI uses, so tooling written for one reads the other:
 
 ```json
@@ -1141,14 +1223,15 @@ Editor CLI uses, so tooling written for one reads the other:
 
 How the fields work:
 - **Severity:** `error`, `warning` or `info`.
-- **`code`:** stable. It's the `validate` rule id or the BPA rule ID.
+- **`code`:** stable. It's the `validate` rule id, the BPA rule ID, or the `lint` rule id (`DI001`...).
 - **`objectPath`:** a tessera reference, so it pastes into any command.
 - **`objectType`:** one of `Model`, `Table`, `Column`, `Measure`, `Hierarchy`, `Level`, `Partition`,
   `CalculationItem`, `Calendar`, `Relationship`, `Role`, `Perspective`, `Culture`, `NamedExpression`, `Function`,
   `DataSource`.
 - **Optional keys** (`objectPath`, `expressionPosition`, `ruleName`, `category`) are left out rather than written
   as `null`. Where the position is only known to the line, `expressionPosition` has no `column`.
-- **`fixable`:** always `false` for now, because no command applies fixes yet.
+- **`fixable`:** whether `tess lint --fix` fixes it. Always `false` for `validate` and `bpa`, which don't
+  apply fixes.
 
 `--ci github` writes one `::error` / `::warning` / `::notice` line per finding to stderr. `--ci azdo` writes
 `##vso[task.logissue ...]` lines, with info findings as plain lines so info-only runs stay green. Each line carries
@@ -1161,7 +1244,7 @@ the code as its title.
 | Code | Meaning |
 |---|---|
 | 0 | success |
-| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
+| 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate`/`lint` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
 | 2 | usage error, including invalid arguments for an editing command: an invalid new name (`rename`, `add`), a property `set` can't write or a value it can't take, or an option `add` doesn't take for that kind |
 | 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), an edit that would change what other references mean (`rename`, `move`), a translation file that can't be applied (`translations import`), or an object a perspective can't hold |
 | 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), or an edit that would change what other references mean (`rename`, `move`). For `script`, also a script that can't be read or applied, or an object a script can't hold |

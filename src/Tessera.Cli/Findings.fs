@@ -47,7 +47,7 @@ type Finding = {
     Position: Position option
     RuleName: string option
     Category: string option
-    /// Whether tess can fix it automatically (no command applies fixes yet).
+    /// Whether tess can fix it automatically (`tess lint --fix`).
     Fixable: bool
 }
 

@@ -36,6 +36,7 @@
     <Compile Include="DaxScript.fs" />
     <Compile Include="ExportScript.fs" />
     <Compile Include="ApplyScript.fs" />
+    <Compile Include="Lint.fs" />
   </ItemGroup>
 
   <ItemGroup>

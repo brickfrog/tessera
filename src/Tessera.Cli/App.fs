@@ -60,6 +60,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Translations args) -> TranslationsCommand.run ctx args
                 | Some(Perspective args) -> PerspectiveCommand.run ctx args
                 | Some(Script args) -> ScriptCommand.run ctx args
+                | Some(Lint args) -> LintCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with
