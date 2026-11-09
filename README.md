@@ -1568,6 +1568,50 @@ To add a command:
 6. Put its CLI tests in `tests/Tessera.Tests/<Name>CommandTests.fs`, using `CliHarness` (`tess`, `json`,
    `project`).
 
+### The DAX parser (`Tessera.Core`)
+
+A real DAX parser, the first step of a local DAX engine. It has no command of its own yet: it is the library the
+evaluator is written against. Three modules, none of which knows about a model:
+
+- `DaxAst` is the tree. Every node carries the span (offset and length) of its source text. Names are unresolved,
+  exactly as written: `Sales` (a table, a variable or a parameter), `'Sales'`, `Sales[Amount]` (a column or a
+  measure), `[Amount]`. Parentheses the source had are kept as nodes, so a tree's shape is the source's grouping.
+- `DaxParser` reads text into it and never throws:
+
+  ```fsharp
+  DaxParser.parseExpression "CALCULATE ( [Total], 'Date'[Year] = 2024 )"   // Result<Expr, ParseError list>
+  DaxParser.parseFunction   "(amount: NUMERIC, rate = 0.1) => amount * rate" // Result<FunctionDef, ...>
+  DaxParser.parseQuery      "DEFINE MEASURE Sales[X] = 1 EVALUATE Sales ORDER BY [X] DESC"
+  DaxParser.parse           text    // whichever of the three the text is
+  ```
+
+  Each has a `...With { Semicolons = true }` form for DAX that separates arguments with `;` and writes decimals
+  with `,`. An error has its offset, length, line, column and a message that says what to fix:
+  `1:18: expected ')' to close the '(' at 1:4, found the end of the text`.
+- `DaxPrinter` writes a tree back as minimal one-line DAX (`Format` remains the formatter). Parsing what it prints
+  gives the same tree.
+
+Operator precedence, loosest first: `||`; `&&`; `NOT`; `=` `==` `<>` `<` `<=` `>` `>=` `IN`; `&`; `+` `-`; `*` `/`;
+the sign; `^`. Operators of one level group left to right. This is Microsoft's
+[operator precedence table](https://learn.microsoft.com/en-us/dax/dax-operator-reference), with `&&` and `||`
+placed as the [DAX Guide](https://dax.guide/operators/) places them. `NOT` is always a prefix operator, never a
+function: `NOT (a) = b` is `NOT ((a) = b)`. The two sources disagree about `IN` (Microsoft lists it with the
+comparisons, the DAX Guide above `^`); the parser follows Microsoft.
+
+Limits, so that nothing can overflow the stack: expressions may nest 256 levels deep, and a tree is at most
+`DaxParser.maxDepth` (500) levels deep, which also caps an unparenthesised chain of one operator at 499 operators.
+Anything deeper is an error, not a tree.
+
+Things worth knowing when using the tree:
+
+- A keyword argument (`DESC`, `MONTH`, `BOTH`, `INTEGER`) is an ordinary `Identifier`: without the function's
+  signature it cannot be told from a table or variable of that name. The `Keyword` pattern reads one in upper case.
+  Several keywords side by side (`ASC BLANKS LAST`) are one `Words` node.
+- An argument left out (`RANKX ( T, [m], , DESC )`) is an `Omitted` node. `F()` has no arguments.
+- A bare `TRUE` is a literal, `TRUE()` a call.
+- `DaxAst.references` lists the names an expression refers to, leaving out the VARs in scope. A test checks it
+  against `Deps` for every expression, and names every reason the two may differ.
+
 ## Prior art
 
 - [Tabular Editor 2](https://github.com/TabularEditor/TabularEditor) (MIT) is the inspiration and the reference
