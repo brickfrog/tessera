@@ -191,6 +191,22 @@ let tests =
             Expect.equal (root.GetProperty("warnings").GetArrayLength()) 1 ""
             Expect.equal (root.GetProperty("saved").ValueKind) JsonValueKind.Null ""
 
+        testCase "--fix warns that DI014 changes edge-case results"
+        <| fun () ->
+            use t = new TempDir()
+
+            let r =
+                tess [
+                    "lint"
+                    lintModel t [ "Ratio", "IFERROR([Total] / [Total], 0)" ]
+                    "--fix"
+                    "--rule"
+                    "DI014"
+                ]
+
+            Expect.equal r.Code ExitCode.ok r.Err
+            Expect.stringContains r.Err "tess: warning: DI014: DIVIDE returns the alternate result" ""
+
         testCase "--fix --save-to writes a copy in PBIP"
         <| fun () ->
             use t = new TempDir()

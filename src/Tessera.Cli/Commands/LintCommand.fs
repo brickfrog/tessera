@@ -97,6 +97,13 @@ let private effect (result: Lint.FixResult) : Tessera.Mutation.Effect =
 
                 for s in result.Unsettled do
                     $"{ObjectRef.format s.Owner.Ref} {s.Property}: the fixes didn't settle, so it was left unchanged"
+
+                if
+                    result.Fixes
+                    |> List.exists (fun f -> f.Fixed |> List.exists (fun (id, _) -> id = "DI014"))
+                then
+                    "DI014: DIVIDE returns the alternate result for a zero or blank divisor, where / gave infinity, "
+                    + "and doesn't catch errors raised by its operands; leave it out with --rule if that matters"
             ]
     }
 
