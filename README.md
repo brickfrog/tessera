@@ -7,7 +7,7 @@
 (`Microsoft.AnalysisServices`). It runs on Linux, macOS and Windows on .NET 10.
 
 Status: early. `init`, `convert`, `info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `rename`, `set`,
-`add`, `remove`, `move`, `bpa`, `translations` and `perspective` work.
+`add`, `remove`, `move`, `bpa`, `script`, `translations` and `perspective` work.
 
 ## Install
 
@@ -59,6 +59,8 @@ tess remove ./MyReport.pbip "Sales[Old Key]" "[Unused]" --save  # refused while 
 tess move   ./MyReport.pbip "[Revenue]" "Measures" --save       # rewrites 'Sales'[Revenue] references
 tess bpa   ./MyReport.pbip                       # Best Practice Analyzer: built-in rules + the model's own
 tess bpa   ./model.bim -r BPARules.json --min-severity 2 --trx bpa.trx   # TE rule files, CI output
+tess script export ./MyReport.pbip -t Sales -o sales.dax   # DAX objects as a DAX script (TE3's format)
+tess script apply  ./MyReport.pbip sales.dax --save        # ... edited, and applied back
 tess convert ./model.bim ./Sales.SemanticModel   # .bim -> PBIP (TMDL + definition.pbism + .platform)
 tess convert ./Sales.SemanticModel ./model.bim   # PBIP -> .bim
 tess convert ./tmdl ./tmdl --force                # re-serialize in place (keeps its line endings)
@@ -393,8 +395,8 @@ that uses a broken measure isn't reported, and TOM's validation doesn't read DAX
 own errors (e.g. a relationship to a missing column) aren't grouped with the DAX that names that column.
 ### Editing commands
 
-The editing commands (`rename`, `set`, `add`, `remove`, `move`, `translations import` and `perspective add|remove`)
-follow one set of conventions, the same as the Tabular Editor CLI's.
+The editing commands (`rename`, `set`, `add`, `remove`, `move`, `script apply`, `translations import` and
+`perspective add|remove`) follow one set of conventions, the same as the Tabular Editor CLI's.
 
 **Saving:**
 - **A dry run by default.** The command shows what would change and writes nothing; stderr says
@@ -1017,6 +1019,108 @@ any form `get` accepts. In TOM a perspective lists its tables, and each table li
 and levels, calculation items and other objects perspectives don't hold. The change shows as the perspective's
 `members`, line by line. `list --json` writes `[{ref, name, tables, columns, measures, hierarchies}]`, or
 `{perspective, members: [{ref, kind}]}` for one perspective.
+### DAX scripts (`script`)
+
+A DAX script is Tabular Editor 3's text format for many objects' DAX and properties in one file: export it, edit
+it, apply it back. `tess script export <model> [objects...]` writes one; `tess script apply <model> <script>`
+creates or updates each object it defines.
+
+```
+-------------------
+-- Measure: [Total]
+-------------------
+MEASURE 'Sales'[Total] = SUM ( Sales[Amount] )
+    Description = "Revenue, before returns"
+    FormatString = "#,0.00"
+    DisplayFolder = "KPIs"
+    Visible = FALSE
+
+-----------------------------------------
+-- Calculation Group: 'Time Intelligence'
+-----------------------------------------
+CALCULATIONGROUP 'Time Intelligence'[Period]
+    Precedence = 0
+
+    CALCULATIONITEM "YTD" =
+        TOTALYTD (
+            SELECTEDMEASURE (),
+            'Date'[Date]
+        )
+        FormatString = "0.00"
+        Ordinal = 0
+```
+
+```sh
+tess script export ./Sales.pbip                          # every DAX object, to stdout
+tess script export ./Sales.pbip "[Total]" Sales -o x.dax  # a table stands for its measures, calculated columns and own DAX
+tess script export ./Sales.pbip -k measure,calcitem -t Sales --json
+tess script apply  ./Sales.pbip x.dax                    # dry run: the changes, as `diff` shows them
+tess script apply  ./Sales.pbip - --save < x.dax         # from stdin
+```
+
+What a script holds, and the properties each object takes (names are case-insensitive):
+
+| Object | Written as | Properties |
+|---|---|---|
+| measure | `MEASURE 'Table'[Name] = <DAX>` | `Description`, `FormatString`, `DisplayFolder`, `Visible`, `DetailRows`, `KpiStatusExpression`, `KpiStatusDescription`, `KpiStatusGraphic`, `KpiTrendExpression`, `KpiTrendDescription`, `KpiTrendGraphic`, `KpiTargetExpression`, `KpiTargetDescription`, `KpiTargetFormatString`, `FormatStringDefinition` |
+| calculated column | `COLUMN 'Table'[Name] = <DAX>` | `Description`, `FormatString`, `DisplayFolder`, `Visible`, `Datatype` |
+| calculated table | `TABLE 'Name' = <DAX>` | `Description`, `Visible`, `DetailRows` |
+| calculation group | `CALCULATIONGROUP 'Table'[Column]` (the column its items are listed in) | `Description`, `Visible`, `Precedence` |
+| calculation item | `CALCULATIONITEM "Name" = <DAX>`, after its group | `Description`, `FormatString`, `Ordinal` |
+| function | `FUNCTION Name = (params) => <DAX>` | `Description`, `Visible` |
+
+Values:
+- **Strings** are in double quotes, with `""` for a quote. They may span lines.
+- **`Visible`** takes `TRUE` or `FALSE`; **`Ordinal`** and **`Precedence`** take whole numbers.
+- **`Datatype`** takes `BOOLEAN`, `DOUBLE`, `INTEGER`, `DATETIME`, `CURRENCY` (decimal) or `STRING`.
+- **DAX properties:** `DetailRows`, the `Kpi*Expression`s, and a calculation item's `FormatString` take DAX.
+- **A measure's `FormatString`:** a lone string is the static format string; any other DAX is a dynamic format
+  string. `FormatStringDefinition = <DAX>` (a tess extension) is always the dynamic one. export writes it when the
+  DAX is a lone string, or when the measure also has a static format string. A static `FormatString` removes a
+  dynamic one, unless the same object also sets `FormatStringDefinition`.
+
+How a script is read:
+- **Where DAX ends.** An expression runs until:
+  - a comma outside parentheses;
+  - a line that starts with a property name, `=` and a value of that property's kind (so the DAX line
+    `Visible = 1` is not the `Visible` property, which takes `TRUE` or `FALSE`), outside parentheses;
+  - or the next object keyword.
+- **Commas.** Properties may be written with a leading comma, as Tabular Editor 3 does after an empty expression.
+- **Comments.** A comment after an expression belongs to it if it's on the expression's last line, or indented
+  deeper than the object's keyword. The banners at the margin don't belong to any expression.
+- **Layout.** An expression that starts on the line after `=` loses the line break and its common indentation.
+  Leading and trailing whitespace is not part of any expression, and neither is the kind of line break.
+- **DAX queries.** The `DEFINE` section of a DAX query is a script (`DEFINE MEASURE 'T'[M] = ...`,
+  `DEFINE COLUMN ...`, `DEFINE TABLE ...`, `DEFINE FUNCTION ...`); its `EVALUATE` sections are skipped. Query
+  `VAR`s are not supported.
+- **Errors.** Syntax errors, and objects that can't be applied, are reported as `script.dax:line:column: message`.
+  With `--json`, the error also has `source`, `line` and `column`.
+
+`apply` follows the [editing conventions](#editing-commands): a dry run unless `--save` or `--save-to`, the changes
+as a diff, new errors refused unless `--force`. It works like this:
+- **New or existing.** Each object is updated if it exists and created if it doesn't, the way `add` creates it.
+  Objects and properties the script doesn't mention are left alone.
+- **Forward references.** All objects are applied before the model is validated, so they may refer to objects
+  defined later in the script.
+- **`=` omitted.** Without `=`, an existing object keeps its expression and only its properties change.
+- **Empty values.** `=` followed by nothing, or an empty value, clears that expression or property: `DetailRows`
+  and dynamic format strings are removed.
+- **No-op detection.** Expressions that differ only in leading and trailing whitespace or line breaks count as
+  unchanged. So exporting and applying back changes nothing, even for a `.bim` file with `\r\n` in its DAX.
+- **Ordinals.** `Ordinal` sets an item's ordinal as given; other items are not renumbered.
+- **Refusals.** `apply` refuses:
+  - a new object without an expression;
+  - an expression on a data column, or on a table that isn't calculated (properties alone are fine);
+  - a calculation group whose `[Column]` isn't its items' column (use `tess rename` for that);
+  - a measure name that another table already uses;
+  - a new object in a table that doesn't exist.
+
+`export` writes objects in model order: for each table, its own DAX (or its calculation group with its items, by
+ordinal), then its calculated columns and measures; functions come last. Expressions are written as stored, with
+`\n` line breaks. Multi-line ones start on the line after `=` and are indented. `export` reads the script back
+before writing it. An object whose DAX would not read back exactly is named in a warning. Examples are a line that
+reads like a property (`Visible = TRUE`) or a comma outside parentheses (`1,1`, from a locale that writes decimals
+that way).
 
 ### Findings JSON and CI annotations
 
@@ -1060,6 +1164,7 @@ the code as its title.
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate` found issues at or above `--fail-on` (default `error`); an edit's `--save` refused because it would introduce errors |
 | 2 | usage error, including invalid arguments for an editing command: an invalid new name (`rename`, `add`), a property `set` can't write or a value it can't take, or an option `add` doesn't take for that kind |
 | 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), an edit that would change what other references mean (`rename`, `move`), a translation file that can't be applied (`translations import`), or an object a perspective can't hold |
+| 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), or an edit that would change what other references mean (`rename`, `move`). For `script`, also a script that can't be read or applied, or an object a script can't hold |
 | 4 | output error (destination not empty, write failed) |
 | 70 | internal error |
 

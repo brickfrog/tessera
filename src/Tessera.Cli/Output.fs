@@ -45,7 +45,19 @@ let errorJson (code: string) (message: string) =
 let versionJson (v: string) = obj [ "version", str v ]
 
 let tessErrorJson (e: TessError) =
-    errorJson (TessError.code e) (TessError.message e)
+    let json = errorJson (TessError.code e) (TessError.message e)
+
+    // Errors in a DAX script also say where.
+    match e with
+    | InvalidScript(source, line, column, _)
+    | ScriptObjectFailed(source, line, column, _) ->
+        let error = json.["error"].AsObject()
+        error.["source"] <- str source
+        error.["line"] <- num line
+        error.["column"] <- num column
+    | _ -> ()
+
+    json
 
 /// "ref" and "kind" fields for an object.
 let refFields (e: Inventory.ObjectEntry) = [

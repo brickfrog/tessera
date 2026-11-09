@@ -45,11 +45,17 @@ type TessError =
     | InvalidTranslationFile of path: string * line: int option * reason: string
     /// `perspective add/remove`: an object that can't be added to or removed from a perspective.
     | UnsupportedPerspectiveChange of perspective: string * reason: string
+    /// A DAX script that can't be read, at a 1-based line and column of `source` (a path or <stdin>).
+    | InvalidScript of source: string * line: int * column: int * reason: string
+    /// An object of a DAX script that can't be applied: the error, at the object's line and column.
+    | ScriptObjectFailed of source: string * line: int * column: int * error: TessError
+    /// `script`: an object a DAX script can't hold or change this way (e.g. a data column's expression).
+    | CannotScript of objectRef: string * reason: string
 
 module TessError =
 
     /// Stable, machine-readable identifier (used in JSON output).
-    let code =
+    let rec code =
         function
         | PathNotFound _ -> "path-not-found"
         | UnrecognizedModel _ -> "unrecognized-model"
@@ -81,8 +87,11 @@ module TessError =
         | MoveConflict _ -> "move-conflict"
         | InvalidTranslationFile _ -> "invalid-translation-file"
         | UnsupportedPerspectiveChange _ -> "unsupported-perspective-change"
+        | InvalidScript _ -> "invalid-script"
+        | ScriptObjectFailed(_, _, _, inner) -> code inner
+        | CannotScript _ -> "cannot-script"
 
-    let message =
+    let rec message =
         function
         | PathNotFound path -> $"Path not found: {path}"
         | UnrecognizedModel(path, reason) -> $"Not a recognised semantic model: {path} ({reason})"
@@ -158,3 +167,6 @@ module TessError =
 
             $"{path}{at}: {reason}"
         | UnsupportedPerspectiveChange(perspective, reason) -> $"Can't change {perspective}: {reason}"
+        | InvalidScript(source, line, column, reason) -> $"{source}:{line}:{column}: {reason}"
+        | ScriptObjectFailed(source, line, column, inner) -> $"{source}:{line}:{column}: {message inner}"
+        | CannotScript(objectRef, reason) -> $"Can't script {objectRef}: {reason}"

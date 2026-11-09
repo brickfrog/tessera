@@ -33,6 +33,9 @@
     <Compile Include="Translations.fs" />
     <Compile Include="Perspectives.fs" />
     <Compile Include="Unused.fs" />
+    <Compile Include="DaxScript.fs" />
+    <Compile Include="ExportScript.fs" />
+    <Compile Include="ApplyScript.fs" />
   </ItemGroup>
 
   <ItemGroup>
