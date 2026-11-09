@@ -32,6 +32,7 @@
     <Compile Include="MoveObject.fs" />
     <Compile Include="Translations.fs" />
     <Compile Include="Perspectives.fs" />
+    <Compile Include="Unused.fs" />
   </ItemGroup>
 
   <ItemGroup>

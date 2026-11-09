@@ -46,6 +46,7 @@ tess diff  ./main/Sales.SemanticModel ./branch/Sales.SemanticModel   # object-le
 tess diff  ./server-export.bim ./Sales.pbip --ignore lineageTag --json
 tess deps  ./MyReport.pbip "[Gross Margin %]"     # what it uses, and what uses it
 tess deps  ./MyReport.pbip "Date[Date]" --referenced-by --depth 0
+tess deps  ./MyReport.pbip --unused               # hidden objects nothing uses
 tess validate ./MyReport.pbip                     # broken references, cycles, ... (exit 1 on errors)
 tess validate ./model.bim --fail-on warning --rule unresolved-reference --json
 tess rename ./MyReport.pbip "[Revenue]" "Net Revenue"          # preview: the rename + every DAX reference it fixes
@@ -301,6 +302,42 @@ Comments and strings are never treated as references. A reference that names not
 `? <text>`. Each link shows the property and line it comes from, e.g. `expression:5`. `--depth` follows links
 further (0 means all the way), and circular references are marked rather than followed.
 
+#### Unused objects (`deps --unused`)
+
+`tess deps <model> --unused` lists the tables, columns, measures, hierarchies and functions that nothing uses.
+Reports can use any visible object, and tess can't see reports, so by default only hidden objects are listed:
+hidden and unused means dead. An object counts as hidden if it, or its table, is hidden or private.
+`--include-visible` checks visible objects too: what nothing *in the model* uses.
+
+```
+$ tess deps ./Sales.pbip --unused
+measure:Sales/Old Margin
+column:Sales/Legacy Key  used only by unused measure:Sales/Old Margin
+```
+
+Usage is transitive: something used only by unused objects is unused too, and is listed with them (`used only
+by unused ...`), so removing those first frees it. An object is used if any of these use it:
+- the DAX of a used object (as `deps` reads it), including a used measure's format string, detail rows and KPI
+- a used column's sort-by column, variations (their hierarchy and column) and group-by columns (field parameters)
+- a used hierarchy's levels
+- a calculation item of a used calculation group
+- a relationship, row-level security filter, calendar or aggregation column (`alternateOf`): these always
+  count as used
+- its own parts: a used column, measure or hierarchy keeps its table, and a used table keeps its key column
+
+Some rules of thumb:
+- A table reference, such as `COUNTROWS(Sales)`, uses the table but not its columns.
+- Perspectives and translations don't count: they list objects, they don't use them.
+- Calculated-table columns are listed with a note, since removing one means changing the table's DAX.
+- Calculation items, levels, partitions, roles, relationships, M expressions and data sources are never
+  listed. tess doesn't read M, so it can't tell which M expressions are used.
+- Power BI's auto date/time template table counts as used.
+- When in doubt, an object counts as used. For example, a hidden table that only a relationship touches is
+  never listed.
+
+`-k` and `-t` narrow the list, as in `list`. `--json` writes an array of `{ ref, kind, name, table, hidden,
+usedBy, note }`. The exit code is 0, unless `--fail-on-unused` is given and something is listed (then 1).
+
 ### Validation (`validate`)
 
 `validate` checks for structural problems: things Analysis Services or Power BI would reject, or that can't
@@ -325,9 +362,35 @@ Options:
 - `--min-severity error|warning|info` hides less severe issues.
 - `--fail-on error|warning|info` sets the exit code: 1 if any issue is this severe or more. The default is
   `error`. Issues hidden by `--min-severity` still count, so hiding warnings can't turn a failing check green.
+- `--no-group` lists issues that share a root cause one by one (see below).
 
 `--json` writes the [findings envelope](#findings-json-and-ci-annotations), with `"valid": false` when there are
 errors. `--ci github|azdo` also writes CI annotations to stderr.
+
+Issues with one root cause are grouped. In practice that means a name many expressions use but that nothing
+has, such as a column renamed or removed outside tess: every `unresolved-reference` naming it is one group, and
+so is every reference to a missing table or its columns. Names match ignoring case. The first issue stands for
+the group, with a count and the missing name, and the summary still counts every issue:
+
+```
+error  measure:Sales/A  expression:1  'Old'[X] does not exist: there is no table 'Old'  [unresolved-reference]  +2 more for 'Old'
+3 errors (2 grouped under their root cause; --no-group lists them)
+```
+
+How grouped issues are reported:
+- **JSON** keeps every finding. The group's first finding gets `dependents` (the other findings' `objectPath`s,
+  each listed once), and the others get `rootCause` (the first finding's `objectPath`). Findings outside a group
+  have neither key. `rootCause` says which finding stands for the group: fixing that one object doesn't fix the
+  others, but restoring the missing name fixes them all.
+- **CI annotations** are written once per group, with the count in the message.
+- **`--no-group`** lists every issue on its own, and the JSON has no grouping keys.
+
+Exit codes don't change. Grouping applies after `--rule` and `--min-severity`.
+
+Other rules don't cascade, so they aren't grouped. Every rule checks an object's own definition: a measure
+that uses a broken measure isn't reported, and TOM's validation doesn't read DAX. To see what a broken object affects, use
+`tess deps <model> <object> --referenced-by --depth 0`. TOM also doesn't say which name it couldn't find, so its
+own errors (e.g. a relationship to a missing column) aren't grouped with the DAX that names that column.
 ### Editing commands
 
 The editing commands (`rename`, `set`, `add`, `remove`, `move`, `translations import` and `perspective add|remove`)
