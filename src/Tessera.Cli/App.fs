@@ -61,6 +61,7 @@ let run (out: TextWriter) (err: TextWriter) (argv: string array) : int =
                 | Some(Perspective args) -> PerspectiveCommand.run ctx args
                 | Some(Script args) -> ScriptCommand.run ctx args
                 | Some(Lint args) -> LintCommand.run ctx args
+                | Some(Format args) -> FormatCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with
