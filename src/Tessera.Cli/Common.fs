@@ -51,6 +51,9 @@ module ExitCode =
         | InvalidScript _
         | CannotScript _ -> input
         | ScriptObjectFailed(_, _, _, inner) -> ofError inner
+        | RuleNotFound _
+        | RuleExists _
+        | CannotIgnore _ -> input
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()
@@ -72,7 +75,16 @@ type Ctx = {
     Out: TextWriter
     Err: TextWriter
     Json: bool
+    /// Environment variables. Commands read them only through this, so tests can supply their own.
+    GetEnv: string -> string option
 }
+
+/// The process's environment variables (an empty value counts as unset).
+let processEnv (name: string) =
+    match Environment.GetEnvironmentVariable name with
+    | null
+    | "" -> None
+    | v -> Some v
 
 let parseList (values: string list) =
     values

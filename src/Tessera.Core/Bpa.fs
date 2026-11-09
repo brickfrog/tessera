@@ -494,16 +494,92 @@ let analyze (db: TomDatabase) (rules: Rule list) : RuleResult list =
                             }
     ]
 
+/// Fetches an external rule file's text. Injected, so nothing touches the network unless the
+/// caller passes a real fetcher (and the user passed --allow-external-rules).
+type Fetcher = Uri -> Result<string, string>
+
+/// Where configuration comes from: environment variables (TESS_BPA_RULES, XDG_CONFIG_HOME, HOME,
+/// APPDATA) are read only through this, so tests can run without the real environment.
+type RuleEnvironment = {
+    GetEnv: string -> string option
+    IsWindows: bool
+}
+
+module RuleEnvironment =
+    /// No environment variables at all: no TESS_BPA_RULES, no user config file.
+    let empty = {
+        GetEnv = fun _ -> None
+        IsWindows = OperatingSystem.IsWindows()
+    }
+
+    let ofProcess = {
+        GetEnv =
+            fun name ->
+                match Environment.GetEnvironmentVariable name with
+                | null
+                | "" -> None
+                | v -> Some v
+        IsWindows = OperatingSystem.IsWindows()
+    }
+
 /// Which rules to run.
 type RuleOptions = {
     /// Include tessera's built-in rules.
     BuiltIn: bool
-    /// Rule files given by the user, in order (later files override earlier ones by ID).
+    /// Rule files given by the user (--rules), in order (later files override earlier ones by ID).
     Files: string list
     /// Include the rules the model carries: its BestPracticeAnalyzer annotation and the files its
     /// BestPracticeAnalyzer_ExternalRuleFiles annotation lists.
     ModelRules: bool
+    /// Include TESS_BPA_RULES and the config files.
+    Config: bool
+    /// Fetch https:// URLs in BestPracticeAnalyzer_ExternalRuleFiles (with `Fetch`).
+    AllowExternal: bool
+    Fetch: Fetcher
+    Environment: RuleEnvironment
 }
+
+module RuleOptions =
+    /// Built-in rules, the model's rules and config; nothing fetched; no environment.
+    let defaults = {
+        BuiltIn = true
+        Files = []
+        ModelRules = true
+        Config = true
+        AllowExternal = false
+        Fetch = fun _ -> Error "fetching is disabled"
+        Environment = RuleEnvironment.empty
+    }
+
+    /// Only the built-in rules.
+    let builtInOnly = {
+        defaults with
+            ModelRules = false
+            Config = false
+    }
+
+/// The rules found, and what happened while finding them.
+type CollectedRules = {
+    /// Every rule definition from every layer, lowest precedence first (before merging by ID).
+    All: Rule list
+    /// The rules that run: `All` merged by ID, the highest-precedence definition winning.
+    Effective: Rule list
+    /// Rules the model refers to that couldn't be read.
+    Warnings: string list
+    /// Things deliberately not done, e.g. URLs not fetched.
+    Notes: string list
+    /// URLs fetched (only with AllowExternal).
+    Fetched: string list
+}
+
+module CollectedRules =
+    /// Lower-layer definitions the effective rule with this ID replaced, lowest first.
+    let overridden (c: CollectedRules) (rule: Rule) =
+        let defs =
+            c.All
+            |> List.filter (fun r -> String.Equals(r.Id, rule.Id, StringComparison.OrdinalIgnoreCase))
+
+        defs |> List.take (max 0 (defs.Length - 1))
 
 /// Folders a model's relative external rule file paths are resolved against.
 let private baseFolders (source: ModelSource) = [
@@ -520,71 +596,220 @@ let private annotation (m: Microsoft.AnalysisServices.Tabular.Model) (names: str
         | null -> None
         | a -> Some a.Value)
 
-/// The rules to run, by precedence: built-in, then rule files, then the model's external rule
-/// files, then the model's own rules. Returns warnings for model-referenced rules that can't be read.
-let collectRules (source: ModelSource) (db: TomDatabase) (opts: RuleOptions) =
-    let builtIn = if opts.BuiltIn then BpaRules.builtIn.Value else []
+/// Config files and the TESS_BPA_RULES variable.
+module RuleConfig =
+    /// The environment variable listing rule files (separated like PATH).
+    let envVar = "TESS_BPA_RULES"
 
-    let files =
-        opts.Files
+    /// A project's config file, relative to a folder: .tessera/bpa.json.
+    let projectFile = Path.Combine(".tessera", "bpa.json")
+
+    /// The user's config file: %APPDATA%\tessera\bpa.json on Windows; elsewhere
+    /// $XDG_CONFIG_HOME/tessera/bpa.json, or ~/.config/tessera/bpa.json without it.
+    let userFile (env: RuleEnvironment) : string option =
+        let rooted = Option.filter (fun (d: string) -> Path.IsPathRooted d)
+
+        if env.IsWindows then
+            env.GetEnv "APPDATA"
+            |> rooted
+            |> Option.map (fun d -> Path.Combine(d, "tessera", "bpa.json"))
+        else
+            match env.GetEnv "XDG_CONFIG_HOME" |> rooted with
+            | Some d -> Some(Path.Combine(d, "tessera", "bpa.json"))
+            | None ->
+                env.GetEnv "HOME"
+                |> rooted
+                |> Option.map (fun h -> Path.Combine(h, ".config", "tessera", "bpa.json"))
+
+    /// The model's own folders: the .bim file's folder or the TMDL folder; in a PBIP project also
+    /// the X.SemanticModel folder and the project folder holding it.
+    let private modelFolders (source: ModelSource) = [
+        yield! baseFolders source
+
+        match source.SemanticModelFolder with
+        | Some f ->
+            match Path.GetDirectoryName(Path.GetFullPath f) with
+            | null -> ()
+            | parent -> parent
+        | None -> ()
+    ]
+
+    let private isRepoRoot (dir: string) =
+        let git = Path.Combine(dir, ".git")
+        Directory.Exists git || File.Exists git
+
+    /// Folders searched for .tessera/bpa.json, nearest first: from the model's folder up to the
+    /// root of the git repository it is in (the first folder holding .git); outside a repository,
+    /// only the model's own folders.
+    let searchFolders (source: ModelSource) : string list =
+        let start = baseFolders source |> List.head
+
+        let rec up (dir: string) acc =
+            let acc = dir :: acc
+
+            if isRepoRoot dir then
+                Some(List.rev acc)
+            else
+                match Path.GetDirectoryName dir with
+                | null -> None
+                | parent when parent = dir -> None
+                | parent -> up parent acc
+
+        match up start [] with
+        | Some dirs -> dirs
+        | None -> modelFolders source |> List.distinct
+
+    /// The nearest project config file, if any.
+    let projectFileFor (source: ModelSource) : string option =
+        searchFolders source
+        |> List.map (fun d -> Path.Combine(d, projectFile))
+        |> List.tryFind File.Exists
+
+    /// Paths in TESS_BPA_RULES, relative ones against the current directory.
+    let envFiles (env: RuleEnvironment) : string list =
+        match env.GetEnv envVar with
+        | None -> []
+        | Some value ->
+            value.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
+            |> List.ofArray
+            |> List.map Path.GetFullPath
+
+/// An external rule file entry that is a URL (http or https), rather than a path.
+let private asUrl (entry: string) =
+    match Uri.TryCreate(entry, UriKind.Absolute) with
+    | true, u when u.Scheme = Uri.UriSchemeHttp || u.Scheme = Uri.UriSchemeHttps -> Some u
+    | _ -> None
+
+/// Why a URL won't be fetched even with --allow-external-rules, if it won't.
+let refuseUrl (u: Uri) : string option =
+    if u.Scheme <> Uri.UriSchemeHttps then
+        Some "only https:// URLs are fetched"
+    elif not (String.IsNullOrEmpty u.UserInfo) then
+        Some "URLs with credentials are not fetched"
+    else
+        None
+
+/// The rules to run, by layer, lowest precedence first (a rule replaces a lower layer's rule
+/// with the same ID):
+///   1. built-in rules
+///   2. the model's rules: the files (and, with AllowExternal, URLs) its
+///      BestPracticeAnalyzer_ExternalRuleFiles annotation lists - the first listed wins, as in TE -
+///      then the rules embedded in its BestPracticeAnalyzer annotation
+///   3. config files: the user's, then the project's .tessera/bpa.json
+///   4. TESS_BPA_RULES files, in order
+///   5. --rules files, in order
+/// Files the user names (layers 3-5) must be valid; problems with the model's own references are
+/// warnings, so a model can always be analyzed.
+let collectRules (source: ModelSource) (db: TomDatabase) (opts: RuleOptions) : Result<CollectedRules, TessError> =
+    let warnings = List<string>()
+    let notes = List<string>()
+    let fetched = List<string>()
+
+    let loadAll (as': string -> RuleSource) (paths: string list) =
+        paths
         |> List.fold
             (fun acc path ->
-                match acc, loadFile path with
+                match acc, loadFileAs as' path with
                 | Error e, _ -> Error e
-                | Ok sets, Ok rules -> Ok(sets @ [ rules ])
+                | Ok sets, Ok rules -> Ok(sets @ rules)
                 | Ok _, Error e -> Error e)
             (Ok [])
 
-    files
-    |> Result.map (fun fileRules ->
-        let warnings = List<string>()
+    let builtIn = if opts.BuiltIn then BpaRules.builtIn.Value else []
 
-        let external =
-            if not opts.ModelRules then
+    let external () =
+        match annotation db.Model [ externalRulesAnnotation ] with
+        | None -> []
+        | Some json ->
+            match parseExternalRuleFiles json with
+            | Error e ->
+                warnings.Add $"{externalRulesAnnotation} annotation: {e}"
                 []
-            else
-                match annotation db.Model [ externalRulesAnnotation ] with
-                | None -> []
-                | Some json ->
-                    match parseExternalRuleFiles json with
-                    | Error e ->
-                        warnings.Add $"{externalRulesAnnotation} annotation: {e}"
+            | Ok entries ->
+                let one (entry: string) : Rule list =
+                    match asUrl entry with
+                    | Some _ when not opts.AllowExternal ->
+                        notes.Add $"external rule file {entry} not fetched (pass --allow-external-rules to fetch it)"
                         []
-                    | Ok paths -> [
-                        for p in paths do
-                            if p.StartsWith("http", StringComparison.OrdinalIgnoreCase) then
-                                warnings.Add $"external rule file {p} not loaded: tess does not download rules"
+                    | Some url ->
+                        match refuseUrl url with
+                        | Some reason ->
+                            warnings.Add $"external rule file {entry} not fetched: {reason}"
+                            []
+                        | None ->
+                            let text = opts.Fetch url
+                            fetched.Add entry
+
+                            match text |> Result.bind (parse (ExternalRuleUrl entry)) with
+                            | Ok rules -> rules
+                            | Error e ->
+                                warnings.Add $"external rule file {entry}: {e}"
+                                []
+                    | None ->
+                        let candidates =
+                            if Path.IsPathRooted entry then
+                                [ entry ]
                             else
-                                let candidates =
-                                    if Path.IsPathRooted p then
-                                        [ p ]
-                                    else
-                                        baseFolders source |> List.map (fun b -> Path.Combine(b, p))
+                                baseFolders source |> List.map (fun b -> Path.Combine(b, entry))
 
-                                match candidates |> List.tryFind File.Exists with
-                                | None -> warnings.Add $"external rule file {p} not found"
-                                | Some file ->
-                                    match loadFile file with
-                                    | Ok rules ->
-                                        rules
-                                        |> List.map (fun r -> {
-                                            r with
-                                                Source = ExternalRuleFile file
-                                        })
-                                    | Error e -> warnings.Add(TessError.message e)
-                      ]
+                        match candidates |> List.tryFind File.Exists with
+                        | None ->
+                            warnings.Add $"external rule file {entry} not found"
+                            []
+                        | Some file ->
+                            match loadFileAs ExternalRuleFile file with
+                            | Ok rules -> rules
+                            | Error e ->
+                                warnings.Add(TessError.message e)
+                                []
 
-        let embedded =
-            if not opts.ModelRules then
+                // Load in the listed order (so fetches happen in that order), but give the first
+                // listed the highest precedence, as TE does.
+                entries |> List.map one |> List.rev |> List.concat
+
+    let embedded () =
+        match annotation db.Model modelRulesAnnotations with
+        | None -> []
+        | Some json ->
+            match parse ModelAnnotation json with
+            | Ok rules -> rules
+            | Error e ->
+                warnings.Add $"rules in the model's BestPracticeAnalyzer annotation: {e}"
                 []
-            else
-                match annotation db.Model modelRulesAnnotations with
-                | None -> []
-                | Some json ->
-                    match parse ModelAnnotation json with
-                    | Ok rules -> rules
-                    | Error e ->
-                        warnings.Add $"rules in the model's BestPracticeAnalyzer annotation: {e}"
-                        []
 
-        merge ([ builtIn ] @ fileRules @ external @ [ embedded ]), List.ofSeq warnings)
+    let modelRules = if opts.ModelRules then external () @ embedded () else []
+
+    let configPaths =
+        if opts.Config then
+            [
+                yield!
+                    RuleConfig.userFile opts.Environment
+                    |> Option.filter File.Exists
+                    |> Option.toList
+                yield! RuleConfig.projectFileFor source |> Option.toList
+            ]
+            |> List.distinct
+        else
+            []
+
+    let envPaths =
+        if opts.Config then
+            RuleConfig.envFiles opts.Environment
+        else
+            []
+
+    loadAll ConfigFile configPaths
+    |> Result.bind (fun config ->
+        loadAll EnvRuleFile envPaths
+        |> Result.bind (fun env ->
+            loadAll RuleFile opts.Files
+            |> Result.map (fun cli ->
+                let all = builtIn @ modelRules @ config @ env @ cli
+
+                {
+                    All = all
+                    Effective = merge [ all ]
+                    Warnings = List.ofSeq warnings
+                    Notes = List.ofSeq notes
+                    Fetched = List.ofSeq fetched
+                })))

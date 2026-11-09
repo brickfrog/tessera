@@ -17,9 +17,9 @@ let summary =
     "check the model against Best Practice Analyzer rules (exit 1: findings)."
 
 type Args =
-    | [<MainCommand; ExactlyOnce>] Model of path: string
+    | [<MainCommand>] Model of path: string
     | [<AltCommandLine("-r")>] Rules of file: string
-    | No_Default_Rules
+    | [<CustomCommandLine("--no-builtin"); AltCommandLine("--no-default-rules")>] No_Default_Rules
     | No_Model_Rules
     | Min_Severity of level: int
     | [<AltCommandLine("-c")>] Category of category: string
@@ -27,20 +27,32 @@ type Args =
     | Trx of path: string
     | Fail_On of level: string
     | Ci of system: string
+    | Builtin_Only
+    | No_Config
+    | Allow_External_Rules
+    | Path of pattern: string
+    | [<CliPrefix(CliPrefix.None); CustomCommandLine("rules")>] Rules_Cmd of ParseResults<BpaRulesCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
             | Model _ -> "model path (.bim, TMDL folder, .SemanticModel folder, .pbip, ...)."
-            | Rules _ -> "a Tabular Editor BPA rule file (JSON) to run as well (repeatable)."
-            | No_Default_Rules -> "don't run tessera's built-in rules."
-            | No_Model_Rules -> "ignore rules stored in the model's annotations."
+            | Rules _ -> BpaRulesCommand.SourceUsage.rules
+            | No_Default_Rules -> BpaRulesCommand.SourceUsage.noBuiltin
+            | No_Model_Rules -> BpaRulesCommand.SourceUsage.noModelRules
             | Min_Severity _ -> "only run rules of at least this severity (1 info, 2 warning, 3 error)."
             | Category _ -> "only run rules in this category (repeatable or comma-separated)."
             | List_Rules -> "list the rules that would run, and whether each is supported, instead of running them."
             | Trx _ -> "also write the results as a VSTest .trx file (one test per rule), e.g. for Azure DevOps."
             | Fail_On _ -> "exit 1 if any finding is this severe or more: error, warning or info (default: error)."
             | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
+            | Builtin_Only -> BpaRulesCommand.SourceUsage.builtinOnly
+            | No_Config -> BpaRulesCommand.SourceUsage.noConfig
+            | Allow_External_Rules -> BpaRulesCommand.SourceUsage.allowExternal
+            | Path _ ->
+                "only report findings on objects whose reference matches: a glob (`measure:Sales/*`, `*:Sales/*`) "
+                + "or a prefix (`column:`); repeatable or comma-separated."
+            | Rules_Cmd _ -> "list, show, add or remove rules, and ignore rules on objects: `tess bpa rules --help`."
 
 let private severityName (s: int) =
     if s >= 3 then "error"
@@ -122,7 +134,12 @@ let private summarize (results: Bpa.RuleResult list) = {
 let private countSeverity (s: Summary) (pred: int -> bool) =
     s.Findings |> List.filter (fun f -> pred f.Rule.Severity) |> List.length
 
-let private resultsJson (duration: TimeSpan) (model: string) (results: Bpa.RuleResult list) (warnings: string list) =
+let private resultsJson
+    (duration: TimeSpan)
+    (model: string)
+    (results: Bpa.RuleResult list)
+    (collected: Bpa.CollectedRules)
+    =
     let s = summarize results
 
     Findings.envelope "bpa" duration (s.Findings |> List.map toFinding) [
@@ -158,7 +175,7 @@ let private resultsJson (duration: TimeSpan) (model: string) (results: Bpa.RuleR
                     ]
                 | _ -> ()
         ]
-        "warnings", arr (warnings |> List.map str)
+        yield! BpaRulesCommand.collectedFields collected
         "rules",
         obj [
             "total", num s.Rules
@@ -173,10 +190,7 @@ let private plural (n: int) (word: string) =
     if n = 1 then $"{n} {word}" else $"{n} {word}s"
 
 /// severity  ref  ruleId  rule name, then a summary line. Problems with rules go to stderr.
-let private resultsText (ctx: Ctx) (results: Bpa.RuleResult list) (warnings: string list) =
-    for w in warnings do
-        ctx.Err.WriteLine $"tess: bpa: warning: {w}"
-
+let private resultsText (ctx: Ctx) (results: Bpa.RuleResult list) =
     for rule, stage, error in problems results do
         let what = if stage = "compile" then "not supported" else "failed"
         ctx.Err.WriteLine $"tess: bpa: rule {rule.Id} ({rule.Name}) {what}: {error}"
@@ -370,18 +384,43 @@ let trx (modelPath: string) (started: DateTime) (results: Bpa.RuleResult list) =
 
     doc.Declaration.ToString() + "\n" + doc.ToString()
 
-let run (ctx: Ctx) (args: ParseResults<Args>) =
+/// A --path pattern: a glob (* and ?) over the whole reference, or else a prefix of it.
+/// Case-insensitive, like names in Tabular.
+let private pathMatcher (pattern: string) : ObjectRef -> bool =
+    if pattern.Contains '*' || pattern.Contains '?' then
+        let rx =
+            Text.RegularExpressions.Regex(
+                "^"
+                + Text.RegularExpressions.Regex.Escape(pattern).Replace("\\*", ".*").Replace("\\?", ".")
+                + "$",
+                Text.RegularExpressions.RegexOptions.IgnoreCase
+                ||| Text.RegularExpressions.RegexOptions.CultureInvariant
+            )
+
+        fun r -> rx.IsMatch(ObjectRef.format r)
+    else
+        fun r -> (ObjectRef.format r).StartsWith(pattern, StringComparison.OrdinalIgnoreCase)
+
+let private analyze (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
     let started = DateTime.Now
     let clock = Diagnostics.Stopwatch.StartNew()
-    let modelPath = args.GetResult Args.Model
     let categories = parseList (args.GetResults Args.Category) |> Set.ofList
     let minSeverity = args.TryGetResult Args.Min_Severity |> Option.defaultValue 0
 
-    let opts: Bpa.RuleOptions = {
-        BuiltIn = not (args.Contains Args.No_Default_Rules)
-        Files = args.GetResults Args.Rules
-        ModelRules = not (args.Contains Args.No_Model_Rules)
-    }
+    let paths = parseList (args.GetResults Args.Path) |> List.map pathMatcher
+
+    let inPaths (f: Bpa.Finding) =
+        paths.IsEmpty || paths |> List.exists (fun m -> m f.Ref)
+
+    let opts =
+        BpaRulesCommand.ruleOptions ctx {
+            Rules = args.GetResults Args.Rules
+            NoBuiltin = args.Contains Args.No_Default_Rules
+            BuiltinOnly = args.Contains Args.Builtin_Only
+            NoModelRules = args.Contains Args.No_Model_Rules
+            NoConfig = args.Contains Args.No_Config
+            AllowExternal = args.Contains Args.Allow_External_Rules
+        }
 
     let selected (r: Rule) =
         r.Severity >= minSeverity
@@ -408,18 +447,20 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             |> Option.map Ok
             |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
 
-    match failOn, ci with
-    | Error message, _
-    | _, Error message -> UsageError message
-    | Ok failOn, Ok ci ->
+    match failOn, ci, opts with
+    | Error message, _, _
+    | _, Error message, _
+    | _, _, Error message -> UsageError message
+    | Ok failOn, Ok ci, Ok opts ->
 
         match
             ModelIO.loadPath modelPath
             |> Result.bind (fun (source, db) -> Bpa.collectRules source db opts |> Result.map (fun x -> db, x))
         with
         | Error e -> Failed e
-        | Ok(db, (rules, warnings)) ->
-            let rules = rules |> List.filter selected
+        | Ok(db, collected) ->
+            BpaRulesCommand.reportCollected ctx "bpa" collected
+            let rules = collected.Effective |> List.filter selected
 
             if args.Contains Args.List_Rules then
                 let checkedRules = rules |> List.map (fun r -> r, Bpa.compile r)
@@ -431,7 +472,13 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
 
                 Done
             else
-                let results = Bpa.analyze db rules
+                let results =
+                    Bpa.analyze db rules
+                    |> List.map (fun r -> {
+                        r with
+                            Findings = r.Findings |> List.filter inPaths
+                            Ignored = r.Ignored |> List.filter inPaths
+                    })
 
                 let written =
                     match args.TryGetResult Args.Trx with
@@ -447,9 +494,9 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
                 | Error e -> Failed e
                 | Ok() ->
                     if ctx.Json then
-                        writeJson ctx.Out (resultsJson clock.Elapsed modelPath results warnings)
+                        writeJson ctx.Out (resultsJson clock.Elapsed modelPath results collected)
                     else
-                        resultsText ctx results warnings
+                        resultsText ctx results
 
                     let findings =
                         results
@@ -462,3 +509,12 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
                         DoneWith ExitCode.findings
                     else
                         Done
+
+let run (ctx: Ctx) (args: ParseResults<Args>) =
+    match args.TryGetResult Args.Rules_Cmd, args.TryGetResult Args.Model with
+    | Some sub, None when args.GetAllResults().Length = 1 -> BpaRulesCommand.run ctx sub
+    | Some _, _ ->
+        UsageError
+            "`tess bpa rules` takes its own options after the subcommand, e.g. `tess bpa rules list <model> --rules x.json`"
+    | None, None -> UsageError(args.Parser.PrintUsage(message = "missing the model path"))
+    | None, Some modelPath -> analyze ctx args modelPath

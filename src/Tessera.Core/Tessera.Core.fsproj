@@ -37,6 +37,8 @@
     <Compile Include="ExportScript.fs" />
     <Compile Include="ApplyScript.fs" />
     <Compile Include="Lint.fs" />
+    <Compile Include="BpaRuleEdit.fs" />
+    <Compile Include="BpaFetch.fs" />
   </ItemGroup>
 
   <ItemGroup>
