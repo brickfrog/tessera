@@ -153,7 +153,20 @@ and runWith
     (modelPath: string)
     (edit: ModelSource -> Database -> Result<Mutation.Effect * Report.FileEdit list, TessError>)
     : Outcome =
-    match ModelIO.loadPath modelPath with
+    let loaded =
+        if XmlaAddress.isRemote modelPath && opts.Target = InPlace then
+            // Refused before anything is contacted.
+            Error(
+                RemoteSourceUnsupported(
+                    modelPath,
+                    "--save can't write to a server. Use --save-to <path> to save the changed model as files, "
+                    + "then `tess deploy` them"
+                )
+            )
+        else
+            Source.load ctx modelPath
+
+    match loaded with
     | Error e -> Failed e
     | Ok(source, db) ->
         let files = ref []

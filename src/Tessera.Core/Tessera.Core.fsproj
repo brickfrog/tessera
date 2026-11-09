@@ -9,6 +9,7 @@
     <Compile Include="Errors.fs" />
     <Compile Include="ObjectRef.fs" />
     <Compile Include="Pbip.fs" />
+    <Compile Include="XmlaAddress.fs" />
     <Compile Include="ModelSource.fs" />
     <Compile Include="ModelIO.fs" />
     <Compile Include="Scaffold.fs" />
@@ -41,6 +42,8 @@
     <Compile Include="BpaFetch.fs" />
     <Compile Include="Report.fs" />
     <Compile Include="Format.fs" />
+    <Compile Include="QueryResult.fs" />
+    <Compile Include="Deploy.fs" />
   </ItemGroup>
 
   <ItemGroup>

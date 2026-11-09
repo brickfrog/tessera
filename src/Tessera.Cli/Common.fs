@@ -14,6 +14,8 @@ module ExitCode =
     let usage = 2
     let input = 3
     let output = 4
+    /// The server couldn't be reached, refused the credentials, or reported an error.
+    let remote = 5
     let internalError = 70
 
     let rec ofError =
@@ -54,6 +56,20 @@ module ExitCode =
         | RuleNotFound _
         | RuleExists _
         | CannotIgnore _ -> input
+        | InvalidServerAddress _
+        | SecretOnCommandLine _ -> usage
+        | RemoteSourceUnsupported _
+        | InvalidCredentials _ -> input
+        | AuthenticationRequired _
+        | AuthenticationFailed _
+        | ConnectionFailed _
+        | UnsupportedConnection _
+        | DatabaseNotFound _
+        | DatabaseRequired _
+        | QueryFailed _
+        | DeployFailed _ -> remote
+        | DatabaseExists _ -> output
+        | DeployIntroducesErrors _ -> findings
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()
@@ -77,6 +93,9 @@ type Ctx = {
     Json: bool
     /// Environment variables. Commands read them only through this, so tests can supply their own.
     GetEnv: string -> string option
+    /// How connections to servers are made. Only commands given an `xmla:` model (or a server
+    /// argument) use it; tests supply their own.
+    Connector: Tessera.Xmla.IXmlaConnector
 }
 
 /// The process's environment variables (an empty value counts as unset).

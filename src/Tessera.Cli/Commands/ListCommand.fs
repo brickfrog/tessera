@@ -65,7 +65,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         let known = ObjectKind.all |> List.map ObjectKind.token |> String.concat ", "
         UsageError $"unknown kind '{bad}' (known: {known})"
     | None ->
-        match ModelIO.loadPath (args.GetResult Args.Model) with
+        match Source.load ctx (args.GetResult Args.Model) with
         | Error e -> Failed e
         | Ok(_, db) ->
             let filter: Inventory.Filter = {

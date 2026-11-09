@@ -454,7 +454,7 @@ let private analyze (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
     | Ok failOn, Ok ci, Ok opts ->
 
         match
-            ModelIO.loadPath modelPath
+            Source.load ctx modelPath
             |> Result.bind (fun (source, db) -> Bpa.collectRules source db opts |> Result.map (fun x -> db, x))
         with
         | Error e -> Failed e

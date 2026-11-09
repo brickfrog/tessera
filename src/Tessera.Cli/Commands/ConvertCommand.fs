@@ -87,7 +87,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | _, _, Error e -> UsageError e
     | Ok format, Ok eol, Ok indent ->
         let result =
-            ModelIO.loadPath source
+            Source.load ctx source
             |> Result.bind (fun (src, db) ->
                 let opts: ModelIO.SaveOptions = {
                     Eol =

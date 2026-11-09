@@ -425,6 +425,7 @@ let tests =
                 Err = err
                 Json = true
                 GetEnv = fun _ -> None
+                Connector = XmlaFakes.NoConnections()
             }
 
             Tessera.Cli.BpaRulesCommand.reportCollected ctx "bpa" {

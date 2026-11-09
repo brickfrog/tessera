@@ -124,7 +124,7 @@ let catalogText (out: TextWriter) (all: bool) (descriptors: SetProperty.Descript
 
 let private runProperties (ctx: Ctx) (modelPath: string) (selector: string) (all: bool) =
     let result =
-        ModelIO.loadPath modelPath
+        Source.load ctx modelPath
         |> Result.bind (fun (_, db) ->
             Inventory.Selector.resolve (Inventory.objects db) selector
             |> Result.map (fun e -> db, e))
@@ -148,7 +148,7 @@ let private show (ctx: Ctx) (args: ParseResults<Args>) =
     let wanted = args.GetResults Args.Property
 
     let result =
-        ModelIO.loadPath modelPath
+        Source.load ctx modelPath
         |> Result.bind (fun (_, db) ->
             Inventory.Selector.resolve (Inventory.objects db) selector
             |> Result.map (fun e -> db, e))

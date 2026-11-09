@@ -81,7 +81,7 @@ let infoText (out: TextWriter) (i: ModelInfo) =
             out.WriteLine($"{n, 6}  {noun kind n}{extra}")
 
 let run (ctx: Ctx) (args: ParseResults<Args>) =
-    match ModelIO.loadPath (args.GetResult Args.Model) with
+    match Source.load ctx (args.GetResult Args.Model) with
     | Error e -> Failed e
     | Ok(source, db) ->
         let info = Inventory.info source db

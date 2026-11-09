@@ -57,6 +57,32 @@ type TessError =
     | RuleExists of ruleId: string * where: string
     /// `bpa rules ignore`: an object that can't carry an ignore annotation.
     | CannotIgnore of objectRef: string * reason: string
+    /// A server address (`xmla:...`, or `deploy`'s server argument) that can't be understood.
+    | InvalidServerAddress of input: string * reason: string
+    /// A credential was passed on the command line (visible in `ps` and shell history).
+    | SecretOnCommandLine of key: string
+    /// A remote (`xmla:`) model where this command, or this way of using it, needs model files.
+    | RemoteSourceUnsupported of source: string * reason: string
+    /// The credential environment variables can't be used as they are (e.g. an unreadable file).
+    | InvalidCredentials of reason: string
+    /// The server needs credentials and none are configured.
+    | AuthenticationRequired of server: string * hint: string
+    /// The identity provider or the server refused the credentials.
+    | AuthenticationFailed of server: string * reason: string * hint: string option
+    | ConnectionFailed of server: string * reason: string * hint: string option
+    /// A kind of connection this platform's client library can't make (e.g. TCP outside Windows).
+    | UnsupportedConnection of server: string * reason: string
+    /// No such database on the server (with the ones that exist).
+    | DatabaseNotFound of server: string * database: string * existing: string list
+    /// The address names no database and the server has none, or more than one.
+    | DatabaseRequired of server: string * existing: string list
+    | QueryFailed of reason: string
+    /// `deploy`: the database exists and --overwrite wasn't given.
+    | DatabaseExists of server: string * database: string
+    /// `deploy`: the deployed model would have errors the server's model doesn't (without --force).
+    | DeployIntroducesErrors of count: int
+    /// `deploy`: the server rejected the script, or reported errors running it.
+    | DeployFailed of server: string * database: string * messages: string list
 
 module TessError =
 
@@ -99,6 +125,20 @@ module TessError =
         | RuleNotFound _ -> "rule-not-found"
         | RuleExists _ -> "rule-exists"
         | CannotIgnore _ -> "cannot-ignore"
+        | InvalidServerAddress _ -> "invalid-server-address"
+        | SecretOnCommandLine _ -> "secret-on-command-line"
+        | RemoteSourceUnsupported _ -> "remote-source-unsupported"
+        | InvalidCredentials _ -> "invalid-credentials"
+        | AuthenticationRequired _ -> "authentication-required"
+        | AuthenticationFailed _ -> "authentication-failed"
+        | ConnectionFailed _ -> "connection-failed"
+        | UnsupportedConnection _ -> "unsupported-connection"
+        | DatabaseNotFound _ -> "database-not-found"
+        | DatabaseRequired _ -> "database-required"
+        | QueryFailed _ -> "query-failed"
+        | DatabaseExists _ -> "database-exists"
+        | DeployIntroducesErrors _ -> "deploy-introduces-errors"
+        | DeployFailed _ -> "deploy-failed"
 
     let rec message =
         function
@@ -184,3 +224,39 @@ module TessError =
             $"No BPA rule '{ruleId}' in {where}{hint}"
         | RuleExists(ruleId, where) -> $"{where} already has a BPA rule '{ruleId}' (use --replace to replace it)"
         | CannotIgnore(objectRef, reason) -> $"Can't ignore rules on {objectRef}: {reason}"
+        | InvalidServerAddress(input, reason) -> $"Invalid server address '{input}': {reason}"
+        | SecretOnCommandLine key ->
+            $"'{key}' must not be given on the command line (it would show in `ps` and shell history); "
+            + "use the TESS_XMLA_* environment variables instead (see `tess connect --help`)"
+        | RemoteSourceUnsupported(source, reason) -> $"Can't use the remote model {source} here: {reason}"
+        | InvalidCredentials reason -> $"Invalid credentials configuration: {reason}"
+        | AuthenticationRequired(server, hint) -> $"No credentials for {server}: {hint}"
+        | AuthenticationFailed(server, reason, hint) ->
+            let hint = hint |> Option.map (fun h -> $"\n{h}") |> Option.defaultValue ""
+            $"Authentication failed for {server}: {reason}{hint}"
+        | ConnectionFailed(server, reason, hint) ->
+            let hint = hint |> Option.map (fun h -> $"\n{h}") |> Option.defaultValue ""
+            $"Can't connect to {server}: {reason}{hint}"
+        | UnsupportedConnection(server, reason) -> $"Can't connect to {server}: {reason}"
+        | DatabaseNotFound(server, database, existing) ->
+            let list =
+                match existing with
+                | [] -> "the server has no databases (that these credentials can see)"
+                | names -> "it has:\n" + (names |> List.map (fun n -> $"  {n}") |> String.concat "\n")
+
+            $"No database '{database}' on {server}; {list}"
+        | DatabaseRequired(server, existing) ->
+            match existing with
+            | [] -> $"{server} has no databases (that these credentials can see)"
+            | names ->
+                let list = names |> List.map (fun n -> $"  {n}") |> String.concat "\n"
+                $"{server} has more than one database; name one (xmla:<server>;<database>):\n{list}"
+        | QueryFailed reason -> $"Query failed: {reason}"
+        | DatabaseExists(server, database) ->
+            $"Database '{database}' already exists on {server} (use --overwrite to replace its model)"
+        | DeployIntroducesErrors n ->
+            let errors = if n = 1 then "1 error" else $"{n} errors"
+            $"Not deployed: the model would have {errors} the deployed one doesn't (see above; use --force to deploy anyway)"
+        | DeployFailed(server, database, messages) ->
+            let list = messages |> List.map (fun m -> $"  {m}") |> String.concat "\n"
+            $"Deploying '{database}' to {server} failed:\n{list}"

@@ -38,8 +38,8 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     }
 
     let result =
-        ModelIO.loadPath beforePath
-        |> Result.bind (fun (_, a) -> ModelIO.loadPath afterPath |> Result.map (fun (_, b) -> a, b))
+        Source.load ctx beforePath
+        |> Result.bind (fun (_, a) -> Source.load ctx afterPath |> Result.map (fun (_, b) -> a, b))
 
     match result with
     | Error e -> Failed e

@@ -28,6 +28,7 @@
     <Compile Include="RemoveMoveTests.fs" />
     <Compile Include="TranslationsTests.fs" />
     <Compile Include="PerspectivesTests.fs" />
+    <Compile Include="XmlaFakes.fs" />
     <Compile Include="CliHarness.fs" />
     <Compile Include="ValidateCommandTests.fs" />
     <Compile Include="CliTests.fs" />
@@ -59,6 +60,15 @@
     <Compile Include="RenameEdgeCommandTests.fs" />
     <Compile Include="FormatTests.fs" />
     <Compile Include="FormatCommandTests.fs" />
+    <Compile Include="XmlaAddressTests.fs" />
+    <Compile Include="QueryResultTests.fs" />
+    <Compile Include="DeployTests.fs" />
+    <Compile Include="XmlaCredentialsTests.fs" />
+    <Compile Include="XmlaRemoteTests.fs" />
+    <Compile Include="XmlaReaderTests.fs" />
+    <Compile Include="XmlaCommandTests.fs" />
+    <Compile Include="OfflineTests.fs" />
+    <Compile Include="XmlaIntegrationTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
@@ -71,6 +81,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/Tessera.Core/Tessera.Core.fsproj" />
+    <ProjectReference Include="../../src/Tessera.Xmla/Tessera.Xmla.fsproj" />
     <ProjectReference Include="../../src/Tessera.Cli/Tessera.Cli.fsproj" />
   </ItemGroup>
 

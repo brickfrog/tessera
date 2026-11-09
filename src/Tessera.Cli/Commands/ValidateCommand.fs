@@ -227,7 +227,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | Ok(minimum, failOn), Ok ci ->
         let clock = Diagnostics.Stopwatch.StartNew()
 
-        match ModelIO.loadPath modelPath with
+        match Source.load ctx modelPath with
         | Error e -> Failed e
         | Ok(_, db) ->
             let g = Deps.build db

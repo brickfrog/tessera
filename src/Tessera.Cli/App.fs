@@ -10,8 +10,15 @@ open Tessera.Cli.Output
 
 let private parser = lazy (ArgumentParser.Create<CliArgs>(programName = "tess"))
 
-/// Run the CLI with these environment variables. Returns the process exit code.
-let runWith (getEnv: string -> string option) (out: TextWriter) (err: TextWriter) (argv: string array) : int =
+/// Run the CLI with these environment variables, making any server connections through
+/// `connector`. Returns the process exit code.
+let runWithConnector
+    (connector: Tessera.Xmla.IXmlaConnector)
+    (getEnv: string -> string option)
+    (out: TextWriter)
+    (err: TextWriter)
+    (argv: string array)
+    : int =
     // Decide JSON mode before parsing so usage errors can be reported as JSON too.
     let jsonRequested = argv |> Array.exists (fun a -> a = "--json" || a = "-j")
 
@@ -31,6 +38,7 @@ let runWith (getEnv: string -> string option) (out: TextWriter) (err: TextWriter
             Err = err
             Json = results.Contains Json
             GetEnv = getEnv
+            Connector = connector
         }
 
         if results.Contains Version then
@@ -63,6 +71,9 @@ let runWith (getEnv: string -> string option) (out: TextWriter) (err: TextWriter
                 | Some(Script args) -> ScriptCommand.run ctx args
                 | Some(Lint args) -> LintCommand.run ctx args
                 | Some(Format args) -> FormatCommand.run ctx args
+                | Some(Connect args) -> ConnectCommand.run ctx args
+                | Some(Query args) -> QueryCommand.run ctx args
+                | Some(Deploy args) -> DeployCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with
@@ -88,6 +99,10 @@ let runWith (getEnv: string -> string option) (out: TextWriter) (err: TextWriter
             err.WriteLine($"tess: internal error: {e}")
 
         ExitCode.internalError
+
+/// Run the CLI with these environment variables. Returns the process exit code.
+let runWith (getEnv: string -> string option) (out: TextWriter) (err: TextWriter) (argv: string array) : int =
+    runWithConnector (Tessera.Xmla.LiveConnector()) getEnv out err argv
 
 /// Run the CLI. Returns the process exit code.
 let run (out: TextWriter) (err: TextWriter) (argv: string array) : int = runWith processEnv out err argv

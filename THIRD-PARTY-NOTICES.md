@@ -15,6 +15,16 @@ object code form, as distributable code under section 2 of those terms. By using
 those terms for that component. In particular, you may not reverse engineer, decompile or disassemble it, and
 you may not remove Microsoft's notices from it.
 
+## Microsoft ADOMD.NET
+
+`Microsoft.AnalysisServices.AdomdClient` 19.x (`Microsoft.AnalysisServices.AdomdClient.dll`). © Microsoft
+Corporation. All rights reserved.
+
+This component is licensed under the **Microsoft Software License Terms for Microsoft Analysis Services
+ADOMD.NET**: <https://go.microsoft.com/fwlink/?linkid=852895>. tessera redistributes it, unmodified and in object
+code form, as distributable code under section 2 of those terms. By using tessera's binaries you agree to those
+terms for that component.
+
 ## Components under the MIT license
 
 | Component | Copyright |

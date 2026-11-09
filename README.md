@@ -74,6 +74,10 @@ tess lint  ./MyReport.pbip                       # DAX code actions: unused VARs
 tess lint  ./MyReport.pbip --fix --save          # ... and rewrite what can be fixed safely
 tess format --expr "calculate(sum(Sales[Amount]),all('Date'))"   # format DAX, SQLBI style, offline
 tess format ./MyReport.pbip --save               # ... every DAX expression in a model (--check for CI)
+tess connect "powerbi://api.powerbi.com/v1.0/myorg/Finance"       # check a server connection, list its models
+tess info  "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales"   # read-only commands on a deployed model
+tess query "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" "EVALUATE 'Date'" --json
+tess deploy ./MyReport.pbip "powerbi://api.powerbi.com/v1.0/myorg/Finance" Sales   # dry run; --execute to deploy
 ```
 
 ### Accepted model paths
@@ -1467,6 +1471,236 @@ measure references, as SQLBI's rules also ask; `lint` does those. It doesn't add
 names either. Comments laid out as a column to the right of the code (`--|` boxes) keep their text and order,
 but not their alignment.
 
+### Connected mode (`connect`, `query`, `deploy`, remote models)
+
+tess works on files and stays offline unless a command is given a server. Then it talks to that server over XMLA,
+through Microsoft's own client libraries (AMO/TOM and ADOMD.NET). **This part has been built and tested against a
+fake server only; it has not yet been run against a real one.** `docs/xmla-manual-test.md` is the checklist for
+that.
+
+```sh
+export TESS_XMLA_TOKEN="$(az account get-access-token --resource https://analysis.windows.net/powerbi/api --query accessToken -o tsv)"
+tess connect "powerbi://api.powerbi.com/v1.0/myorg/Finance"            # can I get in? which models are there?
+tess info "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales"    # any read-only command, on the deployed model
+tess diff "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" ./Sales.SemanticModel
+tess convert "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" ./Sales.SemanticModel   # download as files
+tess query "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" "EVALUATE TOPN(10, 'Date')"
+tess query "xmla:...;Sales" -f totals.dax --json
+tess deploy ./Sales.SemanticModel "powerbi://api.powerbi.com/v1.0/myorg/Finance" Sales          # dry run
+tess deploy ./Sales.SemanticModel "powerbi://api.powerbi.com/v1.0/myorg/Finance" Sales --execute --overwrite
+```
+
+#### Naming a server model
+
+A model on a server is written `xmla:<server>;<database>`, wherever a command takes a model path. Quote it: `;`
+ends a command in every shell, and workspace names often have spaces. The prefix is required, so a path can never
+be mistaken for a server (`localhost:51234` and `host\instance` look exactly like paths) and no command opens a
+connection unless its argument says so. `connect` and `deploy` take a server as its own argument, where the
+prefix is optional.
+
+| Server | Form | Works on |
+|---|---|---|
+| Power BI Premium / PPU / Fabric workspace | `powerbi://api.powerbi.com/v1.0/myorg/<workspace>` | Linux, macOS, Windows |
+| Azure Analysis Services | `asazure://<region>.asazure.windows.net/<server>` | Linux, macOS, Windows |
+| SSAS over HTTP (IIS `msmdpump.dll`) | `https://<host>/olap/msmdpump.dll` | Windows; elsewhere only with a user name and password |
+| SSAS over TCP | `<host>`, `<host>:<port>`, `<host>\<instance>` | Windows only |
+| Power BI Desktop's local model | `localhost:<port>` | Windows only |
+
+The Windows-only rows are a limit of Microsoft's client library, which has no TCP transport on other systems.
+tess says so before trying.
+
+The database can be left out when the server has exactly one (as Power BI Desktop does). A wrong name is answered
+with the names that exist. A full connection string also works after the prefix
+(`xmla:Data Source=...;Initial Catalog=...;Timeout=60`); its extra properties are passed on. A connection string
+with a `Password`, `User ID` or anything token-like is refused (exit 2): credentials never go on the command line.
+
+#### Signing in
+
+Credentials come from environment variables, or from files (or standard input) that variables point at. They are
+never read from the command line, never printed, never written to JSON output, and removed from every error message
+(tess scrubs the secrets it holds, and anything shaped like a password, bearer token or JWT).
+
+| To sign in with | Set |
+|---|---|
+| an access token you already have | `TESS_XMLA_TOKEN`, or `TESS_XMLA_TOKEN_FILE=<path>` (`-` for standard input) |
+| a service principal | `TESS_XMLA_CLIENT_ID`, `TESS_XMLA_TENANT_ID`, and `TESS_XMLA_CLIENT_SECRET` or `TESS_XMLA_CLIENT_SECRET_FILE`. Without those, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_CLIENT_SECRET` are used |
+| your own account (device code) | `TESS_XMLA_AUTH=device-code`; optionally `TESS_XMLA_TENANT_ID` |
+| a user name and password (SSAS) | `TESS_XMLA_USER`, and `TESS_XMLA_PASSWORD` or `TESS_XMLA_PASSWORD_FILE` |
+| the current Windows account (SSAS) | nothing |
+
+`TESS_XMLA_AUTH` picks one explicitly: `auto` (the default), `token`, `spn`, `device-code`, `basic` or `integrated`.
+With `auto`, a cloud server (`powerbi://`, `asazure://`) uses the token if there is one, then the service principal;
+with neither, tess stops and says what to set. It never starts an interactive sign-in by itself. Other servers use
+the user name and password if both are set, otherwise the current Windows account. A token or service principal in
+the environment is never sent to a non-cloud server.
+
+A token must be issued for the server's resource: `https://analysis.windows.net/powerbi/api` for Power BI,
+`https://*.asazure.windows.net` for Azure Analysis Services. A static token isn't renewed; tess reads its expiry from
+the token only to tell the client library.
+
+Device-code sign-in prints a URL and a code on stderr and waits for you to enter the code in a browser, on any
+device. tess signs in through the Analysis Services client libraries' own application ID; set `TESS_XMLA_CLIENT_ID`
+to use an app registration of your own. The sign-in lasts for that one command, unless you opt in to keeping it:
+
+```sh
+export TESS_XMLA_AUTH=device-code TESS_XMLA_TOKEN_CACHE=~/.cache/tessera/xmla-token-cache
+```
+
+`TESS_XMLA_TOKEN_CACHE` names a file where the sign-in (including a refresh token) is kept between runs. It is
+created with mode 0600 on Linux and macOS; on Windows it gets its folder's permissions, so keep it in your profile.
+Nothing else in tess ever writes a credential to disk. Delete the file to sign out.
+
+#### What gets contacted
+
+Only commands given a server contact anything, and only these, all through the client libraries:
+
+- the server in the address;
+- for `powerbi://` and `asazure://`, Microsoft's sign-in service (`login.microsoftonline.com`, or the national
+  cloud's), unless you supply a token;
+- the service's own name resolution: the Power BI workspace lookup on the address's host, and for `asazure://`
+  the region's host and `global.asazure.windows.net`.
+
+tess adds no telemetry and no other calls. The test suite checks, on the compiled assemblies, that
+`Tessera.Core` uses no network type outside the explicit BPA rule download, that the CLI uses none itself, and that
+in `Tessera.Xmla` only the live connector does.
+
+#### Remote models in other commands
+
+`info`, `list`, `get`, `find`, `diff`, `deps`, `validate`, `bpa`, `lint`, `script export` and `convert` accept a
+remote model as their source. The model is read once and the connection closed; the result is the same as for the
+model's files. `convert` from a remote model downloads it. `bpa` uses the built-in, user and `--rules` layers for a
+remote model, but no project config (it has no folder).
+
+The editing commands show their dry run against a remote model and can `--save-to` files, but `--save` is refused:
+`deploy` is how a model gets onto a server. Commands that load models only from files (`format --save`,
+`translations`, `perspective`, `script apply`, `bpa rules`) say so (exit 3) without connecting.
+
+#### `connect`
+
+`tess connect <server>` connects, and prints the product and version, how it signed in (never the credential), and
+the databases with their compatibility levels. With `--json`, each database also has a `source` you can paste as a
+model argument. Nothing is remembered: there are no sessions or profiles, and every command connects by itself.
+
+#### `query`
+
+```sh
+tess query <xmla-model> "<DAX>"        # or: -f <file>, or - for standard input
+tess query <xmla-model> -f q.dax --csv > out.csv
+tess query <xmla-model> "EVALUATE 'Date'" --max-rows 0 --json
+```
+
+A query may hold several `EVALUATE` statements; each gives one result. The default output is an aligned table per
+result, `--csv` is RFC 4180 with results separated by an empty line, and `--json` is described below. `--max-rows`
+caps each result (default 1000, 0 for all); a capped result is marked `truncated` and stderr says so. `query` only
+runs on a server model for now. Queries are sent as they are: tess doesn't check them first.
+
+The JSON shape is shared with the local DAX engine being built, so the two can be compared value by value:
+
+```json
+{ "command": "query",
+  "source": "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales",
+  "results": [
+    { "columns": [ { "name": "Date[Year]", "type": "int64" }, { "name": "[Total]", "type": "decimal" } ],
+      "rows": [ [ 2023, 1234.5 ], [ 2024, null ] ],
+      "rowCount": 2,
+      "truncated": false } ],
+  "durationMs": 212 }
+```
+
+- **`results`:** one entry per `EVALUATE`, in order.
+- **`columns[].name`:** exactly as the engine names it (`Table[Column]`, `[Measure or expression name]`).
+- **`columns[].type`:** `string`, `int64`, `double`, `decimal` (DAX currency), `dateTime`, `boolean`, `binary`, or
+  `variant` when the engine doesn't declare one type for the column.
+- **`rows`:** one array per row, values in column order. Row order is the engine's; without `ORDER BY` it is not
+  defined, so compare such results as multisets.
+- **`rowCount`:** the rows present. **`truncated`:** `--max-rows` cut the result short.
+
+Each value has exactly one spelling:
+
+| Value | JSON |
+|---|---|
+| BLANK | `null` (an empty string is `""`: they stay distinct) |
+| `int64` | an integer: `42` |
+| `double` | a number with a `.` or exponent, shortest digits that round-trip: `1.0`, `0.1`, `1E+21`. `NaN`, `Infinity` and `-Infinity` are those strings |
+| `decimal` | a number with exact digits and at least one decimal place, no exponent, no trailing zeros: `1234.5`, `12.0` |
+| `dateTime` | a string, ISO 8601 with no zone: `"2024-01-31T00:00:00"`; a fraction only if there is one |
+| `boolean` | `true` / `false` |
+| `string` | a string |
+| `binary` | a base64 string |
+
+Read `decimal` values with a decimal type; a parser that goes through binary floating point can lose digits. In a
+`variant` column a number with a decimal point may be a `double` or a `decimal`. In text and CSV output BLANK is
+empty, booleans are `TRUE`/`FALSE`, and CSV writes an empty string as `""`. The type is `Tessera.QueryResult` in
+`Tessera.Core`; `QueryValue.toJson` is the encoder.
+
+#### `deploy`
+
+```sh
+tess deploy <model> <server> <database>            # dry run: connects and reads, changes nothing
+tess deploy <model> <server> <database> --execute  # deploys; an existing database also needs --overwrite
+```
+
+`deploy` always connects, reads the database if it exists, and works out the model the server would hold
+afterwards. A dry run prints what would change (the same diff as `tess diff`, with `--stat`, `--name-only` and
+`--ignore`), then the TMSL `createOrReplace` script it would run. `--tmsl` prints only the script; `--json` gives
+`changes`, `kept`, `warnings`, `introducedErrors`, `tmsl`, `creates`, `dryRun` and `deployed` in one document.
+`<model>` can be another `xmla:` model, to copy between servers.
+
+By default a deployment replaces the model's metadata and leaves alone what belongs to the server:
+
+| Kept from the server unless | Option |
+|---|---|
+| partitions and refresh policies of tables it already has, so refresh state and incremental-refresh partitions survive | `--deploy-partitions` (with `--skip-refresh-policy`: still keep them for tables with a refresh policy) |
+| data sources | `--deploy-connections` |
+| shared (M) expressions | `--deploy-shared-expressions` |
+| roles | `--deploy-roles` |
+| role members | `--deploy-role-members` (implies `--deploy-roles`) |
+
+`--deploy-full` is all of them. The changes shown are against that merged model, so a dry run doesn't report
+partitions or roles that would in fact stay. Tables new to the server get the model's partitions. A database that
+doesn't exist yet takes everything from the model except role members.
+
+Two things stop `--execute`:
+- the database exists and `--overwrite` isn't given (exit 4);
+- the deployed model would have validation errors the current one doesn't, without `--force` (exit 1). The dry run
+  lists them.
+
+If the server rejects the script or reports errors running it, that is exit 5 with its messages. After a
+deployment, new or changed tables may need a refresh; tess doesn't refresh.
+
+Where this differs from the Tabular Editor tools, and why:
+
+- **Arguments.** `te deploy` names the source with `-s`/`-d` and the target with `--target-server`. tess takes the
+  model as its first argument, like every other command, then the server and database.
+- **`--execute` doesn't prompt.** `te` asks for confirmation and wants `--execute --force` in CI. tess never prompts;
+  `--force` means only "despite new errors".
+- **Overwriting needs `--overwrite`**, as in TE2 (`-O`). `te` overwrites unless `--create-only`.
+- **A new database gets the model's roles** even without `--deploy-roles`. TE2 would create it without roles,
+  leaving row-level security off.
+- **The server's data sources are kept even when the model has none.** TE2 keeps them only if the model has some.
+- **Passwords in the model's data sources are not deployed.** The script is written without restricted
+  information, so a dry run never prints a credential; TE2 includes it. After `--deploy-connections` (or creating a
+  database with data sources), set their credentials on the server.
+- **Not done:** TE2's two-step deployment for a table or column that changes between calculated and loaded (tess
+  warns instead), a BPA gate, skipping linguistic metadata, deployment profiles, and refreshing afterwards.
+
+#### Not in tess yet
+
+`refresh`, `vertipaq`, sessions and profiles (`te connect` keeps an active connection; tess doesn't), interactive
+browser sign-in, certificate and managed-identity sign-in, and running `query` against model files.
+
+What each needs, for whoever picks it up:
+- **`refresh`:** nothing new at the seam. `IXmlaSession.Execute` already runs TMSL, so it is a pure TMSL builder in
+  Core (type, tables, partitions, `applyRefreshPolicy`, `effectiveDate`, a `sequence` for max parallelism) plus a
+  command with the same dry-run shape as `deploy`. Progress reporting needs a trace subscription, which is a new
+  seam member.
+- **`vertipaq`:** DMV queries (`$SYSTEM.DISCOVER_STORAGE_TABLE_COLUMNS` and friends). `IXmlaSession.Query` runs
+  them as it stands; Dax.Model.Extractor would instead need the raw connection, which the seam deliberately hides.
+- **Sessions and profiles:** somewhere to keep an address and auth mode (never a secret) per shell, and a decision
+  on where; then `Source.load` reads it when no model is given.
+- **`query` on files:** the local engine returns `QueryResult list`; `QueryCommand` already renders it.
+- **Interactive sign-in:** needs the MSAL broker the single-file builds leave out (see `Tessera.Cli.fsproj`).
+
 ### Findings JSON and CI annotations
 
 `validate`, `bpa` and `lint` (and later `test` and `schemacheck`) report findings in one shape, the one the Tabular
@@ -1510,7 +1744,8 @@ the code as its title.
 | 1 | the "negative" result of the Unix tool a command mirrors: `find` found nothing (like grep); `diff` found differences (like diff); `bpa`/`validate`/`lint` found issues at or above `--fail-on` (default `error`); `format --check` found DAX that isn't formatted; an edit's `--save` refused because it would introduce errors |
 | 2 | usage error, including invalid arguments for an editing command: an invalid new name (`rename`, `add`), a property `set` can't write or a value it can't take, or an option `add` doesn't take for that kind |
 | 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), an edit that would change what other references mean (`rename`, `move`), a translation file that can't be applied (`translations import`), or an object a perspective can't hold. For `script`, also a script that can't be read or applied, or an object a script can't hold. For `bpa`, also a rule file you named that can't be read; for `bpa rules`, a rule ID that isn't there (or already is, for `add`) or an object that can't carry an ignore annotation. For `format`, DAX that can't be read (malformed) |
-| 4 | output error (destination not empty, write failed) |
+| 4 | output error (destination not empty, write failed); `deploy --execute` on a database that exists, without `--overwrite` |
+| 5 | a server couldn't be reached, refused the credentials (or none are configured), has no such database, or reported an error (a failed `query` or `deploy`) |
 | 70 | internal error |
 
 ## Development
@@ -1531,6 +1766,10 @@ in a test that reports how many rules are supported. (This is a test setting; `t
 `TESS_BPA_RULES`, which the CLI tests hide, along with `HOME`, `XDG_CONFIG_HOME` and `APPDATA`.) It runs against `TESSERA_SAMPLE_MODEL` if that is set,
 otherwise against a fixture.
 
+Set `TESSERA_XMLA_SERVER` and `TESSERA_XMLA_DATABASE` (with credentials in the `TESS_XMLA_*` variables) to also run
+read-only tests against a real server; see `docs/xmla-manual-test.md`. The CLI tests never see real credentials,
+and fail if a command that should be offline asks for a connection.
+
 Set `TESSERA_SAMPLE_MODEL=<path>` to also run a round-trip test against a real model, such as a clone of
 [TabularEditor/spaceparts-analytics](https://github.com/TabularEditor/spaceparts-analytics).
 
@@ -1548,12 +1787,17 @@ dotnet publish src/Tessera.Cli -c Release -r linux-x64 --self-contained -p:Publi
 ```
 
 Single-file binaries are compressed and not trimmed, because TOM relies on reflection. They leave out MSAL's native
-sign-in broker, which tess never uses.
+sign-in broker, which tess never uses (it signs in with a token, a service principal or a device code, all in
+managed code), and the optional `msasxpress.dll` transport compression on Windows.
 
 Layout:
 
 - `src/Tessera.Core` holds the model logic and never prints anything. Commands return typed results and
   `TessError` values.
+- `src/Tessera.Xmla` is the only assembly that opens connections to servers. Everything goes through
+  `IXmlaConnector` / `IXmlaSession` (`Session.fs`); `Live.fs` is the one implementation that uses the client
+  libraries' connection types, and tests use a fake. `Remote.fs` holds the logic on top, `Credentials.fs` reads the
+  `TESS_XMLA_*` variables, and `Failures.fs` turns client-library errors into `TessError`s with secrets scrubbed.
 - `src/Tessera.Cli` handles argument parsing (Argu) and text/JSON rendering:
   - `Output.fs` holds the JSON helpers.
   - `Common.fs` holds exit codes, `Outcome`, `Ctx` and argument helpers.
