@@ -851,7 +851,7 @@ tess lint ./Sales.pbip --fix --rule DI001 --save   # remove unused variables, an
 
 | ID | Severity | Name | Before | After |
 |---|---|---|---|---|
-| `TS001` | error | Replace non-standard whitespace | `1`NBSP`+ 2` | `1 + 2` |
+| `TS001` | error | Replace non-standard whitespace | `1 + 2`, with U+00A0 before the `+` | `1 + 2` |
 | `DI001` | warning | Remove unused variable | `VAR a = 1 VAR b = 2 RETURN b` | `VAR b = 2 RETURN b` |
 | `DI002` | warning | Remove all unused variables | `VAR a = 1 VAR b = a RETURN 123` | `123` |
 | `DI003` | warning | Remove table name from measure references | `'Sales'[Total] * 1.25` | `[Total] * 1.25` |
