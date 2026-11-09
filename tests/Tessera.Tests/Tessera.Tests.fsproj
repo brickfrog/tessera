@@ -57,6 +57,8 @@
     <Compile Include="SampleReportTests.fs" />
     <Compile Include="RenameEdgeTests.fs" />
     <Compile Include="RenameEdgeCommandTests.fs" />
+    <Compile Include="FormatTests.fs" />
+    <Compile Include="FormatCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 
