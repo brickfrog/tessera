@@ -507,9 +507,12 @@ and never with `--save-to`, since the report still points at the original model 
 
 Not rewritten:
 - `queryRef`, `nativeQueryRef` and formatting selectors (`"metadata"`). These are a visual's own names for its
-  fields: Power BI itself keeps a `queryRef` after a field is renamed, and visual calculations refer to fields by
-  their `nativeQueryRef`. Visuals keep working with them as they are.
-- free text, such as titles, and literal values (filters and slicer selections store data values)
+  fields: Power BI itself keeps a `queryRef` after a field is renamed, and the format describes the native
+  reference name as the name native expressions (such as visual calculations) use. Visuals keep working with them
+  as they are.
+- free text, such as titles, and literal values (filters and slicer selections store data values). This includes
+  a field parameter's saved selection, stored as the text `NAMEOF` returned (`'Sales'[Total]`): after a rename,
+  that selection no longer matches and must be made again
 - report-level measures (`reportExtensions.json`, and fields with `"Schema": "extension"`): a warning lists the
   file when it mentions the old name
 - a moved measure named in a filter through a `From` alias, which the filter's other fields share: a warning

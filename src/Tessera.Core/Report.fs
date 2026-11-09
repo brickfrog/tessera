@@ -10,8 +10,8 @@
 ///   { "PropertyVariationSource": { "Expression": <SourceRef>, "Name": "Variation", "Property": "Date" } }
 /// Only those names are rewritten, in place: every other byte of the file stays. Not rewritten:
 ///   - queryRef, nativeQueryRef and selector "metadata": identifiers local to a visual (Power BI
-///     itself leaves queryRef as it was after a rename, and visual calculations refer to fields by
-///     their nativeQueryRef), so they keep working as they are;
+///     itself leaves queryRef as it was after a rename, and the schema describes the native
+///     reference name as the one native expressions use), so they keep working as they are;
 ///   - report-level measures (SourceRef "Schema": "extension", reportExtensions.json), free text,
 ///     and literal values (filters and slicer selections store data values).
 module Tessera.Report
