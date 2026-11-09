@@ -647,7 +647,8 @@ let import (db: Database) (spec: ImportSpec) : Result<Mutation.Effect, TessError
                         let current = translation c e.Object p
 
                         match r.Source with
-                        | Some s when s <> sourceValue e.Object p ->
+                        // A blank source (a cleared or hand-written column) isn't checked.
+                        | Some s when s <> "" && s <> sourceValue e.Object p ->
                             stale.Add(defaultArg r.Line (defaultArg r.Item 0))
                         | _ -> ()
 

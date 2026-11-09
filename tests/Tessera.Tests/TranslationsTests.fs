@@ -371,6 +371,13 @@ let importTests =
                 ]
                 ""
 
+        testCase "a blank source isn't checked"
+        <| fun () ->
+            let a =
+                applied (model ()) (spec (csv [ header; "measure:Sales/Total,da-DK,Description,,Alt salg" ]))
+
+            Expect.isEmpty a.Effect.Warnings ""
+
         testCase "the source column is optional"
         <| fun () ->
             let db = model ()
