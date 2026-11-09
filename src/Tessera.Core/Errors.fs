@@ -40,11 +40,17 @@ type TessError =
     | UnsupportedMove of objectRef: string * reason: string
     /// Moving a measure would change what references (its own, or others') mean.
     | MoveConflict of objectRef: string * table: string * details: string list
+    /// A DAX script that can't be read, at a 1-based line and column of `source` (a path or <stdin>).
+    | InvalidScript of source: string * line: int * column: int * reason: string
+    /// An object of a DAX script that can't be applied: the error, at the object's line and column.
+    | ScriptObjectFailed of source: string * line: int * column: int * error: TessError
+    /// `script`: an object a DAX script can't hold or change this way (e.g. a data column's expression).
+    | CannotScript of objectRef: string * reason: string
 
 module TessError =
 
     /// Stable, machine-readable identifier (used in JSON output).
-    let code =
+    let rec code =
         function
         | PathNotFound _ -> "path-not-found"
         | UnrecognizedModel _ -> "unrecognized-model"
@@ -74,8 +80,11 @@ module TessError =
         | UnsupportedRemove _ -> "unsupported-remove"
         | UnsupportedMove _ -> "unsupported-move"
         | MoveConflict _ -> "move-conflict"
+        | InvalidScript _ -> "invalid-script"
+        | ScriptObjectFailed(_, _, _, inner) -> code inner
+        | CannotScript _ -> "cannot-script"
 
-    let message =
+    let rec message =
         function
         | PathNotFound path -> $"Path not found: {path}"
         | UnrecognizedModel(path, reason) -> $"Not a recognised semantic model: {path} ({reason})"
@@ -143,3 +152,6 @@ module TessError =
 
             $"Moving {objectRef} to '{table}' would change what references mean:\n{list}\n"
             + "Qualify those references with their table ('Table'[Column]) first."
+        | InvalidScript(source, line, column, reason) -> $"{source}:{line}:{column}: {reason}"
+        | ScriptObjectFailed(source, line, column, inner) -> $"{source}:{line}:{column}: {message inner}"
+        | CannotScript(objectRef, reason) -> $"Can't script {objectRef}: {reason}"

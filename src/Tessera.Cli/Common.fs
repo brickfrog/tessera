@@ -16,7 +16,7 @@ module ExitCode =
     let output = 4
     let internalError = 70
 
-    let ofError =
+    let rec ofError =
         function
         | PathNotFound _
         | UnrecognizedModel _
@@ -46,6 +46,9 @@ module ExitCode =
         | InvalidPropertyValue _ -> usage
         | CannotAdd _
         | ObjectNotFoundSuggest _ -> input
+        | InvalidScript _
+        | CannotScript _ -> input
+        | ScriptObjectFailed(_, _, _, inner) -> ofError inner
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()

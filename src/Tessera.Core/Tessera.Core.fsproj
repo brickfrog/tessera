@@ -30,6 +30,9 @@
     <Compile Include="AddObject.fs" />
     <Compile Include="RemoveObject.fs" />
     <Compile Include="MoveObject.fs" />
+    <Compile Include="DaxScript.fs" />
+    <Compile Include="ExportScript.fs" />
+    <Compile Include="ApplyScript.fs" />
   </ItemGroup>
 
   <ItemGroup>
