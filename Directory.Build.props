@@ -5,7 +5,7 @@
     <!-- 3390: malformed XML doc comments; 1182: unused variables -->
     <WarnOn>$(WarnOn);3390;1182</WarnOn>
     <Deterministic>true</Deterministic>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <Authors>Justin</Authors>
     <Copyright>Copyright (c) 2026 Justin</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
