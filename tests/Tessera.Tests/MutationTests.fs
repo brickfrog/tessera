@@ -2,6 +2,7 @@ module Tessera.Tests.MutationTests
 
 open Expecto
 open Microsoft.AnalysisServices.Tabular
+open Microsoft.AnalysisServices.Tabular.Serialization
 open Tessera
 open Tessera.Tests.Fixtures
 
@@ -34,6 +35,31 @@ let tests =
         testCase "no edit, no changes"
         <| fun () ->
             Expect.isEmpty (Mutation.apply (sampleDatabase ()) (fun _ -> Ok Mutation.Effect.none) |> ok).Changes ""
+
+        testCase "inferred data types (SSDT-style .bim) don't show up as changes"
+        <| fun () ->
+            let json =
+                """{ "name": "db", "compatibilityLevel": 1500, "model": { "tables": [ { "name": "T",
+                     "columns": [ { "name": "A", "dataType": "int64", "sourceColumn": "A" },
+                                  { "type": "calculated", "name": "B", "dataType": "string",
+                                    "isDataTypeInferred": true, "expression": "\"x\"" } ] } ] } }"""
+
+            let db =
+                JsonSerializer.DeserializeDatabase(
+                    json,
+                    DeserializeOptions(),
+                    Microsoft.AnalysisServices.CompatibilityMode.AnalysisServices
+                )
+
+            Expect.equal (ModelIO.clone db).Model.Tables.["T"].Columns.["B"].DataType DataType.String "clone keeps it"
+
+            let applied =
+                Mutation.apply db (fun db ->
+                    db.Model.Description <- "x"
+                    Ok Mutation.Effect.none)
+                |> ok
+
+            Expect.equal (applied.Changes |> List.map (fun c -> ObjectRef.format c.Ref)) [ "model" ] ""
 
         testCase "errors the edit introduces are reported; existing ones aren't"
         <| fun () ->

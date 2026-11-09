@@ -50,7 +50,7 @@ let private errors (db: Database) =
 /// change set is exact. Issues of renamed objects are matched to their old names, so they don't
 /// count as new.
 let apply (db: Database) (edit: Database -> Result<Effect, TessError>) : Result<Applied, TessError> =
-    let before = db.Clone()
+    let before = ModelIO.clone db
     let beforeErrors = errors before
 
     edit db

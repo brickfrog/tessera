@@ -430,7 +430,7 @@ let verifyWith
     (mapR: ObjectRef -> ObjectRef)
     (mapV: string -> string)
     =
-    let copy = db.Clone()
+    let copy = ModelIO.clone db
     let copyEntries = objects copy |> List.map (fun e -> e.Ref, e.Object) |> dict
     change (fun r -> copyEntries.[r])
     let after = Deps.build copy

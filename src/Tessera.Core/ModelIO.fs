@@ -209,6 +209,38 @@ let private deserializeBim (json: string) =
         with e when e.Message.Contains("Unrecognized JSON property") ->
             attempt Microsoft.AnalysisServices.CompatibilityMode.PowerBI
 
+/// A deep copy of the database. TOM's Database.Clone() resets an inferred column data type
+/// (isDataTypeInferred: true, as .bim files from Visual Studio / SSDT carry for calculated columns)
+/// to Unknown, so comparing a clone with the original would report a dataType change on every such
+/// column. Copy those data types back.
+let clone (db: Database) : Database =
+    let copy = db.Clone()
+
+    if not (isNull db.Model) then
+        for t in db.Model.Tables do
+            match copy.Model.Tables.Find t.Name with
+            | null -> ()
+            | ct ->
+                for c in t.Columns do
+                    match ct.Columns.Find c.Name with
+                    | null -> ()
+                    | cc when cc.DataType = DataType.Unknown && c.DataType <> DataType.Unknown ->
+                        let inferred =
+                            match c with
+                            | :? CalculatedColumn as x -> Some x.IsDataTypeInferred
+                            | :? CalculatedTableColumn as x -> Some x.IsDataTypeInferred
+                            | _ -> None
+
+                        cc.DataType <- c.DataType
+
+                        match cc, inferred with
+                        | (:? CalculatedColumn as x), Some i -> x.IsDataTypeInferred <- i
+                        | (:? CalculatedTableColumn as x), Some i -> x.IsDataTypeInferred <- i
+                        | _ -> ()
+                    | _ -> ()
+
+    copy
+
 /// The mode a database effectively runs in. TMDL loads report Unknown; infer it the way TE2 does.
 /// Deliberately not written back to the Database: TOM would then emit "compatibilityMode: powerBI"
 /// into database.tmdl, which Power BI Desktop doesn't write (pure diff noise in PBIP repos).
