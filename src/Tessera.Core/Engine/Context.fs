@@ -679,6 +679,145 @@ module Filters =
 
                 [ Tuples(lineage, tuples) ]
 
+/// The date-table rule: a filter that CALCULATE puts on the date column of a date table also
+/// removes the filters on every other column of that table.
+///
+///   - "When you apply the Mark as Date Table setting to a table, the DAX engine automatically adds
+///     an ALL function over the same table in each CALCULATE statement where a filter [is applied]
+///     over the column used in that setting"; "this ALL statement is automatically applied when you
+///     apply a filter over a column of Date type that is the primary key in a relationship,
+///     regardless of the presence of the Mark as Date Table setting" (SQLBI, "Time Intelligence in
+///     Power BI Desktop").
+///   - "the DAX engine makes an assumption when two tables are related through a column of Date
+///     data type: When a filter is applied on the key of the relationship ... the new filter
+///     overrides any other filter on the Date table. It basically applies a REMOVEFILTERS ( Date )
+///     ... This behavior occurs automatically only when the relationship is based on a column of
+///     Date data type"; "the additional REMOVEFILTERS is applied only when you apply a filter on the
+///     Date[Date] column. If you move the filter to any other column, then REMOVEFILTERS is not
+///     applied" (SQLBI, "Mark as date table").
+///
+/// What the sources settle is a filter argument of CALCULATE on that one column. Where they are
+/// silent (a context transition that filters the date column, KEEPFILTERS, a filter that pairs the
+/// date column with others, a key that only an inactive relationship uses) the engine refuses,
+/// but only when the rule would change the context: when no other column of the table is filtered,
+/// both readings give the same context.
+module DateTable =
+
+    type Standing =
+        | No
+        | Sure
+        /// It may be one: why that isn't settled.
+        | Unsure of string
+
+    /// Whether filtering this column is filtering the date column of a date table.
+    let standing (config: RelConfig) (c: BColumn) : Standing =
+        if c.DataType <> DaxType.DateTime then
+            No
+        elif c.DateKey = 2 then
+            Sure
+        else
+            let keyOf =
+                c.Table.Model.Rels |> Array.filter (fun r -> obj.ReferenceEquals(r.To, c))
+
+            if
+                keyOf
+                |> Array.exists (fun r -> config.Active.[r.Id] && r.From.DataType = DaxType.DateTime)
+            then
+                Sure
+            elif keyOf.Length > 0 then
+                Unsure "is the key of a relationship that is not active, or not from a date column"
+            elif c.DateKey = 1 then
+                Unsure "is the key of a table that is not marked as a date table"
+            else
+                No
+
+    /// The columns a filter is on.
+    let private covers (f: Filter) : BColumn -> bool =
+        match f with
+        | OnColumn(c, _) -> fun x -> obj.ReferenceEquals(x, c)
+        | Tuples(cols, _) -> fun x -> Array.exists (fun c -> obj.ReferenceEquals(x, c)) cols
+        | Rows(table, _, cfg) -> fun x -> cfg.IsExpanded(table, x.Table)
+
+    /// Whether the context filters a column of the table (or of a table it expands to) that
+    /// `replaced` doesn't name: what an ALL over the table would remove beyond those.
+    let private filtersOthers (fc: FilterCtx) (table: BTable) (replaced: BColumn -> bool) : bool =
+        let inTable (x: BColumn) =
+            fc.Config.IsExpanded(table, x.Table) && not (replaced x)
+
+        fc.Filters
+        |> List.exists (fun f ->
+            match f with
+            | OnColumn(x, _) -> inTable x
+            | Tuples(cols, _) -> cols |> Array.exists inTable
+            | Rows(t, _, cfg) -> Filters.expandedColumns cfg t |> Array.exists inTable)
+
+    let private describe (c: BColumn) = $"'{c.Table.Name}'[{c.Name}]"
+
+    let private unsettled (ctx: Ctx) (span: Span) (c: BColumn) (what: string) : 'a =
+        Fail.notSupported
+            ctx
+            span
+            $"{what} while other columns of '{c.Table.Name}' are filtered (a filter argument of CALCULATE on the date column of a date table removes those filters; whether this does too is not documented)"
+
+    /// The context CALCULATE's filter arguments are added to: `fc` without the filters on the date
+    /// tables whose date column one of them filters. `filters`: each argument's filters, and
+    /// whether it is under KEEPFILTERS. The arguments themselves are not touched: a filter on
+    /// another column of the date table in the same CALCULATE stays, as with the ALL ( Calendar )
+    /// SQLBI writes out next to DATESYTD.
+    let onFilterArguments (ctx: Ctx) (span: Span) (fc: FilterCtx) (filters: (Filter list * bool) list) : FilterCtx =
+        let cfg = fc.Config
+        let cleared = ResizeArray<BTable>()
+
+        let replacedBy (keep: bool) (f: Filter) : BColumn -> bool =
+            if keep then (fun _ -> false) else covers f
+
+        for (fs, keep) in filters do
+            for f in fs do
+                match f with
+                | OnColumn(c, _) ->
+                    match standing cfg c with
+                    | No -> ()
+                    | Sure when not keep ->
+                        if not (cleared.Exists(fun t -> obj.ReferenceEquals(t, c.Table))) then
+                            cleared.Add c.Table
+                    | Sure ->
+                        if filtersOthers fc c.Table (replacedBy keep f) then
+                            unsettled ctx span c $"KEEPFILTERS on a filter of the date column {describe c}"
+                    | Unsure why ->
+                        if filtersOthers fc c.Table (replacedBy keep f) then
+                            unsettled ctx span c $"a filter on {describe c}, which {why},"
+                | Tuples(cols, _) ->
+                    for c in cols do
+                        if standing cfg c <> No && filtersOthers fc c.Table (replacedBy keep f) then
+                            unsettled ctx span c $"a filter on the date column {describe c} together with other columns"
+                | Rows _ ->
+                    // A table filter replaces the filters on every column of its expanded table.
+                    ()
+
+        let mutable result = fc
+
+        for t in cleared do
+            result <- Filters.remove result (fun x -> cfg.IsExpanded(t, x.Table))
+
+        result
+
+    /// A context transition is about to add these filters (one row context's). One on the date
+    /// column of a date table is refused when the rule would change anything.
+    let onTransition (ctx: Ctx) (span: Span) (fc: FilterCtx) (filters: Filter list) : unit =
+        let tests = filters |> List.map covers
+        let replaced (x: BColumn) = tests |> List.exists (fun t -> t x)
+
+        for f in filters do
+            let columns =
+                match f with
+                | OnColumn(c, _) -> [| c |]
+                | Tuples(cols, _) -> cols
+                | Rows _ -> [||]
+
+            for c in columns do
+                if standing fc.Config c <> No && filtersOthers fc c.Table replaced then
+                    unsettled ctx span c $"a context transition on the date column {describe c}"
+
 module Context =
 
     let root (model: Model) (query: QueryDefs) (source: SourceText) (inQuery: bool) : Ctx = {
@@ -753,7 +892,9 @@ module Context =
             let mutable fc = ctx.Filter
 
             for rc in List.rev rows do
-                fc <- Filters.add fc (rowFilters ctx span rc) false
+                let filters = rowFilters ctx span rc
+                DateTable.onTransition ctx span fc filters
+                fc <- Filters.add fc filters false
 
             { ctx with Filter = fc; Rows = [] }
 

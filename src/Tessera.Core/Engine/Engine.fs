@@ -218,6 +218,9 @@ let private bind (db: Database) (store: DataStore) : Tessera.DaxEngine.Model * (
                     else
                         column.SourceName <- c.Name
 
+                if c.IsKey && declared = DaxType.DateTime then
+                    column.DateKey <- (if t.DataCategory = "Time" then 2 else 1)
+
                 columns.Add column
                 table.ColumnByName.[c.Name] <- column
 

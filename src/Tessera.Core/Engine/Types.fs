@@ -290,6 +290,11 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     member val Computing = false with get, set
     /// For a column of a calculated table: the column of the expression's result it holds.
     member val SourceName: string = null with get, set
+    /// The model's own word on this being the date column of a date table: 2 when the table is
+    /// marked as a date table on this column (data category Time, and the column is its key),
+    /// 1 when the column is a date column and the table's key but the table isn't marked, else 0.
+    /// See `DateTable` in Context.fs.
+    member val DateKey = 0 with get, set
     member _.IsReady = not (obj.ReferenceEquals(store, null))
 
     member this.SetData(column: StoreColumn) =

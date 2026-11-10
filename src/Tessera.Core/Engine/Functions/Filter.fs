@@ -335,6 +335,9 @@ module Filter =
         for m in args |> List.choose (isCallTo removers) do
             fc <- Filters.remove fc (removal ev ctx config m)
 
+        // A filter on the date column of a date table first removes the filters on that table.
+        fc <- DateTable.onFilterArguments ctx call.Span fc filters
+
         // 5. The filters: each replaces the filters on its columns, unless under KEEPFILTERS.
         fc <- Filters.add fc (filters |> List.filter (fun (_, keep) -> not keep) |> List.collect fst) false
         fc <- Filters.add fc (filters |> List.filter snd |> List.collect fst) true
