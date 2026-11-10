@@ -60,6 +60,8 @@
     <Compile Include="Engine/Functions/Logical.fs" />
     <Compile Include="Engine/Functions/Conversion.fs" />
     <Compile Include="Engine/Functions/Math.fs" />
+    <Compile Include="Engine/Functions/Statistical.fs" />
+    <Compile Include="Engine/Functions/Information.fs" />
     <Compile Include="Engine/Functions/Text.fs" />
     <Compile Include="Engine/Functions/Filter.fs" />
     <Compile Include="Engine/Functions/TableFunctions.fs" />

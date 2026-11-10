@@ -67,6 +67,56 @@ let private usages (assembly: Reflection.Assembly) (watched: string -> string ->
         typeTokens @ memberTokens
         |> List.map (fun (token, what) -> BitConverter.GetBytes token, what)
 
+    // A token is only ever an operand: the four bytes count where the byte before them is an
+    // opcode that takes a type or member token (the last byte of the two-byte ones included).
+    // Every real use still matches; bytes that merely span other instructions do not.
+    let tokenOpcodes =
+        set [
+            0x27uy // jmp
+            0x28uy // call
+            0x6Fuy // callvirt
+            0x70uy // cpobj
+            0x71uy // ldobj
+            0x73uy // newobj
+            0x74uy // castclass
+            0x75uy // isinst
+            0x79uy // unbox
+            0x7Buy // ldfld
+            0x7Cuy // ldflda
+            0x7Duy // stfld
+            0x7Euy // ldsfld
+            0x7Fuy // ldsflda
+            0x80uy // stsfld
+            0x81uy // stobj
+            0x8Cuy // box
+            0x8Duy // newarr
+            0x8Fuy // ldelema
+            0xA3uy // ldelem
+            0xA4uy // stelem
+            0xA5uy // unbox.any
+            0xC2uy // refanyval
+            0xC6uy // mkrefany
+            0xD0uy // ldtoken
+            0x06uy // ldftn (FE 06)
+            0x07uy // ldvirtftn (FE 07)
+            0x15uy // initobj (FE 15)
+            0x16uy // constrained. (FE 16)
+            0x1Cuy // sizeof (FE 1C)
+        ]
+
+    let mentions (il: byte[]) (bytes: byte[]) =
+        let rec from (start: int) =
+            let i = il.AsSpan(start).IndexOf(ReadOnlySpan bytes)
+
+            if i < 0 then
+                false
+            elif start + i > 0 && tokenOpcodes.Contains il[start + i - 1] then
+                true
+            else
+                from (start + i + 1)
+
+        from 0
+
     let rec typeDefName (h: TypeDefinitionHandle) =
         let t = md.GetTypeDefinition h
         let declaring = t.GetDeclaringType()
@@ -88,7 +138,7 @@ let private usages (assembly: Reflection.Assembly) (watched: string -> string ->
                     let il = pe.GetMethodBody(m.RelativeVirtualAddress).GetILBytes()
 
                     for bytes, what in tokens do
-                        if il.AsSpan().IndexOf(ReadOnlySpan bytes) >= 0 then
+                        if mentions il bytes then
                             {
                                 In = typeDefName typeHandle + "::" + name m.Name
                                 Uses = what

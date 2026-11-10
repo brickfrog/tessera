@@ -64,6 +64,27 @@ open System.Numerics
 open Tessera
 open Tessera.DaxAst
 
+/// Who is asking, for USERNAME, USERPRINCIPALNAME, USEROBJECTID, USERCULTURE and CUSTOMDATA. A
+/// server takes these from the connection; the local engine has none, so they are whatever the
+/// caller says, and a function whose value is None here is refused.
+type Identity = {
+    UserName: string option
+    UserPrincipalName: string option
+    UserObjectId: string option
+    UserCulture: string option
+    CustomData: string option
+}
+
+module Identity =
+    /// Nothing known: every identity function but CUSTOMDATA (which is then BLANK) is refused.
+    let none = {
+        UserName = None
+        UserPrincipalName = None
+        UserObjectId = None
+        UserCulture = None
+        CustomData = None
+    }
+
 /// A text that DAX was parsed from: spans are offsets into it.
 type SourceText = { Label: string; Text: string }
 
@@ -863,6 +884,8 @@ type Ctx = {
     /// evaluated without that row context; whether the engine would let it be seen is not
     /// documented, so anything that would depend on it is refused (see `Context.transition`).
     CallerRows: bool
+    /// Who is asking (see `Identity`): None unless the caller said (`Engine.withIdentity`).
+    Identity: Identity option
 }
 
 type Call = {

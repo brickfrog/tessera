@@ -24,7 +24,15 @@ type Prepared = internal {
     /// Calculated columns and tables that couldn't be computed, and tables whose blank row
     /// can't be decided: queries that touch them fail with the same error.
     Failures: (ObjectRef * TessError) list
+    /// Who is asking, for queries (see `withIdentity`); calculated columns and tables never see it.
+    Identity: Tessera.DaxEngine.Identity option
 }
+
+/// The same model for someone in particular: USERNAME, USERPRINCIPALNAME, USEROBJECTID, USERCULTURE
+/// and CUSTOMDATA answer from `identity` (a function whose value is None there is still refused;
+/// CUSTOMDATA is then BLANK). Without this, the engine refuses them all: it has no connection to
+/// take them from. `p` itself is unchanged: the two share the model and its data.
+let withIdentity (identity: Tessera.DaxEngine.Identity) (p: Prepared) : Prepared = { p with Identity = Some identity }
 
 /// The functions the engine implements: name and family, by family then name.
 let functions: (string * string) list =
@@ -532,7 +540,12 @@ let prepare (db: Database) (store: DataStore) : Result<Prepared, TessError> =
         |> Result.bind (fun (model, failures) ->
             match failures |> List.tryFind (fun (_, e) -> isCircular e) with
             | Some(_, e) -> Error e
-            | None -> Ok { Model = model; Failures = failures })
+            | None ->
+                Ok {
+                    Model = model
+                    Failures = failures
+                    Identity = None
+                })
 
 /// What `prepare` could not compute, with why.
 let failures (p: Prepared) : (ObjectRef * TessError) list = p.Failures
@@ -673,7 +686,11 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
         run (fun () ->
             let source = SourceText.query dax
             let defs = QueryDefs()
-            let mutable ctx = Context.root p.Model defs source true
+
+            let mutable ctx = {
+                Context.root p.Model defs source true with
+                    Identity = p.Identity
+            }
 
             for d in query.Definitions do
                 match d.Kind with
@@ -722,7 +739,11 @@ let evaluateScalar (p: Prepared) (dax: string) : Result<QueryValue, TessError> =
     | Error errors -> Error(syntaxError source.Label errors)
     | Ok expr ->
         run (fun () ->
-            let ctx = Context.root p.Model null source true
+            let ctx = {
+                Context.root p.Model null source true with
+                    Identity = p.Identity
+            }
+
             let _, values = Typing.column (ev.TypeOf(ctx, expr)) [| ev.Scalar(ctx, expr) |]
             queryValue values.[0])
 

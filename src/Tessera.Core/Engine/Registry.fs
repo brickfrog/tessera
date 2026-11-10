@@ -15,6 +15,8 @@ module Registry =
             Logical.functions
             Conversion.functions
             Math.functions
+            Statistical.functions
+            Information.functions
             Text.functions
             Filter.functions
             TableFunctions.functions

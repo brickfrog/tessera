@@ -439,10 +439,13 @@ module Math =
         // "ISO.CEILING rounds negative numbers upward (toward positive infinity)" whatever the
         // sign of the significance; "If the unit of significance is not specified, the number is
         // rounded up to the nearest integer"; "If the optional argument is not included the
-        // result is of integer type" (Microsoft Learn, ISO.CEILING). With a significance, the
-        // page says both "A number, of the same type as the number argument" and "The result type
-        // is usually the same type of the significance": where those two differ the call is
-        // refused. Nothing is said of BLANK or of a significance of zero.
+        // result is of integer type" (Microsoft Learn, ISO.CEILING). With a significance the type
+        // is CEILING's: "The result type is usually the same type of the significance", and
+        // dax.guide/iso-ceiling shows "ISO.CEILING ( -10.2, -1 ) -- Returns -10 (Integer)",
+        // "ISO.CEILING ( 10.2, 0.5 ) -- Returns 10.5 (Decimal)" and "ISO.CEILING ( 10.2, CURRENCY
+        // ( 0.5 ) ) -- Returns 10.5 (Currency)". (The Learn page's summary line, "of the same
+        // type as the number argument", is contradicted by those.) Nothing is said of BLANK or of
+        // a significance of zero.
         Fn.scalar "ISO.CEILING" "Math" (1, 2) Fn.typeUnknown (fun ev ctx call ->
             let number = argNotBlank ev ctx call 0
 
@@ -454,20 +457,6 @@ module Math =
                 if sign significance = 0 then
                     Fail.notSupported ctx call.Span "ISO.CEILING with a significance of zero"
 
-                let sameType =
-                    match number, significance with
-                    | DaxValue.Currency _, _ -> true
-                    | _ when isText raw -> false
-                    | DaxValue.Integer _, DaxValue.Integer _
-                    | DaxValue.Decimal _, DaxValue.Decimal _ -> true
-                    | _ -> false
-
-                if not sameType then
-                    Fail.notSupported
-                        ctx
-                        call.Span
-                        "ISO.CEILING of a number and a significance of different data types (the page gives the result both the number's type and the significance's)"
-
                 let positive =
                     if sign significance < 0 then
                         Fail.dax ctx call.Span (DaxValue.negate significance)
@@ -475,7 +464,7 @@ module Math =
                         significance
 
                 let count, m = countOfMultiple ctx call "ISO.CEILING" Mode.Ceiling number positive
-                ceilingResult ctx call "ISO.CEILING" number significance false (count * m)
+                ceilingResult ctx call "ISO.CEILING" number significance (isText raw) (count * m)
             | _ ->
                 let count, _ =
                     countOfMultiple ctx call "ISO.CEILING" Mode.Ceiling number (DaxValue.Integer 1L)
