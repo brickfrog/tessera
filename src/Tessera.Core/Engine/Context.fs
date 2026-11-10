@@ -153,7 +153,28 @@ module Filters =
         match table.UniqueColumn with
         | Some _ -> plain ()
         | None ->
-            // Compute what can be computed first: the row is identified by every other column.
+            // Without a unique column the row is identified by all of its columns, so a calculated
+            // column that gets here depends on every other column of the table. Two such columns
+            // depend on each other: "CALCULATE in a calculated column performs a context
+            // transition and makes that column dependent on all the columns in the table. If two
+            // such columns exist, they depend on each other" (SQLBI, "Avoiding circular dependency
+            // errors in DAX").
+            if (table.Columns |> Array.filter _.Computing).Length > 1 then
+                let names =
+                    table.Columns
+                    |> Array.filter _.Computing
+                    |> Array.map (fun c -> $"[{c.Name}]")
+                    |> String.concat " and "
+
+                raise (
+                    EngineException(
+                        DaxInvalid(
+                            $"circular dependency: the calculated columns {names} of '{table.Name}' each use a context transition, and the table has no column with unique values to identify a row by",
+                            ""
+                        )
+                    )
+                )
+
             for c in table.Columns do
                 if not c.IsReady && not c.Computing then
                     c.Data |> ignore

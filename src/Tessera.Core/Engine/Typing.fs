@@ -3,31 +3,18 @@ namespace Tessera.DaxEngine
 open Tessera
 open Tessera.DaxAst
 
-/// Static data types of expressions, and the type of a column of values.
-///
-/// A static type is `Some t` (always a `t`, or BLANK), `Some Variant` (not known without
-/// evaluating) or None (always BLANK: it has no type and takes the other side's).
+/// Static data types of expressions (see `StaticType`), and the type of a column of values.
 module Typing =
 
-    let private numericOf =
-        function
-        | Some DaxType.Boolean -> Some DaxType.Integer
-        | t -> t
+    let private known (t: DaxType) = StaticType.Known t
 
-    /// The one type that holds values of both types, as IF, SWITCH and COALESCE pick it: "IF can
-    /// return a variant data type if value_if_true and value_if_false are of different data types,
-    /// but the function attempts to return a single data type if both ... are of numeric data
-    /// types" (Microsoft Learn, IF; the same text on dax.guide/if.eager). The numeric type is the
-    /// one arithmetic between the two gives; a date with a number is a Decimal ("COALESCE ( DATE (
-    /// 2020, 1, 1 ), 1 ) returns the decimal number 43831": dax.guide/coalesce).
-    let unify (a: DaxType option) (b: DaxType option) : DaxType option =
-        match a, b with
-        | None, t
-        | t, None -> t
-        | Some DaxType.Variant, _
-        | _, Some DaxType.Variant -> Some DaxType.Variant
-        | Some x, Some y when x = y -> Some x
-        | Some x, Some y ->
+    /// The numeric type that holds values of both, as arithmetic between them gives it; a date with
+    /// a number is a Decimal ("COALESCE ( DATE ( 2020, 1, 1 ), 1 ) returns the decimal number
+    /// 43831": dax.guide/coalesce). None for types that have no common one.
+    let private common (x: DaxType) (y: DaxType) : DaxType option =
+        if x = y then
+            Some x
+        else
             match x, y with
             | (DaxType.Integer, DaxType.Decimal)
             | (DaxType.Decimal, DaxType.Integer)
@@ -37,16 +24,37 @@ module Typing =
             | (DaxType.Currency, DaxType.Integer) -> Some DaxType.Currency
             | (DaxType.DateTime, (DaxType.Integer | DaxType.Decimal | DaxType.Currency))
             | ((DaxType.Integer | DaxType.Decimal | DaxType.Currency), DaxType.DateTime) -> Some DaxType.Decimal
-            | _ -> Some DaxType.Variant
+            | _ -> None
+
+    /// The type of an expression that is one of two others, as IF, SWITCH and COALESCE have it:
+    /// "IF can return a variant data type if value_if_true and value_if_false are of different
+    /// data types, but the function attempts to return a single data type if both ... are of
+    /// numeric data types" (Microsoft Learn, IF; the same text on dax.guide/if.eager).
+    let unify (a: StaticType) (b: StaticType) : StaticType =
+        match a, b with
+        | StaticType.Blank, t
+        | t, StaticType.Blank -> t
+        | StaticType.Variant, _
+        | _, StaticType.Variant -> StaticType.Variant
+        | StaticType.Unknown, _
+        | _, StaticType.Unknown -> StaticType.Unknown
+        | StaticType.Known x, StaticType.Known y ->
+            match common x y with
+            | Some t -> known t
+            | None -> StaticType.Variant
 
     /// The static type of `l op r`, following `DaxValue`'s arithmetic. Text operands are read as
     /// numbers or dates when evaluated, so their result type isn't known before.
-    let binary (op: BinaryOp) (l: DaxType option) (r: DaxType option) : DaxType option =
-        let l = numericOf l
-        let r = numericOf r
+    let binary (op: BinaryOp) (l: StaticType) (r: StaticType) : StaticType =
+        let numeric (t: StaticType) =
+            match t with
+            | StaticType.Known DaxType.Boolean -> known DaxType.Integer
+            | StaticType.Known DaxType.String
+            | StaticType.Variant -> StaticType.Unknown
+            | t -> t
 
-        let unknown (t: DaxType option) =
-            t = Some DaxType.Variant || t = Some DaxType.String
+        let l = numeric l
+        let r = numeric r
 
         match op with
         | BinaryOp.And
@@ -58,60 +66,73 @@ module Typing =
         | BinaryOp.LessOrEqual
         | BinaryOp.Greater
         | BinaryOp.GreaterOrEqual
-        | BinaryOp.In -> Some DaxType.Boolean
-        | BinaryOp.Concat -> Some DaxType.String
-        | BinaryOp.Power -> if l.IsNone then None else Some DaxType.Decimal
-        | _ when unknown l || unknown r -> Some DaxType.Variant
+        | BinaryOp.In -> known DaxType.Boolean
+        | BinaryOp.Concat -> known DaxType.String
+        | BinaryOp.Power ->
+            if l = StaticType.Blank then
+                StaticType.Blank
+            else
+                known DaxType.Decimal
         | BinaryOp.Add
         | BinaryOp.Subtract ->
             match l, r with
-            | None, None -> None
+            | StaticType.Unknown, _
+            | _, StaticType.Unknown -> StaticType.Unknown
+            | StaticType.Blank, StaticType.Blank -> StaticType.Blank
             // Next to a value, BLANK is the Integer 0.
-            | None, t ->
-                (if op = BinaryOp.Subtract && t = Some DaxType.DateTime then
-                     Some DaxType.Decimal
-                 else
-                     t)
-            | t, None -> t
-            | Some DaxType.DateTime, _ -> Some DaxType.DateTime
-            | _, Some DaxType.DateTime ->
-                if op = BinaryOp.Subtract then
-                    Some DaxType.Decimal
-                else
-                    Some DaxType.DateTime
-            | Some DaxType.Decimal, _
-            | _, Some DaxType.Decimal -> Some DaxType.Decimal
-            | Some DaxType.Currency, _
-            | _, Some DaxType.Currency -> Some DaxType.Currency
-            | _ -> Some DaxType.Integer
+            | StaticType.Blank, StaticType.Known DaxType.DateTime when op = BinaryOp.Subtract -> known DaxType.Decimal
+            | StaticType.Blank, t
+            | t, StaticType.Blank -> t
+            | StaticType.Known x, StaticType.Known y ->
+                match x, y with
+                | DaxType.DateTime, _ -> known DaxType.DateTime
+                | _, DaxType.DateTime ->
+                    if op = BinaryOp.Subtract then
+                        known DaxType.Decimal
+                    else
+                        known DaxType.DateTime
+                | DaxType.Decimal, _
+                | _, DaxType.Decimal -> known DaxType.Decimal
+                | DaxType.Currency, _
+                | _, DaxType.Currency -> known DaxType.Currency
+                | _ -> known DaxType.Integer
+            | _ -> StaticType.Unknown
         | BinaryOp.Multiply ->
             match l, r with
-            | None, _
-            | _, None -> None
-            | Some DaxType.Integer, Some DaxType.Integer -> Some DaxType.Integer
-            | Some DaxType.Currency, Some DaxType.Currency -> Some DaxType.Decimal
-            | Some DaxType.Currency, _
-            | _, Some DaxType.Currency -> Some DaxType.Currency
-            | _ -> Some DaxType.Decimal
+            | StaticType.Blank, _
+            | _, StaticType.Blank -> StaticType.Blank
+            | StaticType.Known x, StaticType.Known y ->
+                match x, y with
+                | DaxType.Integer, DaxType.Integer -> known DaxType.Integer
+                | DaxType.Currency, DaxType.Currency -> known DaxType.Decimal
+                | DaxType.Currency, _
+                | _, DaxType.Currency -> known DaxType.Currency
+                | _ -> known DaxType.Decimal
+            | _ -> StaticType.Unknown
         | BinaryOp.Divide ->
             match l, r with
-            | None, _ -> None
-            // A division by zero or BLANK is a Decimal infinity or NaN whatever the left side.
-            | Some DaxType.Currency, _ -> Some DaxType.Variant
-            | _ -> Some DaxType.Decimal
+            | StaticType.Blank, _ -> StaticType.Blank
+            // Currency / whole number is a Currency, but a division by zero or BLANK is a Decimal
+            // infinity or NaN: the values decide.
+            | StaticType.Known DaxType.Currency, _
+            | StaticType.Unknown, _ -> StaticType.Unknown
+            | _ -> known DaxType.Decimal
 
-    /// A value as a value of a statically known numeric type (an Integer branch of an IF whose
-    /// other branch is a Decimal is a Decimal). Anything else is left as it is.
-    let coerce (target: DaxType option) (v: DaxValue) : DaxValue =
+    /// A value as a value of a numeric type it widens to (an Integer branch of an IF whose other
+    /// branch is a Decimal is a Decimal). Anything else is left as it is.
+    let widen (target: DaxType) (v: DaxValue) : DaxValue =
         match target, DaxValue.typeOf v with
-        | Some t, Some vt when t <> vt && t <> DaxType.Variant ->
-            match t, vt with
-            | DaxType.Decimal, (DaxType.Integer | DaxType.Currency | DaxType.DateTime)
-            | DaxType.Currency, DaxType.Integer ->
-                match DaxValue.convertTo t v with
-                | Ok c -> c
-                | Error _ -> v
-            | _ -> v
+        | DaxType.Decimal, Some(DaxType.Integer | DaxType.Currency | DaxType.DateTime)
+        | DaxType.Currency, Some DaxType.Integer ->
+            match DaxValue.convertTo target v with
+            | Ok c -> c
+            | Error _ -> v
+        | _ -> v
+
+    /// `widen` to a statically known type; nothing changes for the other static types.
+    let coerce (target: StaticType) (v: DaxValue) : DaxValue =
+        match target with
+        | StaticType.Known t -> widen t v
         | _ -> v
 
     /// The type of a column from its values (BLANKs aside): the one type they share, the numeric
@@ -120,26 +141,38 @@ module Typing =
         let mutable t = None
 
         for v in values do
-            match DaxValue.typeOf v with
-            | Some vt -> t <- unify t (Some vt)
-            | None -> ()
+            match DaxValue.typeOf v, t with
+            | None, _ -> ()
+            | Some vt, None -> t <- Some vt
+            | Some _, Some DaxType.Variant -> ()
+            | Some vt, Some current -> t <- Some(common current vt |> Option.defaultValue DaxType.Variant)
 
         t
 
-    /// A column's declared type and its values as that type: the static type where it is known and
-    /// the values fit it, otherwise the type of the values. A column that is BLANK in every row
-    /// and has no static type is declared Variant.
-    let column (staticType: DaxType option) (values: DaxValue array) : DaxType * DaxValue array =
+    /// A column's declared type, and its values as that type.
+    ///
+    /// - statically Variant: Variant, as the engine declares it;
+    /// - statically a type the values fit (after widening): that type, also when every row is BLANK;
+    /// - otherwise the type of the values. A column of BLANKs with no static type is a Variant.
+    let column (staticType: StaticType) (values: DaxValue array) : DaxType * DaxValue array =
         let dynamic = ofValues values
 
         let declared =
             match staticType, dynamic with
-            | Some s, None when s <> DaxType.Variant -> s
-            | Some s, Some d when s <> DaxType.Variant && unify (Some s) (Some d) = Some s -> s
+            | StaticType.Variant, _ -> DaxType.Variant
+            | StaticType.Known s, None -> s
+            | StaticType.Known s, Some d when common s d = Some s -> s
             | _, Some d -> d
             | _, None -> DaxType.Variant
 
         if declared = DaxType.Variant then
             declared, values
         else
-            declared, values |> Array.map (coerce (Some declared))
+            declared, values |> Array.map (widen declared)
+
+    /// The static type of a column of a table value: its declared type.
+    let ofColumn (t: DaxType) : StaticType =
+        if t = DaxType.Variant then
+            StaticType.Variant
+        else
+            StaticType.Known t

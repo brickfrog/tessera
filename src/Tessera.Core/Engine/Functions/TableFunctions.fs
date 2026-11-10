@@ -454,7 +454,9 @@ module TableFunctions =
 
                     let declared =
                         tables
-                        |> List.fold (fun t table -> Typing.unify t (Some table.Cols.[c].Type)) None
+                        |> List.fold
+                            (fun t table -> Typing.unify t (Typing.ofColumn table.Cols.[c].Type))
+                            StaticType.Blank
 
                     let t, values =
                         match Typing.column declared values with

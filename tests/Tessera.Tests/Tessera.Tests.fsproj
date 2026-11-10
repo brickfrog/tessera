@@ -76,6 +76,11 @@
     <Compile Include="DataCommandTests.fs" />
     <Compile Include="EngineHelpers.fs" />
     <Compile Include="EngineSmokeTests.fs" />
+    <Compile Include="EngineScalarTests.fs" />
+    <Compile Include="EngineContextTests.fs" />
+    <Compile Include="EngineTableTests.fs" />
+    <Compile Include="EnginePropertyTests.fs" />
+    <Compile Include="EnginePerfTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

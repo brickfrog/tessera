@@ -158,14 +158,16 @@ module Aggregation =
 
     let private numericOf (ev: IEval) (ctx: Ctx) (arg: Expr) =
         match ev.TypeOf(ctx, arg) with
-        | Some(DaxType.Integer | DaxType.Decimal | DaxType.Currency) as t -> t
-        | _ -> Some DaxType.Variant
+        | StaticType.Known(DaxType.Integer | DaxType.Decimal | DaxType.Currency) as t -> t
+        | StaticType.Blank -> StaticType.Blank
+        | _ -> StaticType.Unknown
 
     let private averageType (ev: IEval) (ctx: Ctx) (arg: Expr) =
         match ev.TypeOf(ctx, arg) with
-        | Some DaxType.Currency -> Some DaxType.Currency
-        | Some(DaxType.Integer | DaxType.Decimal) -> Some DaxType.Decimal
-        | _ -> Some DaxType.Variant
+        | StaticType.Known DaxType.Currency -> StaticType.Known DaxType.Currency
+        | StaticType.Known(DaxType.Integer | DaxType.Decimal) -> StaticType.Known DaxType.Decimal
+        | StaticType.Blank -> StaticType.Blank
+        | _ -> StaticType.Unknown
 
     let private sumColumn (ev: IEval) (ctx: Ctx) (call: Call) : DaxValue =
         let c, counts = columnCounts ev ctx call
@@ -233,7 +235,7 @@ module Aggregation =
                 match args with
                 | [ a ] -> ev.TypeOf(ctx, a)
                 | [ a; b ] -> Typing.unify (ev.TypeOf(ctx, a)) (ev.TypeOf(ctx, b))
-                | _ -> Some DaxType.Variant)
+                | _ -> StaticType.Unknown)
             (fun ev ctx call ->
                 if call.Args.Length = 2 then
                     twoScalars ev ctx call wantMax

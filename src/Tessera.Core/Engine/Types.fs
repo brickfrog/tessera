@@ -787,10 +787,24 @@ type FilterCtx(filters: Filter list, config: RelConfig) =
 /// One level of row context: a row of a table.
 type RowCtx = { Table: TableVal; Row: int }
 
+/// The static type of a scalar expression: what can be said of its type without evaluating it.
+[<RequireQualifiedAccess>]
+type StaticType =
+    /// Always BLANK (BLANK (), an omitted argument): no type of its own; it takes the type of
+    /// whatever it is combined with.
+    | Blank
+    /// Always a value of this type, or BLANK.
+    | Known of DaxType
+    /// Known to be of different types in different cases (an IF with a text and a number branch):
+    /// the engine declares such a column Variant.
+    | Variant
+    /// Not known without evaluating: the values decide.
+    | Unknown
+
 /// What a name is bound to: a VAR or a VAL parameter (a value, computed once, on first use), or an
 /// EXPR parameter (an expression evaluated wherever it is used).
 type Binding =
-    | Val of Lazy<Value> * isTable: bool * staticType: Lazy<DaxType option>
+    | Val of Lazy<Value> * isTable: bool * staticType: Lazy<StaticType>
     | ExprParam of Expr * Scope
 
 /// The lexical side of a context: which names are in scope, and which text the code is from.
@@ -837,10 +851,8 @@ type IEval =
     /// A scalar or a table, whichever the expression is.
     abstract Value: Ctx * Expr -> Value
     abstract IsTable: Ctx * Expr -> bool
-    /// The static type of a scalar expression: `Some t` when it is always a `t` (or BLANK), `Some
-    /// Variant` when it can't be told without evaluating, None for an expression that is always
-    /// BLANK (it takes the type of whatever it is combined with).
-    abstract TypeOf: Ctx * Expr -> DaxType option
+    /// The static type of a scalar expression.
+    abstract TypeOf: Ctx * Expr -> StaticType
     /// The model column an argument names (`T[c]`), or an error.
     abstract Column: Ctx * Expr -> BColumn
     /// The model column an argument names, if it is a column reference.
@@ -867,7 +879,7 @@ type DaxFunction = {
     Returns: Returns
     /// Which argument forms are not supported, told from the trees alone.
     Check: Expr list -> string option
-    Type: IEval -> Ctx -> Expr list -> DaxType option
+    Type: IEval -> Ctx -> Expr list -> StaticType
     Scalar: IEval -> Ctx -> Call -> DaxValue
     Table: IEval -> Ctx -> Call -> TableVal
 }
@@ -893,17 +905,17 @@ module Fail =
         | Error e -> runtime ctx span (DaxError.message e)
 
 module Fn =
-    let typeUnknown: IEval -> Ctx -> Expr list -> DaxType option =
-        fun _ _ _ -> Some DaxType.Variant
+    let typeUnknown: IEval -> Ctx -> Expr list -> StaticType =
+        fun _ _ _ -> StaticType.Unknown
 
-    let typeIs (t: DaxType) : IEval -> Ctx -> Expr list -> DaxType option = fun _ _ _ -> Some t
+    let typeIs (t: DaxType) : IEval -> Ctx -> Expr list -> StaticType = fun _ _ _ -> StaticType.Known t
 
     /// The type of the n-th argument.
-    let typeOfArg (n: int) : IEval -> Ctx -> Expr list -> DaxType option =
+    let typeOfArg (n: int) : IEval -> Ctx -> Expr list -> StaticType =
         fun ev ctx args ->
             match List.tryItem n args with
             | Some a -> ev.TypeOf(ctx, a)
-            | None -> Some DaxType.Variant
+            | None -> StaticType.Unknown
 
     let private noScalar (name: string) : IEval -> Ctx -> Call -> DaxValue =
         fun _ ctx call -> Fail.invalid ctx call.Span $"{name} returns a table, where a single value is needed"

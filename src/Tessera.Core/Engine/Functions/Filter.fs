@@ -461,7 +461,7 @@ module Filter =
                 match args with
                 | [ c; alt ] -> Typing.unify (ev.TypeOf(ctx, c)) (ev.TypeOf(ctx, alt))
                 | c :: _ -> ev.TypeOf(ctx, c)
-                | _ -> Some DaxType.Variant)
+                | _ -> StaticType.Unknown)
             (fun ev ctx call ->
                 let c = ev.Column(ctx, call.Args.[0])
                 let ids = Filters.idsIn c (Filters.visible ctx.Filter c.Table) true

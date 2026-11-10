@@ -229,8 +229,11 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                     let staticType =
                         lazy
                             (match v with
-                             | Value.Scalar s -> DaxValue.typeOf s
-                             | _ -> Some DaxType.Variant)
+                             | Value.Scalar s ->
+                                 match DaxValue.typeOf s with
+                                 | Some t -> StaticType.Known t
+                                 | None -> StaticType.Blank
+                             | _ -> StaticType.Unknown)
 
                     Val(Lazy<Value>.CreateFromValue v, isTable, staticType)
 
@@ -279,7 +282,7 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
             let staticType =
                 lazy
                     (if isTable then
-                         Some DaxType.Variant
+                         StaticType.Unknown
                      else
                          ev.TypeOf(definedIn, v.Value))
 
@@ -326,7 +329,9 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                     let name = if width = 1 then "Value" else $"Value{c + 1}"
 
                     Tables.extension name (t |> Option.defaultValue DaxType.Variant),
-                    values |> Array.map (Typing.coerce t))
+                    (match t with
+                     | Some target -> values |> Array.map (Typing.widen target)
+                     | None -> values))
 
         Tables.ofColumns (cols |> Array.map fst) (cols |> Array.map snd) rows.Length
 
@@ -615,16 +620,16 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
 
         member this.TypeOf(ctx, e) =
             RuntimeHelpers.EnsureSufficientExecutionStack()
-            let unknown = Some DaxType.Variant
+            let unknown = StaticType.Unknown
 
-            let ofDeclared (t: DaxType) = Some t
+            let ofDeclared (t: DaxType) = Typing.ofColumn t
 
             match e.Kind with
-            | IntegerLiteral _ -> Some DaxType.Integer
-            | NumberLiteral _ -> Some DaxType.Decimal
-            | StringLiteral _ -> Some DaxType.String
-            | BooleanLiteral _ -> Some DaxType.Boolean
-            | DateLiteral _ -> Some DaxType.DateTime
+            | IntegerLiteral _ -> StaticType.Known DaxType.Integer
+            | NumberLiteral _ -> StaticType.Known DaxType.Decimal
+            | StringLiteral _ -> StaticType.Known DaxType.String
+            | BooleanLiteral _ -> StaticType.Known DaxType.Boolean
+            | DateLiteral _ -> StaticType.Known DaxType.DateTime
             | Paren inner -> ev.TypeOf(ctx, inner)
             | Identifier name ->
                 match ctx.Scope.Vars.TryFind(upper name) with
@@ -646,25 +651,25 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                 | Some(rc, i), None -> ofDeclared rc.Table.Cols.[i].Type
                 | None, Some m -> this.TypeOfMeasure(ctx, m)
                 | _ -> unknown
-            | Unary(UnaryOp.Not, _) -> Some DaxType.Boolean
+            | Unary(UnaryOp.Not, _) -> StaticType.Known DaxType.Boolean
             | Unary(_, operand) ->
                 match ev.TypeOf(ctx, operand) with
-                | Some DaxType.Boolean -> Some DaxType.Integer
-                | Some DaxType.String -> unknown
+                | StaticType.Known DaxType.Boolean -> StaticType.Known DaxType.Integer
+                | StaticType.Known DaxType.String -> unknown
                 | t -> t
             | Binary _ ->
                 let first, rest = leftSpine e
 
                 let start =
                     match first.Kind with
-                    | Tuple _ -> Some DaxType.Boolean
+                    | Tuple _ -> StaticType.Known DaxType.Boolean
                     | _ -> ev.TypeOf(ctx, first)
 
                 rest
                 |> List.fold
                     (fun acc (op, right) ->
                         match op with
-                        | BinaryOp.In -> Some DaxType.Boolean
+                        | BinaryOp.In -> StaticType.Known DaxType.Boolean
                         | _ -> Typing.binary op acc (ev.TypeOf(ctx, right)))
                     start
             | VarBlock(vars, body) -> ev.TypeOf(bindVars ctx vars, body)
@@ -674,12 +679,12 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                 | _ -> unknown
             | _ -> unknown
 
-    member private this.TypeOfMeasure(ctx: Ctx, m: BMeasure) : DaxType option =
+    member private this.TypeOfMeasure(ctx: Ctx, m: BMeasure) : StaticType =
         if
             ctx.Measures |> List.exists (fun x -> obj.ReferenceEquals(x, m))
             || ctx.Measures.Length > 32
         then
-            Some DaxType.Variant
+            StaticType.Unknown
         else
             let inner = {
                 ctx with
@@ -696,4 +701,4 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
             try
                 ev.TypeOf(inner, m.Expr)
             with EngineException _ ->
-                Some DaxType.Variant
+                StaticType.Unknown

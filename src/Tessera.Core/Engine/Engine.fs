@@ -427,7 +427,7 @@ let private bind (db: Database) (store: DataStore) : Tessera.DaxEngine.Model * (
                                 | Some i ->
                                     let declared, values =
                                         if c.DataType = DaxType.Variant then
-                                            Typing.column (Some result.Cols.[i].Type) (result.Column i)
+                                            Typing.column (Typing.ofColumn result.Cols.[i].Type) (result.Column i)
                                         else
                                             c.DataType, result.Column i
 
@@ -562,10 +562,16 @@ let private queryValue (v: DaxValue) : QueryValue =
         | Some d -> QueryValue.DateTime d
         | None -> raise (DaxRuntimeException("A date is outside the range of dates (0001-01-01 to 9999-12-31).", ""))
 
-/// A column's type and values as a result declares them.
+/// A column's type and values as a result declares them: the column's declared type, which
+/// `Typing.column` settled when the column was made.
 let private resultColumn (info: ColInfo) (values: DaxValue array) : DaxType * DaxValue array =
-    let declared, values =
-        Typing.column (if info.Type = DaxType.Variant then None else Some info.Type) values
+    let declared = info.Type
+
+    let values =
+        if declared = DaxType.Variant then
+            values
+        else
+            values |> Array.map (Typing.widen declared)
 
     // A value that isn't of the declared type makes the column a Variant, rather than a lie.
     if
@@ -668,7 +674,7 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                     let staticType =
                         lazy
                             (if isTable then
-                                 Some DaxType.Variant
+                                 StaticType.Unknown
                              else
                                  ev.TypeOf(definedIn, value))
 
@@ -738,6 +744,26 @@ let coverage (db: Database) : (ObjectRef * string list) list =
         let memo = Dictionary<string, string list>(StringComparer.OrdinalIgnoreCase)
         let active = HashSet<string>(StringComparer.OrdinalIgnoreCase)
 
+        let calculatedColumns = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        let calculatedTables = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+
+        for t in db.Model.Tables do
+            match calculatedTableExpression t with
+            | Some text -> calculatedTables.[t.Name] <- text
+            | None -> ()
+
+            for c in t.Columns do
+                match c with
+                | :? CalculatedColumn as cc ->
+                    calculatedColumns.[t.Name + "\u0000" + c.Name] <-
+                        (if isNull cc.Expression then "" else cc.Expression)
+                | _ -> ()
+
+        // Tables whose rows can't be told without a calculated table or column: the two ends of a
+        // relationship on one. Filled in below, once those are known.
+        let dependsOn =
+            Dictionary<string, ResizeArray<string>>(StringComparer.OrdinalIgnoreCase)
+
         let rec ofExpr (declared: Set<string>) (e: Expr) : string list =
             let found = ResizeArray<string>()
 
@@ -749,14 +775,32 @@ let coverage (db: Database) : (ObjectRef * string list) list =
                     | true, why -> found.Add why
                     | _ -> ()
 
+                    if calculatedTables.ContainsKey name then
+                        found.AddRange(ofCalculated ("t\u0000" + name) calculatedTables.[name])
+
+                    match dependsOn.TryGetValue name with
+                    | true, keys ->
+                        for key in List.ofSeq keys do
+                            let text =
+                                if key.StartsWith("t\u0000", StringComparison.Ordinal) then
+                                    calculatedTables.[key.Substring 2]
+                                else
+                                    calculatedColumns.[key.Substring 2]
+
+                            found.AddRange(ofCalculated key text)
+                    | _ -> ()
+
                 match e.Kind with
                 | QuotedTable name -> table name
                 | Identifier name when not (scope.Contains(name.ToUpperInvariant())) -> table name
                 | Qualified(t, name) ->
                     table t.Name
 
-                    if not (columns.Contains(t.Name + "\u0000" + name)) && measures.ContainsKey name then
-                        found.AddRange(ofMeasure name)
+                    match calculatedColumns.TryGetValue(t.Name + "\u0000" + name) with
+                    | true, text -> found.AddRange(ofCalculated ("c\u0000" + t.Name + "\u0000" + name) text)
+                    | _ ->
+                        if not (columns.Contains(t.Name + "\u0000" + name)) && measures.ContainsKey name then
+                            found.AddRange(ofMeasure name)
                 | Bracketed name when measures.ContainsKey name -> found.AddRange(ofMeasure name)
                 | QueryParameter name -> found.Add $"the query parameter @{name}"
                 | Call(name, args) ->
@@ -797,6 +841,12 @@ let coverage (db: Database) : (ObjectRef * string list) list =
                     memo.[key] <- result
                     result
 
+        and ofCalculated (key: string) (text: string) : string list =
+            cached key (fun () ->
+                match DaxParser.parseExpression text with
+                | Ok e -> ofExpr Set.empty e
+                | Error _ -> [ "an expression that can't be parsed" ])
+
         and ofMeasure (name: string) : string list =
             cached ("m\u0000" + name) (fun () ->
                 match DaxParser.parseExpression measures.[name] with
@@ -817,6 +867,51 @@ let coverage (db: Database) : (ObjectRef * string list) list =
                     @ ofExpr parameters def.Body
                 | Error _ -> [ $"function {name} can't be parsed" ])
 
+        // A table related (over any chain of relationships) to a calculated table, or through a
+        // calculated column, needs that computed before its own rows can be filtered.
+        let group = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+
+        for t in db.Model.Tables do
+            group.[t.Name] <- t.Name
+
+        let rec find (x: string) =
+            if String.Equals(group.[x], x, StringComparison.OrdinalIgnoreCase) then
+                x
+            else
+                let root = find group.[x]
+                group.[x] <- root
+                root
+
+        let keysOfGroup =
+            Dictionary<string, ResizeArray<string>>(StringComparer.OrdinalIgnoreCase)
+
+        for r in db.Model.Relationships do
+            match r with
+            | :? SingleColumnRelationship as s when not (isNull s.FromColumn) && not (isNull s.ToColumn) ->
+                group.[find s.FromColumn.Table.Name] <- find s.ToColumn.Table.Name
+            | _ -> ()
+
+        for r in db.Model.Relationships do
+            match r with
+            | :? SingleColumnRelationship as s when not (isNull s.FromColumn) && not (isNull s.ToColumn) ->
+                let root = find s.FromColumn.Table.Name
+
+                if not (keysOfGroup.ContainsKey root) then
+                    keysOfGroup.[root] <- ResizeArray<string>()
+
+                for c in [ s.FromColumn; s.ToColumn ] do
+                    if calculatedTables.ContainsKey c.Table.Name then
+                        keysOfGroup.[root].Add("t\u0000" + c.Table.Name)
+
+                    if calculatedColumns.ContainsKey(c.Table.Name + "\u0000" + c.Name) then
+                        keysOfGroup.[root].Add("c\u0000" + c.Table.Name + "\u0000" + c.Name)
+            | _ -> ()
+
+        for t in db.Model.Tables do
+            match keysOfGroup.TryGetValue(find t.Name) with
+            | true, keys when keys.Count > 0 -> dependsOn.[t.Name] <- ResizeArray<string>(Seq.distinct keys)
+            | _ -> ()
+
         let ofText (home: string) (text: string) : string list =
             let own =
                 match gates.TryGetValue home with
@@ -833,12 +928,17 @@ let coverage (db: Database) : (ObjectRef * string list) list =
         [
             for t in db.Model.Tables do
                 for m in t.Measures do
-                    yield ObjectRef.inTable ObjectKind.Measure t.Name m.Name, ofText t.Name m.Expression
+                    yield ObjectRef.inTable ObjectKind.Measure t.Name m.Name, ofMeasure m.Name
 
                 for c in t.Columns do
                     match c with
                     | :? CalculatedColumn as cc ->
-                        yield ObjectRef.inTable ObjectKind.Column t.Name c.Name, ofText t.Name cc.Expression
+                        // A calculated column is evaluated in a row context on its table.
+                        yield
+                            ObjectRef.inTable ObjectKind.Column t.Name c.Name,
+                            ofText
+                                t.Name
+                                ("COUNTROWS ( '" + t.Name.Replace("'", "''") + "' ) + (" + cc.Expression + "\n)")
                     | _ -> ()
 
                 match calculatedTableExpression t with

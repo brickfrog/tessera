@@ -14,7 +14,15 @@ module Logical =
 
     let private unifyAll (ev: IEval) (ctx: Ctx) (args: Expr list) =
         args
-        |> List.fold (fun t a -> Typing.unify t (if Fn.isOmitted a then None else ev.TypeOf(ctx, a))) None
+        |> List.fold
+            (fun t a ->
+                Typing.unify
+                    t
+                    (if Fn.isOmitted a then
+                         StaticType.Blank
+                     else
+                         ev.TypeOf(ctx, a)))
+            StaticType.Blank
 
     /// Only the branch that is taken is evaluated; its value becomes a value of the type the
     /// branches share when both are numbers (see `Typing.unify`).
@@ -33,7 +41,7 @@ module Logical =
         | None -> DaxValue.Blank
         | Some e -> Typing.coerce (unifyAll ev ctx branches) (ev.Scalar(ctx, e))
 
-    let private ifType: IEval -> Ctx -> Expr list -> DaxType option =
+    let private ifType: IEval -> Ctx -> Expr list -> StaticType =
         fun ev ctx args -> unifyAll ev ctx args.Tail
 
     /// SWITCH ( expression, value, result, ..., [else] ).
@@ -95,7 +103,7 @@ module Logical =
 
         Fn.scalar "TRUE" "Logical" (0, 0) (Fn.typeIs DaxType.Boolean) (fun _ _ _ -> DaxValue.Boolean true)
         Fn.scalar "FALSE" "Logical" (0, 0) (Fn.typeIs DaxType.Boolean) (fun _ _ _ -> DaxValue.Boolean false)
-        Fn.scalar "BLANK" "Logical" (0, 0) (fun _ _ _ -> None) (fun _ _ _ -> DaxValue.Blank)
+        Fn.scalar "BLANK" "Logical" (0, 0) (fun _ _ _ -> StaticType.Blank) (fun _ _ _ -> DaxValue.Blank)
 
         // "COALESCE returns the first argument that is not BLANK ... An empty string and 0 are not
         // BLANK"; "The data type of the result can be different from the data type of the returned
@@ -123,8 +131,9 @@ module Logical =
             (2, 3)
             (fun ev ctx args ->
                 match List.tryItem 2 args with
-                | Some alt when not (Fn.isOmitted alt) -> Typing.unify (Some DaxType.Decimal) (ev.TypeOf(ctx, alt))
-                | _ -> Some DaxType.Decimal)
+                | Some alt when not (Fn.isOmitted alt) ->
+                    Typing.unify (StaticType.Known DaxType.Decimal) (ev.TypeOf(ctx, alt))
+                | _ -> StaticType.Known DaxType.Decimal)
             (fun ev ctx call ->
                 let number (e: Expr) =
                     match ev.Scalar(ctx, e) with
@@ -139,7 +148,10 @@ module Logical =
                 | DaxValue.Blank
                 | DaxValue.Decimal 0.0 ->
                     match List.tryItem 2 call.Args with
-                    | Some alt when not (Fn.isOmitted alt) -> ev.Scalar(ctx, alt)
+                    | Some alt when not (Fn.isOmitted alt) ->
+                        Typing.coerce
+                            (Typing.unify (StaticType.Known DaxType.Decimal) (ev.TypeOf(ctx, alt)))
+                            (ev.Scalar(ctx, alt))
                     | _ -> DaxValue.Blank
                 | _ -> Fail.dax ctx call.Span (DaxValue.divide n d))
 
@@ -164,7 +176,7 @@ module Logical =
                 DaxValue.Boolean true)
 
         // "stops the execution raising an error with the description provided" (dax.guide/error).
-        Fn.scalar "ERROR" "Logical" (1, 1) (fun _ _ _ -> None) (fun ev ctx call ->
+        Fn.scalar "ERROR" "Logical" (1, 1) (fun _ _ _ -> StaticType.Blank) (fun ev ctx call ->
             Fail.runtime ctx call.Span (DaxValue.toText (ev.Scalar(ctx, call.Args.[0]))))
 
         // CONTAINSROW ( table, value, ... ): what IN runs ("The IN operator internally executes
@@ -258,9 +270,9 @@ module Math =
             (1, 1)
             (fun ev ctx args ->
                 match ev.TypeOf(ctx, args.[0]) with
-                | Some DaxType.Currency -> Some DaxType.Currency
-                | Some(DaxType.Integer | DaxType.Decimal) -> Some DaxType.Integer
-                | _ -> Some DaxType.Variant)
+                | StaticType.Known DaxType.Currency -> StaticType.Known DaxType.Currency
+                | StaticType.Known(DaxType.Integer | DaxType.Decimal) -> StaticType.Known DaxType.Integer
+                | _ -> StaticType.Unknown)
             (fun ev ctx call ->
                 match number ctx call.Args.[0] "INT" (ev.Scalar(ctx, call.Args.[0])) with
                 | DaxValue.Decimal d ->

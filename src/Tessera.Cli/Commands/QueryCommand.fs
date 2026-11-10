@@ -1,4 +1,5 @@
-/// `tess query`: run a DAX query against a model on a server and print the result.
+/// `tess query`: run a DAX query and print the result: against a model on a server, or against
+/// model files with fixture data (`--data`), evaluated by the local engine.
 module Tessera.Cli.QueryCommand
 
 open System
@@ -12,7 +13,7 @@ open Tessera.Cli.Common
 
 /// One-line description, shown in `tess --help`.
 let summary =
-    "run a DAX query on a server model (xmla:<server>;<database>): a table, --csv or --json."
+    "run a DAX query on a server model (xmla:<server>;<database>), or offline on model files with --data <fixture>."
 
 /// Rows shown per result unless --max-rows says otherwise.
 let defaultMaxRows = 1000
@@ -22,17 +23,25 @@ type Args =
     | [<AltCommandLine("-f")>] File of path: string
     | Csv
     | Max_Rows of rows: int
+    | Data of directory: string
+    | Coverage
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
             | Target _ ->
-                "the model, xmla:<server>[;<database>] (quote it: `;` ends a shell command), followed by the DAX "
-                + "query, or `-` to read it from standard input."
+                "the model: xmla:<server>[;<database>] (quote it: `;` ends a shell command), or model files with "
+                + "--data; followed by the DAX query, or `-` to read it from standard input."
             | File _ -> "read the DAX query from this file."
             | Csv -> "write CSV (several results are separated by an empty line)."
             | Max_Rows _ ->
                 $"rows to return per result (default {defaultMaxRows}; 0 for all). A result cut short is marked truncated."
+            | Data _ ->
+                "evaluate offline with the local DAX engine, over this fixture directory (see `tess data`). "
+                + "Nothing leaves the machine."
+            | Coverage ->
+                "instead of running a query: list which measures, calculated columns and calculated tables of "
+                + "the model files the local engine can evaluate, and what the others use that it doesn't support."
 
 let private queryJson (source: string) (results: QueryResult list) (elapsed: TimeSpan) =
     obj [
@@ -57,16 +66,186 @@ let private readDax (args: ParseResults<Args>) (rest: string list) : Result<stri
     | None, [] -> Error(UsageError "expected a DAX query: an argument, `-` (standard input) or --file <path>")
     | None, _ -> Error(UsageError "expected one DAX query (quote it)")
 
+/// Print results as JSON, CSV or tables.
+let private render
+    (ctx: Ctx)
+    (args: ParseResults<Args>)
+    (source: string)
+    (results: QueryResult list)
+    (elapsed: TimeSpan)
+    (maxRows: int)
+    =
+    if ctx.Json then
+        writeJson ctx.Out (queryJson source results elapsed)
+    elif args.Contains Args.Csv then
+        results
+        |> List.iteri (fun i r ->
+            if i > 0 then
+                ctx.Out.WriteLine()
+
+            ctx.Out.Write(QueryResult.toCsv ctx.Out.NewLine r))
+    else
+        results
+        |> List.iteri (fun i r ->
+            if i > 0 then
+                ctx.Out.WriteLine()
+
+            for line in QueryResult.toTable r do
+                ctx.Out.WriteLine line)
+
+    if not ctx.Json && results |> List.exists _.Truncated then
+        ctx.Err.WriteLine($"Showing the first {maxRows} rows of each result (--max-rows 0 for all).")
+
+    Done
+
+/// The first `limit` rows of a result, marked truncated if there were more.
+let private cap (limit: int option) (r: QueryResult) : QueryResult =
+    match limit with
+    | Some n when r.Rows.Length > n -> {
+        r with
+            Rows = List.truncate n r.Rows
+            Truncated = true
+      }
+    | _ -> r
+
+/// `--coverage`: what the local engine can evaluate of a model, told from the model alone.
+let private coverage (ctx: Ctx) (source: string) =
+    match ModelIO.loadPath source with
+    | Error e -> Failed e
+    | Ok(src, db) ->
+        let items = Engine.coverage db
+
+        let ofKind (kind: ObjectKind) =
+            items |> List.filter (fun (r, _) -> r.Kind = kind)
+
+        let supported (xs: (ObjectRef * string list) list) =
+            xs |> List.filter (fun (_, u) -> u.IsEmpty) |> List.length
+
+        let reasons =
+            items
+            |> List.collect (fun (_, unsupported) -> unsupported)
+            |> List.countBy id
+            |> List.sortBy (fun (reason, n) -> -n, reason)
+
+        let kinds = [
+            "measures", ObjectKind.Measure
+            "calculatedColumns", ObjectKind.Column
+            "calculatedTables", ObjectKind.Table
+        ]
+
+        if ctx.Json then
+            writeJson
+                ctx.Out
+                (obj [
+                    "command", str "query coverage"
+                    "source", str (src.Path)
+                    "summary",
+                    obj [
+                        for (name, kind) in kinds ->
+                            name,
+                            obj [
+                                "total", num (ofKind kind).Length
+                                "supported", num (supported (ofKind kind))
+                            ]
+                    ]
+                    "objects",
+                    arr [
+                        for (r, unsupported) in items ->
+                            obj [
+                                "ref", str (ObjectRef.format r)
+                                "kind", str (ObjectKind.token r.Kind)
+                                "supported", bool unsupported.IsEmpty
+                                "unsupported", arr (unsupported |> List.map str)
+                            ]
+                    ]
+                    "unsupported", arr [ for (reason, n) in reasons -> obj [ "reason", str reason; "objects", num n ] ]
+                ])
+        else
+            for (r, unsupported) in items do
+                if not unsupported.IsEmpty then
+                    let why = String.concat "; " unsupported
+                    ctx.Out.WriteLine($"{ObjectRef.format r}  {why}")
+
+            if items |> List.exists (fun (_, u) -> not u.IsEmpty) then
+                ctx.Out.WriteLine()
+
+            for (name, kind) in
+                [
+                    "measures", ObjectKind.Measure
+                    "calculated columns", ObjectKind.Column
+                    "calculated tables", ObjectKind.Table
+                ] do
+                let all = ofKind kind
+
+                if not all.IsEmpty then
+                    ctx.Out.WriteLine($"{supported all} of {all.Length} {name} can be evaluated by the local engine")
+
+            if not reasons.IsEmpty then
+                ctx.Out.WriteLine()
+                ctx.Out.WriteLine "Not supported, by how many objects use it:"
+
+                for (reason, n) in reasons do
+                    ctx.Out.WriteLine($"  {n, 4}  {reason}")
+
+        Done
+
+/// A query on model files, evaluated by the local engine over a fixture.
+let private local
+    (ctx: Ctx)
+    (args: ParseResults<Args>)
+    (source: string)
+    (directory: string)
+    (dax: string)
+    (maxRows: int)
+    =
+    let clock = Stopwatch.StartNew()
+
+    match ModelIO.loadPath source with
+    | Error e -> Failed e
+    | Ok(src, db) ->
+        match Fixture.loadAndCheck db directory with
+        | Error e -> Failed e
+        | Ok(loaded, issues) ->
+            let errors =
+                issues
+                |> List.filter (fun i -> i.Severity = Validate.Severity.Error)
+                |> List.length
+
+            if errors > 0 then
+                Failed(FixtureHasErrors(loaded.Directory, errors))
+            else
+                match
+                    Engine.prepare db loaded.Store
+                    |> Result.bind (fun p -> Engine.evaluateQuery p dax)
+                with
+                | Error e -> Failed e
+                | Ok results ->
+                    let limit = if maxRows = 0 then None else Some maxRows
+                    render ctx args (src.Path) (results |> List.map (cap limit)) clock.Elapsed maxRows
+
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let maxRows = args.TryGetResult Args.Max_Rows |> Option.defaultValue defaultMaxRows
+    let data = args.TryGetResult Args.Data
 
     match args.TryGetResult Args.Target |> Option.defaultValue [] with
-    | [] -> UsageError "expected a model (xmla:<server>;<database>) and a DAX query"
+    | [] -> UsageError "expected a model (xmla:<server>;<database>, or model files with --data) and a DAX query"
     | _ when maxRows < 0 -> UsageError "--max-rows must be 0 (all rows) or more"
     | _ when ctx.Json && args.Contains Args.Csv -> UsageError "--json and --csv can't be combined"
-    | source :: _ when not (XmlaAddress.isRemote source) ->
+    | source :: _ when XmlaAddress.isRemote source && (data.IsSome || args.Contains Args.Coverage) ->
+        UsageError "--data and --coverage are for model files: a server model is queried on the server"
+    | source :: rest when args.Contains Args.Coverage ->
+        if not rest.IsEmpty || args.Contains Args.File then
+            UsageError "--coverage takes the model only, not a query"
+        else
+            coverage ctx source
+    | source :: _ when not (XmlaAddress.isRemote source) && data.IsNone ->
         UsageError
-            $"'{source}' is not a server model: tess runs queries on a server only (xmla:<server>;<database>), not yet on model files"
+            $"'{source}' is model files: give the fixture data to evaluate over with --data <directory> (see `tess data init`), or query a server model (xmla:<server>;<database>)"
+    | source :: rest when not (XmlaAddress.isRemote source) ->
+        match readDax args rest with
+        | Error outcome -> outcome
+        | Ok dax when String.IsNullOrWhiteSpace dax -> UsageError "the DAX query is empty"
+        | Ok dax -> local ctx args source data.Value dax maxRows
     | source :: rest ->
         match readDax args rest with
         | Error outcome -> outcome
@@ -80,26 +259,4 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
                 |> Result.bind (fun address -> Remote.query (Source.access ctx) address dax limit)
             with
             | Error e -> Failed e
-            | Ok(address, results) ->
-                if ctx.Json then
-                    writeJson ctx.Out (queryJson (XmlaAddress.display address) results clock.Elapsed)
-                elif args.Contains Args.Csv then
-                    results
-                    |> List.iteri (fun i r ->
-                        if i > 0 then
-                            ctx.Out.WriteLine()
-
-                        ctx.Out.Write(QueryResult.toCsv ctx.Out.NewLine r))
-                else
-                    results
-                    |> List.iteri (fun i r ->
-                        if i > 0 then
-                            ctx.Out.WriteLine()
-
-                        for line in QueryResult.toTable r do
-                            ctx.Out.WriteLine line)
-
-                if not ctx.Json && results |> List.exists _.Truncated then
-                    ctx.Err.WriteLine($"Showing the first {maxRows} rows of each result (--max-rows 0 for all).")
-
-                Done
+            | Ok(address, results) -> render ctx args (XmlaAddress.display address) results clock.Elapsed maxRows
