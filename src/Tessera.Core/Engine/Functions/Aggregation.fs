@@ -501,7 +501,8 @@ module Aggregation =
         // "A BLANK value of Expression becomes an empty string, but CONCATENATEX still adds the
         // delimiter"; "The result is BLANK when Table has no rows"; "Delimiter is not evaluated in
         // the row context of Table" (dax.guide/concatenatex). Without an order-by the order is not
-        // defined by the engine, so that form is refused.
+        // defined by the engine: all the rows tie, and the result is refused unless the order can't
+        // change it (no rows, or the same text in each).
         Fn.scalar "CONCATENATEX" "Aggregation" (2, -1) (Fn.typeIs DaxType.String) (fun ev ctx call ->
             let table = ev.Table(ctx, call.Args.[0])
 
@@ -571,14 +572,12 @@ module Aggregation =
                     Fail.notSupported
                         ctx
                         call.Span
-                        "CONCATENATEX over rows that tie on the order-by expressions with different texts"
+                        (if keys.IsEmpty then
+                             "CONCATENATEX without an order-by expression, over rows with different texts (the engine doesn't define their order)"
+                         else
+                             "CONCATENATEX over rows that tie on the order-by expressions with different texts")
 
                 DaxValue.String(String.Join(delimiter, sorted |> List.map fst)))
-        |> Fn.withCheck (fun args ->
-            if args.Length < 4 then
-                Some "CONCATENATEX without an order-by expression (the engine doesn't define the order of the texts)"
-            else
-                None)
 
         // dax.guide/rankx and Microsoft Learn RANKX: the expression is evaluated for each row of
         // the table; the value (the expression again when omitted) in the context of the call;

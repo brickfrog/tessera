@@ -411,8 +411,19 @@ let tests =
 
                 is (p ()) "CONCATENATEX ( FILTER ( Customer, FALSE ), Customer[Name], \",\", Customer[Name] )" null
                 is (p ()) "CONCATENATEX ( { 1, 2 }, IF ( [Value] = 1, \"a\" ), \"-\", [Value] )" "a-")
-            testCase "CONCATENATEX without an order is refused: the engine doesn't define one" (fun () ->
-                isError "not-supported" "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name] )")
+            // Without an order-by the engine doesn't define the order, so the result is given only
+            // when no order could change it: "The result is BLANK when Table has no rows"
+            // (dax.guide/concatenatex), or every text is the same.
+            testCase "CONCATENATEX without an order is refused unless the order can't matter" (fun () ->
+                isError "not-supported" "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name] )"
+                is (p ()) "CONCATENATEX ( FILTER ( Customer, FALSE ), Customer[Name], \",\" )" null
+                // Two US customers: "US" twice.
+                is
+                    (p ())
+                    "CONCATENATEX ( FILTER ( Customer, Customer[Country] = \"US\" ), Customer[Country], \"/\" )"
+                    "US/US"
+
+                is (p ()) "CONCATENATEX ( { 7 }, [Value] )" "7")
             // Amount per product name: Bike 410, Helmet 160, Lock 15, Pump BLANK, and the blank row
             // 40. "If expression or value evaluates to BLANK it is treated as a 0" (Microsoft Learn,
             // RANKX); order DESC and ties SKIP by default.

@@ -1283,8 +1283,6 @@ let tests =
             // evaluator uses.
             testCase "argument forms that are refused show in coverage, and when evaluated" (fun () ->
                 let forms = [
-                    "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name], \", \" )",
-                    "CONCATENATEX without an order-by"
                     "COUNTROWS ( SUMMARIZE ( Sales, \"x\", 1 ) )", "SUMMARIZE without a group-by column"
                     "COUNTROWS ( GROUPBY ( Sales ) )", "GROUPBY without a group-by column"
                     "CALCULATE ( [Amount], CROSSFILTER ( Sales[ProductKey], Product[ProductKey], ONEWAY_LEFTFILTERSRIGHT ) )",

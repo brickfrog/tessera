@@ -1,6 +1,5 @@
 # Core-area cases the local engine doesn't pass. See ConformanceTests.fs (baseline).
 aggregation/concatenatex-blank-value-keeps-delimiter	not-supported
-aggregation/concatenatex-empty-table-is-blank	not-supported
 assumptions/blank-and-blank-is-not-blank	not-supported
 assumptions/blank-or-blank-is-not-blank	not-supported
 assumptions/convert-integer-rounds-half-away-from-zero	not-supported
