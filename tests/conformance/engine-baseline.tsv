@@ -10,7 +10,6 @@ assumptions/text-with-currency-symbol-plus-number	not-supported
 assumptions/text-with-thousands-separator-plus-number	not-supported
 blank-row/distinctcount-and-blank-row	not-supported
 blank/equals-date-zero	not-supported
-blank/if-boolean-branch-blank	fail
 blank/less-than-date	not-supported
 calculate/boolean-filter-with-measure-is-an-error	not-supported
 conditional/if-eager-evaluates-the-untaken-branch	fail

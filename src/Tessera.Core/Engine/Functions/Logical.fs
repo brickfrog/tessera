@@ -39,7 +39,13 @@ module Logical =
         match chosen with
         // "If omitted, a BLANK is returned" (dax.guide/if).
         | None -> DaxValue.Blank
-        | Some e -> Typing.coerce (unifyAll ev ctx branches) (ev.Scalar(ctx, e))
+        | Some e ->
+            match unifyAll ev ctx branches, ev.Scalar(ctx, e) with
+            // "When <expression> is of Boolean data type, IF is of Boolean data type and an implicit
+            // cast is applied to BLANK which converts to FALSE" (SQLBI, "BLANK handling in DAX":
+            // IF ( 1 = 1, BLANK(), TRUE ) is FALSE).
+            | StaticType.Known DaxType.Boolean, DaxValue.Blank -> DaxValue.Boolean false
+            | t, v -> Typing.coerce t v
 
     let private ifType: IEval -> Ctx -> Expr list -> StaticType =
         fun ev ctx args -> unifyAll ev ctx args.Tail

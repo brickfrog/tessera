@@ -175,6 +175,11 @@ let tests =
                 is (p ()) "ISERROR ( DIVIDE ( 1, 0 ) )" false
                 is (p ()) "IFERROR ( 25 / 0, 9999 )" 9999.0
                 is (p ()) "IFERROR ( 1 / 4, 9999 )" 0.25)
+            // "an implicit cast is applied to BLANK which converts to FALSE" (SQLBI, "BLANK handling in DAX").
+            testCase "a Boolean IF turns a BLANK branch into FALSE" (fun () ->
+                is (p ()) "IF ( 1 = 1, BLANK (), TRUE )" false
+                is (p ()) "IF ( 1 = 2, TRUE, BLANK () )" false
+                is (p ()) "ISBLANK ( IF ( 1 = 1, BLANK (), 1 ) )" true)
             testCase "an ERROR is reported with its text and position" (fun () ->
                 match scalarError (p ()) "1 + ERROR ( \"boom\" )" with
                 | DaxEvaluation(text, at) ->
