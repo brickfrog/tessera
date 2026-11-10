@@ -1,0 +1,30 @@
+{
+  "title": "BLANK + BLANK is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () + BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "BLANK + BLANK",
+    "supports": "the table of operations on blanks lists BLANK + BLANK with the result BLANK"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-add"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK sum has."
+}

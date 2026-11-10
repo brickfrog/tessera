@@ -1,0 +1,47 @@
+{
+  "title": "VALUES of a one-side column includes the blank row for orphans",
+  "model": "sales-orphans",
+  "query": "EVALUATE VALUES ( Product[Color] ) ORDER BY Product[Color]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Red"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/values/",
+      "quote": "VALUES includes the blank row caused by an invalid relationship, if present",
+      "supports": "VALUES returns the blank row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "If a relationship is invalid, the VertiPaq engine automatically adds a row containing BLANK in every column of the table on the one-side of the relationship",
+      "supports": "Sales has ProductKey 9, which Product lacks, so Product gets the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] holds Red, Blue, Red: two distinct values. Sales rows 3 and 4 have ProductKey 9, not in Product, so the relationship is invalid and Product gets a blank row; VALUES returns it. Sorted ascending, BLANK comes first.",
+  "tags": [
+    "values",
+    "blank-row",
+    "relationship",
+    "order-by"
+  ],
+  "notes": "Not marked ordered: where BLANK sorts is a separate case (assumption:blank-sorts-first)."
+}

@@ -1,0 +1,35 @@
+{
+  "title": "DISTINCT of a one-side column leaves out the blank row for orphans",
+  "model": "sales-orphans",
+  "query": "EVALUATE DISTINCT ( Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Blue"
+        ],
+        [
+          "Red"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/values/",
+    "quote": "DISTINCT does not return the blank row caused by an invalid relationship",
+    "supports": "DISTINCT leaves the blank row out"
+  },
+  "confidence": "derived",
+  "derivation": "Product[Color] holds Red, Blue, Red: the distinct values are Red and Blue. The blank row added for the orphan Sales rows is not returned by DISTINCT.",
+  "tags": [
+    "distinct",
+    "blank-row",
+    "relationship"
+  ]
+}

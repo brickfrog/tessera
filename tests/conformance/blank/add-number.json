@@ -1,0 +1,30 @@
+{
+  "title": "BLANK + 5 is 5",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () + 5 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "BLANK + 5",
+    "supports": "the table of operations on blanks lists BLANK + 5 with the result 5"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-add"
+  ]
+}
