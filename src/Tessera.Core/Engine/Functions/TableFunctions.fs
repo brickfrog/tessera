@@ -188,6 +188,91 @@ module TableFunctions =
                         row
             |])
 
+    /// NATURALINNERJOIN and NATURALLEFTOUTERJOIN of tables whose columns have no data lineage
+    /// (DATATABLE, table constructors, columns computed by ADDCOLUMNS or SELECTCOLUMNS): "Tables
+    /// are joined on common columns (by name) in the two tables. If the two tables have no common
+    /// column names, an error is returned. Columns being joined on must have the same data type in
+    /// both tables"; "Strict comparison semantics are used during join" (Microsoft Learn,
+    /// NATURALINNERJOIN). "When a row of the left table matches more than one row of the right
+    /// table, the result has one row for each match. A row of the left table without a match is
+    /// returned once, with blank values in the columns of the right table" (dax.guide/
+    /// naturalleftouterjoin). Tables with model columns are joined over their expanded tables and
+    /// by lineage, which is not implemented; nor is a join on a key that is BLANK in some row (if
+    /// BLANK matches BLANK is not documented).
+    let private naturalJoin (outer: bool) (name: string) =
+        Fn.table name "Table manipulation" (2, 2) (fun ev ctx call ->
+            let left = ev.Table(ctx, call.Args.[0])
+            let right = ev.Table(ctx, call.Args.[1])
+
+            if
+                Array.append left.Cols right.Cols
+                |> Array.exists (fun c -> not (isNull c.Lineage) || not (isNull c.Table))
+            then
+                Fail.notSupported ctx call.Span $"{name} of tables with columns of the model (joins by data lineage)"
+
+            let named (t: TableVal) (n: string) =
+                t.Cols
+                |> Array.tryFindIndex (fun c -> String.Equals(c.Name, n, StringComparison.OrdinalIgnoreCase))
+
+            let common =
+                left.Cols
+                |> Array.indexed
+                |> Array.choose (fun (i, c) -> named right c.Name |> Option.map (fun j -> i, j))
+
+            if common.Length = 0 then
+                Fail.invalid ctx call.Span $"the two tables of {name} have no column in common"
+
+            for i, j in common do
+                let a, b = left.Cols.[i], right.Cols.[j]
+
+                if a.Type = DaxType.Variant || b.Type = DaxType.Variant then
+                    Fail.notSupported ctx call.Span $"{name} on a column whose values are of different data types"
+
+                if a.Type <> b.Type then
+                    Fail.invalid
+                        ctx
+                        call.Span
+                        $"the column [{a.Name}] has a different data type in the two tables of {name}, so they can't be joined on it"
+
+            let keyOf (t: TableVal) (cols: int array) (row: int) =
+                let key = cols |> Array.map (fun c -> t.Get(c, row))
+
+                if key |> Array.exists DaxValue.isBlank then
+                    Fail.notSupported ctx call.Span $"{name} on a key that is BLANK in some row"
+
+                key
+
+            let rightOnly =
+                [| 0 .. right.Cols.Length - 1 |]
+                |> Array.filter (fun j -> not (common |> Array.exists (fun (_, x) -> x = j)))
+
+            let byKey =
+                Dictionary<DaxValue array, ResizeArray<int>>(
+                    ValueArrayComparer(ctx.Model.Comparer) :> IEqualityComparer<DaxValue array>
+                )
+
+            for row in 0 .. right.Count - 1 do
+                let key = keyOf right (common |> Array.map snd) row
+
+                match byKey.TryGetValue key with
+                | true, rows -> rows.Add row
+                | _ -> byKey.[key] <- ResizeArray [ row ]
+
+            let rows = ResizeArray<DaxValue array>()
+
+            for row in 0 .. left.Count - 1 do
+                let mine = left.Row row
+
+                match byKey.TryGetValue(keyOf left (common |> Array.map fst) row) with
+                | true, matches ->
+                    for m in matches do
+                        rows.Add(Array.append mine (rightOnly |> Array.map (fun j -> right.Get(j, m))))
+                | _ ->
+                    if outer then
+                        rows.Add(Array.append mine (rightOnly |> Array.map (fun _ -> DaxValue.Blank)))
+
+            Tables.ofRows (Array.append left.Cols (rightOnly |> Array.map (fun j -> right.Cols.[j]))) rows)
+
     let private generate (all: bool) (name: string) =
         Fn.table name "Table manipulation" (2, 2) (fun ev ctx call ->
             let left = ev.Table(ctx, call.Args.[0])
@@ -929,6 +1014,8 @@ module TableFunctions =
 
             Tables.ofColumns (columns |> Array.map fst) (columns |> Array.map snd) (tables |> List.sumBy _.Count))
 
+        naturalJoin false "NATURALINNERJOIN"
+        naturalJoin true "NATURALLEFTOUTERJOIN"
         setOperation true "INTERSECT"
         setOperation false "EXCEPT"
 

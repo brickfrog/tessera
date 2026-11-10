@@ -138,6 +138,48 @@ module Filter =
             sameTable ctx call.Span name cols |> ignore
             fun c -> cols |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
 
+    /// ALLEXCEPT as a table: "all the unique combinations of the columns in the table specified
+    /// in the first argument that are not listed in the following arguments"
+    /// (dax.guide/allexcept), with no filter applied. Whether the blank row of an invalid
+    /// relationship is among them isn't stated, so a table that has one is refused; so is a table
+    /// as a kept argument, and listing every column.
+    let private allExceptTable (ev: IEval) (ctx: Ctx) (call: Call) : TableVal =
+        let t =
+            match ev.TryModelTable(ctx, call.Args.Head) with
+            | Some t -> t
+            | None -> Fail.invalid ctx call.Args.Head.Span "the first argument of ALLEXCEPT is a table"
+
+        let kept =
+            call.Args.Tail
+            |> List.map (fun k ->
+                if (ev.TryModelTable(ctx, k)).IsSome then
+                    Fail.notSupported ctx k.Span "ALLEXCEPT as a table with a table among the kept arguments"
+
+                let kc = ev.Column(ctx, k)
+
+                if not (ctx.Filter.Config.IsExpanded(t, kc.Table)) then
+                    Fail.invalid
+                        ctx
+                        k.Span
+                        $"'{kc.Table.Name}'[{kc.Name}] is not a column of '{t.Name}' or of a table related to it"
+
+                kc)
+
+        let rest =
+            t.Columns
+            |> Array.filter (fun c -> not (kept |> List.exists (fun k -> obj.ReferenceEquals(k, c))))
+
+        if rest.Length = 0 then
+            Fail.notSupported ctx call.Span "ALLEXCEPT as a table that lists every column of the table"
+
+        if t.HasBlankRow then
+            Fail.notSupported
+                ctx
+                call.Span
+                $"ALLEXCEPT as a table over '{t.Name}', which has a blank row for an invalid relationship (whether it is returned isn't documented)"
+
+        combinations rest (allRows t false)
+
     let private relationship (ev: IEval) (ctx: Ctx) (call: Call) : BRel =
         let a = ev.Column(ctx, call.Args.[0])
         let b = ev.Column(ctx, call.Args.[1])
@@ -416,12 +458,7 @@ module Filter =
 
         {
             Fn.modifier "ALLEXCEPT" "Filter" (2, -1) with
-                Table =
-                    fun _ ctx call ->
-                        Fail.notSupported
-                            ctx
-                            call.Span
-                            "ALLEXCEPT as a table (it is supported as a filter argument of CALCULATE)"
+                Table = allExceptTable
         }
 
         Fn.table "ALL" "Filter" (0, -1) (allTable "ALL" true)

@@ -1,7 +1,6 @@
 # Core-area cases the local engine doesn't pass. See ConformanceTests.fs (baseline).
 aggregation/concatenatex-blank-value-keeps-delimiter	not-supported
 aggregation/concatenatex-empty-table-is-blank	not-supported
-all-removefilters/allexcept-as-table-function-returns-other-columns	not-supported
 assumptions/blank-and-blank-is-not-blank	not-supported
 assumptions/blank-or-blank-is-not-blank	not-supported
 assumptions/convert-integer-rounds-half-away-from-zero	not-supported
@@ -97,12 +96,7 @@ relationships/one-to-one-filter-to-second-table	not-supported
 relationships/one-to-one-related-blank-for-missing-row	not-supported
 relationships/related-across-limited-relationship-error	not-supported
 relationships/userelationship-table-expansion-fixed-when-table-is-evaluated	not-supported
-selection/firstnonblank-aggregate-without-context-transition	not-supported
-selection/firstnonblank-skips-value-with-blank-measure	not-supported
 selection/isfiltered-iscrossfiltered-filter-on-many-side	not-supported
-selection/lastnonblank-skips-value-with-blank-measure	not-supported
-set-functions/naturalinnerjoin	not-supported
-set-functions/naturalleftouterjoin	not-supported
 set-functions/table-constructor-column-names-and-types	not-supported
 set-functions/table-constructor-mixed-types-to-string	not-supported
 sorting/maxx-variant-true-ranks-text-above-numbers	not-supported

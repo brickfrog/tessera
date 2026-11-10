@@ -556,6 +556,90 @@ let tests =
                 // "data comparison with no type coercion": the whole number 1 is not the decimal 1.
                 returns (p ()) "EVALUATE INTERSECT ( { 1 }, { 1.0 } )" []
                 Expect.equal (queryCode (p ()) "EVALUATE UNION ( { 1 }, { ( 1, 2 ) } )") "dax-invalid" "column counts")
+            // "Tables are joined on common columns (by name)"; "If the two tables have no common
+            // column names, an error is returned"; "Columns being joined on must have the same data
+            // type in both tables" (Microsoft Learn, NATURALINNERJOIN). "A row of the left table
+            // without a match is returned once, with blank values in the columns of the right
+            // table" (dax.guide/naturalleftouterjoin).
+            testCase "NATURALINNERJOIN and NATURALLEFTOUTERJOIN" (fun () ->
+                let left =
+                    "DATATABLE ( \"K\", INTEGER, \"A\", STRING, { { 1, \"x\" }, { 2, \"y\" } } )"
+
+                let right =
+                    "DATATABLE ( \"K\", INTEGER, \"B\", STRING, { { 2, \"p\" }, { 2, \"q\" }, { 3, \"r\" } } )"
+
+                let inner = $"EVALUATE NATURALINNERJOIN ( {left}, {right} )"
+                // K = 2 matches twice; 1 and 3 have no partner.
+                returns (p ()) inner [ [ 2; "y"; "p" ]; [ 2; "y"; "q" ] ]
+
+                Expect.equal
+                    (columns (query (p ()) inner))
+                    [ "[K]", "int64"; "[A]", "string"; "[B]", "string" ]
+                    "the key once"
+
+                returns (p ()) $"EVALUATE NATURALLEFTOUTERJOIN ( {left}, {right} )" [
+                    [ 1; "x"; null ]
+                    [ 2; "y"; "p" ]
+                    [ 2; "y"; "q" ]
+                ]
+
+                Expect.equal
+                    (queryCode (p ()) "EVALUATE NATURALINNERJOIN ( { 1 }, ROW ( \"x\", 1 ) )")
+                    "dax-invalid"
+                    "no common column"
+
+                Expect.equal
+                    (queryCode
+                        (p ())
+                        "EVALUATE NATURALINNERJOIN ( DATATABLE ( \"K\", INTEGER, { { 1 } } ), DATATABLE ( \"K\", DOUBLE, { { 1 } } ) )")
+                    "dax-invalid"
+                    "different data types"
+
+                notSupported (p ()) "EVALUATE NATURALINNERJOIN ( Sales, Product )" "lineage"
+                notSupported (p ()) "EVALUATE NATURALINNERJOIN ( { 1, BLANK () }, { 1 } )" "BLANK")
+            // "all the unique combinations of the columns in the table specified in the first
+            // argument that are not listed in the following arguments" (dax.guide/allexcept).
+            testCase "ALLEXCEPT as a table" (fun () ->
+                returns (p ()) "EVALUATE ALLEXCEPT ( Customer, Customer[CustomerKey], Customer[Name] )" [
+                    [ "US" ]
+                    [ "UK" ]
+                ]
+                // No filter applies to it.
+                Expect.equal
+                    (rows
+                        (p ())
+                        "EVALUATE CALCULATETABLE ( ALLEXCEPT ( Customer, Customer[CustomerKey] ), Customer[Country] = \"UK\" )")
+                        .Length
+                    3
+                    "all of Name, Country"
+                // Product has the blank row of Sales' product 9.
+                notSupported (p ()) "EVALUATE ALLEXCEPT ( Product, Product[ProductKey] )" "blank row"
+                notSupported (p ()) "EVALUATE ALLEXCEPT ( Customer, Customer )" "table")
+            // "Returns the first value in the column for which the expression has a non blank
+            // value"; a column reference "is replaced by CALCULATETABLE ( DISTINCT ( <ColumnName> )
+            // )" (dax.guide/firstnonblank). FIRSTNONBLANKVALUE is "CALCULATE ( <Expression>,
+            // FIRSTNONBLANK ( <ColumnName>, CALCULATE ( <Expression> ) ) )"
+            // (dax.guide/firstnonblankvalue).
+            testCase "FIRSTNONBLANK, LASTNONBLANK and their VALUE forms" (fun () ->
+                // Ann has sales (200 + 60 + 110).
+                returns (p ()) "EVALUATE FIRSTNONBLANK ( Customer[Name], [Amount] )" [ [ "Ann" ] ]
+                // Bike, Helmet, Lock, Pump: Pump has no sales; the blank row is not among the values.
+                returns (p ()) "EVALUATE LASTNONBLANK ( Product[Name], [Amount] )" [ [ "Lock" ] ]
+                is (p ()) "FIRSTNONBLANKVALUE ( Product[Name], [Amount] )" 410
+                is (p ()) "LASTNONBLANKVALUE ( Product[Name], [Amount] )" 15
+                // Cy: 15 + 100.
+                is (p ()) "LASTNONBLANKVALUE ( Customer[Name], [Amount] )" 115
+                // The column's values come after a context transition: per country, its customers.
+                returns
+                    (p ())
+                    "EVALUATE ADDCOLUMNS ( VALUES ( Customer[Country] ), \"f\", FIRSTNONBLANK ( Customer[Name], [Amount] ) )"
+                    [ [ "US"; "Ann" ]; [ "UK"; "Bob" ] ]
+                // A table of one column, in a row context on each value.
+                returns (p ()) "EVALUATE FIRSTNONBLANK ( { 3, 1, 2 }, IF ( [Value] > 1, 1 ) )" [ [ 2 ] ]
+                returns (p ()) "EVALUATE LASTNONBLANK ( { 3, 1, 2 }, IF ( [Value] < 3, 1 ) )" [ [ 2 ] ]
+                returns (p ()) "EVALUATE FIRSTNONBLANK ( Customer[Name], BLANK () )" []
+                notSupported (p ()) "EVALUATE FIRSTNONBLANK ( Customer[Name] = \"Ann\", 1 )" "Boolean"
+                notSupported (p ()) "EVALUATE FIRSTNONBLANK ( { 1, \"a\" }, 1 )" "different data types")
             // "Column names from table arguments must all be different in all tables or an error
             // is returned" (Microsoft Learn, CROSSJOIN).
             testCase "CROSSJOIN" (fun () ->
