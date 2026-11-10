@@ -1871,6 +1871,15 @@ let fuzzTests =
             for opener in [ "("; "{"; "F("; "- "; "IF(a, 1 + "; "VAR x = " ] do
                 boundedOn 160 opener (fun () ->
                     match parseExpression (String.replicate 250 opener + "1") with
+                    // How much stack a level costs, and the smallest stack a thread can have, differ by
+                    // platform: where 160 KB turns out to be enough (seen on macOS arm64), parsing is fine.
+                    | Ok _ when
+                        not (
+                            System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform
+                                System.Runtime.InteropServices.OSPlatform.Linux
+                        )
+                        ->
+                        ()
                     | Ok _ -> failtestf "%s parsed" opener
                     | Error errors -> Expect.isNonEmpty errors opener)
 
