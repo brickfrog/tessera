@@ -1,6 +1,8 @@
 /// Checks against a real server. They run only when TESSERA_XMLA_SERVER and TESSERA_XMLA_DATABASE
 /// are set (with credentials in the TESS_XMLA_* variables, as for the tool itself); otherwise they
 /// are skipped. They only read: nothing is deployed. See docs/xmla-manual-test.md.
+/// The one exception needs a second opt-in, TESSERA_XMLA_ALLOW_REFRESH=1: it runs a `calculate`
+/// refresh of the whole model (which loads no data, but does write to the server).
 module Tessera.Tests.XmlaIntegrationTests
 
 open System
@@ -131,4 +133,62 @@ let tests =
                 Expect.isTrue (doc.RootElement.GetProperty("dryRun").GetBoolean()) ""
                 Expect.isFalse (doc.RootElement.GetProperty("deployed").GetBoolean()) ""
                 Expect.equal (doc.RootElement.GetProperty("changes").GetArrayLength()) 0 out
+
+            testCase "refresh: a dry run plans the whole model and runs nothing"
+            <| fun () ->
+                let code, out, err = tess [ "refresh"; source; "--type"; "full"; "--json" ]
+                Expect.equal code 0 err
+                use doc = JsonDocument.Parse out
+                let root = doc.RootElement
+                Expect.isTrue (root.GetProperty("dryRun").GetBoolean()) ""
+                Expect.isFalse (root.GetProperty("refreshed").GetBoolean()) ""
+                Expect.equal (root.GetProperty("objects").[0].GetProperty("ref").GetString()) "model" ""
+                Expect.isGreaterThan (root.GetProperty("covers").GetArrayLength()) 0 "the model's tables"
+                use script = JsonDocument.Parse(root.GetProperty("tmsl").GetString())
+
+                Expect.equal
+                    (script.RootElement
+                        .GetProperty("refresh")
+                        .GetProperty("objects")
+                        .[0].GetProperty("database")
+                        .GetString())
+                    (root.GetProperty("database").GetString())
+                    "the server's name for the database"
+
+            testCase "refresh: --execute recalculates the model and reports progress (TESSERA_XMLA_ALLOW_REFRESH=1)"
+            <| fun () ->
+                if variable "TESSERA_XMLA_ALLOW_REFRESH" <> Some "1" then
+                    skiptest "TESSERA_XMLA_ALLOW_REFRESH is not 1: this test writes to the server"
+
+                let code, out, err =
+                    tess [
+                        "refresh"
+                        source
+                        "--type"
+                        "calculate"
+                        "--execute"
+                        "--progress"
+                        "all"
+                        "--json"
+                    ]
+
+                Expect.equal code 0 (out + err)
+                use doc = JsonDocument.Parse out
+                let root = doc.RootElement
+                Expect.isTrue (root.GetProperty("refreshed").GetBoolean()) out
+                // If the trace didn't work this says why; the refresh itself must still succeed.
+                Expect.equal (root.GetProperty("traceError").ValueKind) JsonValueKind.Null out
+
+            testCase "refresh: what can't be refreshed is an error before anything runs"
+            <| fun () ->
+                let code, out, _ =
+                    tess [ "refresh"; source; "tessera no such table"; "--execute"; "--json" ]
+
+                Expect.equal code Common.ExitCode.input out
+                use doc = JsonDocument.Parse out
+
+                Expect.equal
+                    (doc.RootElement.GetProperty("error").GetProperty("code").GetString())
+                    "object-not-found"
+                    ""
     ]
