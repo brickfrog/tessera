@@ -341,7 +341,77 @@ tess connect "asazure://<region>.asazure.windows.net/<server>"
 
 Expect: as A2. A service principal must be a server administrator (`app:<id>@<tenant>`).
 
+## F. The DAX conformance corpus (Power BI or any server; writes to the workspace)
+
+`tests/conformance` holds a few hundred small DAX queries with the results published sources say a real engine
+gives (see its README). None has been checked against a server: this section is how. One command embeds each
+model's rows in the model (`tess data embed`), deploys it, refreshes it, runs every case's query and writes a
+report of every expectation the server disagrees with.
+
+**It has never been run against a server.** Everything below the live connection is tested against the fake.
+Run section C first: this relies on the same deployment, plus a TMSL `refresh` and a `delete`, which nothing
+else in tessera sends yet.
+
+What it does to the workspace: for every model of the corpus it creates, or **replaces without asking**, a
+database named `tessera-conformance-<model>` (about 30 of them), and with `--drop` deletes each afterwards. It
+never names any other database. Use a workspace where that is fine. The models are a few rows each.
+
+### F1. One model first
+
+```sh
+export TESSERA_XMLA_SERVER="$WS"        # with the TESS_XMLA_* credentials of section A
+dotnet run --project tests/Tessera.Tests -c Release -- conformance-server --filter blank/ --out ./conformance-report
+echo "exit $?"
+```
+
+Without `TESSERA_XMLA_SERVER` the command says so and does nothing (exit 0). It is not part of `dotnet test`:
+no test deploys.
+
+Expect: on stderr, `N cases on 1 models -> powerbi://...`, then
+`  tessera-conformance-scalar: deploying (1 tables), refreshing` and
+`  tessera-conformance-scalar: N of N cases agree`; on stdout the counts and the two report paths. Exit 0 if the
+server agrees with every case, 1 if not, 5 if no model could be deployed.
+
+If it stops at the deployment, look at these first (they are the untested parts):
+
+| Symptom | Likely cause |
+|---|---|
+| the refresh is refused | the script is `{"refresh":{"type":"full","objects":[{"database":"..."}]}}` (`refreshScript` in `ConformanceServer.fs`); try `"calculate"` |
+| "Models that are not what the corpus says" lists a table | `tess data embed` wrote something the server reads differently. The report shows the rows that differ. Known unknowns: whether `""` stays an empty string in a DATATABLE `STRING` column, `dt"..."` literals before 1900-03-01, and a fixed decimal with more than 15 digits |
+| every case of a model fails with the same error | a calculated table didn't calculate: run `tess query "xmla:$WS;tessera-conformance-<model>" "EVALUATE '<table>'"` and read the error |
+| compatibility level refused | the models are level 1702 (they hold user-defined functions); the workspace must support it |
+
+To look at what is deployed without deploying:
+
+```sh
+tess data embed <model> <fixture-dir> out.bim     # any model with a fixture; the corpus models are built in the tests
+```
+
+### F2. The whole corpus
+
+```sh
+dotnet run --project tests/Tessera.Tests -c Release -- conformance-server --out ./conformance-report --drop
+```
+
+`--drop` deletes each scratch database when its cases have run; leave it out to query them yourself afterwards
+(`tess query "xmla:$WS;tessera-conformance-sales" "..."`). `--filter <text>` runs the cases whose id contains the
+text; `--tolerance <x>` changes the relative tolerance for doubles (default 1e-9).
+
+`conformance-report/conformance-report.md` is the readable report, `conformance-report.json` the same with each
+case's expected and actual results. Its sections, in the order to act on them:
+
+1. **Models that are not what the corpus says.** Fix these first (they are bugs in `data embed` or the runner),
+   and re-run: a case on such a model proves nothing.
+2. **The server disagrees.** The expectation is wrong. Correct the case file: the `expected` result, and its
+   `confidence`, `derivation` or `source`. Cases marked uncertain are the ones written to be settled this way;
+   their `alternative` says what the other reading predicted.
+3. **The server failed the query.** Results were expected. Either the case is wrong, or the query uses something
+   this server version lacks.
+4. **Values agree, a type doesn't.** Usually the case's declared column type is the thing to correct.
+
+Every case that agrees is now confirmed by a real engine, whatever its `confidence` said.
+
 ## What to send back
 
 For each step that differed: the command, the full output with secrets removed, and the platform. The most useful
-single artifacts are the `--json` output of B3 and the `tess diff ... --stat` of C2.
+single artifacts are the `--json` output of B3, the `tess diff ... --stat` of C2, and `conformance-report.json` of F2.

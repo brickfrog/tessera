@@ -1716,6 +1716,7 @@ tess data init  ./Sales.pbip ./fixtures                      # a header-only CSV
 tess data init  ./Sales.pbip ./fixtures --rows 1000 --seed 7 # ... or 1000 rows of synthetic data per table
 tess data check ./Sales.pbip ./fixtures                      # files, columns, types, keys, relationships
 tess data info  ./Sales.pbip ./fixtures --json               # tables, row counts, distinct counts per column
+tess data embed ./Sales.pbip ./fixtures ./with-data.bim      # the model with the fixture's rows inside it
 ```
 
 #### The format
@@ -1833,6 +1834,31 @@ finding.
 `--json` writes the [findings envelope](#findings-json-and-ci-annotations) with `"command": "data check"` and
 `"source": "data"`. Findings also carry `file` (full path), `line` and `columnName` where they apply, and the
 envelope adds `"valid"` (no errors), `"directory"` and `"tables": [{table, file, rows}]`.
+
+#### `data embed`
+
+```sh
+tess data embed ./Sales.pbip ./fixtures ./Sales-with-data.bim
+```
+
+`embed` writes a copy of the model that carries the fixture inside it: every loaded table becomes a calculated
+table whose expression is a `DATATABLE` of the fixture's rows. The copy needs no data source, so it can be
+deployed to any workspace (`tess deploy`, then refresh it there) and answers queries the way the model does
+locally against the fixture. That is how the [conformance corpus](#the-dax-conformance-corpus) is run on a real
+server.
+
+- **Kept:** every column with its name, type and properties, so relationships, sort-by columns, hierarchies,
+  measures and calculated columns still resolve. Calculated tables and calculation groups are untouched.
+- **Removed:** partitions, refresh policies, data sources and shared (M) expressions: what only a refresh needs.
+- **Values:** numbers in plain digits, text quoted, `TRUE`/`FALSE`, `BLANK ()`, dates as `dt"2024-01-31T13:05:00"`.
+  An empty table keeps its columns and types. Where a constant can't be exactly the value, stderr says so (and
+  `--json` lists it under `warnings`): a date/time loses a fraction of a second, a fixed decimal with more than
+  15 digits may be rounded by the server, and a table with no data columns gets a hidden column `_`.
+
+The output format follows the destination as for `convert` (`--format bim|tmdl|pbip`), and like `convert` it
+refuses a destination that isn't empty without `--force` (exit 4). A fixture with errors is refused (exit 3):
+its invalid values would be deployed as BLANK. `--json` writes `{"command": "data embed", "directory", "output":
+{format, path, files}, "tables": [{table, rows, columns}], "warnings": [...]}`.
 
 #### `data info`
 
@@ -1996,6 +2022,39 @@ Things worth knowing when using the tree:
 - A bare `TRUE` is a literal, `TRUE()` a call.
 - `DaxAst.references` lists the names an expression refers to, leaving out the VARs in scope. A test checks it
   against `Deps` for every expression, and names every reason the two may differ.
+
+### The DAX conformance corpus
+
+`tests/conformance` is a corpus of small DAX queries with the results a real engine gives, each taken from a
+published source (the DAX reference, DAX Guide, SQLBI) and saying which: its format and rules are in
+[`tests/conformance/README.md`](tests/conformance/README.md). It is the independent check on the local DAX
+engine: no expected value came from running or reading an engine. **It has not been confirmed against a server
+yet**; many cases are worked out by hand from documented rules, and some are marked uncertain.
+
+- `tests/Tessera.Tests/Conformance.fs` reads and checks the corpus, and runs any engine against a case:
+
+  ```fsharp
+  Conformance.run : (Database -> DataStore -> string -> Result<QueryResult list, TessError>) -> Case -> Outcome
+  // Outcome: Pass | Fail of Mismatch (a value-level diff) | NotSupported of reason | Error of message
+  ```
+
+- `dotnet test` checks every case file (the model builds, the rows are a valid fixture, the query parses, the
+  expectation is well-formed) and that every model embeds its rows exactly. The `conformance (engine)` test list
+  is skipped until the engine exists: set `engine` at the top of `ConformanceTests.fs`. `expectedUnsupported`
+  there lists the tags the engine may leave for later.
+- `QueryResult.compare` (`Tessera.Core`) is the comparison: columns by name, rows as a multiset unless ordered,
+  doubles within a tolerance, int64 and decimal exactly, and differences of type (`1` against `1.0`, a column
+  declared `double` instead of `decimal`) reported apart from differences of value. `QueryResult.ofJson` reads
+  the `tess query --json` shape back.
+- To run the corpus against a real server (it deploys scratch databases named `tessera-conformance-*`):
+
+  ```sh
+  TESSERA_XMLA_SERVER='powerbi://api.powerbi.com/v1.0/myorg/<workspace>' \
+    dotnet run --project tests/Tessera.Tests -c Release -- conformance-server --out ./conformance-report
+  ```
+
+  See `docs/xmla-manual-test.md`, section F. `python3 tests/conformance/check-quotes.py` checks every quoted
+  source line against its page (the only part that uses the network, and only when you run it).
 
 ## Prior art
 
