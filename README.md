@@ -2030,10 +2030,11 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 |---|---|
 | Aggregation | `AVERAGE` `AVERAGEX` `CONCATENATEX` `COUNT` `COUNTA` `COUNTAX` `COUNTBLANK` `COUNTROWS` `COUNTX` `DISTINCTCOUNT` `DISTINCTCOUNTNOBLANK` `MAX` `MAXX` `MIN` `MINX` `PRODUCTX` `RANKX` `SUM` `SUMX` |
 | Filter | `ALL` `ALLCROSSFILTERED` `ALLEXCEPT` `ALLNOBLANKROW` `CALCULATE` `CALCULATETABLE` `CROSSFILTER` `DISTINCT` `EARLIER` `EARLIEST` `FILTER` `HASONEFILTER` `HASONEVALUE` `ISCROSSFILTERED` `ISFILTERED` `KEEPFILTERS` `REMOVEFILTERS` `SELECTEDVALUE` `TREATAS` `USERELATIONSHIP` `VALUES` |
-| Information | `CONTAINSROW` `ISBLANK` `ISERROR` |
+| Information | `CONTAINS` `CONTAINSROW` `CUSTOMDATA` `ISBLANK` `ISEMPTY` `ISERROR` `ISEVEN` `ISLOGICAL` `ISNONTEXT` `ISNUMBER` `ISODD` `ISTEXT` `USERCULTURE` `USERNAME` `USEROBJECTID` `USERPRINCIPALNAME` |
 | Logical | `AND` `BLANK` `COALESCE` `ERROR` `FALSE` `IF` `IF.EAGER` `IFERROR` `NOT` `OR` `SWITCH` `TRUE` |
-| Math | `ABS` `DIVIDE` `INT` `MOD` `ROUND` |
+| Math | `ABS` `CEILING` `CONVERT` `CURRENCY` `DIVIDE` `EVEN` `EXP` `FACT` `FLOOR` `GCD` `INT` `ISO.CEILING` `LCM` `LN` `LOG` `LOG10` `MOD` `MROUND` `ODD` `PI` `POWER` `QUOTIENT` `ROUND` `ROUNDDOWN` `ROUNDUP` `SIGN` `SQRT` `SQRTPI` `TRUNC` |
 | Relationship | `LOOKUPVALUE` `RELATED` `RELATEDTABLE` |
+| Statistical | `GEOMEAN` `GEOMEANX` `MEDIAN` `MEDIANX` `PERCENTILE.EXC` `PERCENTILE.INC` `PERCENTILEX.EXC` `PERCENTILEX.INC` `RANK.EQ` `STDEV.P` `STDEV.S` `STDEVX.P` `STDEVX.S` `VAR.P` `VAR.S` `VARX.P` `VARX.S` |
 | Table manipulation | `ADDCOLUMNS` `CROSSJOIN` `CURRENTGROUP` `DATATABLE` `EXCEPT` `GENERATE` `GENERATEALL` `GROUPBY` `INTERSECT` `ROW` `SELECTCOLUMNS` `SUMMARIZE` `SUMMARIZECOLUMNS` `TOPN` `UNION` |
 | Text | `CONCATENATE` |
 
@@ -2042,6 +2043,38 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   pairs, as a query's own table expression: existing combinations for columns of one table, a cross join between
   tables, the blank row as a group, and rows whose expressions are all BLANK dropped; not `ROLLUPADDISSUBTOTAL`,
   `IGNORE` or `NONVISUAL`, and not inside a row context or under an outer filter.
+
+#### Numbers, conversion and the identity functions
+
+Besides the table above: `AVERAGEA`, `MINA` and `MAXA` (Aggregation) and `VALUE` (Text). `RAND` and
+`RANDBETWEEN` are known names but always refused: a random answer can't be checked against a server's.
+
+Arithmetic follows the published descriptions of the engine (SQLBI's "Rounding errors with different data types in
+DAX" and "Understanding numeric data type conversions", Microsoft Learn's data types tables); where they say nothing
+the engine refuses rather than pick:
+
+- whole numbers and fixed decimal numbers wrap around on `+`, `-` and whole × whole, as SQLBI shows
+  (`5000000000000000000 + 5000000000000000000` is `-8446744073709551616`); a result that lands on the two values
+  that mean BLANK (2^63 - 1 and -2^63) is refused, and so is `SUM`/`SUMX` past the 64-bit range;
+- a whole or fixed decimal number compared with a decimal number is compared as decimal numbers (floating point), as
+  the comparison table says: `CURRENCY ( 0.1 ) = 0.1` is TRUE;
+- fixed decimal results round half away from zero to four places; a value whose decimal reading and binary value
+  disagree about the rounding (`ROUND ( 1.005, 2 )`, `CURRENCY ( 2.00005 )`) is refused, since which one the engine
+  rounds isn't documented;
+- `DIVIDE` returns what `/` returns, a fixed decimal number for a fixed decimal numerator;
+- text read as a number takes only what doesn't depend on the culture: `"1,234"` or `"$5"` is refused, `"abc"` is an
+  error.
+
+`USERNAME`, `USERPRINCIPALNAME`, `USEROBJECTID`, `USERCULTURE` and `CUSTOMDATA` come from the connection on a server;
+the local engine has none, so it refuses them unless the caller says who is asking:
+
+```fsharp
+Engine.withIdentity : Identity -> Engine.Prepared -> Engine.Prepared
+// { Identity.none with UserName = Some "CONTOSO\\ann"; UserCulture = Some "en-US" }
+```
+
+A field left `None` stays refused (`CUSTOMDATA` is then BLANK, as for a connection without it). The original
+`Prepared` is unchanged; calculated columns and tables never see the identity. There is no CLI flag for it yet.
 
 #### What it refuses
 
@@ -2060,7 +2093,7 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   - `TOPN` without an order-by on more rows than asked for, and `CONCATENATEX` without one (the engine defines no
     order), and sorting where BLANK meets zero or negative values, or values of different types;
   - a date or TRUE/FALSE turned into text by `&` (the format depends on the model's culture), text read as a date
-    in arithmetic, a date multiplied, `ROUND` of a negative number exactly halfway;
+    in arithmetic, a date multiplied;
   - `DISTINCTCOUNT` of a column while its table's blank row is visible (whether that BLANK is counted: write
     `COUNTROWS ( DISTINCT ( ... ) )` or `COUNTROWS ( VALUES ( ... ) )` to say which);
   - a context transition, or a column read, inside a user-defined function that was called from a row context
