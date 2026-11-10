@@ -288,9 +288,14 @@ module TimeIntelligence =
 
     /// The year end date argument. "A literal string with a date that defines the year-end date"
     /// (Microsoft Learn, DATESYTD); "The year part of the date is ignored, so "2001-06-30" and
-    /// "06-30" give the same result" (dax.guide/closingbalanceyear). How text is read as a date
-    /// depends on the model's culture, so only text that reads the same in every culture is
-    /// taken: ISO year-month-day, or two numbers of which only one can be the month.
+    /// "06-30" give the same result" (dax.guide/closingbalanceyear). It is read "in the same locale
+    /// as the locale of the client where the workbook was created ... Depending on locale, the
+    /// format might be something like "m-dd" or "dd-m"" (Microsoft Learn, DATESYTD), and "it is
+    /// recommended you specify year_end_date using "month/day" ... to ensure the string resolves to
+    /// a date" (Microsoft Learn, TOTALYTD). So what is taken is a whole ISO date, or month then day
+    /// where the day can't be a month ("6/30": the documented form; a day-first locale can't read
+    /// it as day 6 of month 30, and "if conversion using the locale and date/time settings of the
+    /// model fails, DATEVALUE will attempt to use other date formats": Microsoft Learn, DATEVALUE).
     let private yearEnd (ctx: Ctx) (arg: Expr option) : Period =
         match arg with
         | None -> calendarYear
@@ -313,13 +318,11 @@ module TimeIntelligence =
 
                     if a = b || (a <= 12 && b > 12) then
                         a, b
-                    elif a > 12 && b <= 12 then
-                        b, a
                     else
                         Fail.notSupported
                             ctx
                             e.Span
-                            $"the year end date \"{text}\" (which number is the month depends on the model's culture; write it as \"2000-{a:D2}-{b:D2}\")"
+                            $"the year end date \"{text}\" (which number is the month depends on the model's culture; write the month first with a day above 12, as in \"6/30\", or a whole date, as in \"2000-06-30\")"
                 else
                     Fail.notSupported
                         ctx
@@ -502,7 +505,13 @@ module TimeIntelligence =
     /// the one case those leave open (DAX Guide's EXTENDING, for calendars, extends from the last
     /// day alone): refused.
     ///
-    /// On a column that is not unique or has gaps, a selection with gaps is the engine's error.
+    /// A selection with gaps: "If the date column syntax is used and the dates in the current
+    /// context do not form a contiguous interval, the function returns an error" (Microsoft Learn,
+    /// DATEADD). The engine's message, as the Power BI community quotes it ("SAMEPERIODLASTYEAR
+    /// expects a contiguous selection when the date column is not unique, has gaps or it contains
+    /// time portion", community.fabric.microsoft.com/t5/Desktop/td-p/3217642), puts a condition on
+    /// that. So on a column that is not unique or has gaps it is an error by both; on a column that
+    /// is unique and complete, where SQLBI's "for each month" would apply, the two disagree: refused.
     let private shift (ctx: Ctx) (span: Span) (name: string) (d: Dates) (n: int) (unit: string) : int array =
         noBlank ctx span name d
         let u = d.U
@@ -511,7 +520,13 @@ module TimeIntelligence =
         if s.Length = 0 then
             [||]
         else
-            if not u.WellFormed && not (isContiguous s) then
+            if not (isContiguous s) then
+                if u.WellFormed then
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"{name} of a selection of dates with gaps (Microsoft Learn: \"if the dates in the current context do not form a contiguous interval, the function returns an error\"; the engine's own message only expects a contiguous selection of a column that is not unique or has gaps)"
+
                 if (range u s.[0] s.[s.Length - 1]).Length = s.Length then
                     Fail.notSupported
                         ctx
@@ -737,7 +752,8 @@ module TimeIntelligence =
     /// LastVisibleDate = MAX ( 'Date'[Date] ) RETURN FILTER ( ALL ( 'Date'[Date] ), 'Date'[Date] >=
     /// DATE ( YEAR ( LastVisibleDate ), 1, 1 ) && 'Date'[Date] <= LastVisibleDate )" (SQLBI, "Mark
     /// as date table"). DAX Guide's form, DATESBETWEEN ( <Dates>, STARTOFYEAR ( LASTDATE ( <Dates>
-    /// ) ), LASTDATE ( <Dates> ) ), is the same dates whenever STARTOFYEAR finds its date.
+    /// ) ), LASTDATE ( <Dates> ) ), is the same dates whenever STARTOFYEAR finds its date; when it
+    /// doesn't, the two differ, and the function refuses.
     let private toDate (name: string) (p: Call -> Ctx -> Period) (maxArgs: int) : DaxFunction =
         datesTable name maxArgs (checkYearEnd 1) (fun _ ctx call d ->
             match firstOrLast true d with
@@ -749,8 +765,25 @@ module TimeIntelligence =
                     call.Span
                     $"{name} with no date selected (by SQLBI's definition the result is empty, by DAX Guide's it is DATESBETWEEN with two BLANK boundaries, every date of the column)"
             | ValueSome last ->
-                let lo, _ = bounds (p call ctx) last
-                range d.U lo last)
+                let period = p call ctx
+                let lo, _ = bounds period last
+
+                // The first date of the period as DAX Guide's form finds it: STARTOF* ( LASTDATE (
+                // <Dates> ) ), which other filters can leave empty (the DATESBETWEEN of that form
+                // then starts from the first date of the column, SQLBI's from the period's).
+                let only = {
+                    d with
+                        Days = [| last |]
+                        Blank = false
+                }
+
+                match edge false period ctx call.Span name only with
+                | [||] ->
+                    Fail.notSupported
+                        ctx
+                        call.Span
+                        $"{name} when other filters hide the first date of the period (STARTOF* is then empty: DAX Guide's definition starts from the first date of the column, SQLBI's from the first of the period)"
+                | _ -> range d.U lo last)
 
     let private yearEndAt (index: int) : Call -> Ctx -> Period =
         fun call ctx -> yearEnd ctx (List.tryItem index call.Args)

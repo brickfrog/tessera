@@ -463,24 +463,6 @@ let publishedTests =
 [<Tests>]
 let edgeTests =
     testList "Engine time intelligence: edges" [
-        // SQLBI-DP: "If the interval is MONTH, QUARTER, or YEAR, then for each month": a selection
-        // of two separate whole months moves as two whole months.
-        testCase "DATEADD treats the months of a selection with gaps one by one"
-        <| fun () ->
-            let p = small.Value
-
-            let selection =
-                pick (
-                    daysFrom (day 2024 2 1) (day 2024 2 29)
-                    @ daysFrom (day 2024 4 1) (day 2024 4 30)
-                )
-
-            isDays
-                p
-                (under selection "DATEADD ( 'Date'[Date], -1, MONTH )")
-                (daysFrom (day 2024 1 1) (day 2024 1 31)
-                 @ daysFrom (day 2024 3 1) (day 2024 3 31))
-
         // DG/dateadd: "The notion of 'month selected' is based on the dates available in the
         // underlying date table": a quarter and a year move month by month, so a whole quarter is
         // the whole quarter before, whatever the lengths (Q2 2024, 91 days, to Q1 2024, 91; the
@@ -686,7 +668,6 @@ let edgeTests =
             money p (may "TOTALYTD ( [Sales], 'Date'[Date], 'Date'[Year] = 2023, \"6/30\" )") 150M
             money p (may "TOTALYTD ( [Sales], 'Date'[Date], , \"06-30\" )") 2250M
             money p (may "TOTALYTD ( [Sales], 'Date'[Date], \"2001-06-30\" )") 2250M
-            money p (may "TOTALYTD ( [Sales], 'Date'[Date], \"30/6\" )") 2250M
             blank p (may "TOTALMTD ( [Sales], 'Date'[Date], Sales[Amount] > 1000 )")
     ]
 
@@ -752,13 +733,11 @@ let dateTableTests =
                 "CALCULATE ( CALCULATE ( [Sales], 'Date'[Date] >= dt\"2024-01-01\" && 'Date'[Date] <= dt\"2024-03-31\" ), 'Date'[YearMonth] = 202403 )"
 
             let unmarked = keyed ignore
-            money unmarked ytd 500M
             money unmarked plain 500M
-            // DATESYTD still returns January 1 to March 31: it is the filter on the month that stays.
-            Expect.equal
-                (value unmarked "CALCULATE ( COUNTROWS ( DATESYTD ( 'Date'[Date] ) ), 'Date'[YearMonth] = 202403 )")
-                (QueryValue.Int64 91L)
-                "the dates of DATESYTD"
+            // The filter on the month stays, so DATESYTD's own two definitions part ways: SQLBI's
+            // January 1 to March 31, and DG's dates of the year up to the last visible one, which
+            // starts at March 1. Refused rather than picking one.
+            refused unmarked $"EVALUATE ROW ( \"r\", {ytd} )" "hide the first date of the period"
 
             let marked =
                 keyed (fun db ->
@@ -799,7 +778,7 @@ let dateTableTests =
                 "EVALUATE ROW ( \"r\", CALCULATE ( CALCULATE ( [Sales], KEEPFILTERS ( DATESYTD ( 'Date'[Date] ) ) ), 'Date'[YearMonth] = 202403 ) )"
                 "KEEPFILTERS"
 
-        testCase "a context transition on the date column: refused when other Date columns are filtered"
+        testCase "a context transition on the date column: refused when the other Date filters hide the date"
         <| fun () ->
             let p = small.Value
             // Nothing else filters Date: the rule would change nothing. The sales by date add up.
@@ -809,9 +788,28 @@ let dateTableTests =
             // A filter on the date column itself is replaced by the row's, rule or no rule.
             money p "CALCULATE ( SUMX ( VALUES ( 'Date'[Date] ), [Sales] ), 'Date'[Date] >= dt\"2024-01-01\" )" 3600M
 
+            // A date that the other filters keep: the Date table is that one row, rule or no rule.
+            // Grouping by date under a filter on the year adds up to the year, 3600.
+            money p "CALCULATE ( SUMX ( VALUES ( 'Date'[Date] ), [Sales] ), 'Date'[Year] = 2024 )" 3600M
+
+            money
+                p
+                "CALCULATE ( SUMX ( ADDCOLUMNS ( SUMMARIZE ( Sales, 'Date'[Date] ), \"s\", [Sales] ), [s] ), 'Date'[Year] = 2024 )"
+                3600M
+
+            match
+                Engine.evaluateQuery
+                    p
+                    "EVALUATE CALCULATETABLE ( SUMMARIZE ( Sales, 'Date'[Date], \"s\", [Sales] ), 'Date'[Year] = 2024 )"
+            with
+            | Ok [ r ] -> Expect.equal r.Rows.Length 8 "the 2024 dates with sales"
+            | other -> failtestf "expected one result, got %A" other
+
+            // A date the other filters hide: the rule would bring back its sales (all 3960), no rule
+            // leaves it empty (3600).
             refused
                 p
-                "EVALUATE ROW ( \"r\", CALCULATE ( SUMX ( VALUES ( 'Date'[Date] ), [Sales] ), 'Date'[Year] = 2024 ) )"
+                "EVALUATE ROW ( \"r\", CALCULATE ( SUMX ( ALL ( 'Date'[Date] ), [Sales] ), 'Date'[Year] = 2024 ) )"
                 "context transition on the date column"
 
         // The star model's Date[Date] is the key of an active and an inactive date relationship.
@@ -834,7 +832,7 @@ let dateTableTests =
             // With USERELATIONSHIP the relationship is in force, and the rule is sure.
             money
                 p
-                "CALCULATE ( CALCULATE ( [Sales], DATESYTD ( 'Date'[Date] ), USERELATIONSHIP ( Sales[Date], 'Date'[Date] ) ), 'Date'[YearMonth] = 202403 )"
+                "CALCULATE ( CALCULATE ( [Sales], 'Date'[Date] >= dt\"2024-01-01\" && 'Date'[Date] <= dt\"2024-03-31\", USERELATIONSHIP ( Sales[Date], 'Date'[Date] ) ), 'Date'[YearMonth] = 202403 )"
                 1500M
     ]
 
@@ -911,6 +909,8 @@ let refusalTests =
                 $"EVALUATE DATESYTD ( 'Date'[Date], {yearEnd} )"
 
             refused p (ytd "\"6/7\"") "depends on the model's culture"
+            // Day first: June 30 in a day-first culture, an error in a month-first one.
+            refused p (ytd "\"30/6\"") "depends on the model's culture"
             refused p (ytd "\"Jun 30\"") "only numeric"
             refused p (ytd "\"2/28\"") "February"
             refused p (ytd "\"6/31\"") "not a day of every year"
@@ -940,6 +940,19 @@ let refusalTests =
                 (under (pick [ day 2024 6 30 ]) "DATEADD ( 'Date'[Date], 1, MONTH )"
                  |> (+) "EVALUATE ")
                 "last day of a month"
+
+            // Microsoft Learn (DATEADD): "if the dates in the current context do not form a
+            // contiguous interval, the function returns an error"; SQLBI-DP moves each month on its
+            // own. February and April 1, 2024, without March.
+            let gapped = pick [ day 2024 2 1; day 2024 4 1 ]
+
+            for f in
+                [
+                    "DATEADD ( 'Date'[Date], -1, MONTH )"
+                    "DATEADD ( 'Date'[Date], 1, DAY )"
+                    "SAMEPERIODLASTYEAR ( 'Date'[Date] )"
+                ] do
+                refused p ("EVALUATE " + under gapped f) "selection of dates with gaps"
 
             // January and March, without February.
             refused
@@ -1002,12 +1015,6 @@ let refusalTests =
             | DaxEvaluation(message, _) ->
                 Expect.stringContains message "'SAMEPERIODLASTYEAR'" "named after the function"
             | other -> failtestf "expected a DAX error, got %A" other
-
-            // IFERROR catches it, as it does any DAX error.
-            Expect.equal
-                (value p "CALCULATE ( IFERROR ( COUNTROWS ( DATEADD ( Log[At], 1, DAY ) ), -1 ), Log[N] IN { 1, 4 } )")
-                (QueryValue.Int64 -1L)
-                "IFERROR"
 
             // February 1 and 15: the column has no date in between. Contiguous or not?
             refused
@@ -1158,6 +1165,15 @@ let private parallelOracle (selection: DateTime list) (n: int) (size: int) : Dat
 
             Some(allDays |> List.filter (fun d -> d >= first && d <= last))
 
+/// Consecutive days: on the small calendar, which has every day, the selections DATEADD shifts.
+let private isRun (days: DateTime list) =
+    days |> List.pairwise |> List.forall (fun (a, b) -> b = a.AddDays 1.0)
+
+let private refusedWithGaps (query: string) (result: Result<DateTime list, TessError>) =
+    match result with
+    | Error(DaxNotSupported(what, _)) -> Expect.stringContains what "selection of dates with gaps" query
+    | other -> failtestf "expected the refusal of a selection with gaps, got %A\n%s" other query
+
 let private unitOf (random: Random) =
     match random.Next 3 with
     | 0 -> "MONTH", 1
@@ -1204,11 +1220,15 @@ let propertyTests =
             let random = Random(seed)
             let selection = selectionOf random
             let n = random.Next(-40, 41)
+            let query = under (pick selection) $"DATEADD ( 'Date'[Date], {n}, DAY )"
 
-            Expect.equal
-                (dates small.Value (under (pick selection) $"DATEADD ( 'Date'[Date], {n}, DAY )"))
-                (inCalendar (selection |> List.map (fun d -> d.AddDays(float n))))
-                $"seed {seed}"
+            if isRun selection then
+                Expect.equal
+                    (dates small.Value query)
+                    (inCalendar (selection |> List.map (fun d -> d.AddDays(float n))))
+                    $"seed {seed}"
+            else
+                refusedWithGaps query (tryDates small.Value query)
 
         testPropertyWithConfig config "DATEADD by MONTH, QUARTER, YEAR: whole months, days, month ends"
         <| fun (seed: int) ->
@@ -1219,6 +1239,7 @@ let propertyTests =
             let query = under (pick selection) $"DATEADD ( 'Date'[Date], {n}, {unit} )"
 
             match dateAddOracle selection (n * months), tryDates small.Value query with
+            | _, actual when not (isRun selection) -> refusedWithGaps query actual
             | Some expected, Ok actual -> Expect.equal actual expected $"seed {seed}: {query}"
             | None, Error(DaxNotSupported(what, _)) -> Expect.stringContains what "last day of a month" query
             | expected, actual -> failtestf "seed %d: expected %A, got %A\n%s" seed expected actual query
@@ -1375,8 +1396,7 @@ let propertyTests =
 
             for (f, expansion) in
                 [
-                    // DG/sameperiodlastyear, previousday, nextday, previousmonth ... nextyear.
-                    "SAMEPERIODLASTYEAR ( 'Date'[Date] )", "DATEADD ( 'Date'[Date], -1, YEAR )"
+                    // DG/previousday, nextday, previousmonth ... nextyear.
                     "PREVIOUSDAY ( 'Date'[Date] )", "DATEADD ( FIRSTDATE ( 'Date'[Date] ), -1, DAY )"
                     "NEXTDAY ( 'Date'[Date] )", "DATEADD ( LASTDATE ( 'Date'[Date] ), 1, DAY )"
                     "PREVIOUSMONTH ( 'Date'[Date] )", "PARALLELPERIOD ( FIRSTDATE ( 'Date'[Date] ), -1, MONTH )"
@@ -1387,6 +1407,21 @@ let propertyTests =
                     "NEXTYEAR ( 'Date'[Date] )", "PARALLELPERIOD ( LASTDATE ( 'Date'[Date] ), 1, YEAR )"
                 ] do
                 sameDates p seed (under selection f) (under selection expansion)
+
+        // DG/sameperiodlastyear: DATEADD ( dates, -1, YEAR ). Refused or wrong the same way, but
+        // under its own name.
+        testPropertyWithConfig config "SAMEPERIODLASTYEAR is DATEADD back a year"
+        <| fun (seed: int) ->
+            let random = Random(seed)
+            let selection = pick (selectionOf random)
+            let p = small.Value
+            let query = under selection "SAMEPERIODLASTYEAR ( 'Date'[Date] )"
+
+            match tryDates p query, tryDates p (under selection "DATEADD ( 'Date'[Date], -1, YEAR )") with
+            | Ok a, Ok b -> Expect.equal a b $"seed {seed}: {query}"
+            | Error(DaxNotSupported(a, _)), Error(DaxNotSupported(b, _)) ->
+                Expect.equal a (b.Replace("DATEADD", "SAMEPERIODLASTYEAR")) $"seed {seed}: {query}"
+            | a, b -> failtestf "seed %d: %A\n%A\n%s" seed a b query
 
         testPropertyWithConfig config "TOTAL*, OPENINGBALANCE* and CLOSINGBALANCE* are their CALCULATE"
         <| fun (seed: int) ->

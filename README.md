@@ -2080,18 +2080,24 @@ Refused, because the sources don't settle them (each error says which):
   `DATEADD`'s Extension and Truncation and `DATESINPERIOD`'s EndBehavior;
 - a True/False expression as the dates argument; a table of dates that are not the values of a model column; a date
   column with a time of day;
-- a year end date that reads differently by culture (`"6/7"`, a month name) or is in February;
-- `FIRSTDATE` / `LASTDATE` as a table, and `DATESMTD` / `QTD` / `YTD`, when no date is selected;
+- a year end date that reads differently by culture (`"6/7"`, the day first as in `"30/6"`, a month name) or is in
+  February;
+- `FIRSTDATE` / `LASTDATE` as a table, and `DATESMTD` / `QTD` / `YTD`, when no date is selected; `DATESMTD` /
+  `QTD` / `YTD` (and `TOTALMTD` / `QTD` / `YTD`) when other filters hide the first date of the period, where SQLBI's
+  and DAX Guide's definitions give different dates;
+- `DATEADD` and `SAMEPERIODLASTYEAR` of a selection of dates with gaps on a complete date table: Microsoft Learn
+  says it is an error, SQLBI moves each month on its own;
 - `DATEADD` of the last day of a month, selected without the day before it, to a longer month; `PARALLELPERIOD` of
   a selection that skips a whole month, quarter or year; `DATESINPERIOD` from a day the other month doesn't have
   (unless it is a month end), or from a BLANK start;
 - the date-table rule where it is not documented and would change the result: a context transition that filters
-  the date column (a measure iterated over `VALUES ( 'Date'[Date] )`) while other columns of the date table are
-  filtered, `KEEPFILTERS` on a date filter, a filter that pairs the date column with other columns, a key column of
+  the date column while other filters on the date table hide that date (a measure iterated over
+  `ALL ( 'Date'[Date] )` under a filter on the year; over `VALUES ( 'Date'[Date] )` or `SUMMARIZE` by date it is
+  fine), `KEEPFILTERS` on a date filter, a filter that pairs the date column with other columns, a key column of
   a table that is not marked, the key of a relationship that is not active.
 
 On a date column that is not unique or has gaps (a fact table's), `DATEADD` and `SAMEPERIODLASTYEAR` of a selection
-with gaps are the error the engine gives: "Function 'DATEADD' expects a contiguous selection when the date column is
+with gaps are an error, with the message the Power BI community quotes from the engine: "Function 'DATEADD' expects a contiguous selection when the date column is
 not unique, has gaps or it contains time portion."
 
 #### What it refuses

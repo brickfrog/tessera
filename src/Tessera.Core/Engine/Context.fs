@@ -802,21 +802,34 @@ module DateTable =
         result
 
     /// A context transition is about to add these filters (one row context's). One on the date
-    /// column of a date table is refused when the rule would change anything.
+    /// column of a date table is refused when the rule could change anything. It can't when the
+    /// row's date is visible once the filters are added without the rule: the date column is a key,
+    /// so the table is then that one row either way (the other filters on it all keep that row),
+    /// as when grouping by Date[Date] under a filter on the year.
     let onTransition (ctx: Ctx) (span: Span) (fc: FilterCtx) (filters: Filter list) : unit =
         let tests = filters |> List.map covers
         let replaced (x: BColumn) = tests |> List.exists (fun t -> t x)
+        let after = lazy (Filters.add fc filters false)
+
+        let keepsRow (c: BColumn) (values: RowSet) =
+            values.Count = 1
+            && (let id = values.Rows.[0]
+
+                Filters.idsIn c (Filters.visible after.Value c.Table) false |> Array.contains id)
+
+        let check (c: BColumn) (values: RowSet option) =
+            if
+                standing fc.Config c <> No
+                && filtersOthers fc c.Table replaced
+                && not (values |> Option.exists (keepsRow c))
+            then
+                unsettled ctx span c $"a context transition on the date column {describe c}"
 
         for f in filters do
-            let columns =
-                match f with
-                | OnColumn(c, _) -> [| c |]
-                | Tuples(cols, _) -> cols
-                | Rows _ -> [||]
-
-            for c in columns do
-                if standing fc.Config c <> No && filtersOthers fc c.Table replaced then
-                    unsettled ctx span c $"a context transition on the date column {describe c}"
+            match f with
+            | OnColumn(c, values) -> check c (Some values)
+            | Tuples(cols, _) -> cols |> Array.iter (fun c -> check c None)
+            | Rows _ -> ()
 
 module Context =
 
