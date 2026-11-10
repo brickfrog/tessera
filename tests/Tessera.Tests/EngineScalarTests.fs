@@ -166,6 +166,15 @@ let tests =
                 is (p ()) "ISERROR ( ERROR ( \"x\" ) )" true
                 is (p ()) "ISERROR ( 1 )" false
                 is (p ()) "IFERROR ( 1 + \"a\", -1 )" -1)
+            // "ISERROR also returns TRUE when the value is positive infinity, negative infinity or
+            // NaN" (dax.guide/iserror); IFERROR is IF ( ISERROR ( A ), B, A ).
+            testCase "ISERROR and IFERROR count infinity and NaN as errors" (fun () ->
+                is (p ()) "ISERROR ( 1 / 0 )" true
+                is (p ()) "ISERROR ( -1 / 0 )" true
+                is (p ()) "ISERROR ( 0 / 0 )" true
+                is (p ()) "ISERROR ( DIVIDE ( 1, 0 ) )" false
+                is (p ()) "IFERROR ( 25 / 0, 9999 )" 9999.0
+                is (p ()) "IFERROR ( 1 / 4, 9999 )" 0.25)
             testCase "an ERROR is reported with its text and position" (fun () ->
                 match scalarError (p ()) "1 + ERROR ( \"boom\" )" with
                 | DaxEvaluation(text, at) ->

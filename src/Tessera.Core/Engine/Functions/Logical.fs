@@ -54,6 +54,12 @@ module Logical =
 
         read args.Tail []
 
+    /// Infinity and NaN: what dividing by zero gives, and what ISERROR and IFERROR count as errors.
+    let private isNonFinite (v: DaxValue) =
+        match v with
+        | DaxValue.Decimal d -> not (System.Double.IsFinite d)
+        | _ -> false
+
     let functions: DaxFunction list = [
         Fn.scalar "IF" "Logical" (2, 3) ifType ifImpl
         Fn.scalar "IF.EAGER" "Logical" (2, 3) ifType ifImpl
@@ -175,15 +181,21 @@ module Logical =
             (2, 2)
             (fun ev ctx args -> Typing.unify (ev.TypeOf(ctx, args.[0])) (ev.TypeOf(ctx, args.[1])))
             (fun ev ctx call ->
-                try
-                    ev.Scalar(ctx, call.Args.[0])
-                with DaxRuntimeException _ ->
-                    ev.Scalar(ctx, call.Args.[1]))
+                let value =
+                    try
+                        Some(ev.Scalar(ctx, call.Args.[0]))
+                    with DaxRuntimeException _ ->
+                        None
 
+                match value with
+                | Some v when not (isNonFinite v) -> v
+                | _ -> ev.Scalar(ctx, call.Args.[1]))
+
+        // "ISERROR also returns TRUE when the value is positive infinity, negative infinity or NaN
+        // (not a number). For example, 1 / 0, -1 / 0 and 0 / 0 return these values" (dax.guide/iserror).
         Fn.scalar "ISERROR" "Information" (1, 1) (Fn.typeIs DaxType.Boolean) (fun ev ctx call ->
             try
-                ev.Scalar(ctx, call.Args.[0]) |> ignore
-                DaxValue.Boolean false
+                DaxValue.Boolean(isNonFinite (ev.Scalar(ctx, call.Args.[0])))
             with DaxRuntimeException _ ->
                 DaxValue.Boolean true)
 

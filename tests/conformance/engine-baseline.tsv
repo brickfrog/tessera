@@ -14,8 +14,6 @@ blank/if-boolean-branch-blank	fail
 blank/less-than-date	not-supported
 calculate/boolean-filter-with-measure-is-an-error	not-supported
 conditional/if-eager-evaluates-the-untaken-branch	fail
-conditional/iferror-catches-division-by-zero	fail
-conditional/iserror-true-for-infinity-and-nan	fail
 conditional/switch-compares-strictly-blank-is-not-zero	not-supported
 context-transition/calculated-column-measure-reference	not-supported
 context-transition/calculated-column-with-calculate	not-supported
@@ -41,8 +39,6 @@ define/query-table-with-query-measure	not-supported
 define/start-at-two-values	not-supported
 define/start-at-value-not-in-the-result	not-supported
 define/start-at-with-descending-order	not-supported
-division/iserror-of-division-by-zero	fail
-division/iserror-of-zero-by-zero	fail
 earlier/rank-in-query-calculated-column	not-supported
 earlier/running-total-in-query-calculated-column	not-supported
 grouping/groupby-extension-column	error
