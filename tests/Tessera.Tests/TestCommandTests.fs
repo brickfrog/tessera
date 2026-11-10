@@ -19,7 +19,7 @@ open Tessera.Cli.Common
 /// The star model with a measure the local engine refuses.
 let private model = {
     star with
-        Measures = star.Measures @ [ "Sales", "Label", "FORMAT ( [Amount], \"0\" )" ]
+        Measures = star.Measures @ [ "Sales", "Label", "PATHITEM ( \"a|b\", 1 )" ]
 }
 
 /// A test model as model.bim in a temp folder, with its data as a fixture directory `data`.
@@ -403,7 +403,7 @@ let tests' =
             Expect.equal (testJson r "errors" (fun t -> t.GetProperty("code").GetString())) "dax-invalid" "error code"
             Expect.equal (testJson r "syntax" (fun t -> t.GetProperty("code").GetString())) "dax-syntax" "syntax"
             Expect.stringContains (message r "two results") "2 EVALUATE statements" "one EVALUATE"
-            Expect.stringContains (message r "unsupported") "FORMAT" "the function is named"
+            Expect.stringContains (message r "unsupported") "PATHITEM" "the function is named"
             Expect.equal (message r "pending") "pending" "pending"
             Expect.equal (message r "skipped") "not yet" "skip reason"
 
@@ -890,7 +890,7 @@ tests:
                     "  + by country"
                     "  + by year, ordered"
                     "  ! cannot be recorded"
-                    "      not recorded (unsupported): Not supported by the local DAX engine: the function FORMAT (measure 'Sales'[Label] 1:1)"
+                    "      not recorded (unsupported): Not supported by the local DAX engine: the function PATHITEM (measure 'Sales'[Label] 1:1)"
                 ]
                 "what would change"
 
