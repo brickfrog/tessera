@@ -352,106 +352,119 @@ module Filters =
             && obj.ReferenceEquals(via.From.Table, t)
             && cfg.IsExpanded(via.To.Table, x)
 
-        for f in fc.Filters do
-            match f with
-            | OnColumn(c, ids) ->
-                if obj.ReferenceEquals(c.Table, t) then
-                    set <- rowsWithIds t c ids set
-            | Tuples(cols, tuples) ->
-                let here = [|
-                    for i in 0 .. cols.Length - 1 do
-                        if cfg.IsExpanded(t, cols.[i].Table) then
-                            i
-                |]
+        // Filters on this table's own columns first, then (below) the tables it relates to, and
+        // only then the filters that pair columns of several tables: those test row by row, so
+        // they come last, on the rows that are left.
+        let mutable paired = false
 
-                if here.Length > 0 then
-                    let tables = here |> Array.map (fun i -> cols.[i].Table) |> Array.distinctBy _.Id
+        let applyFilters () =
+            for f in fc.Filters do
+                match f with
+                | OnColumn(c, ids) ->
+                    if not paired && obj.ReferenceEquals(c.Table, t) then
+                        set <- rowsWithIds t c ids set
+                | Tuples(cols, tuples) ->
+                    let here = [|
+                        for i in 0 .. cols.Length - 1 do
+                            if cfg.IsExpanded(t, cols.[i].Table) then
+                                i
+                    |]
 
-                    let apply =
-                        if tables.Length = 1 then
-                            // One table's columns: that table applies them, and its rows filter ours.
-                            obj.ReferenceEquals(tables.[0], t)
-                        else
-                            not (tables |> Array.forall beyondVia)
+                    if here.Length > 0 then
+                        let tables = here |> Array.map (fun i -> cols.[i].Table) |> Array.distinctBy _.Id
 
-                    if apply then
-                        let projected =
-                            if here.Length = cols.Length then
-                                tuples
+                        let apply =
+                            if tables.Length = 1 then
+                                // One table's columns: that table applies them, and its rows filter ours.
+                                obj.ReferenceEquals(tables.[0], t)
                             else
-                                let p =
-                                    HashSet<int array>(IntArrayComparer.Instance :> IEqualityComparer<int array>)
+                                not (tables |> Array.forall beyondVia)
 
-                                for tuple in tuples do
-                                    p.Add(here |> Array.map (fun i -> tuple.[i])) |> ignore
-
-                                p
-
-                        let columns = here |> Array.map (fun i -> cols.[i])
-
-                        let maps =
-                            columns
-                            |> Array.map (fun c ->
-                                if obj.ReferenceEquals(c.Table, t) then
-                                    null
+                        if apply && paired = (tables.Length > 1) then
+                            let projected =
+                                if here.Length = cols.Length then
+                                    tuples
                                 else
-                                    cfg.RowMap(t, c.Table))
+                                    let p =
+                                        HashSet<int array>(IntArrayComparer.Instance :> IEqualityComparer<int array>)
 
-                        let buffer = Array.zeroCreate<int> columns.Length
+                                    for tuple in tuples do
+                                        p.Add(here |> Array.map (fun i -> tuple.[i])) |> ignore
 
-                        set <-
-                            set.Where(fun row ->
-                                for i in 0 .. columns.Length - 1 do
-                                    let r = if isNull maps.[i] then row else maps.[i].[row]
-                                    buffer.[i] <- columns.[i].IdAt r
+                                    p
 
-                                projected.Contains buffer)
-            | Rows(x, rows, _) ->
-                if obj.ReferenceEquals(x, t) then
-                    set <- set.Intersect rows
-                elif cfg.IsExpanded(t, x) then
-                    // x filters us through the relationships below.
-                    ()
-                elif cfg.IsExpanded(x, t) then
-                    // We are part of x's expanded table: our rows that its rows refer to.
-                    let map = cfg.RowMap(x, t)
+                            let columns = here |> Array.map (fun i -> cols.[i])
 
-                    let image =
-                        RowSet.OfSeq(size, rows.Rows |> Seq.map (fun r -> map.[r]) |> Seq.filter (fun r -> r < size))
+                            let maps =
+                                columns
+                                |> Array.map (fun c ->
+                                    if obj.ReferenceEquals(c.Table, t) then
+                                        null
+                                    else
+                                        cfg.RowMap(t, c.Table))
 
-                    set <- set.Intersect image
-                else
-                    // What the two expanded tables share. If that hangs off one table, that table
-                    // carries the filter to us; otherwise the combinations matter.
-                    let shared =
-                        cfg.Expanded t |> Array.map fst |> Array.filter (fun y -> cfg.IsExpanded(x, y))
+                            let buffer = Array.zeroCreate<int> columns.Length
 
-                    let top =
-                        shared
-                        |> Array.filter (fun y ->
-                            not (
-                                shared
-                                |> Array.exists (fun z -> not (obj.ReferenceEquals(z, y)) && cfg.IsExpanded(z, y))
-                            ))
+                            set <-
+                                set.Where(fun row ->
+                                    for i in 0 .. columns.Length - 1 do
+                                        let r = if isNull maps.[i] then row else maps.[i].[row]
+                                        buffer.[i] <- columns.[i].IdAt r
 
-                    if top.Length > 1 && not (top |> Array.forall beyondVia) then
-                        let fromX = top |> Array.map (fun y -> cfg.RowMap(x, y))
-                        let fromT = top |> Array.map (fun y -> cfg.RowMap(t, y))
+                                    projected.Contains buffer)
+                | Rows(x, rows, _) ->
+                    if obj.ReferenceEquals(x, t) then
+                        if not paired then
+                            set <- set.Intersect rows
+                    elif cfg.IsExpanded(t, x) then
+                        // x filters us through the relationships below.
+                        ()
+                    elif cfg.IsExpanded(x, t) then
+                        // We are part of x's expanded table: our rows that its rows refer to.
+                        let map = cfg.RowMap(x, t)
 
-                        let combos =
-                            HashSet<int array>(IntArrayComparer.Instance :> IEqualityComparer<int array>)
+                        let image =
+                            RowSet.OfSeq(
+                                size,
+                                rows.Rows |> Seq.map (fun r -> map.[r]) |> Seq.filter (fun r -> r < size)
+                            )
 
-                        for r in rows.Rows do
-                            combos.Add(fromX |> Array.map (fun m -> m.[r])) |> ignore
+                        if not paired then
+                            set <- set.Intersect image
+                    elif paired then
+                        // What the two expanded tables share. If that hangs off one table, that table
+                        // carries the filter to us; otherwise the combinations matter.
+                        let shared =
+                            cfg.Expanded t |> Array.map fst |> Array.filter (fun y -> cfg.IsExpanded(x, y))
 
-                        let buffer = Array.zeroCreate<int> top.Length
+                        let top =
+                            shared
+                            |> Array.filter (fun y ->
+                                not (
+                                    shared
+                                    |> Array.exists (fun z -> not (obj.ReferenceEquals(z, y)) && cfg.IsExpanded(z, y))
+                                ))
 
-                        set <-
-                            set.Where(fun row ->
-                                for i in 0 .. top.Length - 1 do
-                                    buffer.[i] <- fromT.[i].[row]
+                        if top.Length > 1 && not (top |> Array.forall beyondVia) then
+                            let fromX = top |> Array.map (fun y -> cfg.RowMap(x, y))
+                            let fromT = top |> Array.map (fun y -> cfg.RowMap(t, y))
 
-                                combos.Contains buffer)
+                            let combos =
+                                HashSet<int array>(IntArrayComparer.Instance :> IEqualityComparer<int array>)
+
+                            for r in rows.Rows do
+                                combos.Add(fromX |> Array.map (fun m -> m.[r])) |> ignore
+
+                            let buffer = Array.zeroCreate<int> top.Length
+
+                            set <-
+                                set.Where(fun row ->
+                                    for i in 0 .. top.Length - 1 do
+                                        buffer.[i] <- fromT.[i].[row]
+
+                                    combos.Contains buffer)
+
+        applyFilters ()
 
         // The one-side tables we reach filter us.
         for r in cfg.ManyToOne t do
@@ -480,6 +493,9 @@ module Filters =
                             }
 
                         set <- set.Intersect(RowSet.OfSeq(size, rows))
+
+        paired <- true
+        applyFilters ()
 
         // A many-side table that filters both ways restricts us to the rows it refers to.
         for r in cfg.OneToMany t do

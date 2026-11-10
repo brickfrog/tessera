@@ -617,8 +617,26 @@ let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
             let keys =
                 e.OrderBy
                 |> List.map (fun k ->
+                    // A key that names a column of the result is that column (also when a measure
+                    // has the same name); anything else is an expression over the result's rows.
+                    let named =
+                        match (Fn.unparen k.Expr).Kind with
+                        | Bracketed name ->
+                            table.Cols
+                            |> Array.tryFindIndex (fun c ->
+                                isNull c.Table
+                                && String.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+                        | Qualified(t, name) ->
+                            table.Cols
+                            |> Array.tryFindIndex (fun c ->
+                                String.Equals(c.Table, t.Name, StringComparison.OrdinalIgnoreCase)
+                                && String.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+                        | _ -> None
+
                     let values =
-                        Array.init table.Count (fun row -> ev.Scalar(Context.pushRow ctx table row, k.Expr))
+                        match named with
+                        | Some i -> table.Column i
+                        | None -> Array.init table.Count (fun row -> ev.Scalar(Context.pushRow ctx table row, k.Expr))
 
                     Functions.TableFunctions.checkSortable ctx k.Span "ORDER BY" values
                     values, k.Direction = Some SortDirection.Desc)

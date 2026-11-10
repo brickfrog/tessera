@@ -202,6 +202,8 @@ let tests =
                     [ "diff"; model; other ]
                     [ "rename"; model; "[Total]"; "Total 2"; "--save" ]
                     [ "format"; model ]
+                    [ "query"; model; "--coverage" ]
+                    [ "query"; model; "--data"; p.Path; "EVALUATE { 1 }" ]
                     [ "--version" ]
                 ] do
                 tess args |> ignore

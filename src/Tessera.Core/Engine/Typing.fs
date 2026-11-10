@@ -176,3 +176,69 @@ module Typing =
             StaticType.Variant
         else
             StaticType.Known t
+
+/// Conversions whose result the sources leave open: refused rather than guessed.
+module Convert =
+
+    /// A value as text, as `&` and CONCATENATEX need it. A date's text depends on the model's
+    /// culture, and the sources disagree on a Boolean's ("True" or "TRUE"), so those are refused.
+    let toText (ctx: Ctx) (span: Span) (v: DaxValue) : string =
+        match v with
+        | DaxValue.DateTime _ ->
+            Fail.notSupported
+                ctx
+                span
+                "a date converted to text (the format depends on the model's culture; FORMAT is not implemented)"
+        | DaxValue.Boolean _ -> Fail.notSupported ctx span "TRUE or FALSE converted to text"
+        | _ -> DaxValue.toText v
+
+    /// An operand of arithmetic. Text that reads as a number is that number; text that would only
+    /// read as a date is refused (how the engine reads one depends on the model's culture).
+    let checkOperand (ctx: Ctx) (span: Span) (v: DaxValue) : unit =
+        match v with
+        | DaxValue.String _ ->
+            match DaxValue.convertTo DaxType.Decimal v, DaxValue.add (DaxValue.Integer 0L) v with
+            | Error _, Ok _ ->
+                Fail.notSupported
+                    ctx
+                    span
+                    "text read as a date in arithmetic (how a date is written depends on the model's culture)"
+            | _ -> ()
+        | _ -> ()
+
+/// Sorting where the sources leave the order open.
+module Sorting =
+
+    /// Refuse to sort by values of different types, or by a key that is BLANK in some rows and
+    /// zero, negative, empty or FALSE in others: where BLANK sorts among those is not documented.
+    let check (ctx: Ctx) (span: Span) (what: string) (values: DaxValue seq) : unit =
+        let values = List.ofSeq values
+        let blank = values |> List.exists DaxValue.isBlank
+
+        let families =
+            values
+            |> List.choose (fun v ->
+                match v with
+                | DaxValue.Blank -> None
+                | DaxValue.String _ -> Some 1
+                | DaxValue.Boolean _ -> Some 2
+                | _ -> Some 0)
+            |> List.distinct
+
+        if families.Length > 1 then
+            Fail.notSupported ctx span $"{what} by values of different data types"
+
+        if blank then
+            let low =
+                values
+                |> List.exists (fun v ->
+                    not (DaxValue.isBlank v)
+                    && (match DaxValue.compare ctx.Model.Collation v DaxValue.Blank with
+                        | Ok c -> c <= 0
+                        | Error _ -> false))
+
+            if low then
+                Fail.notSupported
+                    ctx
+                    span
+                    $"{what} by a key that is BLANK in some rows and zero, negative, empty or FALSE in others (where BLANK sorts among those is not documented)"

@@ -392,7 +392,15 @@ module Filter =
             ev.Table(calculateContext ev ctx call, call.Args.[0]))
         |> Fn.withCheck checkCalculate
 
-        Fn.modifier "KEEPFILTERS" "Filter" (1, 1)
+        {
+            Fn.modifier "KEEPFILTERS" "Filter" (1, 1) with
+                Table =
+                    fun _ ctx call ->
+                        Fail.notSupported
+                            ctx
+                            call.Span
+                            "KEEPFILTERS on the table of an iterator (it is supported on a filter argument of CALCULATE)"
+        }
         Fn.modifier "USERELATIONSHIP" "Filter" (2, 2)
         Fn.modifier "CROSSFILTER" "Filter" (3, 3)
         Fn.modifier "REMOVEFILTERS" "Filter" (0, -1)
@@ -588,6 +596,12 @@ module Filter =
                     let t = rc.Table
 
                     if not (isNull t.BaseTable) && ctx.Filter.Config.IsExpanded(t.BaseTable, c.Table) then
+                        if not t.IsPureBase then
+                            Fail.notSupported
+                                ctx
+                                call.Span
+                                $"RELATED in a row context on a table built on '{t.BaseTable.Name}' with columns added"
+
                         if not (obj.ReferenceEquals(t.Config, ctx.Filter.Config)) then
                             Fail.notSupported
                                 ctx

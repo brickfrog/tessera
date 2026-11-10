@@ -394,6 +394,26 @@ let tests =
                 is (p ()) "CALCULATE ( HASONEFILTER ( Product[Color] ), Product[Name] = \"Bike\" )" false)
         ]
 
+        testList "refused rather than guessed" [
+            testCase "KEEPFILTERS on an iterator's table" (fun () ->
+                isError "not-supported" "SUMX ( KEEPFILTERS ( VALUES ( Product[Color] ) ), [Amount] )")
+            testCase "a model table with columns added, where its related tables would matter" (fun () ->
+                isError "not-supported" "SUMX ( ADDCOLUMNS ( Sales, \"x\", 1 ), [Amount] )"
+                isError "not-supported" "CALCULATE ( [Amount], ADDCOLUMNS ( Sales, \"x\", 1 ) )"
+                isError "not-supported" "SUMX ( ADDCOLUMNS ( Sales, \"x\", 1 ), RELATED ( Product[ProductKey] ) )"
+                isError "not-supported" "COUNTROWS ( SUMMARIZE ( ADDCOLUMNS ( Sales, \"x\", 1 ), Product[Color] ) )"
+                // A table that relates to no other has no such question: per product, its amount.
+                is (p ()) "SUMX ( ADDCOLUMNS ( Product, \"x\", 1 ), [Amount] * [x] )" 585)
+            testCase "a name that is both a column of the row context and a measure" (fun () ->
+                isError "not-supported" "SUMX ( ADDCOLUMNS ( VALUES ( Product[Color] ), \"Amount\", 1 ), [Amount] )")
+            // Nesting as deep as the parser allows: evaluated on a deep stack.
+            testCase "deeply nested expressions" (fun () ->
+                let nested = String.replicate 200 "IF ( TRUE, " + "1" + String.replicate 200 " )"
+                is (p ()) nested 1
+                let parens = String.replicate 250 "(" + "1" + String.replicate 250 ")"
+                is (p ()) (parens + " + 1") 2)
+        ]
+
         testList "measures and functions" [
             testCase "a measure that refers to itself is an error" (fun () ->
                 let m =

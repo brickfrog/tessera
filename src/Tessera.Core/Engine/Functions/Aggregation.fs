@@ -410,7 +410,7 @@ module Aggregation =
 
             let delimiter =
                 match List.tryItem 2 call.Args with
-                | Some d when not (Fn.isOmitted d) -> DaxValue.toText (ev.Scalar(ctx, d))
+                | Some d when not (Fn.isOmitted d) -> Convert.toText ctx d.Span (ev.Scalar(ctx, d))
                 | _ -> ""
 
             // Order-by expressions, each optionally followed by its order.
@@ -443,9 +443,13 @@ module Aggregation =
                 let rows =
                     Array.init table.Count (fun row ->
                         let inner = Context.pushRow ctx table row
-                        let text = DaxValue.toText (ev.Scalar(inner, call.Args.[1]))
+                        let text = Convert.toText ctx call.Args.[1].Span (ev.Scalar(inner, call.Args.[1]))
                         let sortBy = keys |> List.map (fun (k, _) -> ev.Scalar(inner, k)) |> Array.ofList
                         text, sortBy)
+
+                keys
+                |> List.iteri (fun i (k, _) ->
+                    Sorting.check ctx k.Span "CONCATENATEX ordered" (rows |> Seq.map (fun (_, sortBy) -> sortBy.[i])))
 
                 let descending = keys |> List.map snd |> Array.ofList
 

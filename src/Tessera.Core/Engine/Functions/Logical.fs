@@ -298,15 +298,13 @@ module Math =
             | _ -> Fail.notSupported ctx call.Span "MOD of values that are not whole numbers")
 
         // "A BLANK argument is an empty string. If both arguments are BLANK, the result is BLANK"
-        // (dax.guide/concatenate). The page shows TRUE as "TRUE" where `&` gives "True", so
-        // Booleans are refused.
+        // (dax.guide/concatenate). The page shows TRUE as "TRUE" where other sources give "True",
+        // so Booleans are refused (see `Convert.toText`).
         Fn.scalar "CONCATENATE" "Text" (2, 2) (Fn.typeIs DaxType.String) (fun ev ctx call ->
             let a = ev.Scalar(ctx, call.Args.[0])
             let b = ev.Scalar(ctx, call.Args.[1])
 
             match a, b with
             | DaxValue.Blank, DaxValue.Blank -> DaxValue.Blank
-            | DaxValue.Boolean _, _
-            | _, DaxValue.Boolean _ -> Fail.notSupported ctx call.Span "CONCATENATE of a BOOLEAN"
-            | _ -> DaxValue.concat a b)
+            | _ -> DaxValue.String(Convert.toText ctx call.Span a + Convert.toText ctx call.Span b))
     ]

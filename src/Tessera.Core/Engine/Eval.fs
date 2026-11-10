@@ -382,12 +382,30 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
             let r = ev.Scalar(ctx, right)
 
             match op with
+            | BinaryOp.Add
+            | BinaryOp.Subtract
+            | BinaryOp.Multiply
+            | BinaryOp.Divide
+            | BinaryOp.Power ->
+                Convert.checkOperand ctx span l
+                Convert.checkOperand ctx span r
+            | _ -> ()
+
+            let isDate (v: DaxValue) =
+                match v with
+                | DaxValue.DateTime _ -> true
+                | _ -> false
+
+            match op with
+            | BinaryOp.Multiply when isDate l || isDate r ->
+                // The documentation's table has no row for a date in a multiplication.
+                Fail.notSupported ctx span "multiplying a date"
             | BinaryOp.Add -> Fail.dax ctx span (DaxValue.add l r)
             | BinaryOp.Subtract -> Fail.dax ctx span (DaxValue.subtract l r)
             | BinaryOp.Multiply -> Fail.dax ctx span (DaxValue.multiply l r)
             | BinaryOp.Divide -> Fail.dax ctx span (DaxValue.divide l r)
             | BinaryOp.Power -> Fail.dax ctx span (DaxValue.power l r)
-            | BinaryOp.Concat -> DaxValue.concat l r
+            | BinaryOp.Concat -> DaxValue.String(Convert.toText ctx span l + Convert.toText ctx span r)
             | BinaryOp.Equal -> DaxValue.Boolean(Fail.dax ctx span (DaxValue.equals coll l r))
             | BinaryOp.StrictEqual -> DaxValue.Boolean(Fail.dax ctx span (DaxValue.strictEquals coll l r))
             | BinaryOp.NotEqual -> DaxValue.Boolean(not (Fail.dax ctx span (DaxValue.equals coll l r)))

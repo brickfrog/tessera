@@ -80,6 +80,8 @@
     <Compile Include="EngineContextTests.fs" />
     <Compile Include="EngineTableTests.fs" />
     <Compile Include="EnginePropertyTests.fs" />
+    <Compile Include="EngineCommandTests.fs" />
+    <Compile Include="EngineSampleTests.fs" />
     <Compile Include="EnginePerfTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>

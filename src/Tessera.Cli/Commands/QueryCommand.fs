@@ -227,7 +227,8 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     let maxRows = args.TryGetResult Args.Max_Rows |> Option.defaultValue defaultMaxRows
     let data = args.TryGetResult Args.Data
 
-    match args.TryGetResult Args.Target |> Option.defaultValue [] with
+    // The model and the query may have options between them (`query <model> --data <dir> "<DAX>"`).
+    match args.GetResults Args.Target |> List.concat with
     | [] -> UsageError "expected a model (xmla:<server>;<database>, or model files with --data) and a DAX query"
     | _ when maxRows < 0 -> UsageError "--max-rows must be 0 (all rows) or more"
     | _ when ctx.Json && args.Contains Args.Csv -> UsageError "--json and --csv can't be combined"

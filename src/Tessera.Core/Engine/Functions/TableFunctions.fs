@@ -60,6 +60,12 @@ module TableFunctions =
                 not (isNull table.BaseTable)
                 && table.Config.IsExpanded(table.BaseTable, c.Table)
             then
+                if not table.IsPureBase then
+                    Fail.notSupported
+                        ctx
+                        e.Span
+                        $"{fn} by a column of a related table, over a table built on '{table.BaseTable.Name}' with columns added"
+
                 let map = table.Config.RowMap(table.BaseTable, c.Table)
                 Tables.modelColumn c, Array.init table.Count (fun row -> c.ValueAt map.[table.BaseRows.[row]])
             else
@@ -113,39 +119,8 @@ module TableFunctions =
                 Some $"{name.Name.ToUpperInvariant()} in {fn}"
             | _ -> None)
 
-    /// Where the order of BLANK against zero or negative values, or of values of different types,
-    /// would decide the result: the sources don't say how the engine orders those.
-    let checkSortable (ctx: Ctx) (span: Span) (what: string) (values: DaxValue seq) =
-        let values = List.ofSeq values
-        let blank = values |> List.exists DaxValue.isBlank
-
-        let families =
-            values
-            |> List.choose (fun v ->
-                match v with
-                | DaxValue.Blank -> None
-                | DaxValue.String _ -> Some 1
-                | DaxValue.Boolean _ -> Some 2
-                | _ -> Some 0)
-            |> List.distinct
-
-        if families.Length > 1 then
-            Fail.notSupported ctx span $"{what} by values of different data types"
-
-        if blank then
-            let low =
-                values
-                |> List.exists (fun v ->
-                    not (DaxValue.isBlank v)
-                    && (match DaxValue.compare ctx.Model.Collation v DaxValue.Blank with
-                        | Ok c -> c <= 0
-                        | Error _ -> false))
-
-            if low then
-                Fail.notSupported
-                    ctx
-                    span
-                    $"{what} by a key that is BLANK in some rows and zero, negative, empty or FALSE in others (where BLANK sorts among those is not documented)"
+    /// See `Sorting.check`.
+    let checkSortable (ctx: Ctx) (span: Span) (what: string) (values: DaxValue seq) = Sorting.check ctx span what values
 
     let private descending (e: Expr) : bool option =
         match Fn.keyword e, (Fn.unparen e).Kind with

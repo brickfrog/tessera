@@ -84,6 +84,24 @@ let tests =
                 is (p ()) chain 499)
         ]
 
+        testList "conversions" [
+            // "You can use a string in a numeric expression and the string is automatically
+            // converted into a corresponding number" (SQLBI, numeric data type conversions).
+            testCase "text that is a number is a number in arithmetic" (fun () ->
+                is (p ()) "\"22\" + 1" 23
+                is (p ()) "\"1.5\" * 2" 3.0)
+            testCase "a date plus a number is a date" (fun () ->
+                is (p ()) "dt\"2024-01-01\" + 1" (DateTime(2024, 1, 2))
+                is (p ()) "dt\"2024-01-03\" - dt\"2024-01-01\"" (DateTime(1900, 1, 1)))
+            // What depends on the model's culture, or what the sources disagree on, is refused.
+            testCase "culture-dependent conversions are refused" (fun () ->
+                isError "not-supported" "dt\"2024-01-31\" & \"\""
+                isError "not-supported" "\"1/31/2024\" + 1"
+                isError "not-supported" "TRUE & \"\""
+                isError "not-supported" "dt\"2024-01-31\" * 2"
+                isError "not-supported" "CONCATENATEX ( 'Date', 'Date'[Date], \",\", 'Date'[Date] )")
+        ]
+
         testList "logical" [
             // "The value that is returned if the logical test is FALSE. If omitted, a BLANK is
             // returned" (dax.guide/if).

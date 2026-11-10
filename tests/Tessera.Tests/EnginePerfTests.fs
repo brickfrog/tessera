@@ -81,6 +81,16 @@ let tests =
                     big.Value
                     "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], TREATAS ( { 2024 }, 'Date'[Year] ), \"Amount\", [Amount] )"
                 |> ignore)
+            timed "SUMMARIZE with a measure per group (2000 groups)" 3000L (fun () ->
+                rows big.Value "EVALUATE SUMMARIZE ( Sales, Customer[CustomerKey], \"Amount\", [Amount] )"
+                |> ignore)
+            timed "ADDCOLUMNS over SUMMARIZE (2000 groups)" 2000L (fun () ->
+                rows
+                    big.Value
+                    "EVALUATE ADDCOLUMNS ( SUMMARIZE ( Sales, Customer[CustomerKey] ), \"Amount\", [Amount] )"
+                |> ignore)
+            timed "a measure per row of the fact table (100k context transitions)" 5000L (fun () ->
+                scalar big.Value "SUMX ( Sales, [Amount] )" |> ignore)
             timed "context transition per row of a dimension" 2000L (fun () ->
                 scalar big.Value "SUMX ( Product, [Amount] )" |> ignore)
         ]
