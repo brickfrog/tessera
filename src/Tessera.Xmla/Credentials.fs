@@ -10,9 +10,9 @@ open Tessera
 type DeviceCodeOptions = {
     /// The Microsoft Entra tenant (ID or domain); None lets the address or the user's home tenant decide.
     TenantId: string option
-    /// The public client application to sign in through; None uses the Analysis Services client
-    /// libraries' own application.
-    ClientId: string option
+    /// The public client application to sign in through: an app registration of the user's own.
+    /// tess ships no application ID.
+    ClientId: string
     /// Where to keep the sign-in between runs; None keeps it in memory only.
     CachePath: string option
 }
@@ -189,11 +189,20 @@ module Credentials =
         | _ -> Ok None
 
     let private deviceCode (env: Environment) =
-        XmlaCredential.DeviceCode {
-            TenantId = env.GetEnv Var.tenantId
-            ClientId = env.GetEnv Var.clientId
-            CachePath = env.GetEnv Var.tokenCache
-        }
+        match env.GetEnv Var.clientId with
+        | Some clientId when not (String.IsNullOrWhiteSpace clientId) ->
+            Ok(
+                XmlaCredential.DeviceCode {
+                    TenantId = env.GetEnv Var.tenantId
+                    ClientId = clientId.Trim()
+                    CachePath = env.GetEnv Var.tokenCache
+                }
+            )
+        | _ ->
+            Error(
+                InvalidCredentials
+                    $"device-code sign-in needs {Var.clientId}: the application (client) ID of a public client app registration of your own, with the Power BI Service delegated permission and \"Allow public client flows\" on. tess ships no application ID"
+            )
 
     /// Work out the credential for an address from the environment. Nothing is contacted.
     let resolve (env: Environment) (address: XmlaAddress) : Result<XmlaCredential, TessError> =
@@ -214,7 +223,7 @@ module Credentials =
         match (env.GetEnv Var.auth |> Option.defaultValue "auto").Trim().ToLowerInvariant() with
         | "token" -> cloudOnly "token" (fun () -> require (token env true))
         | "spn" -> cloudOnly "spn" (fun () -> require (servicePrincipal env true))
-        | "device-code" -> cloudOnly "device-code" (fun () -> Ok(deviceCode env))
+        | "device-code" -> cloudOnly "device-code" (fun () -> deviceCode env)
         | "basic" -> require (basic env true)
         | "integrated" ->
             if cloud then

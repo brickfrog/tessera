@@ -1526,7 +1526,7 @@ never read from the command line, never printed, never written to JSON output, a
 |---|---|
 | an access token you already have | `TESS_XMLA_TOKEN`, or `TESS_XMLA_TOKEN_FILE=<path>` (`-` for standard input) |
 | a service principal | `TESS_XMLA_CLIENT_ID`, `TESS_XMLA_TENANT_ID`, and `TESS_XMLA_CLIENT_SECRET` or `TESS_XMLA_CLIENT_SECRET_FILE`. Without those, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and `AZURE_CLIENT_SECRET` are used |
-| your own account (device code) | `TESS_XMLA_AUTH=device-code`; optionally `TESS_XMLA_TENANT_ID` |
+| your own account (device code) | `TESS_XMLA_AUTH=device-code` and `TESS_XMLA_CLIENT_ID` (your own app registration); optionally `TESS_XMLA_TENANT_ID` |
 | a user name and password (SSAS) | `TESS_XMLA_USER`, and `TESS_XMLA_PASSWORD` or `TESS_XMLA_PASSWORD_FILE` |
 | the current Windows account (SSAS) | nothing |
 
@@ -1541,11 +1541,12 @@ A token must be issued for the server's resource: `https://analysis.windows.net/
 the token only to tell the client library.
 
 Device-code sign-in prints a URL and a code on stderr and waits for you to enter the code in a browser, on any
-device. tess signs in through the Analysis Services client libraries' own application ID; set `TESS_XMLA_CLIENT_ID`
-to use an app registration of your own. The sign-in lasts for that one command, unless you opt in to keeping it:
+device. It needs `TESS_XMLA_CLIENT_ID`: the application (client) ID of a public client app registration of your
+own, with the Power BI Service delegated permission and "Allow public client flows" on. tess ships no application
+ID. The sign-in lasts for that one command, unless you opt in to keeping it:
 
 ```sh
-export TESS_XMLA_AUTH=device-code TESS_XMLA_TOKEN_CACHE=~/.cache/tessera/xmla-token-cache
+export TESS_XMLA_AUTH=device-code TESS_XMLA_CLIENT_ID=<your app> TESS_XMLA_TOKEN_CACHE=~/.cache/tessera/xmla-token-cache
 ```
 
 `TESS_XMLA_TOKEN_CACHE` names a file where the sign-in (including a refresh token) is kept between runs. It is

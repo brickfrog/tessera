@@ -98,8 +98,9 @@ Then each failure, one at a time (restore the right value after each):
 ### A4. Device code
 
 ```sh
-unset TESS_XMLA_CLIENT_ID TESS_XMLA_TENANT_ID TESS_XMLA_CLIENT_SECRET_FILE
+unset TESS_XMLA_TENANT_ID TESS_XMLA_CLIENT_SECRET_FILE
 export TESS_XMLA_AUTH=device-code
+export TESS_XMLA_CLIENT_ID=<application ID of your own public client app registration>
 tess connect "$WS"
 ```
 
@@ -107,10 +108,9 @@ Expect: stderr shows `To sign in, use a web browser to open the page https://log
 the code XXXXXXXXX to authenticate.`; after you do, the same output as A2 with `Signed in with  device code sign-in`.
 Run it again: it asks for a code again (nothing was kept).
 
-If the sign-in page refuses the application (tess uses the Analysis Services client libraries' own application ID,
-`cf710c6e-dfcc-4fa8-a093-d47294e44c66`), record the error, then repeat with `TESS_XMLA_CLIENT_ID` set to a public
-client app registration of your own that has the Power BI Service `Dataset.ReadWrite.All` delegated permission and
-"Allow public client flows" on.
+tess ships no application ID. The app registration must be a public client with the Power BI Service
+`Dataset.ReadWrite.All` delegated permission and "Allow public client flows" on. Without `TESS_XMLA_CLIENT_ID`,
+expect an `invalid-credentials` error naming the variable, before anything is contacted.
 
 Then the opt-in cache:
 

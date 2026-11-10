@@ -22,9 +22,6 @@ type private AmoServer = Microsoft.AnalysisServices.Tabular.Server
 
 module private Live =
 
-    /// The application AMO/ADOMD themselves sign in through (their DefaultApplicationId).
-    let analysisServicesClientId = "cf710c6e-dfcc-4fa8-a093-d47294e44c66"
-
     let staticToken (token: string) =
         let expiry =
             Credentials.tokenExpiry token
@@ -52,10 +49,7 @@ module private Live =
         let scopes = [| properties.ResourceId.TrimEnd('/') + "/.default" |]
 
         let app =
-            PublicClientApplicationBuilder
-                .Create(opts.ClientId |> Option.defaultValue analysisServicesClientId)
-                .WithAuthority(authority)
-                .Build()
+            PublicClientApplicationBuilder.Create(opts.ClientId).WithAuthority(authority).Build()
 
         match opts.CachePath with
         | Some path ->

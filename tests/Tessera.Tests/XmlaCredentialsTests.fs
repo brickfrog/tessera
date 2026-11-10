@@ -132,26 +132,39 @@ let credentialTests =
             Expect.equal (resolve (mode "SPN" @ spn) [] cloud |> code) "ok" "the mode is case-insensitive"
 
             Expect.equal
-                (resolve (mode "device-code" @ [ Var.tenantId, "contoso.com"; Var.tokenCache, "/c/cache" ]) [] cloud)
+                (resolve
+                    (mode "device-code"
+                     @ [
+                         Var.tenantId, "contoso.com"
+                         Var.clientId, "my-app"
+                         Var.tokenCache, "/c/cache"
+                     ])
+                    []
+                    cloud)
                 (Ok(
                     XmlaCredential.DeviceCode {
                         TenantId = Some "contoso.com"
-                        ClientId = None
+                        ClientId = "my-app"
                         CachePath = Some "/c/cache"
                     }
                 ))
                 ""
 
             Expect.equal
-                (resolve (mode "device-code") [] cloud)
+                (resolve (mode "device-code" @ [ Var.clientId, "my-app" ]) [] cloud)
                 (Ok(
                     XmlaCredential.DeviceCode {
                         TenantId = None
-                        ClientId = None
+                        ClientId = "my-app"
                         CachePath = None
                     }
                 ))
                 "no cache file unless asked for"
+
+            // tess ships no application ID: device code needs the user's own.
+            match resolve (mode "device-code") [] cloud with
+            | Error(InvalidCredentials reason) -> Expect.stringContains reason Var.clientId ""
+            | other -> failtestf "%A" other
 
         testCase "SSAS: integrated unless a user and password are given; cloud sign-ins are refused"
         <| fun () ->
@@ -180,7 +193,7 @@ let credentialTests =
                 XmlaCredential.Basic("user", "pw-secret")
                 XmlaCredential.DeviceCode {
                     TenantId = None
-                    ClientId = None
+                    ClientId = "my-app"
                     CachePath = None
                 }
                 XmlaCredential.Integrated
@@ -273,7 +286,7 @@ let secretTests =
                     XmlaCredential.Integrated
                     XmlaCredential.DeviceCode {
                         TenantId = None
-                        ClientId = None
+                        ClientId = "my-app"
                         CachePath = None
                     }
                 ] do
