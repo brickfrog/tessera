@@ -26,6 +26,94 @@ type Prepared = internal {
     Failures: (ObjectRef * TessError) list
 }
 
+/// The instant the date functions see as "now". `Now` is what TODAY and NOW return (local time),
+/// `UtcNow` what UTCTODAY and UTCNOW return. It is fixed when a model is prepared: the calculated
+/// tables and columns and every query against the prepared model see this one instant.
+type Clock = { Now: DateTime; UtcNow: DateTime }
+
+module Clock =
+
+    /// The machine's clock, read once: local time and UTC, to the millisecond.
+    let system () : Clock =
+        let utc = DateTime.UtcNow
+        let utc = DateTime(utc.Ticks - utc.Ticks % TimeSpan.TicksPerMillisecond, DateTimeKind.Unspecified)
+        let local = utc + TimeZoneInfo.Local.GetUtcOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc))
+
+        { Now = local; UtcNow = utc }
+
+    /// The same instant for the local and the UTC functions (an offset of zero).
+    let fixedAt (now: DateTime) : Clock =
+        let now = DateTime.SpecifyKind(now, DateTimeKind.Unspecified)
+        { Now = now; UtcNow = now }
+
+    let private formats = [|
+        "yyyy-MM-dd"
+        "yyyy-MM-dd'T'HH:mm"
+        "yyyy-MM-dd'T'HH:mm:ss"
+        "yyyy-MM-dd'T'HH:mm:ss.FFFFFFF"
+        "yyyy-MM-dd HH:mm"
+        "yyyy-MM-dd HH:mm:ss"
+        "yyyy-MM-dd HH:mm:ss.FFFFFFF"
+    |]
+
+    /// An ISO 8601 date or date and time: `2024-03-05`, `2024-03-05T14:30`, `2024-03-05T14:30:00`,
+    /// with a `T` or a space, and optionally a UTC offset (`Z`, `+02:00`, `-0500`). The date and
+    /// time as written is the local `Now`. With an offset, `UtcNow` is that instant in UTC; without
+    /// one it is the same as `Now`: the machine's own time zone is never consulted.
+    let parse (text: string) : Result<Clock, string> =
+        let invalid () =
+            Error
+                $"'{text}' is not an ISO 8601 date and time (2024-03-05, 2024-03-05T14:30:00, 2024-03-05T14:30:00+02:00)"
+
+        let t = (if isNull text then "" else text.Trim())
+        let inv = Globalization.CultureInfo.InvariantCulture
+
+        let local (s: string) =
+            match DateTime.TryParseExact(s, formats, inv, Globalization.DateTimeStyles.None) with
+            | true, d -> Some(DateTime.SpecifyKind(d, DateTimeKind.Unspecified))
+            | _ -> None
+
+        // The offset, if the text ends in one: Z, or a sign and hh:mm / hhmm after a time.
+        let hasTime = t.Length > 10
+
+        let body, offset =
+            if hasTime && (t.EndsWith "Z" || t.EndsWith "z") then
+                t.Substring(0, t.Length - 1), Some TimeSpan.Zero
+            else
+                let sign = t.LastIndexOfAny [| '+'; '-' |]
+
+                if hasTime && sign > 10 then
+                    let digits = t.Substring(sign + 1).Replace(":", "")
+
+                    if digits.Length = 4 && digits |> Seq.forall Char.IsAsciiDigit then
+                        let hours = int (digits.Substring(0, 2))
+                        let minutes = int (digits.Substring(2, 2))
+
+                        if hours <= 14 && minutes <= 59 then
+                            let span = TimeSpan(hours, minutes, 0)
+                            t.Substring(0, sign), Some(if t.[sign] = '-' then -span else span)
+                        else
+                            t, None
+                    else
+                        t, None
+                else
+                    t, None
+
+        match local body, offset with
+        | Some now, Some offset ->
+            if now.Ticks - offset.Ticks < 0L || now.Ticks - offset.Ticks > DateTime.MaxValue.Ticks then
+                invalid ()
+            else
+                Ok { Now = now; UtcNow = now - offset }
+        | Some now, None when body.Length = t.Length -> Ok { Now = now; UtcNow = now }
+        | _ -> invalid ()
+
+/// How a model is prepared. `Clock = None` reads the machine's clock when `prepareWith` is called.
+type Options = { Clock: Clock option }
+
+module Options =
+    let defaults: Options = { Clock = None }
+
 /// The functions the engine implements: name and family, by family then name.
 let functions: (string * string) list =
     Registry.all
@@ -152,8 +240,15 @@ let private isCircular (e: TessError) =
 
 // ---- prepare -----------------------------------------------------------------------------------
 
-let private bind (db: Database) (store: DataStore) : Tessera.DaxEngine.Model * (ObjectRef * TessError) list =
+let private bind
+    (clock: Clock)
+    (db: Database)
+    (store: DataStore)
+    : Tessera.DaxEngine.Model * (ObjectRef * TessError) list =
     let model = Tessera.DaxEngine.Model(store.Collation)
+    model.Now <- clock.Now
+    model.UtcNow <- clock.UtcNow
+    model.Culture <- (if isNull db.Model.Culture then "" else db.Model.Culture)
     let gates = staticGates db
     let tables = ResizeArray<BTable>()
     let mutable columnId = 0
@@ -524,15 +619,27 @@ let private bind (db: Database) (store: DataStore) : Tessera.DaxEngine.Model * (
 /// Fails for a circular dependency between calculated columns or tables. A calculated column or
 /// table that can't be computed for another reason (it uses something not supported) doesn't fail
 /// `prepare`: see `failures`; a query that touches it gets that error.
-let prepare (db: Database) (store: DataStore) : Result<Prepared, TessError> =
+///
+/// `options.Clock` is the instant TODAY, NOW, UTCTODAY and UTCNOW return, in calculated tables and
+/// columns and in every query against the result; without one the machine's clock is read once, now.
+let prepareWith (options: Options) (db: Database) (store: DataStore) : Result<Prepared, TessError> =
     if isNull db.Model then
         Error(DaxInvalid("the database has no model", ""))
     else
-        run (fun () -> bind db store)
+        let clock = options.Clock |> Option.defaultWith Clock.system
+
+        run (fun () -> bind clock db store)
         |> Result.bind (fun (model, failures) ->
             match failures |> List.tryFind (fun (_, e) -> isCircular e) with
             | Some(_, e) -> Error e
             | None -> Ok { Model = model; Failures = failures })
+
+/// `prepareWith` with the defaults: the date functions see the machine's clock, read once here.
+let prepare (db: Database) (store: DataStore) : Result<Prepared, TessError> =
+    prepareWith Options.defaults db store
+
+/// The instant the prepared model's date functions see.
+let clock (p: Prepared) : Clock = { Now = p.Model.Now; UtcNow = p.Model.UtcNow }
 
 /// What `prepare` could not compute, with why.
 let failures (p: Prepared) : (ObjectRef * TessError) list = p.Failures

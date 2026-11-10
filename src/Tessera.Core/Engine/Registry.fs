@@ -15,6 +15,7 @@ module Registry =
             Logical.functions
             Math.functions
             Text.functions
+            DateAndTime.functions
             Filter.functions
             TableFunctions.functions
         ]
