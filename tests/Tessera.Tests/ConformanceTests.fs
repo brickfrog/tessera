@@ -133,6 +133,28 @@ let corpusTests =
 
             Expect.isEmpty clashes "")
 
+        // What the server runner deploys: the model with its rows inside it.
+        testList "each model embeds its rows exactly" [
+            for c in cases () |> List.distinctBy _.ModelKey ->
+                testCase c.ModelName
+                <| fun () ->
+                    match prepared c with
+                    | Error e -> failtest e
+                    | Ok p ->
+                        match FixtureEmbed.embed p.Database p.Store with
+                        | Error e -> failtest (TessError.message e)
+                        | Ok embedded ->
+                            EmbedTests.expectHoldsStore p.Database p.Store embedded |> ignore
+                            Expect.isEmpty embedded.Warnings "a corpus model must embed without loss"
+
+                            let errors (db: Microsoft.AnalysisServices.Tabular.Database) =
+                                Validate.validate db
+                                |> List.filter (fun i -> i.Severity = Validate.Severity.Error)
+                                |> List.map (fun i -> i.Rule, i.Message)
+
+                            Expect.equal (errors embedded.Database) (errors p.Database) "no new validation errors"
+        ]
+
         testList "each case is sound" [
             for c in cases () ->
                 testCase c.Id

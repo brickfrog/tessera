@@ -763,13 +763,14 @@ let private parseCase (models: Map<string, JsonNode>) (id: string) (file: string
         | n when kindOf n = JsonValueKind.String ->
             let name = n.GetValue<string>()
             let node = shared name
-            name, name, lazy node
+            // The key has the content too: two corpora may each have a model of this name.
+            name, name + ":" + hash8 (node.ToJsonString()), lazy node
         | n when kindOf n = JsonValueKind.Object ->
             let overlay = n.AsObject()
             let name = reqString "\"model\"" overlay "base"
             let baseModel = shared name
             let key = hash8 (name + "\n" + overlay.ToJsonString())
-            $"{name}-{key}", $"{name}-{key}", lazy (applyOverlay baseModel overlay)
+            $"{name}-{key}", $"{name}-{key}:" + hash8 (baseModel.ToJsonString()), lazy (applyOverlay baseModel overlay)
         | _ -> bad "\"model\" must be the name of a shared model, or { \"base\": name, ...changes }"
 
     let untyped = Collections.Generic.HashSet<string>()
