@@ -1998,7 +1998,10 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 
 - **Values:** whole, decimal and fixed decimal numbers, text, true/false, dates and BLANK, with DAX's rules for
   each operator (`BLANK + 5` is 5, `BLANK * 5` is BLANK, `BLANK = 0` but not `BLANK == 0`, `5 / 0` is infinity, text
-  compares without case). `&&`, `||`, `IF`, `SWITCH` and `COALESCE` evaluate only what they need.
+  compares without case). `&&`, `||`, `IF`, `SWITCH` and `COALESCE` evaluate only what they need; `IF.EAGER`
+  evaluates both branches. Whole-number `+`, `-` and `*` wrap around past 64 bits as the engine's do (SQLBI,
+  "Rounding errors with different data types"); `ISERROR` and `IFERROR` treat infinity and NaN as errors; a BLANK
+  written as a branch of an `IF` whose other branch is TRUE/FALSE is FALSE.
 - **Tables as values, with data lineage:** a column of a table expression remembers the model column it came from,
   which is what makes `VALUES ( T[c] )` usable as a filter, what `TREATAS` assigns, and what an expression loses.
   Result columns are named as the engine names them (`Sales[Amount]`, `[Total]`, `[Value]`) and typed statically
@@ -2017,7 +2020,9 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   `USERELATIONSHIP`, `CROSSFILTER` (NONE, ONEWAY, BOTH); arbitrarily shaped filters, which lose their pairing when
   one of their columns is replaced.
 - **Queries:** `DEFINE MEASURE` (overriding a model measure for the query's own code only), `DEFINE VAR`,
-  `DEFINE FUNCTION`, several `EVALUATE` statements, `ORDER BY` by result columns or expressions.
+  `DEFINE FUNCTION`, `DEFINE COLUMN` (a calculated column on a model table, for the query) and `DEFINE TABLE` (a
+  calculated table, for the query), several `EVALUATE` statements, `ORDER BY` by result columns or expressions,
+  `START AT` (the rows before the values, in the order of the keys and their directions, are skipped).
 - **User-defined functions,** the model's and the query's, with `VAL` parameters (evaluated once, in the caller's
   context, and converted to the parameter's type) and `EXPR` parameters (evaluated where the body uses them).
 - **Calculated columns and calculated tables,** computed in dependency order when the model is loaded. A circular
@@ -2029,27 +2034,36 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 | Family | Functions |
 |---|---|
 | Aggregation | `AVERAGE` `AVERAGEX` `CONCATENATEX` `COUNT` `COUNTA` `COUNTAX` `COUNTBLANK` `COUNTROWS` `COUNTX` `DISTINCTCOUNT` `DISTINCTCOUNTNOBLANK` `MAX` `MAXX` `MIN` `MINX` `PRODUCTX` `RANKX` `SUM` `SUMX` |
-| Filter | `ALL` `ALLCROSSFILTERED` `ALLEXCEPT` `ALLNOBLANKROW` `CALCULATE` `CALCULATETABLE` `CROSSFILTER` `DISTINCT` `EARLIER` `EARLIEST` `FILTER` `HASONEFILTER` `HASONEVALUE` `ISCROSSFILTERED` `ISFILTERED` `KEEPFILTERS` `REMOVEFILTERS` `SELECTEDVALUE` `TREATAS` `USERELATIONSHIP` `VALUES` |
-| Information | `CONTAINSROW` `ISBLANK` `ISERROR` |
+| Filter | `ALL` `ALLCROSSFILTERED` `ALLEXCEPT` (also as a table) `ALLNOBLANKROW` `CALCULATE` `CALCULATETABLE` `CROSSFILTER` `DISTINCT` `EARLIER` `EARLIEST` `FILTER` `HASONEFILTER` `HASONEVALUE` `ISCROSSFILTERED` `ISFILTERED` `KEEPFILTERS` `REMOVEFILTERS` `SELECTEDVALUE` `TREATAS` `USERELATIONSHIP` `VALUES` |
+| Information | `CONTAINSROW` `ISBLANK` `ISERROR` `ISINSCOPE` |
 | Logical | `AND` `BLANK` `COALESCE` `ERROR` `FALSE` `IF` `IF.EAGER` `IFERROR` `NOT` `OR` `SWITCH` `TRUE` |
 | Math | `ABS` `DIVIDE` `INT` `MOD` `ROUND` |
 | Relationship | `LOOKUPVALUE` `RELATED` `RELATEDTABLE` |
-| Table manipulation | `ADDCOLUMNS` `CROSSJOIN` `CURRENTGROUP` `DATATABLE` `EXCEPT` `GENERATE` `GENERATEALL` `GROUPBY` `INTERSECT` `ROW` `SELECTCOLUMNS` `SUMMARIZE` `SUMMARIZECOLUMNS` `TOPN` `UNION` |
+| Table manipulation | `ADDCOLUMNS` `CROSSJOIN` `CURRENTGROUP` `DATATABLE` `EXCEPT` `GENERATE` `GENERATEALL` `GROUPBY` `IGNORE` `INTERSECT` `NATURALINNERJOIN` `NATURALLEFTOUTERJOIN` `ROLLUPADDISSUBTOTAL` `ROLLUPGROUP` `ROW` `SELECTCOLUMNS` `SUMMARIZE` `SUMMARIZECOLUMNS` `TOPN` `UNION` |
 | Text | `CONCATENATE` |
+| Time intelligence | `FIRSTNONBLANK` `FIRSTNONBLANKVALUE` `LASTNONBLANK` `LASTNONBLANKVALUE` |
 
   `SUMMARIZE` takes a table, group-by columns (its own, or of tables it has a many-to-one relationship to) and
-  name/expression pairs; not `ROLLUP`. `SUMMARIZECOLUMNS` takes group-by columns, filter tables and name/expression
-  pairs, as a query's own table expression: existing combinations for columns of one table, a cross join between
-  tables, the blank row as a group, and rows whose expressions are all BLANK dropped; not `ROLLUPADDISSUBTOTAL`,
-  `IGNORE` or `NONVISUAL`, and not inside a row context or under an outer filter.
+  name/expression pairs; not `ROLLUP`. `SUMMARIZECOLUMNS` takes group-by columns, filter tables (with
+  `KEEPFILTERS`) and name/expression pairs, anywhere outside a row context: in a query, in `CALCULATETABLE`, in a
+  measure. Existing combinations for columns of one table; group-by tables that a filter table spans together are
+  grouped by the combinations it has, the others cross joined; the blank row is a group; rows whose expressions are
+  all BLANK (except `IGNORE`d ones) are dropped. `ROLLUPADDISSUBTOTAL` (with `ROLLUPGROUP` and its flag columns) adds
+  the subtotal rows, and `ISINSCOPE` tells them apart. Not `ROLLUP`, `ROLLUPISSUBTOTAL`, `NONVISUAL`, nor a rollup
+  with a group-level filter. `NATURALINNERJOIN` and `NATURALLEFTOUTERJOIN` join tables with no model columns
+  (`DATATABLE`, table constructors, computed columns) on their columns of the same name. `FIRSTNONBLANK` and its
+  relatives go through the column's values in ascending order.
 
 #### What it refuses
 
 - **Not implemented yet:** time intelligence, `ALLSELECTED`, `FORMAT` and most text, date, math and statistical
   functions, window functions (`OFFSET`, `INDEX`, `WINDOW`, `RANK`, `ROWNUMBER`), visual calculations,
-  `DEFINE TABLE` / `DEFINE COLUMN`, `START AT`, query parameters, detail rows, KPIs. Row-level and object-level
+  query parameters, detail rows, KPIs, natural joins of tables with model columns (joined over their expanded
+  tables). Row-level and object-level
   security are not applied (a query runs as an administrator's would).
-- **Model shapes:** many-to-many and one-to-one relationships, relationships on several columns, DirectQuery and
+- **Model shapes:** many-to-many and one-to-one relationships (a one-to-one relationship puts each table in the
+  other's expanded table and can give both a blank row; treating it as a two-way many-to-one would answer
+  `ALL ( table )` and table filters wrongly), relationships on several columns, DirectQuery and
   Dual tables: every table connected to one is closed to queries, the rest of the model works. A calculation group
   is closed when a query names it. Active relationships that give two filter paths between two tables.
 - **Where the sources don't say what the engine does,** for instance:
@@ -2057,8 +2071,16 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   - keys with no match on an inactive relationship only, or at the start of a chain of relationships (whether the
     blank row exists);
   - a filter that crosses a both-directions relationship while keeping every row of the many side;
-  - `TOPN` without an order-by on more rows than asked for, and `CONCATENATEX` without one (the engine defines no
-    order), and sorting where BLANK meets zero or negative values, or values of different types;
+  - `TOPN` without an order-by on more rows than asked for, and `CONCATENATEX` without one over different texts
+    (the engine defines no order), and sorting where BLANK meets zero or negative values, or values of different
+    types (also in `START AT`);
+  - whole-number arithmetic that reaches -2^63 or 2^63-1 (the documented range stops short of them, and the engine
+    uses one of them for BLANK); a total of an aggregation that overflows; a whole number above 2^53 compared with a
+    decimal where rounding it would change the answer;
+  - `BLANK () && BLANK ()`, `BLANK () || BLANK ()` and `NOT BLANK ()` (the sources disagree);
+  - text turned into a number when it has spaces around it, a currency symbol, thousands separators or `%`;
+  - a variable whose value is an error when the result may not need it (the engine may or may not evaluate it);
+  - `MAXX` / `MINX` with their variant argument TRUE, and over numbers mixed with dates or TRUE/FALSE;
   - a date or TRUE/FALSE turned into text by `&` (the format depends on the model's culture), text read as a date
     in arithmetic, a date multiplied, `ROUND` of a negative number exactly halfway;
   - `DISTINCTCOUNT` of a column while its table's blank row is visible (whether that BLANK is counted: write
