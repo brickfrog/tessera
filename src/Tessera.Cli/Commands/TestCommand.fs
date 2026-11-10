@@ -791,7 +791,7 @@ let private junit (r: Report) (strict: bool) : XDocument =
 
 /// Write a report file. A file that is already there is replaced only if it is a test report
 /// (or with --force): a mistyped path must not cost someone their model.
-let private writeReport (path: string) (force: bool) (document: XDocument) : Result<unit, TessError> =
+let private checkReport (path: string) (force: bool) : Result<unit, TessError> =
     let full = Path.GetFullPath path
 
     let isReport () =
@@ -807,6 +807,17 @@ let private writeReport (path: string) (force: bool) (document: XDocument) : Res
         elif File.Exists full && not force && FileInfo(full).Length > 0L && not (isReport ()) then
             Error(DestinationNotEmpty full)
         else
+            Ok()
+    with
+    | :? IOException
+    | :? UnauthorizedAccessException as e -> Error(SaveFailed(full, e.Message))
+
+let private writeReport (path: string) (force: bool) (document: XDocument) : Result<unit, TessError> =
+    let full = Path.GetFullPath path
+
+    checkReport path force
+    |> Result.bind (fun () ->
+        try
             match Path.GetDirectoryName full with
             | null
             | "" -> ()
@@ -814,9 +825,17 @@ let private writeReport (path: string) (force: bool) (document: XDocument) : Res
 
             document.Save full
             Ok()
-    with
-    | :? IOException
-    | :? UnauthorizedAccessException as e -> Error(SaveFailed(full, e.Message))
+        with
+        | :? IOException
+        | :? UnauthorizedAccessException as e -> Error(SaveFailed(full, e.Message)))
+
+/// The report files a run was asked for can be written: checked before anything runs.
+let private checkReports (options: ReportOptions) : Result<unit, TessError> =
+    [ options.Trx; options.Junit ]
+    |> List.choose id
+    |> List.fold
+        (fun (state: Result<unit, TessError>) path -> state |> Result.bind (fun () -> checkReport path options.Force))
+        (Ok())
 
 /// Render a report everywhere it was asked for, and say how the run went.
 let private finish (ctx: Ctx) (options: ReportOptions) (r: Report) : Outcome =
@@ -833,16 +852,17 @@ let private finish (ctx: Ctx) (options: ReportOptions) (r: Report) : Outcome =
         |> List.choose id
         |> List.fold (fun (state: Result<unit, TessError>) write -> state |> Result.bind write) (Ok())
 
-    if ctx.Json then
-        writeJson ctx.Out (reportJson r findings)
-    else
-        renderText ctx.Out r
-
-    Findings.annotate options.Ci ctx.Err findings
-
     match written with
+    // One document on stdout: the error, not a report and then an error.
     | Error e -> Failed e
     | Ok() ->
+        if ctx.Json then
+            writeJson ctx.Out (reportJson r findings)
+        else
+            renderText ctx.Out r
+
+        Findings.annotate options.Ci ctx.Err findings
+
         let fails (f: Findings.Finding) =
             f.Severity = Findings.Severity.Error
             || (strict && f.Severity = Findings.Severity.Warning)
@@ -913,7 +933,10 @@ let private execute
     | Ok options ->
         let clock = Stopwatch.StartNew()
 
-        match findSuites (Some model) shared.Paths with
+        match
+            checkReports options
+            |> Result.bind (fun () -> findSuites (Some model) shared.Paths)
+        with
         | Error e -> Failed e
         | Ok suites when not suites.Invalid.IsEmpty ->
             finish ctx options {
@@ -1291,23 +1314,27 @@ let private init (ctx: Ctx) (args: ParseResults<InitArgs>) =
 
             let text, tests = scaffold db data (args.Contains InitArgs.Snapshot)
 
-            try
-                Directory.CreateDirectory(Path.GetDirectoryName output) |> ignore
-                // CreateNew: never over a file that appeared in the meantime.
-                use stream = new FileStream(output, FileMode.CreateNew, FileAccess.Write)
-                use writer = new StreamWriter(stream, UTF8Encoding false)
-                writer.Write text
-                writer.Flush()
+            if tests = 0 then
+                Failed(SaveFailed(output, "the model has no measures to write tests for"))
+            else
 
-                if ctx.Json then
-                    writeJson ctx.Out (obj [ "command", str "test init"; "file", str output; "tests", num tests ])
-                else
-                    ctx.Out.WriteLine(("Wrote " + output + ": " + plural tests "test" "tests" + "."))
+                try
+                    Directory.CreateDirectory(Path.GetDirectoryName output) |> ignore
+                    // CreateNew: never over a file that appeared in the meantime.
+                    use stream = new FileStream(output, FileMode.CreateNew, FileAccess.Write)
+                    use writer = new StreamWriter(stream, UTF8Encoding false)
+                    writer.Write text
+                    writer.Flush()
 
-                Done
-            with
-            | :? IOException
-            | :? UnauthorizedAccessException as e -> Failed(SaveFailed(output, e.Message))
+                    if ctx.Json then
+                        writeJson ctx.Out (obj [ "command", str "test init"; "file", str output; "tests", num tests ])
+                    else
+                        ctx.Out.WriteLine(("Wrote " + output + ": " + plural tests "test" "tests" + "."))
+
+                    Done
+                with
+                | :? IOException
+                | :? UnauthorizedAccessException as e -> Failed(SaveFailed(output, e.Message))
 
 // ---- list ------------------------------------------------------------------------------------------
 

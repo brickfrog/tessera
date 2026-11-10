@@ -2232,9 +2232,10 @@ build they can't fix. It is never silent, though: it is counted in the summary l
 `--ci` annotation), and a run where nothing but unsupported or pending tests is left exits 1. `--strict` (the same
 as `--fail-on warning`) makes any unsupported test fail the run, for a suite that is meant to be fully covered.
 
-What stops a run altogether, with its usual exit code and before any test: no suites found (3, `no-test-suites`), a
-model or a fixture that can't be loaded or has errors (3), a snapshot file that can't be read (3), a server that
-can't be reached (5). An invalid suite stops it too, as findings (exit 1): **suites are checked before the model is
+What stops a run altogether, with its usual exit code and no report: no suites found (3, `no-test-suites`), a
+model that can't be loaded (3), a server that can't be reached (5), a `--trx` / `--junit` file that can't be
+written (4), and, when the first test that needs it gets there, a fixture that can't be loaded or has errors (3)
+or a snapshot file that can't be read (3). An invalid suite stops it too, as findings (exit 1): **suites are checked before the model is
 loaded or a connection made**, and nothing runs if one of them is wrong, so a broken file can't pass as "no tests
 failed".
 
@@ -2420,6 +2421,9 @@ and the exit codes are those of `run`; a test either side's local engine refuses
   models.
 - Finding codes `TEST_FAIL`, `TEST_ERROR` and `TEST_SUITE_INVALID` are te's; `TEST_UNSUPPORTED` and `TEST_NONE_RAN`
   are tess's. `testSummary` adds `unsupported`.
+- **BLANK is not 0.** `expect: 0` fails for a BLANK result (`COUNTROWS` of no rows is BLANK, not 0): write
+  `expect: null`, or `COUNTROWS ( ... ) + 0` in the query. te's own example suite expects `0` from such a query, so
+  te may be laxer here; tess stays strict because a measure that went BLANK is the regression a test is for.
 - Not there: `te test spec` and the JSON Schema for editors, `test use`, and a `now:` setting to pin the clock.
 - The suite format was matched to te's published reference, not to its binary: `matrix` (both shapes are accepted
   here) and `compare` (read and ignored) are the parts that reference doesn't spell out.

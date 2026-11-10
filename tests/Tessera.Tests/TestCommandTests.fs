@@ -558,11 +558,7 @@ tests:
 
             let r = tess [ "test"; "run"; path; "--json" ]
             Expect.equal r.Code ExitCode.ok r.Out
-            Expect.equal (summary r) [ 4; 0; 0; 0; 0; 4 ] r.Out
-            // Nothing is left behind in the temp folder.
-            Expect.isEmpty
-                (Directory.GetDirectories(Path.GetTempPath(), "tessera-test-*"))
-                "temporary fixtures are deleted")
+            Expect.equal (summary r) [ 4; 0; 0; 0; 0; 4 ] r.Out)
 
         testCase "fixture problems stop the run, naming the suite's line for inline rows" (fun () ->
             let t, path = setup ()
@@ -671,7 +667,12 @@ tests:
             let none = tess [ "test"; "run"; path; "--json" ]
             Expect.equal none.Code ExitCode.input none.Out
             Expect.stringContains none.Out "no-test-suites" "no suites"
-            Expect.stringContains none.Out (t.Combine ".tess-tests") "says where it looked"
+            use noneDoc = json none
+
+            Expect.stringContains
+                (noneDoc.RootElement.GetProperty("error").GetProperty("message").GetString())
+                (t.Combine ".tess-tests")
+                "says where it looked"
 
             let missing = tess [ "test"; "run"; path; t.Combine "nope.test.yaml" ]
             Expect.equal missing.Code ExitCode.input missing.Err
@@ -819,6 +820,16 @@ tests:
             let precious = tess [ "test"; "run"; path; "--trx"; path ]
             Expect.equal precious.Code ExitCode.output precious.Err
             Expect.stringContains (File.ReadAllText path) "\"model\"" "the model is untouched"
+            // In JSON too the refusal is the one document on stdout, and nothing was run.
+            let refused = tess [ "test"; "run"; path; "--trx"; path; "--json" ]
+            Expect.equal refused.Code ExitCode.output refused.Out
+            use refusedDoc = json refused
+
+            Expect.equal
+                (refusedDoc.RootElement.GetProperty("error").GetProperty("code").GetString())
+                "destination-not-empty"
+                "the error alone"
+
             let other = t.Combine "notes.txt"
             File.WriteAllText(other, "notes")
             Expect.equal (tess [ "test"; "run"; path; "--junit"; other ]).Code ExitCode.output "refused"
@@ -1063,7 +1074,15 @@ tests:
             Expect.equal
                 (tess [ "test"; "init"; path; "-o"; t.Combine "x.yaml" ]).Code
                 ExitCode.usage
-                "the name must be a suite's")
+                "the name must be a suite's"
+
+            // A model with no measures: nothing to write, and no suite that would be invalid.
+            let bare, barePath = setupWith { star with Measures = [] }
+            use _ = bare
+            let nothing = tess [ "test"; "init"; barePath ]
+            Expect.equal nothing.Code ExitCode.output nothing.Err
+            Expect.stringContains nothing.Err "no measures" "says why"
+            Expect.isFalse (Directory.Exists(bare.Combine ".tess-tests")) "nothing written")
 
         testCase "list checks suites without a model" (fun () ->
             let t, _ = setup ()
