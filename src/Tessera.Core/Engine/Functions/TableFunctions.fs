@@ -232,6 +232,459 @@ module TableFunctions =
 
             Tables.ofRows (Array.append left.Cols shape.Cols) rows)
 
+    // ---- SUMMARIZECOLUMNS -------------------------------------------------------------------------
+    //
+    // SUMMARIZECOLUMNS ( group-by column | ROLLUPADDISSUBTOTAL ( ... ), ..., filter table, ...,
+    // name, expression | IGNORE ( expression ), ... ). Sources: Microsoft Learn SUMMARIZECOLUMNS
+    // (quoted as "Learn" below), dax.guide/summarizecolumns, SQLBI "Introducing SUMMARIZECOLUMNS"
+    // and "Understanding DAX auto-exist".
+    //
+    // - Group-by columns of one table give the combinations that exist in it ("auto-existed (same
+    //   table)"); different tables are cross-joined (Learn).
+    // - A filter restricts the group-by columns of the tables it has columns of, and the
+    //   expressions; it does not reach group-by columns over a relationship: "GroupBy columns
+    //   within SummarizeColumns will no longer be filtered by columns from external tables, even if
+    //   a relationship exists between them" (Learn, "SelfValue semantics"), and for a filter
+    //   argument "the filter expression is a no-op and the groupBy columns are not impacted". This
+    //   holds for the filter arguments and for the filter context the function is called in.
+    // - A filter argument replaces the outer filters on its columns; under KEEPFILTERS it is added
+    //   to them ("normal filters (which override existing filters) and filters with KeepFilters
+    //   specified": Learn).
+    // - A model table as a filter has the columns of its expanded table, so it pairs the group-by
+    //   columns of the tables it relates to: SUMMARIZECOLUMNS ( a, b, Sales ) is SUMMARIZE ( Sales,
+    //   a, b ) (SQLBI, "Introducing SUMMARIZECOLUMNS").
+    // - "Only rows for which at least one of the supplied expressions return a non-blank value are
+    //   included"; "Rows for which all expressions not using IGNORE return BLANK/NULL will be
+    //   excluded" (Learn).
+    // - ROLLUPADDISSUBTOTAL adds subtotal rows: the rolled-up columns are BLANK there, the named
+    //   column is TRUE, and the expressions are evaluated without the grouping (the filters stay).
+    //   Several columns in one call roll up from the last to the first; several calls roll up
+    //   independently; ROLLUPGROUP rolls its columns up together. The result has the group-by
+    //   columns, then the subtotal columns, then the expressions (the result tables of Learn and
+    //   of dax.guide/rollupaddissubtotal).
+
+    type private ScArgument =
+        | GroupBy of BColumn
+        /// The levels of one ROLLUPADDISSUBTOTAL: the columns of each, and its subtotal column's name.
+        | RollUp of (BColumn array * string) list
+        | FilterTable of Expr * keep: bool
+
+    let private callTo (name: string) (e: Expr) : Expr list option =
+        match (Fn.unparen e).Kind with
+        | Call(n, args) when n.Name.ToUpperInvariant() = name -> Some args
+        | _ -> None
+
+    let private checkSummarizeColumns (args: Expr list) : string option =
+        let helper (names: string list) (a: Expr) =
+            match (Fn.unparen a).Kind with
+            | Call(name, _) when names |> List.contains (name.Name.ToUpperInvariant()) ->
+                Some $"{name.Name.ToUpperInvariant()} in SUMMARIZECOLUMNS"
+            | _ -> None
+
+        let rollupFilters (a: Expr) =
+            match callTo "ROLLUPADDISSUBTOTAL" a with
+            | Some inner ->
+                // column | ROLLUPGROUP ( ... ), name, repeated: anything else is a level filter.
+                let rec plain (items: Expr list) =
+                    match items with
+                    | [] -> true
+                    | c :: n :: tail when isName n && not (isName c) ->
+                        (match (Fn.unparen c).Kind with
+                         | Qualified _ -> true
+                         | Call(g, _) -> g.Name.ToUpperInvariant() = "ROLLUPGROUP"
+                         | _ -> false)
+                        && plain tail
+                    | _ -> false
+
+                if plain inner then
+                    None
+                else
+                    Some "ROLLUPADDISSUBTOTAL with a filter for the grand total or for a level"
+            | None -> None
+
+        args
+        |> List.tryPick (fun a ->
+            helper [ "ROLLUP"; "ROLLUPGROUP"; "ROLLUPISSUBTOTAL"; "NONVISUAL"; "ISSUBTOTAL" ] a
+            |> Option.orElseWith (fun () -> rollupFilters a))
+
+    /// A helper that only means something as an argument of another function.
+    let private onlyInside (name: string) (host: string) : DaxFunction = {
+        Name = name
+        Family = "Table manipulation"
+        MinArgs = 0
+        MaxArgs = -1
+        Returns = Returns.Modifier
+        Check = fun _ -> None
+        Type = Fn.typeUnknown
+        Scalar = fun _ ctx call -> Fail.invalid ctx call.Span $"{name} can only be used as an argument of {host}"
+        Table = fun _ ctx call -> Fail.invalid ctx call.Span $"{name} can only be used as an argument of {host}"
+    }
+
+    /// The rows of SUMMARIZECOLUMNS for one set of group-by columns: each row's group values (in
+    /// the order of `groupCols`) and the values of the expressions.
+    let private summarizeGroups
+        (ev: IEval)
+        (ctx: Ctx)
+        (call: Call)
+        (filtered: FilterCtx)
+        (groupCols: BColumn array)
+        (exprs: (Expr * bool) array)
+        : (DaxValue array * DaxValue array) array =
+        let cfg = filtered.Config
+        let all = filtered.Filters
+        let groupTables = groupCols |> Array.map _.Table |> Array.distinctBy _.Id
+
+        let touches (f: Filter) (t: BTable) =
+            match f with
+            | OnColumn(c, _) -> obj.ReferenceEquals(c.Table, t)
+            | Tuples(cols, _) -> cols |> Array.exists (fun c -> obj.ReferenceEquals(c.Table, t))
+            | Rows(x, _, _) -> cfg.IsExpanded(x, t)
+
+        let covers (f: Filter) (c: BColumn) =
+            match f with
+            | OnColumn(x, _) -> obj.ReferenceEquals(x, c)
+            | Tuples(cols, _) -> cols |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
+            | Rows(x, _, _) -> cfg.IsExpanded(x, c.Table)
+
+        // Group-by tables that one filter has columns of are grouped together: the filter pairs
+        // their values.
+        let leader = Dictionary<int, int>()
+
+        for t in groupTables do
+            leader.[t.Id] <- t.Id
+
+        let rec find (id: int) =
+            if leader.[id] = id then id else find leader.[id]
+
+        for f in all do
+            let touched = groupTables |> Array.filter (touches f)
+
+            for t in touched do
+                leader.[find t.Id] <- find touched.[0].Id
+
+        let clusters = groupTables |> Array.groupBy (fun t -> find t.Id) |> Array.map snd
+
+        // Per cluster: its group-by columns, the columns its filter will be on (the group-by
+        // columns and the filtered columns of its tables: "SUMMARIZECOLUMNS always combines all
+        // the filters on the same table into a single filter"), and the existing combinations.
+        let perCluster =
+            clusters
+            |> Array.map (fun tables ->
+                let parts =
+                    tables
+                    |> Array.map (fun t ->
+                        let mine = groupCols |> Array.filter (fun c -> obj.ReferenceEquals(c.Table, t))
+
+                        let extra =
+                            t.Columns
+                            |> Array.filter (fun c ->
+                                not (mine |> Array.exists (fun m -> obj.ReferenceEquals(m, c)))
+                                && all |> List.exists (fun f -> covers f c))
+
+                        mine, Array.append mine extra)
+
+                let mine = parts |> Array.collect fst
+                let cols = parts |> Array.collect snd
+
+                // The candidates: for each, the row of every table of the cluster.
+                let count, rowOf =
+                    if tables.Length = 1 then
+                        // The table's own rows under its own filters, the blank row included.
+                        let rows = (Filters.ownRows filtered tables.[0]).Rows
+                        rows.Length, (fun (_: BTable) (p: int) -> rows.[p])
+                    else
+                        let source =
+                            all
+                            |> List.tryPick (fun f ->
+                                match f with
+                                | Rows(x, _, _) when tables |> Array.forall (fun t -> cfg.IsExpanded(x, t)) -> Some x
+                                | _ -> None)
+
+                        match source with
+                        | None ->
+                            Fail.notSupported
+                                ctx
+                                call.Span
+                                "a SUMMARIZECOLUMNS filter over columns of more than one of the group-by tables that is not the rows of a table related to them all"
+                        | Some x ->
+                            // The rows of the filtering table that the filters on these tables
+                            // leave: each is a combination of rows of the group-by tables.
+                            let relevant = all |> List.filter (fun f -> tables |> Array.exists (touches f))
+
+                            let rows = (Filters.visible (Filters.build cfg relevant) x).Rows
+                            let maps = tables |> Array.map (fun t -> t.Id, cfg.RowMap(x, t)) |> dict
+                            rows.Length, (fun (t: BTable) (p: int) -> maps.[t.Id].[rows.[p]])
+
+                let keys =
+                    mine
+                    |> Array.map (fun c -> Array.init count (fun p -> c.ValueAt(rowOf c.Table p)))
+
+                let groups =
+                    groupRows ctx.Model keys count
+                    |> Array.map (fun (key, positions) ->
+                        let tuples =
+                            HashSet<int array>(IntArrayComparer.Instance :> IEqualityComparer<int array>)
+
+                        for p in positions do
+                            tuples.Add(cols |> Array.map (fun c -> c.IdAt(rowOf c.Table p))) |> ignore
+
+                        let filter =
+                            if cols.Length = 1 then
+                                OnColumn(cols.[0], RowSet.OfSeq(cols.[0].IdCount, tuples |> Seq.map (fun t -> t.[0])))
+                            else
+                                Tuples(cols, tuples)
+
+                        key, filter)
+
+                mine, cols, groups)
+
+        // The filters no longer filter those columns themselves: the combined filter does.
+        let merged = perCluster |> Array.collect (fun (_, cols, _) -> cols)
+
+        let baseCtx =
+            if merged.Length = 0 then
+                filtered
+            else
+                Filters.remove filtered (fun c -> merged |> Array.exists (fun m -> obj.ReferenceEquals(m, c)))
+
+        // Clusters are cross-joined.
+        let combos =
+            perCluster
+            |> Array.fold
+                (fun (acc: (DaxValue array * Filter list) list) (_, _, groups) -> [
+                    for (key, fs) in acc do
+                        for (k, f) in groups -> Array.append key k, f :: fs
+                ])
+                [ [||], [] ]
+            |> Array.ofList
+
+        let order = perCluster |> Array.collect (fun (mine, _, _) -> mine)
+
+        let position =
+            groupCols
+            |> Array.map (fun c -> order |> Array.findIndex (fun o -> obj.ReferenceEquals(o, c)))
+
+        let counted = [|
+            for i in 0 .. exprs.Length - 1 do
+                if not (snd exprs.[i]) then
+                    i
+        |]
+
+        combos
+        |> Array.choose (fun (key, fs) ->
+            let inner =
+                Context.withFilter ctx (Filters.mark (Filters.add baseCtx fs true) (Grouped groupCols))
+
+            let values = exprs |> Array.map (fun (expr, _) -> ev.Scalar(inner, expr))
+
+            // With no expression that counts, every combination is a row.
+            let blank =
+                counted.Length > 0
+                && counted |> Array.forall (fun i -> DaxValue.isBlank values.[i])
+
+            if blank && groupCols.Length = 0 then
+                Fail.notSupported
+                    ctx
+                    call.Span
+                    "a SUMMARIZECOLUMNS total row (no group-by column) whose expressions are all BLANK (whether it is returned is not documented)"
+
+            if blank then
+                None
+            else
+                Some(position |> Array.map (fun p -> key.[p]), values))
+
+    let private summarizeColumns (ev: IEval) (ctx: Ctx) (call: Call) : TableVal =
+        if not ctx.Rows.IsEmpty then
+            // "contextual SummarizeColumns ... allows SummarizeColumns to be evaluated in any
+            // context transition" (Learn): under the filters a transition leaves. What a row
+            // context that was not turned into filters means to it is not said.
+            Fail.notSupported
+                ctx
+                call.Span
+                "SUMMARIZECOLUMNS inside a row context (it is supported under a filter context: in a measure, or inside CALCULATE or CALCULATETABLE)"
+
+        let before = call.Args |> List.takeWhile (fun a -> not (isName a))
+
+        let added =
+            pairs ctx call.Span "SUMMARIZECOLUMNS" (call.Args |> List.skip before.Length)
+            |> List.map (fun (name, expr) ->
+                match callTo "IGNORE" expr with
+                | Some [ inner ] -> name, inner, true
+                | Some _ -> Fail.invalid ctx expr.Span "IGNORE takes one expression"
+                | None -> name, expr, false)
+
+        let rollup (a: Expr) (items: Expr list) : ScArgument =
+            let rec read (items: Expr list) =
+                match items with
+                | [] -> []
+                | c :: n :: tail when isName n ->
+                    let cols =
+                        match callTo "ROLLUPGROUP" c with
+                        | Some grouped -> grouped |> List.map (fun g -> ev.Column(ctx, g)) |> Array.ofList
+                        | None -> [| ev.Column(ctx, c) |]
+
+                    (cols, literalName ctx n) :: read tail
+                | _ ->
+                    Fail.notSupported ctx a.Span "ROLLUPADDISSUBTOTAL with a filter for the grand total or for a level"
+
+            match read items with
+            | [] -> Fail.invalid ctx a.Span "ROLLUPADDISSUBTOTAL takes a column and the name of its subtotal column"
+            | levels -> RollUp levels
+
+        let arguments =
+            before
+            |> List.map (fun a ->
+                match callTo "ROLLUPADDISSUBTOTAL" a, callTo "KEEPFILTERS" a with
+                | Some items, _ -> rollup a items
+                | None, Some [ inner ] -> FilterTable(inner, true)
+                | None, Some _ -> Fail.invalid ctx a.Span "KEEPFILTERS takes one argument"
+                | None, None ->
+                    match (Fn.unparen a).Kind with
+                    | Qualified _ when (ev.TryColumn(ctx, a)).IsSome -> GroupBy (ev.TryColumn(ctx, a)).Value
+                    | _ -> FilterTable(a, false))
+
+        // Every group-by column, in the order the query names them.
+        let groupCols =
+            arguments
+            |> List.collect (fun a ->
+                match a with
+                | GroupBy c -> [ c ]
+                | RollUp levels -> levels |> List.collect (fun (cols, _) -> List.ofArray cols)
+                | FilterTable _ -> [])
+            |> Array.ofList
+
+        if (groupCols |> Array.distinctBy _.Id).Length <> groupCols.Length then
+            // "A column cannot be specified more than once" (Learn).
+            Fail.invalid
+                ctx
+                call.Span
+                "SUMMARIZECOLUMNS: a column cannot be specified more than once as a group-by column"
+
+        let rollups =
+            arguments
+            |> List.choose (fun a ->
+                match a with
+                | RollUp levels -> Some levels
+                | _ -> None)
+
+        let flagNames = rollups |> List.collect (List.map snd)
+
+        checkNewNames
+            ctx
+            call.Span
+            "SUMMARIZECOLUMNS"
+            (groupCols |> Array.map Tables.modelColumn)
+            (flagNames @ (added |> List.map (fun (name, _, _) -> name)))
+
+        // The filter tables, each evaluated on its own in the context of the call.
+        let filters =
+            arguments
+            |> List.choose (fun a ->
+                match a with
+                | FilterTable(e, keep) ->
+                    if not (ev.IsTable(ctx, e)) then
+                        Fail.invalid ctx e.Span "a filter argument of SUMMARIZECOLUMNS is a table expression"
+
+                    Some(Filters.ofTable ctx e.Span (ev.Table(ctx, e)), keep)
+                | _ -> None)
+
+        if filters |> List.exists snd && filters |> List.exists (fun (_, keep) -> not keep) then
+            // "SummarizeColumns filters with keepfilters behavior and overridefilters behavior are
+            // mixed within one cluster, which is not allowed" (Learn): which mixes are one cluster
+            // is not spelled out, so every mix is refused.
+            Fail.notSupported
+                ctx
+                call.Span
+                "SUMMARIZECOLUMNS with some filters under KEEPFILTERS and some not (use KEEPFILTERS on all of them or on none)"
+
+        let filtered =
+            Filters.add
+                (Filters.add ctx.Filter (filters |> List.filter (fun (_, keep) -> not keep) |> List.collect fst) false)
+                (filters |> List.filter snd |> List.collect fst)
+                true
+
+        let exprs =
+            added |> List.map (fun (_, expr, ignored) -> expr, ignored) |> Array.ofList
+
+        // The states of the rollups: for each ROLLUPADDISSUBTOTAL, how many of its levels are
+        // still grouped (all of them: a detail row; none: its grand total).
+        let states =
+            rollups
+            |> List.fold
+                (fun (acc: int list list) levels -> [
+                    for state in acc do
+                        for kept in levels.Length .. -1 .. 0 -> state @ [ kept ]
+                ])
+                [ [] ]
+
+        let rows = ResizeArray<DaxValue array * DaxValue array * DaxValue array>()
+
+        for state in states do
+            // Which columns are grouped in this state, and the subtotal columns' values.
+            let rolled = HashSet<int>()
+            let flags = ResizeArray<DaxValue>()
+
+            List.iter2
+                (fun (levels: (BColumn array * string) list) (kept: int) ->
+                    levels
+                    |> List.iteri (fun i (cols, _) ->
+                        flags.Add(DaxValue.Boolean(i >= kept))
+
+                        if i >= kept then
+                            for c in cols do
+                                rolled.Add c.Id |> ignore))
+                rollups
+                state
+
+            let active = groupCols |> Array.filter (fun c -> not (rolled.Contains c.Id))
+            let flags = flags.ToArray()
+
+            for (key, values) in summarizeGroups ev ctx call filtered active exprs do
+                let mutable next = 0
+
+                let full =
+                    groupCols
+                    |> Array.map (fun c ->
+                        if rolled.Contains c.Id then
+                            DaxValue.Blank
+                        else
+                            next <- next + 1
+                            key.[next - 1])
+
+                rows.Add((full, flags, values))
+
+        let rows = rows.ToArray()
+
+        let groupData =
+            groupCols
+            |> Array.mapi (fun i _ -> rows |> Array.map (fun (key, _, _) -> key.[i]))
+
+        let flagData =
+            flagNames
+            |> List.mapi (fun i _ -> rows |> Array.map (fun (_, flags, _) -> flags.[i]))
+            |> Array.ofList
+
+        let extensions =
+            added
+            |> List.mapi (fun i (name, expr, _) ->
+                let t, values =
+                    Typing.column (ev.TypeOf(ctx, expr)) (rows |> Array.map (fun (_, _, v) -> v.[i]))
+
+                Tables.extension name t, values)
+            |> Array.ofList
+
+        Tables.ofColumns
+            (Array.concat [
+                groupCols |> Array.map Tables.modelColumn
+                flagNames
+                |> List.map (fun n -> Tables.extension n DaxType.Boolean)
+                |> Array.ofList
+                extensions |> Array.map fst
+            ])
+            (Array.concat [ groupData; flagData; extensions |> Array.map snd ])
+            rows.Length
+
+
     let functions: DaxFunction list = [
         // Each new column is evaluated in a row context on the table; the filter context is the
         // caller's (dax.guide/addcolumns).
@@ -525,184 +978,14 @@ module TableFunctions =
             Tables.addColumns header (extensions |> Array.map fst) (extensions |> Array.map snd))
         |> Fn.withCheck (fun args -> checkHelpers "SUMMARIZE" args |> Option.orElse (checkGrouped "SUMMARIZE" args))
 
-        // SUMMARIZECOLUMNS ( group-by column, ..., filter table, ..., name, expression, ... ), as a
-        // query's own table (no outer filters, no row context). See the README for what is
-        // implemented; sources: Microsoft Learn SUMMARIZECOLUMNS, dax.guide/summarizecolumns,
-        // SQLBI "Introducing SUMMARIZECOLUMNS" and "Understanding DAX auto-exist".
-        Fn.table "SUMMARIZECOLUMNS" "Table manipulation" (1, -1) (fun ev ctx call ->
-            if not ctx.Rows.IsEmpty || not ctx.Filter.Filters.IsEmpty then
-                Fail.notSupported
-                    ctx
-                    call.Span
-                    "SUMMARIZECOLUMNS inside a row context or under an outer filter (only as a query's own table expression)"
+        // SUMMARIZECOLUMNS: see `summarizeColumns`.
+        Fn.table "SUMMARIZECOLUMNS" "Table manipulation" (1, -1) summarizeColumns
+        |> Fn.withCheck checkSummarizeColumns
 
-            let isGroup (a: Expr) =
-                match (Fn.unparen a).Kind with
-                | Qualified _ -> (ev.TryColumn(ctx, a)).IsSome
-                | _ -> false
-
-            let groupArgs = call.Args |> List.takeWhile isGroup
-            let rest = call.Args |> List.skip groupArgs.Length
-            let filterArgs = rest |> List.takeWhile (fun a -> not (isName a))
-
-            let added =
-                pairs ctx call.Span "SUMMARIZECOLUMNS" (rest |> List.skip filterArgs.Length)
-
-            let groupCols = groupArgs |> List.map (fun a -> ev.Column(ctx, a)) |> Array.ofList
-
-            if (groupCols |> Array.distinctBy _.Id).Length <> groupCols.Length then
-                // "A column cannot be specified more than once" (Microsoft Learn).
-                Fail.invalid
-                    ctx
-                    call.Span
-                    "SUMMARIZECOLUMNS: a column cannot be specified more than once as a group-by column"
-
-            checkNewNames
-                ctx
-                call.Span
-                "SUMMARIZECOLUMNS"
-                (groupCols |> Array.map Tables.modelColumn)
-                (added |> List.map fst)
-
-            // The filter tables, each evaluated on its own.
-            let filters =
-                filterArgs
-                |> List.collect (fun a ->
-                    if not (ev.IsTable(ctx, a)) then
-                        Fail.invalid ctx a.Span "a filter argument of SUMMARIZECOLUMNS is a table expression"
-
-                    Filters.ofTable ctx a.Span (ev.Table(ctx, a)))
-
-            let cfg = ctx.Filter.Config
-            let groupTables = groupCols |> Array.map _.Table |> Array.distinctBy _.Id
-
-            let filterTouches (f: Filter) (t: BTable) =
-                match f with
-                | OnColumn(c, _) -> obj.ReferenceEquals(c.Table, t)
-                | Tuples(cols, _) -> cols |> Array.exists (fun c -> obj.ReferenceEquals(c.Table, t))
-                | Rows(x, _, _) -> cfg.IsExpanded(x, t)
-
-            // A filter over the columns of two group-by tables pairs their values: whether the
-            // groups are then only the pairs it has is beyond what the sources settle.
-            for f in filters do
-                if (groupTables |> Array.filter (filterTouches f)).Length > 1 then
-                    Fail.notSupported
-                        ctx
-                        call.Span
-                        "a SUMMARIZECOLUMNS filter table that covers columns of more than one of the group-by tables"
-
-            let filtered = Filters.add ctx.Filter filters false
-
-            // Per group-by table: the columns its filter will be on (the group-by columns and the
-            // table's filtered columns: "SUMMARIZECOLUMNS always combines all the filters on the
-            // same table into a single filter"), and the existing combinations ("auto-exist"),
-            // from the table's own rows, the blank row included. Filters on other tables don't
-            // restrict the groups ("Filters in SUMMARIZECOLUMNS only apply to group-by columns
-            // from the same table and to measures").
-            let perTable =
-                groupTables
-                |> Array.map (fun t ->
-                    let mine = groupCols |> Array.filter (fun c -> obj.ReferenceEquals(c.Table, t))
-
-                    let filteredCols =
-                        t.Columns
-                        |> Array.filter (fun c ->
-                            filters
-                            |> List.exists (fun f ->
-                                match f with
-                                | OnColumn(x, _) -> obj.ReferenceEquals(x, c)
-                                | Tuples(cols, _) -> cols |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
-                                | Rows(x, _, _) -> cfg.IsExpanded(x, t)))
-
-                    let cols =
-                        Array.append
-                            mine
-                            (filteredCols
-                             |> Array.filter (fun c ->
-                                 not (mine |> Array.exists (fun m -> obj.ReferenceEquals(m, c)))))
-
-                    let rows = (Filters.ownRows filtered t).Rows
-                    let keys = mine |> Array.map (fun c -> rows |> Array.map c.ValueAt)
-                    let groups = groupRows ctx.Model keys rows.Length
-
-                    let withFilter =
-                        groups
-                        |> Array.map (fun (key, positions) ->
-                            let tuples =
-                                HashSet<int array>(IntArrayComparer.Instance :> IEqualityComparer<int array>)
-
-                            for p in positions do
-                                tuples.Add(cols |> Array.map (fun c -> c.IdAt rows.[p])) |> ignore
-
-                            let filter =
-                                if cols.Length = 1 then
-                                    OnColumn(
-                                        cols.[0],
-                                        RowSet.OfSeq(cols.[0].IdCount, tuples |> Seq.map (fun t -> t.[0]))
-                                    )
-                                else
-                                    Tuples(cols, tuples)
-
-                            key, filter)
-
-                    mine, cols, withFilter)
-
-            // The filter tables no longer filter those columns themselves: the combined filter does.
-            let merged = perTable |> Array.collect (fun (_, cols, _) -> cols)
-
-            let baseCtx =
-                Filters.remove filtered (fun c -> merged |> Array.exists (fun m -> obj.ReferenceEquals(m, c)))
-
-            // Different tables are cross-joined.
-            let combos =
-                perTable
-                |> Array.fold
-                    (fun (acc: (DaxValue array * Filter list) list) (_, _, groups) -> [
-                        for (key, fs) in acc do
-                            for (k, f) in groups -> Array.append key k, f :: fs
-                    ])
-                    [ [||], [] ]
-                |> Array.ofList
-
-            let order = perTable |> Array.collect (fun (mine, _, _) -> mine)
-
-            let results =
-                combos
-                |> Array.map (fun (key, fs) ->
-                    let inner = Context.withFilter ctx (Filters.add baseCtx fs true)
-                    key, added |> List.map (fun (_, expr) -> ev.Scalar(inner, expr)) |> Array.ofList)
-
-            // "Only rows for which at least one of the supplied expressions return a non-blank
-            // value are included"; with no expression at all, every combination is.
-            let kept =
-                if added.IsEmpty then
-                    results
-                else
-                    results
-                    |> Array.filter (fun (_, values) -> values |> Array.exists (fun v -> not (DaxValue.isBlank v)))
-
-            // Columns in the order the query named them.
-            let position (c: BColumn) =
-                order |> Array.findIndex (fun o -> obj.ReferenceEquals(o, c))
-
-            let groupData =
-                groupCols
-                |> Array.map (fun c -> let p = position c in kept |> Array.map (fun (key, _) -> key.[p]))
-
-            let extensions =
-                added
-                |> List.mapi (fun i (name, expr) ->
-                    let t, values =
-                        Typing.column (ev.TypeOf(ctx, expr)) (kept |> Array.map (fun (_, v) -> v.[i]))
-
-                    Tables.extension name t, values)
-                |> Array.ofList
-
-            Tables.ofColumns
-                (Array.append (groupCols |> Array.map Tables.modelColumn) (extensions |> Array.map fst))
-                (Array.append groupData (extensions |> Array.map snd))
-                kept.Length)
-        |> Fn.withCheck (checkHelpers "SUMMARIZECOLUMNS")
+        onlyInside "ROLLUPADDISSUBTOTAL" "SUMMARIZECOLUMNS"
+        onlyInside "ROLLUPGROUP" "ROLLUPADDISSUBTOTAL"
+        onlyInside "IGNORE" "SUMMARIZECOLUMNS"
+        onlyInside "NONVISUAL" "SUMMARIZECOLUMNS"
 
         // GROUPBY ( table, group-by column, ..., name, X-aggregation over CURRENTGROUP () ): "an
         // implied CALCULATE is not performed, and the group isn't placed into the filter context"

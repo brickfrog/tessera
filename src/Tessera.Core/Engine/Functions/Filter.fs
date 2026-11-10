@@ -541,6 +541,41 @@ module Filter =
 
                 DaxValue.Boolean false)
 
+        // "ISINSCOPE checks whether there is a filter placed on the column derived either from
+        // context transition or from a group by column placed by SUMMARIZECOLUMNS"
+        // (dax.guide/isinscope); "at the grand total ... Brand neither has one value, nor is it in
+        // scope" (SQLBI, "Distinguishing HASONEVALUE from ISINSCOPE"). A filter that CALCULATE
+        // puts on the column, or removes from it, ends that.
+        Fn.scalar "ISINSCOPE" "Information" (1, 1) (Fn.typeIs DaxType.Boolean) (fun ev ctx call ->
+            let c = ev.Column(ctx, call.Args.[0])
+
+            if not ctx.Rows.IsEmpty then
+                Fail.notSupported
+                    ctx
+                    call.Span
+                    "ISINSCOPE inside a row context (whether a column being iterated is in scope before a context transition is not documented)"
+
+            let has (cols: BColumn array) =
+                cols |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
+
+            let rec inScope (marks: ScopeMark list) =
+                match marks with
+                | [] -> false
+                | Grouped cols :: rest -> has cols || inScope rest
+                | Transitioned(own, related) :: rest ->
+                    if has own then
+                        true
+                    elif related c then
+                        Fail.notSupported
+                            ctx
+                            call.Span
+                            $"ISINSCOPE of '{c.Table.Name}'[{c.Name}] after a context transition over a table related to '{c.Table.Name}' (whether the columns of related tables are then in scope is not documented)"
+                    else
+                        inScope rest
+                | Unfiltered gone :: rest -> not (gone c) && inScope rest
+
+            DaxValue.Boolean(inScope ctx.Filter.Scope))
+
         // "COUNTROWS ( FILTERS ( <ColumnName> ) ) = 1": "the number of directly filtered values"
         // (dax.guide/hasonefilter). Answered when the column has one filter of its own.
         Fn.scalar "HASONEFILTER" "Filter" (1, 1) (Fn.typeIs DaxType.Boolean) (fun ev ctx call ->

@@ -97,10 +97,6 @@ division/divide-function-currency-numerator	not-supported
 earlier/rank-in-query-calculated-column	not-supported
 earlier/running-total-in-query-calculated-column	not-supported
 grouping/summarize-group-by-extension-column	not-supported
-grouping/summarizecolumns-fact-table-as-filter	not-supported
-grouping/summarizecolumns-ignore	not-supported
-grouping/summarizecolumns-ignore-keeps-blank-rows	not-supported
-grouping/summarizecolumns-rollupaddissubtotal	not-supported
 related/lookupvalue-several-identical-matches	not-supported
 relationships/many-to-many-cardinality-filter-on-other-column	not-supported
 relationships/many-to-many-cardinality-filter-propagation	not-supported
@@ -118,8 +114,6 @@ row-context/calculated-column-sum-is-grand-total	not-supported
 selection/firstnonblank-aggregate-without-context-transition	not-supported
 selection/firstnonblank-skips-value-with-blank-measure	not-supported
 selection/isfiltered-iscrossfiltered-filter-on-many-side	not-supported
-selection/isinscope-false-on-subtotal-row	not-supported
-selection/isinscope-grouped-column-only	not-supported
 selection/lastnonblank-skips-value-with-blank-measure	not-supported
 set-functions/naturalinnerjoin	not-supported
 set-functions/naturalleftouterjoin	not-supported

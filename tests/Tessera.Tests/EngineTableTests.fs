@@ -261,27 +261,260 @@ let tests =
                     [ [ "Red"; 570; 175 ]; [ "Black"; 15; 175 ] ])
             testCase "no group-by column: one row" (fun () ->
                 returns (p ()) "EVALUATE SUMMARIZECOLUMNS ( \"A\", [Amount], \"U\", [Units] )" [ [ 625; 17 ] ])
+            // "GroupBy columns within SummarizeColumns will no longer be filtered by columns from
+            // external tables, even if a relationship exists between them" (Microsoft Learn,
+            // SUMMARIZECOLUMNS, "SelfValue semantics"); the expressions are filtered. Bob (UK) has
+            // rows 2 (Red, 100) and 5 (no product, 40); the Safety products are Red and Black.
+            testCase "under an outer filter" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], \"A\", [Amount] ), Customer[Country] = \"UK\" )"
+                    [ [ "Red"; 100 ]; [ null; 40 ] ]
+
+                // A filter on the group-by table restricts the groups.
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color] ), Product[Category] = \"Safety\" )"
+                    [ [ "Red" ]; [ "Black" ] ]
+
+                // A filter on a related table does not: every customer key of Sales, though only
+                // customer 3 bought the Black product.
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Sales[CustomerKey] ), Product[Color] = \"Black\" )"
+                    [ [ 1 ]; [ 2 ]; [ 3 ] ]
+
+                // With an expression, only the groups where it isn't BLANK are left.
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Sales[CustomerKey], \"A\", [Amount] ), Product[Color] = \"Black\" )"
+                    [ [ 3; 15 ] ])
+            // "normal filters (which override existing filters) and filters with KeepFilters
+            // specified" (Microsoft Learn).
+            testCase "a filter argument replaces the outer filter on its column, unless under KEEPFILTERS" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], TREATAS ( { \"Red\" }, Product[Color] ), \"A\", [Amount] ), Product[Color] = \"Black\" )"
+                    [ [ "Red"; 570 ] ]
+
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], KEEPFILTERS ( TREATAS ( { \"Red\" }, Product[Color] ) ), \"A\", [Amount] ), Product[Color] = \"Black\" )"
+                    []
+
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], KEEPFILTERS ( TREATAS ( { \"Red\", \"Black\" }, Product[Color] ) ), \"A\", [Amount] ), Product[Color] = \"Black\" )"
+                    [ [ "Black"; 15 ] ])
+            // "contextual SummarizeColumns ... allows SummarizeColumns to be evaluated in any context
+            // transition" (Microsoft Learn). Colours with an amount: Ann (rows 1, 3, 7) Red; Bob
+            // (2, 5) Red and no product; Cy (4, 6) Black and Red.
+            testCase "in a measure, after a context transition" (fun () ->
+                returns
+                    (p ())
+                    "DEFINE MEASURE Sales[Colours] = COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], \"A\", [Amount] ) )
+                     EVALUATE ADDCOLUMNS ( VALUES ( Customer[Name] ), \"N\", [Colours] )"
+                    [ [ "Ann"; 1 ]; [ "Bob"; 2 ]; [ "Cy"; 2 ] ]
+
+                returns
+                    (p ())
+                    "EVALUATE ROW ( \"x\", SUMX ( VALUES ( Customer[Name] ), CALCULATE ( COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], \"A\", [Amount] ) ) ) ) )"
+                    [ [ 5 ] ])
+            // "SUMMARIZECOLUMNS ( year, color, Sales )" is "SUMMARIZE ( Sales, year, color )" (SQLBI,
+            // "Introducing SUMMARIZECOLUMNS"): the table has the columns of its expanded table, so
+            // it pairs the two group-by tables. Rows 1, 3, 6, 7 are Red in the US (200 + 60 + 100 +
+            // 110), row 2 Red in the UK, row 4 Black in the US, row 5 no product in the UK.
+            testCase "a model table as a filter pairs the group-by tables it relates to" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales, \"A\", [Amount] )"
+                    [
+                        [ "Red"; "US"; 470 ]
+                        [ "Red"; "UK"; 100 ]
+                        [ "Black"; "US"; 15 ]
+                        [ null; "UK"; 40 ]
+                    ]
+
+                returns (p ()) "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales )" [
+                    [ "Red"; "US" ]
+                    [ "Red"; "UK" ]
+                    [ "Black"; "US" ]
+                    [ null; "UK" ]
+                ]
+
+                // The same as SUMMARIZE.
+                Expect.equal
+                    (sortedRows (p ()) "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales )")
+                    (sortedRows (p ()) "EVALUATE SUMMARIZE ( Sales, Product[Color], Customer[Country] )")
+                    ""
+
+                // Only the Sales rows a filter on one of the tables leaves.
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales, TREATAS ( { \"UK\" }, Customer[Country] ) )"
+                    [ [ "Red"; "UK" ]; [ null; "UK" ] ])
+            // "Rows for which all expressions not using IGNORE return BLANK/NULL will be excluded
+            // independent of whether the expressions which do use IGNORE evaluate to BLANK/NULL or
+            // not"; with every expression ignored, "they're included since there are no unignored
+            // expressions which return blank" (Microsoft Learn).
+            testCase "IGNORE" (fun () ->
+                returns (p ()) "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"A\", IGNORE ( [Amount] ) )" [
+                    [ "Red"; 570 ]
+                    [ "Black"; 15 ]
+                    [ "Blue"; null ]
+                    [ null; 40 ]
+                ]
+
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"A\", IGNORE ( [Amount] ), \"Big\", IF ( [Amount] > 100, 1 ) )"
+                    [ [ "Red"; 570; 1 ] ]
+
+                Expect.equal
+                    (queryCode (p ()) "EVALUATE ROW ( \"x\", IGNORE ( 1 ) )")
+                    "dax-invalid"
+                    "only in SUMMARIZECOLUMNS")
+            // dax.guide/rollupaddissubtotal: the subtotal row has a blank group and TRUE in the
+            // named column; the result is the group-by columns, the subtotal columns, the
+            // expressions.
+            testCase "ROLLUPADDISSUBTOTAL" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"T\" ), \"A\", [Amount] )"
+                    [
+                        [ "Red"; false; 570 ]
+                        [ "Black"; false; 15 ]
+                        [ null; false; 40 ]
+                        [ null; true; 625 ]
+                    ]
+
+                Expect.equal
+                    ((query
+                        (p ())
+                        "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Customer[Country], \"CT\" ), ROLLUPADDISSUBTOTAL ( Product[Category], \"PT\" ), \"A\", [Amount] )")
+                         .Columns
+                     |> List.map _.Name)
+                    [ "Customer[Country]"; "Product[Category]"; "[CT]"; "[PT]"; "[A]" ]
+                    "columns"
+
+                // The filters stay on a subtotal: the Safety products only (60 + 100 + 15).
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"T\" ), TREATAS ( { \"Safety\" }, Product[Category] ), \"A\", [Amount] )"
+                    [ [ "Red"; false; 160 ]; [ "Black"; false; 15 ]; [ null; true; 175 ] ])
+            // Cycling is rows 1, 2, 7 (410), Safety rows 3, 4, 6 (175), no product row 5 (40); the
+            // US is 485 and the UK 140. Two calls roll up independently ("matrices of subtotals").
+            testCase "several ROLLUPADDISSUBTOTAL" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Customer[Country], \"CT\" ), ROLLUPADDISSUBTOTAL ( Product[Category], \"PT\" ), \"A\", [Amount] )"
+                    [
+                        [ "US"; "Cycling"; false; false; 310 ]
+                        [ "US"; "Safety"; false; false; 175 ]
+                        [ "UK"; "Cycling"; false; false; 100 ]
+                        [ "UK"; null; false; false; 40 ]
+                        [ "US"; null; false; true; 485 ]
+                        [ "UK"; null; false; true; 140 ]
+                        [ null; "Cycling"; true; false; 410 ]
+                        [ null; "Safety"; true; false; 175 ]
+                        [ null; null; true; false; 40 ]
+                        [ null; null; true; true; 625 ]
+                    ])
+            // "multiple ROLLUP columns in the same ROLLUPADDISSUBTOTAL ... including only the group
+            // totals at higher levels following the hierarchy of columns specified"
+            // (dax.guide/rollupaddissubtotal); ROLLUPGROUP: "rolled together when reporting a
+            // subtotal" (Microsoft Learn).
+            testCase "levels in one ROLLUPADDISSUBTOTAL, and ROLLUPGROUP" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Customer[Country], \"CT\", Product[Category], \"PT\" ), \"A\", [Amount] )"
+                    [
+                        [ "US"; "Cycling"; false; false; 310 ]
+                        [ "US"; "Safety"; false; false; 175 ]
+                        [ "UK"; "Cycling"; false; false; 100 ]
+                        [ "UK"; null; false; false; 40 ]
+                        [ "US"; null; false; true; 485 ]
+                        [ "UK"; null; false; true; 140 ]
+                        [ null; null; true; true; 625 ]
+                    ]
+
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( ROLLUPGROUP ( Customer[Country], Product[Category] ), \"T\" ), \"A\", [Amount] )"
+                    [
+                        [ "US"; "Cycling"; false; 310 ]
+                        [ "US"; "Safety"; false; 175 ]
+                        [ "UK"; "Cycling"; false; 100 ]
+                        [ "UK"; null; false; 40 ]
+                        [ null; null; true; 625 ]
+                    ])
+            // "ISINSCOPE checks whether there is a filter placed on the column derived either from
+            // context transition or from a group by column placed by SUMMARIZECOLUMNS"
+            // (dax.guide/isinscope); "at the grand total ... Brand neither has one value, nor is it
+            // in scope" (SQLBI, "Distinguishing HASONEVALUE from ISINSCOPE").
+            testCase "ISINSCOPE" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"T\" ), \"S\", ISINSCOPE ( Product[Color] ), \"C\", ISINSCOPE ( Product[Category] ), \"X\", CALCULATE ( ISINSCOPE ( Product[Color] ), ALL ( Product[Color] ) ) )"
+                    [
+                        [ "Red"; false; true; false; false ]
+                        [ "Black"; false; true; false; false ]
+                        [ "Blue"; false; true; false; false ]
+                        [ null; false; true; false; false ]
+                        [ null; true; false; false; false ]
+                    ]
+
+                // A filter from a context transition counts; the measure sees it too.
+                returns
+                    (p ())
+                    "DEFINE MEASURE Sales[In] = ISINSCOPE ( Customer[Country] )
+                     EVALUATE ADDCOLUMNS ( VALUES ( Customer[Country] ), \"a\", CALCULATE ( ISINSCOPE ( Customer[Country] ) ), \"b\", [In], \"c\", CALCULATE ( [In], Customer[Country] = \"US\" ) )"
+                    [ [ "US"; true; true; false ]; [ "UK"; true; true; false ] ]
+
+                returns (p ()) "EVALUATE ROW ( \"x\", ISINSCOPE ( Product[Color] ) )" [ [ false ] ]
+
+                notSupported
+                    (p ())
+                    "EVALUATE ADDCOLUMNS ( VALUES ( Product[Color] ), \"s\", ISINSCOPE ( Product[Color] ) )"
+                    "ISINSCOPE inside a row context"
+
+                // The transition over Sales also filters Product: whether that counts is not said.
+                notSupported
+                    (p ())
+                    "EVALUATE ROW ( \"x\", SUMX ( Sales, IF ( CALCULATE ( ISINSCOPE ( Product[Color] ) ), 1 ) ) )"
+                    "related")
             testCase "what is not supported says so" (fun () ->
                 notSupported
                     (p ())
-                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"s\" ), \"A\", [Amount] )"
-                    "ROLLUPADDISSUBTOTAL"
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"s\", VALUES ( Product[Color] ) ), \"A\", [Amount] )"
+                    "ROLLUPADDISSUBTOTAL with a filter"
+
+                notSupported
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ), \"A\", [Amount] )"
+                    "NONVISUAL"
 
                 notSupported
                     (p ())
                     "EVALUATE ROW ( \"x\", SUMX ( Product, COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color] ) ) ) )"
-                    "SUMMARIZECOLUMNS"
+                    "SUMMARIZECOLUMNS inside a row context"
 
                 notSupported
                     (p ())
-                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], \"A\", [Amount] ), Customer[Country] = \"UK\" )"
-                    "SUMMARIZECOLUMNS"
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], KEEPFILTERS ( VALUES ( Product[Color] ) ), VALUES ( Product[Category] ) )"
+                    "KEEPFILTERS"
 
-                // A filter that pairs columns of two group-by tables.
+                // A filter that pairs columns of two group-by tables and isn't a model table.
                 notSupported
                     (p ())
-                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales, \"A\", [Amount] )"
-                    "more than one")
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], TREATAS ( { ( \"Red\", \"US\" ) }, Product[Color], Customer[Country] ) )"
+                    "more than one"
+
+                // No group and nothing to show: is the one row returned?
+                notSupported
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( \"A\", CALCULATE ( [Amount], Product[Color] = \"Blue\" ) )"
+                    "total row")
         ]
 
         testList "other table functions" [
@@ -782,8 +1015,8 @@ let tests =
                     "CALCULATE ( [Amount], CROSSFILTER ( Sales[ProductKey], Product[ProductKey], ONEWAY_LEFTFILTERSRIGHT ) )",
                     "CROSSFILTER direction"
                     "CALCULATE ( [Amount], ALLSELECTED () )", "ALLSELECTED"
-                    "COUNTROWS ( SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"s\" ) ) )",
-                    "ROLLUPADDISSUBTOTAL"
+                    "COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ) ) )",
+                    "NONVISUAL"
                 ]
 
                 let model = {

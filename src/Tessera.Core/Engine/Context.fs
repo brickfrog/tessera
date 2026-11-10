@@ -258,7 +258,7 @@ module Filters =
     /// A filter context with these filters under these relationships. A table filter evaluated
     /// under other relationships keeps the columns it had then ("table expansion ... happens when
     /// you define a table": SQLBI, "Expanded tables in DAX"), so it is spelled out by column.
-    let build (config: RelConfig) (filters: Filter list) : FilterCtx =
+    let buildWith (scope: ScopeMark list) (config: RelConfig) (filters: Filter list) : FilterCtx =
         let filters =
             filters
             |> List.collect (fun f ->
@@ -267,7 +267,13 @@ module Filters =
                     spellOut table rows cfg (fun _ -> true)
                 | f -> [ f ])
 
-        FilterCtx(filters, config)
+        FilterCtx(filters, config, scope)
+
+    let build (config: RelConfig) (filters: Filter list) : FilterCtx = buildWith [] config filters
+
+    /// The same filters, with a mark added for ISINSCOPE (see `ScopeMark`).
+    let mark (fc: FilterCtx) (m: ScopeMark) : FilterCtx =
+        FilterCtx(fc.Filters, fc.Config, m :: fc.Scope)
 
     /// The columns a filter is on, as a test.
     let private covers (f: Filter) : BColumn -> bool =
@@ -278,7 +284,7 @@ module Filters =
 
     /// The context without any filter on the columns `drop` names.
     let remove (fc: FilterCtx) (drop: BColumn -> bool) : FilterCtx =
-        build fc.Config (fc.Filters |> List.collect (without drop))
+        buildWith (Unfiltered drop :: fc.Scope) fc.Config (fc.Filters |> List.collect (without drop))
 
     /// The context with filters added. Unless `keep` (KEEPFILTERS), each new filter first removes
     /// the context's filters on its columns; the new filters do not remove one another.
@@ -286,21 +292,21 @@ module Filters =
         if filters.IsEmpty then
             fc
         else
-            let old =
+            let old, scope =
                 if keep then
-                    fc.Filters
+                    fc.Filters, fc.Scope
                 else
                     let tests = filters |> List.map covers
                     let drop (c: BColumn) = tests |> List.exists (fun t -> t c)
-                    fc.Filters |> List.collect (without drop)
+                    fc.Filters |> List.collect (without drop), Unfiltered drop :: fc.Scope
 
-            build fc.Config (old @ filters)
+            buildWith scope fc.Config (old @ filters)
 
     let withConfig (fc: FilterCtx) (config: RelConfig) : FilterCtx =
         if obj.ReferenceEquals(fc.Config, config) then
             fc
         else
-            build config fc.Filters
+            buildWith fc.Scope config fc.Filters
 
     // ---- Which rows are visible ------------------------------------------------------------------
 
@@ -754,6 +760,24 @@ module Context =
 
             for rc in List.rev rows do
                 fc <- Filters.add fc (rowFilters ctx span rc) false
+                let t = rc.Table
+
+                let scope =
+                    if t.IsPureBase then
+                        let b = t.BaseTable
+                        let cfg = t.Config
+
+                        Transitioned(
+                            b.Columns,
+                            fun c -> not (obj.ReferenceEquals(c.Table, b)) && cfg.IsExpanded(b, c.Table)
+                        )
+                    else
+                        Transitioned(
+                            t.Cols |> Array.map _.Lineage |> Array.filter (fun c -> not (isNull c)),
+                            fun _ -> false
+                        )
+
+                fc <- Filters.mark fc scope
 
             { ctx with Filter = fc; Rows = [] }
 

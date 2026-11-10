@@ -802,12 +802,28 @@ type Filter =
     /// `FilterCtx` the configuration is always the context's own (see `Filters.build`).
     | Rows of BTable * RowSet * RelConfig
 
+/// How a column came to be filtered, as ISINSCOPE asks: "whether there is a filter placed on the
+/// column derived either from context transition or from a group by column placed by
+/// SUMMARIZECOLUMNS" (dax.guide/isinscope). A filter context keeps these marks, newest first.
+type ScopeMark =
+    /// Group-by columns of the SUMMARIZECOLUMNS row being computed.
+    | Grouped of BColumn array
+    /// A context transition: the columns of the table that was iterated, and a test for the
+    /// columns of the tables related to it (which the transition also filters; whether those
+    /// count as in scope is not documented).
+    | Transitioned of own: BColumn array * related: (BColumn -> bool)
+    /// The filters on these columns were removed or replaced.
+    | Unfiltered of (BColumn -> bool)
+
 /// A filter context: filters, and the relationships in force. Immutable; the caches belong to one
 /// evaluation (one thread).
 [<Sealed; AllowNullLiteral>]
-type FilterCtx(filters: Filter list, config: RelConfig) =
+type FilterCtx(filters: Filter list, config: RelConfig, scope: ScopeMark list) =
+    new(filters: Filter list, config: RelConfig) = FilterCtx(filters, config, [])
     member _.Filters = filters
     member _.Config = config
+    /// See `ScopeMark`. Part of the context: a measure's value may depend on it.
+    member _.Scope = scope
     member val Visible = Dictionary<int, RowSet>() with get
     member val InProgress = HashSet<int>() with get
     member val Measures = Dictionary<obj, DaxValue>(HashIdentity.Reference) with get
