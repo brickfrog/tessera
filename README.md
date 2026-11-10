@@ -81,6 +81,8 @@ tess deploy ./MyReport.pbip "powerbi://api.powerbi.com/v1.0/myorg/Finance" Sales
 tess refresh "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" Orders --type full   # dry run; --execute to refresh
 tess data init ./MyReport.pbip ./fixtures --rows 100   # fixture data for the local DAX engine: CSV per table
 tess data check ./MyReport.pbip ./fixtures       # ... checked against the model's columns, types and relationships
+tess query ./MyReport.pbip --data ./fixtures "EVALUATE SUMMARIZECOLUMNS('Date'[Year], \"Sales\", [Total])"   # offline
+tess query ./MyReport.pbip --coverage            # which measures the local engine can evaluate, and what the rest need
 ```
 
 ### Accepted model paths
@@ -1597,10 +1599,11 @@ tess query <xmla-model> "EVALUATE 'Date'" --max-rows 0 --json
 
 A query may hold several `EVALUATE` statements; each gives one result. The default output is an aligned table per
 result, `--csv` is RFC 4180 with results separated by an empty line, and `--json` is described below. `--max-rows`
-caps each result (default 1000, 0 for all); a capped result is marked `truncated` and stderr says so. `query` only
-runs on a server model for now. Queries are sent as they are: tess doesn't check them first.
+caps each result (default 1000, 0 for all); a capped result is marked `truncated` and stderr says so. Queries to a
+server are sent as they are: tess doesn't check them first. On model files, `query` needs `--data <fixture>` and
+runs offline: see [the local DAX engine](#the-local-dax-engine-query---data).
 
-The JSON shape is shared with the local DAX engine being built, so the two can be compared value by value:
+The JSON shape is shared with the local DAX engine, so the two can be compared value by value:
 
 ```json
 { "command": "query",
@@ -1781,7 +1784,7 @@ Where this differs from `te refresh`, and why:
 #### Not in tess yet
 
 `vertipaq`, sessions and profiles (`te connect` keeps an active connection; tess doesn't), interactive
-browser sign-in, certificate and managed-identity sign-in, and running `query` against model files.
+browser sign-in, and certificate and managed-identity sign-in.
 
 What each needs, for whoever picks it up:
 - **Refresh overrides:** `Refresh.Request` (Core) would carry the TMSL `overrides` array; the builder writes it
@@ -1790,13 +1793,13 @@ What each needs, for whoever picks it up:
   them as it stands; Dax.Model.Extractor would instead need the raw connection, which the seam deliberately hides.
 - **Sessions and profiles:** somewhere to keep an address and auth mode (never a secret) per shell, and a decision
   on where; then `Source.load` reads it when no model is given.
-- **`query` on files:** the local engine returns `QueryResult list`; `QueryCommand` already renders it.
 - **Interactive sign-in:** needs the MSAL broker the single-file builds leave out (see `Tessera.Cli.fsproj`).
 ### Fixture data (`data`)
 
 A fixture is a directory of data files, one per table, that the local DAX engine evaluates a model against: no
-server, no refresh. `tess data` creates one, checks it against the model, and summarizes it. (The engine itself,
-`tess query` and `tess test`, is not here yet.)
+server, no refresh. `tess data` creates one, checks it against the model, and summarizes it. `tess query <model>
+--data <dir>` runs queries over it: see [the local DAX engine](#the-local-dax-engine-query---data). (`tess test` is
+not here yet.)
 
 **Fixture data never leaves your machine.** tess reads the files from the directory and does nothing else with
 them: no upload, no telemetry, no network call of any kind.
@@ -1957,6 +1960,158 @@ values, and the number of BLANK rows. BLANK counts as one of the distinct values
 "data info", "directory", "tables": [{table, ref, file, rows, columns: [{name, ref, dataType, distinct, blanks}]}],
 "computed": [...], "issues": {errors, warnings}}`. `info` exits 0 even when the fixture has errors (it says so on
 stderr); use `check` to see them.
+
+### The local DAX engine (`query --data`)
+
+`tess query` on model files evaluates DAX on your machine, over [fixture data](#fixture-data-data): no server, no
+refresh, no network.
+
+```sh
+tess query ./Sales.pbip --data ./fixtures "EVALUATE SUMMARIZECOLUMNS ( 'Date'[Year], \"Sales\", [Total] )"
+tess query ./Sales.pbip --data ./fixtures -f totals.dax --json      # or - for standard input; --csv; --max-rows
+tess query ./Sales.pbip --coverage                                  # what the engine can evaluate of this model
+```
+
+The options, the output and the JSON are those of [`query` on a server](#query): the same `QueryResult`, with
+`"source"` the model's path. The fixture is checked first (as `tess data check` does) and a fixture with errors is
+refused (exit 3, `fixture-has-errors`).
+
+**What it is.** An independent reimplementation of DAX's semantics, written against the public documentation:
+Microsoft Learn's DAX reference, [dax.guide](https://dax.guide) and SQLBI's articles, cited in the code next to each
+rule. **It has not been checked against a real Analysis Services engine yet.** Its tests are hand-worked expected
+values with their sources, identities DAX guarantees, and a check of filter propagation against its definition on
+random models; a conformance corpus against published results is the next step.
+
+**The one rule: never a wrong answer.** A function, an argument form, a data-type combination or a model feature the
+engine doesn't implement exactly is an error, `not-supported` (exit 3), naming the thing and where it is:
+
+```
+tess: Not supported by the local DAX engine: the function FORMAT (measure 'Sales'[Label] 2:5)
+```
+
+That includes the places where the sources don't settle what the real engine does. A subset that is right is the
+point; so expect refusals, and read them as "not yet" rather than as a problem with your DAX. `IFERROR` never hides a
+refusal. The other errors are `dax-syntax` (with line and column), `dax-invalid` (an unknown name, the wrong
+arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `ERROR ( )`, a failed conversion).
+
+#### What it supports
+
+- **Values:** whole, decimal and fixed decimal numbers, text, true/false, dates and BLANK, with DAX's rules for
+  each operator (`BLANK + 5` is 5, `BLANK * 5` is BLANK, `BLANK = 0` but not `BLANK == 0`, `5 / 0` is infinity, text
+  compares without case). `&&`, `||`, `IF`, `SWITCH` and `COALESCE` evaluate only what they need.
+- **Tables as values, with data lineage:** a column of a table expression remembers the model column it came from,
+  which is what makes `VALUES ( T[c] )` usable as a filter, what `TREATAS` assigns, and what an expression loses.
+  Result columns are named as the engine names them (`Sales[Amount]`, `[Total]`, `[Value]`) and typed statically
+  where DAX types them so (a column that is BLANK in every row still has its type; an `IF` with a whole and a decimal
+  branch is a decimal; one with a text and a number is a variant).
+- **Evaluation contexts:** the filter context; nested row contexts with `EARLIER`; context transition in
+  `CALCULATE` and in every measure reference, covering the expanded table and keeping duplicate rows together;
+  variables evaluated where they are defined, on first use, once.
+- **Relationships:** many-to-one, single column. Filters travel from the one side; both ways where the model says
+  so or under `CROSSFILTER`; inactive relationships under `USERELATIONSHIP`; expanded tables (a table used as a
+  filter filters the tables it relates to, and `ALL ( Sales )` removes filters from them); the blank row for keys
+  with no match (`VALUES` and `ALL` have it, `DISTINCT`, `ALLNOBLANKROW` and a plain table reference don't).
+- **`CALCULATE` / `CALCULATETABLE`:** the documented order (filter arguments in the original context, context
+  transition, modifiers, then the filters); True/False filters over one or several columns of a table; table
+  filters; `KEEPFILTERS`; `ALL`, `ALLEXCEPT`, `ALLNOBLANKROW`, `REMOVEFILTERS`, `ALLCROSSFILTERED`,
+  `USERELATIONSHIP`, `CROSSFILTER` (NONE, ONEWAY, BOTH); arbitrarily shaped filters, which lose their pairing when
+  one of their columns is replaced.
+- **Queries:** `DEFINE MEASURE` (overriding a model measure for the query's own code only), `DEFINE VAR`,
+  `DEFINE FUNCTION`, several `EVALUATE` statements, `ORDER BY` by result columns or expressions.
+- **User-defined functions,** the model's and the query's, with `VAL` parameters (evaluated once, in the caller's
+  context, and converted to the parameter's type) and `EXPR` parameters (evaluated where the body uses them).
+- **Calculated columns and calculated tables,** computed in dependency order when the model is loaded. A circular
+  dependency is an error, including the classic one: two calculated columns that each use `CALCULATE` in a table
+  with no unique column. A calculated column or table that uses something unsupported doesn't stop the rest: only
+  the queries that read it fail, with its error.
+- **Functions** (anything else is `not-supported`):
+
+| Family | Functions |
+|---|---|
+| Aggregation | `AVERAGE` `AVERAGEX` `CONCATENATEX` `COUNT` `COUNTA` `COUNTAX` `COUNTBLANK` `COUNTROWS` `COUNTX` `DISTINCTCOUNT` `DISTINCTCOUNTNOBLANK` `MAX` `MAXX` `MIN` `MINX` `PRODUCTX` `RANKX` `SUM` `SUMX` |
+| Filter | `ALL` `ALLCROSSFILTERED` `ALLEXCEPT` `ALLNOBLANKROW` `CALCULATE` `CALCULATETABLE` `CROSSFILTER` `DISTINCT` `EARLIER` `EARLIEST` `FILTER` `HASONEFILTER` `HASONEVALUE` `ISCROSSFILTERED` `ISFILTERED` `KEEPFILTERS` `REMOVEFILTERS` `SELECTEDVALUE` `TREATAS` `USERELATIONSHIP` `VALUES` |
+| Information | `CONTAINSROW` `ISBLANK` `ISERROR` |
+| Logical | `AND` `BLANK` `COALESCE` `ERROR` `FALSE` `IF` `IF.EAGER` `IFERROR` `NOT` `OR` `SWITCH` `TRUE` |
+| Math | `ABS` `DIVIDE` `INT` `MOD` `ROUND` |
+| Relationship | `LOOKUPVALUE` `RELATED` `RELATEDTABLE` |
+| Table manipulation | `ADDCOLUMNS` `CROSSJOIN` `CURRENTGROUP` `DATATABLE` `EXCEPT` `GENERATE` `GENERATEALL` `GROUPBY` `INTERSECT` `ROW` `SELECTCOLUMNS` `SUMMARIZE` `SUMMARIZECOLUMNS` `TOPN` `UNION` |
+| Text | `CONCATENATE` |
+
+  `SUMMARIZE` takes a table, group-by columns (its own, or of tables it has a many-to-one relationship to) and
+  name/expression pairs; not `ROLLUP`. `SUMMARIZECOLUMNS` takes group-by columns, filter tables and name/expression
+  pairs, as a query's own table expression: existing combinations for columns of one table, a cross join between
+  tables, the blank row as a group, and rows whose expressions are all BLANK dropped; not `ROLLUPADDISSUBTOTAL`,
+  `IGNORE` or `NONVISUAL`, and not inside a row context or under an outer filter.
+
+#### What it refuses
+
+- **Not implemented yet:** time intelligence, `ALLSELECTED`, `FORMAT` and most text, date, math and statistical
+  functions, window functions (`OFFSET`, `INDEX`, `WINDOW`, `RANK`, `ROWNUMBER`), visual calculations,
+  `DEFINE TABLE` / `DEFINE COLUMN`, `START AT`, query parameters, detail rows, KPIs. Row-level and object-level
+  security are not applied (a query runs as an administrator's would).
+- **Model shapes:** many-to-many and one-to-one relationships, relationships on several columns, DirectQuery and
+  Dual tables: every table connected to one is closed to queries, the rest of the model works. A calculation group
+  is closed when a query names it. Active relationships that give two filter paths between two tables.
+- **Where the sources don't say what the engine does,** for instance:
+  - a one-side key that repeats or is BLANK;
+  - keys with no match on an inactive relationship only, or at the start of a chain of relationships (whether the
+    blank row exists);
+  - a filter that crosses a both-directions relationship while keeping every row of the many side;
+  - `TOPN` without an order-by on more rows than asked for, and `CONCATENATEX` without one (the engine defines no
+    order), and sorting where BLANK meets zero or negative values, or values of different types;
+  - a date or TRUE/FALSE turned into text by `&` (the format depends on the model's culture), text read as a date
+    in arithmetic, a date multiplied, `ROUND` of a negative number exactly halfway;
+  - `DISTINCTCOUNT` of a column while its table's blank row is visible (whether that BLANK is counted: write
+    `COUNTROWS ( DISTINCT ( ... ) )` or `COUNTROWS ( VALUES ( ... ) )` to say which);
+  - a context transition, or a column read, inside a user-defined function that was called from a row context
+    (the documentation says what the function's parameters see of the caller's row context, not its body);
+  - a name that is both a column of the row context and a measure (except in `ORDER BY`, where it is the result's
+    column);
+  - a table built on a model table with columns added, used as a filter or iterated with a measure, when that table
+    relates to others (whether those are still filtered).
+
+Without `ORDER BY`, rows come in the order the engine produced them. As on a server, that order is not defined:
+compare such results as sets.
+
+#### `--coverage`
+
+`tess query <model> --coverage` reads the model only (no data) and lists every measure, calculated column and
+calculated table that uses something the engine doesn't support, with what; then how many of each kind it can
+evaluate, and the unsupported things ranked by how many objects use them. It follows references: a measure that
+calls an unsupported measure or function is unsupported, and so is everything that depends, over relationships, on a
+calculated table or column that can't be computed (a `CALENDAR ( )` date table closes most of a model until date
+functions arrive). `--json` writes `{"command": "query coverage", "source", "summary": {measures, calculatedColumns,
+calculatedTables: {total, supported}}, "objects": [{ref, kind, supported, unsupported: [...]}], "unsupported":
+[{reason, objects}]}`.
+
+Coverage runs each function's static check of its argument forms, the same one the evaluator runs before a call. A
+refusal that depends on where a function is used (`KEEPFILTERS` on an iterator's table), on the evaluation context (a
+function called from a row context) or on the data (a key that repeats, a blank row that can't be decided, values
+of mixed types) only shows when evaluating: coverage is a lower bound on what is refused, not a guarantee.
+
+#### For developers
+
+The engine is `src/Tessera.Core/Engine/`:
+
+```fsharp
+Engine.prepare        : Database -> DataStore -> Result<Engine.Prepared, TessError>   // bind, compute calculated columns/tables
+Engine.evaluateQuery  : Engine.Prepared -> string -> Result<QueryResult list, TessError>
+Engine.evaluateScalar : Engine.Prepared -> string -> Result<QueryValue, TessError>    // no filter context, no row context
+Engine.coverage       : Database -> (ObjectRef * string list) list
+Engine.failures       : Engine.Prepared -> (ObjectRef * TessError) list               // what prepare couldn't compute
+Engine.functions      : (string * string) list                                        // name, family
+```
+
+A `Prepared` is immutable and can be shared between threads. Every DAX function is an entry in a registry, in a
+file per family under `Engine/Functions/`; a function receives its arguments unevaluated together with the
+evaluation context, so iterators and `CALCULATE` are ordinary entries. Adding a family is a new file, a `<Compile>`
+line and a line in `Registry.fs`; the header of `Engine/Types.fs` documents the API with examples. Each entry also
+carries a static check of its argument forms, which is what `coverage` runs.
+
+Performance, on a 100,000-row fact table with three dimensions (see `EnginePerfTests`, on a laptop): `SUMX` over
+the fact about 0.15 s, `CALCULATE` with two filters under 0.01 s, `SUMMARIZECOLUMNS` by a dimension column with a
+measure 0.1 to 0.2 s (by two dimensions with a filter 0.35 s), a measure per row of the fact (100,000 context
+transitions) 0.35 s.
 
 ### Findings JSON and CI annotations
 

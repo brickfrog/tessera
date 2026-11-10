@@ -73,6 +73,11 @@ module ExitCode =
         | InvalidFixture _ -> input
         | CannotRefresh _ -> input
         | RefreshFailed _ -> remote
+        | DaxSyntax _
+        | DaxNotSupported _
+        | DaxInvalid _
+        | DaxEvaluation _
+        | FixtureHasErrors _ -> input
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()

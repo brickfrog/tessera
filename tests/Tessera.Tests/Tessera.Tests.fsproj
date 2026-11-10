@@ -83,6 +83,15 @@
     <Compile Include="ConformanceTests.fs" />
     <Compile Include="ConformanceServer.fs" />
     <Compile Include="ConformanceServerTests.fs" />
+    <Compile Include="EngineHelpers.fs" />
+    <Compile Include="EngineSmokeTests.fs" />
+    <Compile Include="EngineScalarTests.fs" />
+    <Compile Include="EngineContextTests.fs" />
+    <Compile Include="EngineTableTests.fs" />
+    <Compile Include="EnginePropertyTests.fs" />
+    <Compile Include="EngineCommandTests.fs" />
+    <Compile Include="EngineSampleTests.fs" />
+    <Compile Include="EnginePerfTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

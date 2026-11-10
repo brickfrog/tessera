@@ -533,7 +533,7 @@ let tests =
                 Expect.equal (V.add (str "2024-01-15") (int' 1) |> ok) (date 2024 1 16) "text that reads as a date"
                 Expect.equal (V.concat (int' 12) (int' 34)) (str "1234") ""
                 Expect.equal (V.concat blank (str "A")) (str "A") ""
-                Expect.equal (V.concat blank blank) (str "") "never BLANK"
+                Expect.equal (V.concat blank blank) blank "two BLANKs are BLANK (dax.guide/concatenate)"
 
                 Expect.equal
                     (V.add (str "abc") (int' 1))

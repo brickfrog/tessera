@@ -11,10 +11,9 @@ open Tessera.Tests.Conformance
 
 // ---- The engine under test ------------------------------------------------------------------------
 
-/// The local engine. None until it lands; then this is the one line to change:
-///
-///     Some(fun db store dax -> Engine.prepare db store |> Result.bind (fun e -> Engine.evaluateQuery e dax))
-let private engine: Evaluate option = None
+/// The local engine.
+let private engine: Evaluate option =
+    Some(fun db store dax -> Engine.prepare db store |> Result.bind (fun e -> Engine.evaluateQuery e dax))
 
 /// Tags the engine isn't expected to handle yet. A case with one of them is reported as skipped
 /// unless it passes; remove a tag here when its area is implemented.
@@ -22,6 +21,29 @@ let private expectedUnsupported: Set<string> = set laterAreas
 
 /// Which of the engine's errors mean "not implemented" (see `RunConfig.defaults`).
 let private engineConfig = RunConfig.defaults
+
+/// Cases the engine is known not to pass, one `<case id><tab><kind>` per line, where kind is
+/// `not-supported` (an honest refusal), `error` or `fail` (the engine disagrees with the corpus:
+/// one of the two is wrong, and that needs settling). A case whose outcome differs from its line
+/// fails, and so does a line whose case now passes, so the file only ever shrinks.
+let private baselineFile = "engine-baseline.tsv"
+
+let private baseline () : Map<string, string> =
+    match corpusDirectory with
+    | None -> Map.empty
+    | Some dir ->
+        let path = Path.Combine(dir, baselineFile)
+
+        if not (File.Exists path) then
+            Map.empty
+        else
+            File.ReadAllLines path
+            |> Array.filter (fun l -> l.Trim() <> "" && not (l.StartsWith "#"))
+            |> Array.map (fun l ->
+                match l.Split('\t') with
+                | [| id; kind |] -> id.Trim(), kind.Trim()
+                | _ -> failwithf "%s: expected '<case id><tab><kind>': %s" baselineFile l)
+            |> Map.ofArray
 
 // ---- The corpus -----------------------------------------------------------------------------------
 
@@ -196,19 +218,31 @@ let engineTests =
             testCase "no engine yet"
             <| fun () -> skiptest "point `engine` in ConformanceTests.fs at the local DAX engine"
         | Some evaluate ->
+            let known = baseline ()
+
             for c in cases () do
                 testCase c.Id
                 <| fun () ->
                     let later = c.Tags |> List.exists expectedUnsupported.Contains
+                    let outcome = runWith engineConfig evaluate c
 
-                    match runWith engineConfig evaluate c with
-                    | Outcome.Pass -> ()
-                    | outcome when later -> skiptest $"not expected to work yet ({outcome})"
-                    | Outcome.NotSupported reason -> failtest (report c [ $"not supported: {reason}" ])
-                    | Outcome.Error message -> failtest (report c [ $"error: {message}" ])
+                    let kind, lines =
+                        match outcome with
+                        | Outcome.Pass -> "pass", []
+                        | Outcome.NotSupported reason -> "not-supported", [ $"not supported: {reason}" ]
+                        | Outcome.Error message -> "error", [ $"error: {message}" ]
+                        | Outcome.Fail mismatch -> "fail", Mismatch.describe mismatch
+
+                    match kind, Map.tryFind c.Id known with
+                    | "pass", None -> ()
+                    | "pass", Some was ->
+                        failtest $"{c.Id} now passes: remove its line ({was}) from tests/conformance/{baselineFile}"
+                    | _, Some was when was = kind -> ()
+                    | _, Some was -> failtest (report c ($"the baseline says {was}, now {kind}" :: lines))
+                    | _ when later -> skiptest $"not expected to work yet ({kind})"
                     // An expectation no source settles can't fail the engine: a server decides it first.
-                    | Outcome.Fail mismatch when c.Uncertain -> skiptest (report c (Mismatch.describe mismatch))
-                    | Outcome.Fail mismatch -> failtest (report c (Mismatch.describe mismatch))
+                    | "fail", None when c.Uncertain -> skiptest (report c lines)
+                    | _ -> failtest (report c lines)
     ]
 
 // ---- The harness itself ---------------------------------------------------------------------------

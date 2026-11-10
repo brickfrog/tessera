@@ -297,6 +297,17 @@ let configTests =
         testCase "project config outside a repository: only the model's own folders"
         <| fun () ->
             use t = new TempDir()
+
+            // The machine's temp folder can itself sit inside a repository (a stray /tmp/.git).
+            let rec inRepository (dir: string) =
+                not (isNull dir)
+                && (Directory.Exists(Path.Combine(dir, ".git"))
+                    || File.Exists(Path.Combine(dir, ".git"))
+                    || inRepository (Path.GetDirectoryName dir))
+
+            if inRepository (Path.GetFullPath t.Path) then
+                skiptest "the temp folder is inside a git repository"
+
             let db = bpaDatabase ()
             let source, _ = saveAndLoad db (t.Combine("a", "b"))
             write (t.Combine("a", ".tessera", "bpa.json")) "[]"

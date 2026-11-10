@@ -918,8 +918,14 @@ module DaxValue =
             | NReal r -> Ok(DaxValue.Decimal(-r))
             | NDate d -> Ok(DaxValue.DateTime(-d))
 
-    /// `&`. Both sides as text (see `toText`); BLANK is "". Always a String, never BLANK.
-    let concat (a: DaxValue) (b: DaxValue) : DaxValue = DaxValue.String(toText a + toText b)
+    /// `&`. Both sides as text (see `toText`); a BLANK side is "". Two BLANKs give BLANK: the `&`
+    /// operator "works as the CONCATENATE function" (dax.guide, Concatenation), for which "A BLANK
+    /// argument is an empty string. If both arguments are BLANK, the result is BLANK"
+    /// (dax.guide/concatenate).
+    let concat (a: DaxValue) (b: DaxValue) : DaxValue =
+        match a, b with
+        | DaxValue.Blank, DaxValue.Blank -> DaxValue.Blank
+        | _ -> DaxValue.String(toText a + toText b)
 
     // ---- Conversion -------------------------------------------------------------------------------
 
