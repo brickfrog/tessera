@@ -17,7 +17,61 @@ type private Usage = { In: string; Uses: string }
 
 /// Every method in an assembly whose IL mentions a referenced type (or a member of one) that
 /// `watched` picks out by namespace and name. Tokens are found by scanning method bodies for
-/// their four bytes: that can over-report, never under-report.
+/// their four bytes after an opcode that takes a token: that can over-report, never under-report.
+/// The opcodes whose operand is a metadata token (ECMA-335, III): one byte, or 0xFE and one more.
+let private tokenOpcodes =
+    set [
+        0x27uy
+        0x28uy
+        0x29uy
+        0x6Fuy
+        0x70uy
+        0x71uy
+        0x73uy
+        0x74uy
+        0x75uy
+        0x79uy
+        0x7Buy
+        0x7Cuy
+        0x7Duy
+        0x7Euy
+        0x7Fuy
+        0x80uy
+        0x81uy
+        0x8Cuy
+        0x8Duy
+        0x8Fuy
+        0xA3uy
+        0xA4uy
+        0xA5uy
+        0xC2uy
+        0xC6uy
+        0xD0uy
+    ]
+
+let private tokenOpcodesAfterFE = set [ 0x06uy; 0x07uy; 0x15uy; 0x16uy; 0x1Cuy ]
+
+/// Whether the four bytes of a token appear in a method body right after an opcode that takes a
+/// token. (Any four bytes can turn up by chance among other opcodes and operands.)
+let private mentions (il: byte array) (token: byte array) : bool =
+    let mutable found = false
+    let mutable from = 0
+
+    while not found && from <= il.Length - 4 do
+        match il.AsSpan(from).IndexOf(ReadOnlySpan token) with
+        | -1 -> from <- il.Length
+        | offset ->
+            let at = from + offset
+
+            found <-
+                at >= 1
+                && (tokenOpcodes.Contains il.[at - 1]
+                    || (at >= 2 && il.[at - 2] = 0xFEuy && tokenOpcodesAfterFE.Contains il.[at - 1]))
+
+            from <- at + 1
+
+    found
+
 let private usages (assembly: Reflection.Assembly) (watched: string -> string -> bool) : Usage list =
     use stream = File.OpenRead assembly.Location
     use pe = new PEReader(stream)
@@ -88,7 +142,7 @@ let private usages (assembly: Reflection.Assembly) (watched: string -> string ->
                     let il = pe.GetMethodBody(m.RelativeVirtualAddress).GetILBytes()
 
                     for bytes, what in tokens do
-                        if il.AsSpan().IndexOf(ReadOnlySpan bytes) >= 0 then
+                        if mentions il bytes then
                             {
                                 In = typeDefName typeHandle + "::" + name m.Name
                                 Uses = what
