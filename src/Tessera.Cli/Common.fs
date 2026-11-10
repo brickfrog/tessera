@@ -71,6 +71,8 @@ module ExitCode =
         | DatabaseExists _ -> output
         | DeployIntroducesErrors _ -> findings
         | InvalidFixture _ -> input
+        | CannotRefresh _ -> input
+        | RefreshFailed _ -> remote
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()
