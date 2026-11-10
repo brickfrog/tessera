@@ -1,0 +1,51 @@
+{
+  "title": "FORMAT with \"hh:MM\": an upper-case MM after the hour is the minutes, as mm is",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"hh:MM\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "13:23"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "If mm immediately follows h or hh, minute rather than the month is displayed.",
+      "supports": "mm after hh is minutes"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "The format strings supported as an argument to the DAX FORMAT function are based on the format strings used by Visual Basic (OLE Automation), not on the format strings used by the .NET Framework.",
+      "supports": "DAX's format characters are Visual Basic's (OLE Automation), the case-insensitive ones"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/73ctwf33(v=vs.85)",
+      "quote": "Unlike in previous versions of Visual Basic, these format characters are case-sensitive.",
+      "supports": "the date/time format characters of Visual Basic before VB 2005 (VB6, VBA: OLE Automation) are not case-sensitive"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/ff452175(v=technet.10)",
+      "quote": "Formatting strings are case sensitive. Different formatting can be obtained by using a different case.",
+      "supports": "the 2010 (PowerPivot) DAX page describes .NET's case-sensitive characters; its h is the 12-hour clock, which the current page's \"h:nn:ss\" = 13:23:45 contradicts, so it no longer describes the engine"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Microsoft Learn: \"If mm immediately follows h or hh, minute rather than the month is displayed\". Visual Basic's characters are not case-sensitive, so MM after hh is mm after hh: the minutes, \"13:23\" for 1:23:45 PM.",
+  "uncertain": true,
+  "alternative": "The 2010 DAX page reads the case: \"The M character displays the month\". With that reading the result would be \"13:06\".",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "upper-case"
+  ]
+}

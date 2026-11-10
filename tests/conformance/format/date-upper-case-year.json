@@ -1,0 +1,51 @@
+{
+  "title": "FORMAT with \"YYYY\" and \"YY\" (upper case) gives the year, as yyyy and yy do",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"YYYY\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"YYYY\" ), \"YY\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"YY\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[YYYY]",
+          "type": "string"
+        },
+        {
+          "name": "[YY]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "2020",
+          "20"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Display the year as a 4-digit number (100-9999).",
+      "supports": "yyyy is the 4-digit year; the example table shows \"yyyy\" 2020 and \"yy\" 20 for June 25, 2020"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "The format strings supported as an argument to the DAX FORMAT function are based on the format strings used by Visual Basic (OLE Automation), not on the format strings used by the .NET Framework.",
+      "supports": "DAX's format characters are Visual Basic's (OLE Automation), the case-insensitive ones"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/73ctwf33(v=vs.85)",
+      "quote": "Unlike in previous versions of Visual Basic, these format characters are case-sensitive.",
+      "supports": "the date/time format characters of Visual Basic before VB 2005 (VB6, VBA: OLE Automation) are not case-sensitive"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The current pages write y in lower case: \"yyyy\" is 2020 and \"yy\" 20 for June 25, 2020 (Microsoft Learn's table). The characters are Visual Basic's (OLE Automation), which are not case-sensitive (VB 2005 page: \"Unlike in previous versions\"), so YYYY reads as yyyy and YY as yy: \"2020\" and \"20\". The 2010 DAX page agrees (\"The Y and y characters display the year\").",
+  "uncertain": true,
+  "alternative": "No DAX page shows an upper-case Y. If the engine took it as literal text, the results would be \"YYYY\" and \"YY\".",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "upper-case"
+  ]
+}

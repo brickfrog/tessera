@@ -84,13 +84,14 @@ date-functions/int-of-date-difference	not-supported
 date-functions/int-of-datetime-is-day-serial	not-supported
 define/query-measures-reference-later-definitions	fail
 division/divide-function-currency-numerator	not-supported
-format/date-iso-pattern-upper-case-month	not-supported
 format/locale-general-date-en-gb	not-supported
 format/locale-ignored-for-fixed-pattern	not-supported
 format/locale-month-name-pt	not-supported
 format/locale-number-de	not-supported
 format/percent-large-number	not-supported
 format/result-is-text	not-supported
+format/time-upper-case-hour-with-am-pm	not-supported
+format/time-upper-case-month-after-hour	not-supported
 grouping/summarize-group-by-extension-column	not-supported
 relationships/many-to-many-cardinality-filter-on-other-column	not-supported
 relationships/many-to-many-cardinality-filter-propagation	not-supported

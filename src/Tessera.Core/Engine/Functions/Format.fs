@@ -28,6 +28,22 @@ exception FormatRefused of string
 ///   - "Percent" of a number that needs a thousand separator: 1,234,567.00 % in Microsoft Learn's
 ///     example, 1234567.00% in DAX Guide;
 ///   - every culture other than en-US, for the model and for the locale argument.
+///
+/// Upper-case letters in a date format. The current pages write the date and time characters in
+/// lower case and show two upper-case ones: "\QQ yyyy" is Q1 2019 (dax.guide/format), and Power BI's
+/// own auto date/time table has `Month = FORMAT([Date], "MMMM")` (sqlbi.com, "Continuous axis for
+/// any Date table in Power BI") whose rows Microsoft Learn shows as January ("Auto date/time in Power
+/// BI Desktop"). The characters are Visual Basic's (OLE Automation), and in those the case doesn't
+/// matter: "Unlike in previous versions of Visual Basic, these format characters are case-sensitive"
+/// (Visual Basic 2005, "User-Defined Date/Time Formats (Format Function)"). So a run of an upper-case
+/// D, M, Y, H, N, S, W or Q is read as the lower-case letter. The 2010 DAX pages ("Custom Date and Time formats
+/// for the FORMAT Function", for PowerPivot) describe .NET's case-sensitive characters instead; they
+/// no longer describe the engine (their h is the 12-hour clock, while "h:nn:ss" is 13:23:45 today),
+/// but where they give an upper-case letter another meaning it is refused: M or MM right after the
+/// hour (the month there, minutes in Visual Basic), H with AM/PM (always 24-hour there), Y alone
+/// (the year there, the day of the year in Visual Basic), the formats "D", "M" and "Y" (predefined
+/// there), and a run in mixed case ("Mmm": the month then minutes there). AM/PM, am/pm, A/P, a/p and
+/// AMPM/ampm are as the pages write them; mixed case is refused.
 module Formatting =
 
     let private refuse (what: string) : 'a = raise (FormatRefused what)
@@ -739,7 +755,8 @@ module Formatting =
     [<RequireQualifiedAccess>]
     type DateToken =
         | Literal of string
-        /// A run of one of d, m, y, h, n, s, q, w: the letter in lower case and how many.
+        /// A run of one of d, m, y, h, n, s, q, w, all in lower case or all in upper case: the letter
+        /// in lower case and how many.
         | Field of char * int
         /// An `m` or `mm` that follows the hour: minutes.
         | Minute of int
@@ -751,6 +768,19 @@ module Formatting =
     let parseDateFormat (format: string) : DateToken list =
         let out = ResizeArray<DateToken>()
         let mutable i = 0
+        // Where an m or mm written with an upper-case M is, and whether an upper-case H is used.
+        let upperMonth = Collections.Generic.HashSet<int>()
+        let mutable upperHour = false
+
+        // "M", "D" and "Y" alone were predefined formats in the 2010 DAX pages ("Displays the month
+        // and the day of a date. For example, March 12."; the long date; "March, 2008").
+        match format with
+        | "D"
+        | "M"
+        | "Y" ->
+            refuse
+                $"the format \"{format}\" (a predefined format in the 2010 DAX pages, the letter {format.ToLowerInvariant()} in Visual Basic: write it in lower case)"
+        | _ -> ()
 
         let startsWith (s: string) =
             String.CompareOrdinal(format, i, s, 0, s.Length) = 0
@@ -809,12 +839,24 @@ module Formatting =
                     j <- j + 1
 
                 let run = j - i
+                let text = format.Substring(i, run)
+                let hasUpper = text <> String(letter, run)
 
-                // "\QQ yyyy" shows Q read as q (dax.guide/format). No page shows another letter
-                // in upper case ("yyyy-MM-dd" could be the month or the text MM).
-                if letter <> 'q' && format.Substring(i, run) <> String(letter, run) then
-                    refuse
-                        $"the upper-case letter {Char.ToUpperInvariant letter} in a date format (the pages write the date and time characters in lower case)"
+                // Upper case: see "Upper-case letters" in the module's header. The letter is read
+                // as its lower case, except where the 2010 DAX pages give it another meaning.
+                if hasUpper then
+                    // "Mmm" is the month then minutes in the 2010 DAX pages, "Jun" in Visual Basic.
+                    if text <> String(Char.ToUpperInvariant letter, run) then
+                        refuse
+                            $"the run {text} in a date format, in upper and lower case (the 2010 DAX pages read M and m, H and h as different characters: write it in one case)"
+
+                    match letter with
+                    | 'y' when run = 1 ->
+                        refuse
+                            "the letter Y alone in a date format (the day of the year in Visual Basic, the year in the 2010 DAX pages: use y for the day of the year)"
+                    | 'm' when run <= 2 -> upperMonth.Add out.Count |> ignore
+                    | 'h' -> upperHour <- true
+                    | _ -> ()
 
                 let ok =
                     match letter with
@@ -865,6 +907,19 @@ module Formatting =
         // not settled by the pages.
         let tokens = out.ToArray()
 
+        // An upper-case H is the hour of the 24-hour clock in the 2010 DAX pages ("Displays the hour
+        // ... using the 24-hour clock"), and h in Visual Basic, which AM/PM turns to the 12-hour clock.
+        if
+            upperHour
+            && tokens
+               |> Array.exists (fun t ->
+                   match t with
+                   | DateToken.AmPm _ -> true
+                   | _ -> false)
+        then
+            refuse
+                "an upper-case H with AM/PM in a date format (the 24-hour clock in the 2010 DAX pages, the 12-hour clock in Visual Basic: write h)"
+
         let isLiteral (t: DateToken) =
             match t with
             | DateToken.Literal _
@@ -897,7 +952,12 @@ module Formatting =
                         | DateToken.Field('h', _) -> true
                         | _ -> false)
 
-                if isHour near then
+                if isHour near && upperMonth.Contains at then
+                    // "The M character displays the month in a user-defined date format. The m
+                    // character displays the minutes" (the 2010 DAX pages); minutes in Visual Basic.
+                    refuse
+                        "an upper-case M after h in a date format (the month in the 2010 DAX pages, minutes in Visual Basic: use n for minutes)"
+                elif isHour near then
                     DateToken.Minute run
                 elif isHour far then
                     refuse

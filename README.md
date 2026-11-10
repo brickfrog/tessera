@@ -2117,7 +2117,16 @@ model's culture is read from the model; `FORMAT`'s locale argument overrides it.
   literal text, digit placeholders, literal text: placeholders in two places (`0-0`) are refused.
 - **`FORMAT` dates.** `General Date`, `Long Date`, `Short Date`, `Long Time`, `Medium Time`, `Short Time`, and custom
   formats: `d dd ddd dddd dddddd w ww m mm mmm mmmm q y yy yyyy h hh n nn s ss`, `AM/PM am/pm A/P a/p AMPM`, `/`, `:`,
-  literals, in lower case as the pages write them. `m` right after `h` (with or without `:`) is minutes.
+  literals. `m` right after `h` (with or without `:`) is minutes.
+- **Upper-case date letters.** A run of `D M Y H N S W Q` in upper case is read as the lower-case letters
+  (`YYYY`, `MMM DD`, `DDDD`, `HH:NN:SS`). The pages write the characters in lower case and show only `\QQ yyyy`
+  (DAX Guide) and `MMMM` (Power BI's own auto date/time table, whose Month column is shown as January). The
+  characters are Visual Basic's (OLE Automation), which Microsoft says were not case-sensitive before VB 2005. The
+  2010 DAX pages describe .NET's case-sensitive characters instead; where they give an upper-case letter another
+  meaning it is refused: `M`/`MM` right after the hour (`hh:MM`: month there, minutes in Visual Basic), `H` with
+  AM/PM (always 24-hour there), `Y` alone (the year there, the day of the year in Visual Basic) and the formats `D`,
+  `M` and `Y` on their own, and a run in mixed case (`Mmm`: the month then minutes there). Mixed-case AM/PM
+  (`Am/Pm`) is refused too.
 - **BLANK.** `FORMAT ( BLANK (), ... )` is the empty text. A BLANK argument read as text is the empty text
   (`LEN ( BLANK () )` is 0), but a function that returns text refuses a BLANK text: no source says whether the real
   engine returns BLANK or the empty text.
@@ -2132,8 +2141,8 @@ model's culture is read from the model; `FORMAT`'s locale argument overrides it.
   shows (`FORMAT ( 2.675, "0.00" )`: the float is just below 2.675); a negative number exactly halfway, one that
   rounds to zero, a negative `Currency` or `FIXED`, and a negative number through a one-section format that starts
   with literal text (`"$0.00"`); a number with a date format, a date with a number format, text as the value;
-  `Short Time` before 10:00; `General Date` of a date with no time or of a time alone; `ww` of a Sunday; upper-case
-  date letters other than `Q`; a time with a fraction of a second; dates before March 1, 1900; `TOCSV` and `TOJSON`.
+  `Short Time` before 10:00; `General Date` of a date with no time or of a time alone; `ww` of a Sunday; a time
+  with a fraction of a second; dates before March 1, 1900; `TOCSV` and `TOJSON`.
 - A measure's format string (`FormatString`, or a format string expression) is **not** applied to query results: the
   real engine doesn't apply it either.
 
