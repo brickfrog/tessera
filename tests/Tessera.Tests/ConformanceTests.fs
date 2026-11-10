@@ -17,7 +17,8 @@ let private engine: Evaluate option =
 
 /// Tags the engine isn't expected to handle yet. A case with one of them is reported as skipped
 /// unless it passes; remove a tag here when its area is implemented.
-let private expectedUnsupported: Set<string> = set laterAreas
+let private expectedUnsupported: Set<string> =
+    set laterAreas - set [ "text-functions"; "format" ]
 
 /// Which of the engine's errors mean "not implemented" (see `RunConfig.defaults`).
 let private engineConfig = RunConfig.defaults

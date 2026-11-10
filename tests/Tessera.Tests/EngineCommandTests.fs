@@ -34,7 +34,7 @@ let private withFormatted = {
         Measures =
             star.Measures
             @ [
-                "Sales", "Formatted", "FORMAT ( [Amount], \"0\" )"
+                "Sales", "Formatted", "PATHITEM ( [Amount], 1 )"
                 "Sales", "Uses Formatted", "[Formatted] & \"!\""
             ]
 }
@@ -177,7 +177,7 @@ let tests =
 
             Expect.stringContains
                 r.Err
-                "Not supported by the local DAX engine: the function FORMAT (measure 'Sales'[Formatted] 1:1)"
+                "Not supported by the local DAX engine: the function PATHITEM (measure 'Sales'[Formatted] 1:1)"
                 "message"
 
             let j =
@@ -215,11 +215,11 @@ let tests =
             Expect.equal
                 (lines r.Out)
                 [
-                    "measure:Sales/Formatted  FORMAT"
-                    "measure:Sales/Uses Formatted  FORMAT"
+                    "measure:Sales/Formatted  PATHITEM"
+                    "measure:Sales/Uses Formatted  PATHITEM"
                     "3 of 5 measures can be evaluated by the local engine"
                     "Not supported, by how many objects use it:"
-                    "     2  FORMAT"
+                    "     2  PATHITEM"
                 ]
                 "text"
 
@@ -239,8 +239,8 @@ let tests =
                 |> Seq.find (fun o -> o.GetProperty("ref").GetString() = "measure:Sales/Formatted")
 
             Expect.isFalse (formatted.GetProperty("supported").GetBoolean()) "supported"
-            Expect.equal (raw (formatted.GetProperty "unsupported")) """["FORMAT"]""" "unsupported"
-            Expect.equal (raw (root.GetProperty "unsupported")) """[{"reason":"FORMAT","objects":2}]""" "ranking"
+            Expect.equal (raw (formatted.GetProperty "unsupported")) """["PATHITEM"]""" "unsupported"
+            Expect.equal (raw (root.GetProperty "unsupported")) """[{"reason":"PATHITEM","objects":2}]""" "ranking"
 
             Expect.equal
                 (tess [ "query"; model; "--coverage"; "EVALUATE Sales" ]).Code

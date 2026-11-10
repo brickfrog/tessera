@@ -154,6 +154,10 @@ let private isCircular (e: TessError) =
 
 let private bind (db: Database) (store: DataStore) : Tessera.DaxEngine.Model * (ObjectRef * TessError) list =
     let model = Tessera.DaxEngine.Model(store.Collation)
+
+    if not (isNull db.Model) then
+        model.Culture <- db.Model.Culture
+
     let gates = staticGates db
     let tables = ResizeArray<BTable>()
     let mutable columnId = 0

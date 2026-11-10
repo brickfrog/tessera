@@ -691,6 +691,8 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
 
     member _.Collation = collation
     member val Comparer = DaxValue.comparer collation
+    /// The model's culture ("en-US"); null when the model names none. See `Culture`.
+    member val Culture: string = null with get, set
     member val Tables: BTable array = [||] with get, set
     member val TableByName = Dictionary<string, BTable>(StringComparer.OrdinalIgnoreCase) with get
     member val Rels: BRel array = [||] with get, set

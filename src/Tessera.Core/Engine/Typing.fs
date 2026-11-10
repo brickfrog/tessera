@@ -1,5 +1,6 @@
 namespace Tessera.DaxEngine
 
+open System
 open Tessera
 open Tessera.DaxAst
 
@@ -190,6 +191,13 @@ module Convert =
                 span
                 "a date converted to text (the format depends on the model's culture; FORMAT is not implemented)"
         | DaxValue.Boolean _ -> Fail.notSupported ctx span "TRUE or FALSE converted to text"
+        // The decimal separator is the culture's: 1.5 is "1,5" in a German model.
+        | DaxValue.Decimal d when d <> Math.Floor d ->
+            Culture.requireModel ctx span "a number with decimals converted to text"
+            DaxValue.toText v
+        | DaxValue.Currency c when c % 10000L <> 0L ->
+            Culture.requireModel ctx span "a number with decimals converted to text"
+            DaxValue.toText v
         | _ -> DaxValue.toText v
 
     /// An operand of arithmetic. Text that reads as a number is that number; text that would only
