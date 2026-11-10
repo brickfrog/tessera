@@ -11,6 +11,7 @@
     <Compile Include="Session.fs" />
     <Compile Include="Failures.fs" />
     <Compile Include="Remote.fs" />
+    <Compile Include="RemoteRefresh.fs" />
     <Compile Include="ConnectionString.fs" />
     <Compile Include="TokenCache.fs" />
     <Compile Include="ResultReader.fs" />

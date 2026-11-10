@@ -1,6 +1,6 @@
 # Manual test: connected mode against real servers
 
-Connected mode (`connect`, `query`, `deploy`, `xmla:` models) was developed without a server. Everything below
+Connected mode (`connect`, `query`, `deploy`, `refresh`, `xmla:` models) was developed without a server. Everything below
 the client libraries is tested against a fake; the live connector (`src/Tessera.Xmla/Live.fs`) has only been
 exercised as far as fake credentials go:
 
@@ -11,13 +11,14 @@ exercised as far as fake credentials go:
 | device-code sign-in starts and prints the code | finishing a device-code sign-in; the token cache file; token renewal |
 | SSAS over TCP and password-less HTTP are refused off Windows | running a query; several `EVALUATE`s; the value types that come back |
 | HTTP with a user name and password attempts the connection | executing TMSL; everything on Windows; Azure AS; SSAS |
+| | a refresh of any kind; whether the server accepts the scripts `refresh` writes; the session trace and the events it carries |
 
 So expect to find bugs here. This checklist is ordered so each step depends only on the ones before it. Note what
 differs from "Expect" (the exact output, with any secret removed) and stop at the first step that fails badly.
 
 ## Setup
 
-Use a workspace and models you can afford to break. Section C deploys.
+Use a workspace and models you can afford to break. Section C deploys; section F refreshes.
 
 ```sh
 dotnet publish src/Tessera.Cli -c Release -r linux-x64 --self-contained -p:PublishSingleFile=true -o publish
@@ -208,7 +209,7 @@ TESSERA_XMLA_SERVER="$WS" TESSERA_XMLA_DATABASE="$DB" \
   dotnet run --project tests/Tessera.Tests -c Release -- --filter-test-list "XMLA integration"
 ```
 
-Expect: 6 tests pass. They only read.
+Expect: 8 tests pass and 1 is skipped (the refresh that writes: F6 runs it). They only read.
 
 ## C. Deploy (Power BI; writes to the workspace)
 
@@ -341,7 +342,112 @@ tess connect "asazure://<region>.asazure.windows.net/<server>"
 
 Expect: as A2. A service principal must be a server administrator (`app:<id>@<tenant>`).
 
+## F. Refresh (Power BI; loads data and writes to the model)
+
+Do this on `tessera-test` from C2 (before C5 deletes it), or on another model you can afford to reload. Its data
+sources must have working credentials in the service, or every load fails for reasons that aren't tess's.
+`refresh` has never touched a server: the scripts, the trace and the progress lines below are all untested.
+
+```sh
+M="xmla:$WS;tessera-test"
+T='<a small table>'      # tess list "$M" -k table
+```
+
+### F1. Dry run
+
+```sh
+tess refresh "$M"; echo "exit $?"
+tess refresh "$M" "$T" --type full --tmsl
+tess refresh "$M" "$T" --type full --max-parallelism 2 --json
+```
+
+Expect: `Refresh (automatic) 'tessera-test' on powerbi://...: the whole model`, one line per table with its
+partitions, `TMSL:` and a `{ "refresh": { "type": "automatic", "objects": [ { "database": "tessera-test" } ] } }`
+script, and on stderr `Dry run: nothing refreshed. Add --execute to refresh.`, `exit 0`. The second prints only a
+script naming the table; the third a `sequence` with `maxParallelism` 2. In the service the model's "Refreshed"
+time is untouched.
+
+### F2. What is refused before anything runs
+
+```sh
+tess refresh /tmp/spaceparts; echo "exit $?"                              # exit 2: not a server model
+tess refresh "$M" "[<a measure>]" --execute; echo "exit $?"               # exit 3: a measure isn't refreshed
+tess refresh "$M" "$T" --type add --execute; echo "exit $?"               # exit 3: add takes partitions
+tess refresh "$M" "no such table" --execute; echo "exit $?"               # exit 3
+```
+
+### F3. Calculate (loads no data)
+
+```sh
+tess refresh "$M" --type calculate --execute; echo "exit $?"
+```
+
+Expect: the plan on stdout; on stderr `Refreshing...`, possibly some progress lines, and
+`Refreshed 'tessera-test' on powerbi://... in <n>s.`, `exit 0`. If instead there is
+`warning: no progress could be reported: ...`, the refresh worked but the session trace didn't: send that line.
+
+### F4. A full refresh of one table, with progress
+
+```sh
+tess refresh "$M" "$T" --type full --execute; echo "exit $?"
+tess refresh "$M" "$T" --type full --execute --progress all 2> /tmp/progress-all.txt; echo "exit $?"
+tess refresh "$M" "$T" --type full --execute --progress none; echo "exit $?"
+tess refresh "$M" "$T" --type full --execute --json > /tmp/refresh.json; echo "exit $?"
+tess query "$M" "EVALUATE ROW(\"rows\", COUNTROWS('$T'))"
+```
+
+Expect: `exit 0` each time, and the table holds its rows afterwards. With the default progress, a few lines per
+partition such as `  [ReadData] Finished reading data for the '<table>' table. (<n> rows, <s>s)` and
+`  [Process] ...`. **The exact lines are a guess** (which events arrive, their subclass names and their text were
+taken from public descriptions of Analysis Services traces): compare them with `/tmp/progress-all.txt`, which has
+every progress event the server sent, and say which per-object steps are missing or noisy. With `none`, only
+`Refreshing...` and `Refreshed ...`. In `/tmp/refresh.json`: `"refreshed": true`, a `progress` array,
+`"traceError": null`. Check that nothing is printed after the `Refreshed ...` line.
+
+### F5. A failure
+
+Use a table whose refresh fails: one whose data source has no credentials in the service, or whose partition
+query you have broken (deployed with `--deploy-partitions`). Then:
+
+```sh
+tess refresh "$M" "$T" --type full --execute; echo "exit $?"
+tess refresh "$M" "$T" --type full --execute --json; echo "exit $?"
+```
+
+Expect: `tess: Refreshing 'tessera-test' on powerbi://... failed:` followed by the server's messages, `exit 5`;
+the JSON has `"refreshed": false` and an `error` with code `refresh-failed`. Check that no credential or connection
+string password appears anywhere in the output.
+
+### F6. Refresh policies and parallelism (if a table has an incremental refresh policy)
+
+```sh
+tess refresh "$M" "<policy table>" --type full                                      # warns: the policy is applied
+tess refresh "$M" "<policy table>" --type full --effective-date 2024-06-30 --tmsl   # "effectiveDate": "06/30/2024"
+tess refresh "$M" "<policy table>" --type full --effective-date 2024-06-30 --execute; echo "exit $?"
+tess refresh "$M" "<policy table>" --type full --no-apply-refresh-policy --max-parallelism 1 --execute; echo "exit $?"
+tess list "$M" -k partition -t "<policy table>"
+```
+
+Expect: `exit 0` twice. After the first, the table's partitions are those the policy gives for that date; the
+second reloads them as they are, one at a time. **Whether the server accepts `effectiveDate` in this form, and the
+`sequence` wrapper, has not been tried.**
+
+The gated test that writes:
+
+```sh
+TESSERA_XMLA_SERVER="$WS" TESSERA_XMLA_DATABASE="tessera-test" TESSERA_XMLA_ALLOW_REFRESH=1 \
+  dotnet run --project tests/Tessera.Tests -c Release -- --filter-test-list "XMLA integration"
+```
+
+Expect: 9 tests pass (one runs a `calculate` refresh of the whole model with `--progress all`).
+
+### F7. SSAS and Azure AS
+
+Repeat F1, F3 and F4 against a database there. `--apply-refresh-policy` and `--effective-date` are for Power BI
+models: expect the server to reject them (exit 5), and say what it says.
+
 ## What to send back
 
 For each step that differed: the command, the full output with secrets removed, and the platform. The most useful
-single artifacts are the `--json` output of B3 and the `tess diff ... --stat` of C2.
+single artifacts are the `--json` output of B3, the `tess diff ... --stat` of C2, and `/tmp/progress-all.txt` and
+`/tmp/refresh.json` from F4.

@@ -85,6 +85,10 @@ type TessError =
     | DeployFailed of server: string * database: string * messages: string list
     /// A fixture data directory that can't be used at all (problems inside one are findings).
     | InvalidFixture of path: string * reason: string
+    /// `refresh`: something that can't be refreshed, or not in the way asked.
+    | CannotRefresh of target: string * reason: string
+    /// `refresh`: the server rejected the script, or reported errors running it.
+    | RefreshFailed of server: string * database: string * messages: string list
 
 module TessError =
 
@@ -142,6 +146,8 @@ module TessError =
         | DeployIntroducesErrors _ -> "deploy-introduces-errors"
         | DeployFailed _ -> "deploy-failed"
         | InvalidFixture _ -> "invalid-fixture"
+        | CannotRefresh _ -> "cannot-refresh"
+        | RefreshFailed _ -> "refresh-failed"
 
     let rec message =
         function
@@ -264,3 +270,7 @@ module TessError =
             let list = messages |> List.map (fun m -> $"  {m}") |> String.concat "\n"
             $"Deploying '{database}' to {server} failed:\n{list}"
         | InvalidFixture(path, reason) -> $"Can't use {path} as fixture data: {reason}"
+        | CannotRefresh(target, reason) -> $"Can't refresh {target}: {reason}"
+        | RefreshFailed(server, database, messages) ->
+            let list = messages |> List.map (fun m -> $"  {m}") |> String.concat "\n"
+            $"Refreshing '{database}' on {server} failed:\n{list}"

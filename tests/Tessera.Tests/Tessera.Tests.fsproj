@@ -74,6 +74,9 @@
     <Compile Include="DataStoreTests.fs" />
     <Compile Include="FixtureTests.fs" />
     <Compile Include="DataCommandTests.fs" />
+    <Compile Include="RefreshTests.fs" />
+    <Compile Include="XmlaRefreshTests.fs" />
+    <Compile Include="RefreshCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

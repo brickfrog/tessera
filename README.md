@@ -78,6 +78,7 @@ tess connect "powerbi://api.powerbi.com/v1.0/myorg/Finance"       # check a serv
 tess info  "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales"   # read-only commands on a deployed model
 tess query "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" "EVALUATE 'Date'" --json
 tess deploy ./MyReport.pbip "powerbi://api.powerbi.com/v1.0/myorg/Finance" Sales   # dry run; --execute to deploy
+tess refresh "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" Orders --type full   # dry run; --execute to refresh
 tess data init ./MyReport.pbip ./fixtures --rows 100   # fixture data for the local DAX engine: CSV per table
 tess data check ./MyReport.pbip ./fixtures       # ... checked against the model's columns, types and relationships
 ```
@@ -1490,6 +1491,8 @@ tess query "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" "EVALUATE T
 tess query "xmla:...;Sales" -f totals.dax --json
 tess deploy ./Sales.SemanticModel "powerbi://api.powerbi.com/v1.0/myorg/Finance" Sales          # dry run
 tess deploy ./Sales.SemanticModel "powerbi://api.powerbi.com/v1.0/myorg/Finance" Sales --execute --overwrite
+tess refresh "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" Orders --type full       # dry run
+tess refresh "xmla:powerbi://api.powerbi.com/v1.0/myorg/Finance;Sales" Orders --type full --execute
 ```
 
 #### Naming a server model
@@ -1669,7 +1672,7 @@ Two things stop `--execute`:
   lists them.
 
 If the server rejects the script or reports errors running it, that is exit 5 with its messages. After a
-deployment, new or changed tables may need a refresh; tess doesn't refresh.
+deployment, new or changed tables may need a refresh: see `refresh` below (`deploy` doesn't run one).
 
 Where this differs from the Tabular Editor tools, and why:
 
@@ -1687,16 +1690,102 @@ Where this differs from the Tabular Editor tools, and why:
 - **Not done:** TE2's two-step deployment for a table or column that changes between calculated and loaded (tess
   warns instead), a BPA gate, skipping linguistic metadata, deployment profiles, and refreshing afterwards.
 
+#### `refresh`
+
+```sh
+tess refresh "xmla:<server>;<database>"                               # dry run: the whole model, type automatic
+tess refresh "xmla:<server>;<database>" Sales "partition:Orders/2024" --type full
+tess refresh "xmla:<server>;<database>" Sales --type full --execute   # refreshes
+```
+
+`refresh` connects, reads the model to find what the selectors name, and prints what the refresh covers and the
+TMSL script it would run. Nothing is refreshed without `--execute`. `--tmsl` prints only the script, and `--json`
+gives one document either way. It only runs on a server model: model files hold no data (exit 2, without
+connecting). **Like the rest of connected mode, `refresh` has never been run against a real server.**
+
+What to refresh comes after the model, in the selector syntax of the other commands. Nothing, or `model`, is the
+whole model. A table is `Sales`, `'Sales'` or `table:Sales`. A partition is `partition:Sales/2024` or
+`'Sales'[2024]`; a bare name that no table has is taken as a partition if exactly one has it. A table and its only
+partition often share a name: the bare name is the table. Names are matched without regard to case and written
+into the script as the server has them. A selector that names something else (a measure, a column) is exit 3.
+A partition of a table that is also named is dropped (with a warning), as is everything else when the model is.
+
+| `--type` | Does | Takes |
+|---|---|---|
+| `automatic` (default) | loads and recalculates only what isn't in a ready state | model, tables, partitions |
+| `full` | reloads the data and recalculates everything that depends on it | model, tables, partitions |
+| `dataOnly` | reloads the data, without recalculating | model, tables, partitions |
+| `calculate` | recalculates what needs it; loads nothing | model, tables, partitions |
+| `clearValues` | removes the data | model, tables, partitions |
+| `defragment` | cleans up column dictionaries | model, tables |
+| `add` | appends what a partition's query returns to the rows it has | partitions |
+
+Those are all the types TMSL documents; any other is a usage error. The "Takes" column is Microsoft's reference,
+and tess refuses the rest (exit 3) before running anything, where the client library would script it and leave it
+to the server.
+
+- **`--max-parallelism <n>`** wraps the refresh in a TMSL `sequence` with `maxParallelism`, so at most `n` objects
+  are processed at once. Without it the server decides.
+- **`--apply-refresh-policy` / `--no-apply-refresh-policy`** write `applyRefreshPolicy` into the script. With
+  neither, the property is left out and the server applies the policy of tables that have one (its default). With
+  `--no-apply-refresh-policy`, a table's partitions are refreshed as they are, which is how to reload a whole
+  incremental-refresh table. Power BI only.
+- **`--effective-date YYYY-MM-DD`** is the date an applied policy treats as today (and implies applying it). It is
+  written as `MM/DD/YYYY`, the form in Microsoft's reference.
+- The refresh-policy options apply to tables, so they can't be combined with a partition (exit 3). The dry run
+  warns when a policy will be applied (the server may add, merge and remove partitions), and when the options are
+  given but can't matter (no table in the refresh has a policy, or the type ignores policies).
+
+With `--execute`, tess writes `Refreshing...` to stderr, then progress as the server reports it, then
+`Refreshed '<database>' on <server> in <seconds>`. If the server rejects the script or reports errors running it,
+that is exit 5 with its messages (`refresh-failed` in JSON, where the document still has `progress`).
+
+Progress comes from a trace of tess's own session (the client library's `Server.SessionTrace`). `--progress` picks
+how much:
+
+| `--progress` | Shows |
+|---|---|
+| `objects` (default) | the steps that finish once per table or partition (the source query, rows read, processing, the commit) and every error |
+| `all` | every "Progress Report" event the server sends (begin, current, end, error), including the per-column ones |
+| `none` | nothing: the session isn't traced, and only the start, finish and duration are reported |
+
+```
+Refreshing...
+  [ReadData] Finished reading data for the 'Sales' table. (1,234,567 rows, 12.3s)
+  [Process] Finished processing partition 'Sales' of table 'Sales'. (13.0s)
+Refreshed 'Sales' on powerbi://api.powerbi.com/v1.0/myorg/Finance in 14.2s.
+```
+
+The text in each line is the server's own. If the trace can't be started or stops, the refresh still runs and tess
+says why there is no progress (`traceError` in JSON). Which events a server sends, and what they say, has only been
+checked against a fake: use `--progress all` to see what yours sends, and `--progress none` if the trace itself
+gets in the way.
+
+`--json` has `source`, `server`, `database`, `type`, `dryRun`, `refreshed`, `objects` (what the script names, each
+with a `ref`), `covers` (per table: `partitions`, `wholeTable`, `refreshPolicy`), `applyRefreshPolicy`,
+`effectiveDate` (ISO), `maxParallelism`, `warnings`, `tmsl`, `serverMessages`, `progress` (each event's `phase`,
+`step`, `object`, `objectPath`, `text`, `integerData`, `durationMs`), `traceError` and `durationMs`. With `--json`
+nothing is written to stderr.
+
+Where this differs from `te refresh`, and why:
+
+- **Objects are selectors after the model**, not `--table` and `--partition T.P`, as in every other tess command.
+- **`--execute` doesn't prompt**, as with `deploy`.
+- **`--apply-refresh-policy` takes no value.** `te` accepts `true`, `false` or a table name; tess has the pair of
+  flags, and one script applies one setting to every table in it. Run two refreshes to treat tables differently.
+- **Not done:** refresh override profiles (TMSL `overrides`: other data sources, queries or parameters for one
+  refresh), writing the trace to a file (`--trace <path>`), VertiPaq statistics after a refresh, cancelling a
+  running refresh (interrupting tess closes the session; what the server then does hasn't been observed), and
+  waiting for trace events the server sends after the script returns (they are dropped).
+
 #### Not in tess yet
 
-`refresh`, `vertipaq`, sessions and profiles (`te connect` keeps an active connection; tess doesn't), interactive
+`vertipaq`, sessions and profiles (`te connect` keeps an active connection; tess doesn't), interactive
 browser sign-in, certificate and managed-identity sign-in, and running `query` against model files.
 
 What each needs, for whoever picks it up:
-- **`refresh`:** nothing new at the seam. `IXmlaSession.Execute` already runs TMSL, so it is a pure TMSL builder in
-  Core (type, tables, partitions, `applyRefreshPolicy`, `effectiveDate`, a `sequence` for max parallelism) plus a
-  command with the same dry-run shape as `deploy`. Progress reporting needs a trace subscription, which is a new
-  seam member.
+- **Refresh overrides:** `Refresh.Request` (Core) would carry the TMSL `overrides` array; the builder writes it
+  after `objects`. `IXmlaSession.ExecuteTraced` is the trace seam, if something else needs server events.
 - **`vertipaq`:** DMV queries (`$SYSTEM.DISCOVER_STORAGE_TABLE_COLUMNS` and friends). `IXmlaSession.Query` runs
   them as it stands; Dax.Model.Extractor would instead need the raw connection, which the seam deliberately hides.
 - **Sessions and profiles:** somewhere to keep an address and auth mode (never a secret) per shell, and a decision
@@ -1887,7 +1976,7 @@ the code as its title.
 | 2 | usage error, including invalid arguments for an editing command: an invalid new name (`rename`, `add`), a property `set` can't write or a value it can't take, or an option `add` doesn't take for that kind |
 | 3 | input error: model not found, unrecognised, ambiguous or failed to load. For the editing commands also a name that's taken, a missing object or parent, an object that can't be created, removed or moved there, an object others still refer to (`remove`), an edit that would change what other references mean (`rename`, `move`), a translation file that can't be applied (`translations import`), or an object a perspective can't hold. For `script`, also a script that can't be read or applied, or an object a script can't hold. For `bpa`, also a rule file you named that can't be read; for `bpa rules`, a rule ID that isn't there (or already is, for `add`) or an object that can't carry an ignore annotation. For `format`, DAX that can't be read (malformed) |
 | 4 | output error (destination not empty, write failed); `deploy --execute` on a database that exists, without `--overwrite` |
-| 5 | a server couldn't be reached, refused the credentials (or none are configured), has no such database, or reported an error (a failed `query` or `deploy`) |
+| 5 | a server couldn't be reached, refused the credentials (or none are configured), has no such database, or reported an error (a failed `query`, `deploy` or `refresh`) |
 | 70 | internal error |
 
 ## Development

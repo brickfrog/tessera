@@ -33,6 +33,14 @@ type FakeServer() =
     member val ExecuteError: exn option = None with get, set
     /// Messages Execute returns. With an error among them, the script is not applied.
     member val ExecuteMessages: XmlaMessage list = [] with get, set
+    /// Events a traced Execute reports before it returns.
+    member val TraceEvents: XmlaTraceEvent list = [] with get, set
+    /// What a traced Execute says went wrong with the trace (the script still runs).
+    member val TraceFailure: string option = None with get, set
+    /// How many scripts were run traced.
+    member val Traced = 0 with get, set
+    /// The event callback of the last traced Execute: lets a test deliver an event late.
+    member val LastOnEvent: XmlaTraceEvent -> unit = ignore with get, set
     /// The answer to a query (before any row limit).
     member val OnQuery: string -> QueryResult list = (fun _ -> []) with get, set
 
@@ -100,6 +108,21 @@ type FakeServer() =
                             this.Apply script
 
                         this.ExecuteMessages
+
+                    member session.ExecuteTraced(script: string, onEvent: XmlaTraceEvent -> unit) =
+                        this.Traced <- this.Traced + 1
+                        this.LastOnEvent <- onEvent
+
+                        // As the client library does: from another thread, while Execute waits.
+                        let reporting =
+                            System.Threading.Tasks.Task.Run(fun () -> this.TraceEvents |> List.iter onEvent)
+
+                        reporting.Wait()
+
+                        {
+                            Messages = session.Execute script
+                            TraceFailure = this.TraceFailure
+                        }
 
                     member _.Query(database: string, dax: string, maxRows: int option) =
                         queries.Add(database, dax, maxRows)
