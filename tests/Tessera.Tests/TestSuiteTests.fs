@@ -8,15 +8,19 @@ open Expecto
 open Tessera
 open Tessera.Tests.Fixtures
 
-let private file = Path.Combine(Path.GetTempPath(), "tessera-tests", "suite.test.yaml")
-let private jsonFile = Path.Combine(Path.GetTempPath(), "tessera-tests", "suite.test.json")
+let private file =
+    Path.Combine(Path.GetTempPath(), "tessera-tests", "suite.test.yaml")
+
+let private jsonFile =
+    Path.Combine(Path.GetTempPath(), "tessera-tests", "suite.test.json")
 
 let private parse (yaml: string) = TestSuite.parse file yaml
 
 let private good (yaml: string) =
     match parse yaml with
     | Ok suite -> suite
-    | Error issues -> failtestf "expected a valid suite, got:\n%s" (issues |> List.map SuiteIssue.format |> String.concat "\n")
+    | Error issues ->
+        failtestf "expected a valid suite, got:\n%s" (issues |> List.map SuiteIssue.format |> String.concat "\n")
 
 /// The problems of a suite, as (line, message).
 let private bad (yaml: string) =
@@ -76,7 +80,12 @@ tests:
 
             Expect.equal suite.Name "Revenue regression" "name"
             Expect.equal suite.Description (Some "Guards the core revenue measures") "description"
-            Expect.equal (suite.Tests |> List.map _.Name) [ "FY25 revenue matches finance sign-off"; "No orphan sales rows" ] "tests"
+
+            Expect.equal
+                (suite.Tests |> List.map _.Name)
+                [ "FY25 revenue matches finance sign-off"; "No orphan sales rows" ]
+                "tests"
+
             let first = suite.Tests.[0]
             Expect.equal first.Tags [ "revenue" ] "default tags"
             Expect.equal first.Line 10 "the test's line"
@@ -88,11 +97,26 @@ tests:
             let name, revenue = first.Expect.Values.[0]
             Expect.equal name "Revenue" "column"
             Expect.equal revenue.Value (Some(SuiteValue.Int 12500000L)) "value"
-            Expect.equal revenue.Tolerance { Relative = Some 0.001; Absolute = None } "the column's tolerance"
+
+            Expect.equal
+                revenue.Tolerance
+                {
+                    Relative = Some 0.001
+                    Absolute = None
+                }
+                "the column's tolerance"
 
             let second = suite.Tests.[1]
             Expect.equal second.Tags [ "revenue"; "integrity" ] "tags add to the defaults"
-            Expect.equal (snd second.Expect.Values.[0]).Tolerance { Relative = Some 0.01; Absolute = None } "inherited"
+
+            Expect.equal
+                (snd second.Expect.Values.[0]).Tolerance
+                {
+                    Relative = Some 0.01
+                    Absolute = None
+                }
+                "inherited"
+
             Expect.equal second.Expect.Rows (Some(RowsExpect.Exactly 1)) "rows"
             Expect.equal second.Expect.Empty (Some false) "empty"
             Expect.equal second.Expect.Columns (Some [ "Orphans" ]) "columns"
@@ -203,11 +227,20 @@ tests:
                 | Ok s -> s
                 | Error issues -> failtestf "%A" issues
 
-            Expect.equal suite.Data (Some(Path.GetFullPath(t.Combine("..", "fixtures")))) "suite data, relative to the suite"
+            Expect.equal
+                suite.Data
+                (Some(Path.GetFullPath(t.Combine("..", "fixtures"))))
+                "suite data, relative to the suite"
+
             let test = only suite
             Expect.equal test.Data (Some(t.Combine "own")) "the test's own data"
             Expect.equal test.Body (TestBody.Query "EVALUATE Sales") "query_file is read"
-            Expect.equal (test.Tables |> List.map _.Table) [ "Sales"; "date" ] "the test's table replaces the suite's Date"
+
+            Expect.equal
+                (test.Tables |> List.map _.Table)
+                [ "Sales"; "date" ]
+                "the test's table replaces the suite's Date"
+
             Expect.equal test.Tables.[0].Line 3 "table line"
 
             Expect.equal
@@ -224,7 +257,10 @@ tests:
                     }
                     {
                         Column = "'Product'[Color]"
-                        Values = [ FilterValue.Literal(SuiteValue.Text "Red"); FilterValue.Literal(SuiteValue.Text "Blue") ]
+                        Values = [
+                            FilterValue.Literal(SuiteValue.Text "Red")
+                            FilterValue.Literal(SuiteValue.Text "Blue")
+                        ]
                     }
                     {
                         Column = "Sales[When]"
@@ -404,15 +440,9 @@ test:
                 2,
                 "tests must be a list"
 
-                "no tests",
-                "suite: x\n",
-                1,
-                "a suite needs `tests`"
+                "no tests", "suite: x\n", 1, "a suite needs `tests`"
 
-                "an empty list of tests",
-                "suite: x\ntests: []\n",
-                2,
-                "the suite has no tests"
+                "an empty list of tests", "suite: x\ntests: []\n", 2, "the suite has no tests"
 
                 "YAML that doesn't parse",
                 """tests:
@@ -504,7 +534,10 @@ test:
                     ]
                     "a value that is one placeholder takes the variable's value and type"
 
-                Expect.equal suite.Tests.[2].Matrix [ "year", SuiteValue.Int 2024L; "color", SuiteValue.Text "Red" ] "matrix values")
+                Expect.equal
+                    suite.Tests.[2].Matrix
+                    [ "year", SuiteValue.Int 2024L; "color", SuiteValue.Text "Red" ]
+                    "matrix values")
 
             testCase "a list of mappings is those combinations, with expected values among them" (fun () ->
                 let suite =
@@ -520,7 +553,10 @@ test:
       Total: "{total}"
 """
 
-                Expect.equal (suite.Tests |> List.map _.Name) [ "sales in 2023"; "sales in 2024" ] "a name with a placeholder is not suffixed"
+                Expect.equal
+                    (suite.Tests |> List.map _.Name)
+                    [ "sales in 2023"; "sales in 2024" ]
+                    "a name with a placeholder is not suffixed"
 
                 Expect.equal
                     (suite.Tests |> List.map (fun t -> (snd t.Expect.Values.[0]).Value))
@@ -574,7 +610,8 @@ test:
                     | other -> failtestf "expected one problem, got %A" other
 
                 let line, message =
-                    position "{\n  \"tests\": [\n    { \"name\": \"t\",\n      \"mesure\": \"X\", \"expect\": 1 }\n  ]\n}\n"
+                    position
+                        "{\n  \"tests\": [\n    { \"name\": \"t\",\n      \"mesure\": \"X\", \"expect\": 1 }\n  ]\n}\n"
 
                 Expect.equal line 4 "an unknown key"
                 Expect.stringContains message "unknown key 'mesure'" "message"
@@ -584,7 +621,8 @@ test:
                 Expect.stringContains message "not valid JSON" "message"
 
                 let line, message =
-                    position "{\n  \"tests\": [ { \"name\": \"t\", \"measure\": \"X\",\n \"measure\": \"Y\", \"expect\": 1 } ]\n}\n"
+                    position
+                        "{\n  \"tests\": [ { \"name\": \"t\", \"measure\": \"X\",\n \"measure\": \"Y\", \"expect\": 1 } ]\n}\n"
 
                 Expect.equal line 3 "a key twice"
                 Expect.stringContains message "twice" "message")
@@ -599,7 +637,7 @@ test:
 
             testCase "filters are TREATAS filters of a CALCULATE, with values as DAX literals" (fun () ->
                 let yaml =
-                        """tests:
+                    """tests:
   - name: t
     expression: "[Amount] -- a comment"
     filters:
@@ -629,7 +667,7 @@ test:
 
             testCase "a query's EVALUATE goes inside CALCULATETABLE; DEFINE and ORDER BY stay" (fun () ->
                 let yaml =
-                        """tests:
+                    """tests:
   - name: t
     query: "DEFINE MEASURE Sales[M] = 1 EVALUATE VALUES ( Product[Color] ) ORDER BY Product[Color] DESC"
     filters:
@@ -663,11 +701,23 @@ test:
 
             Expect.equal
                 (TestSuite.discover [ t.Path ])
-                (Ok [ t.Combine("a", "deep", "y.TEST.YML"); t.Combine("a", "z.test.json"); t.Combine("b", "x.test.yaml") ])
+                (Ok [
+                    t.Combine("a", "deep", "y.TEST.YML")
+                    t.Combine("a", "z.test.json")
+                    t.Combine("b", "x.test.yaml")
+                ])
                 "found"
 
             // A file given by name is a suite whatever it is called.
-            Expect.equal (TestSuite.discover [ t.Combine("a", "notes.yaml") ]) (Ok [ t.Combine("a", "notes.yaml") ]) "a file"
+            Expect.equal
+                (TestSuite.discover [ t.Combine("a", "notes.yaml") ])
+                (Ok [ t.Combine("a", "notes.yaml") ])
+                "a file"
+
             Expect.equal (TestSuite.discover [ t.Combine "nope" ]) (Error(t.Combine "nope")) "missing"
-            Expect.equal (TestRun.Snapshots.fileOf (t.Combine("b", "x.test.yaml"))) (t.Combine("b", "x.snapshot.json")) "snapshot file")
+
+            Expect.equal
+                (TestRun.Snapshots.fileOf (t.Combine("b", "x.test.yaml")))
+                (t.Combine("b", "x.snapshot.json"))
+                "snapshot file")
     ]

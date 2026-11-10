@@ -321,7 +321,11 @@ module TestSuite =
 
     // ---- The document tree: YAML and JSON read into one shape, every node with its position -------
 
-    type private Node = { Kind: NodeKind; Line: int; Column: int }
+    type private Node = {
+        Kind: NodeKind
+        Line: int
+        Column: int
+    }
 
     and private NodeKind =
         /// `raw` is the text as written (without quotes); `plain` whether it was unquoted.
@@ -337,13 +341,28 @@ module TestSuite =
     let rec private ofYaml (n: YamlNode) : Node =
         let line = int n.Start.Line
         let column = int n.Start.Column
-        let at kind = { Kind = kind; Line = line; Column = column }
+
+        let at kind = {
+            Kind = kind
+            Line = line
+            Column = column
+        }
 
         match n with
         | :? YamlScalarNode as s ->
             let raw = if isNull s.Value then "" else s.Value
             let plain = s.Style = ScalarStyle.Plain
-            at (Scalar((if plain then SuiteValue.ofPlain raw else SuiteValue.Text raw), raw, plain))
+
+            at (
+                Scalar(
+                    (if plain then
+                         SuiteValue.ofPlain raw
+                     else
+                         SuiteValue.Text raw),
+                    raw,
+                    plain
+                )
+            )
         | :? YamlSequenceNode as s -> at (Sequence [ for c in s.Children -> ofYaml c ])
         | :? YamlMappingNode as m ->
             at (
@@ -367,7 +386,12 @@ module TestSuite =
             // "(Line: 3, Col: 5, Idx: 20) - (Line: ...): message": the position is given apart.
             let message =
                 match e.InnerException with
-                | null -> Regex.Replace(e.Message, @"^\(Line: \d+, Col: \d+, Idx: \d+\) - \(Line: \d+, Col: \d+, Idx: \d+\): ", "")
+                | null ->
+                    Regex.Replace(
+                        e.Message,
+                        @"^\(Line: \d+, Col: \d+, Idx: \d+\) - \(Line: \d+, Col: \d+, Idx: \d+\): ",
+                        ""
+                    )
                 | inner -> inner.Message
 
             raise (Problem(int e.Start.Line, int e.Start.Column, $"not valid YAML: {message}"))
@@ -402,7 +426,10 @@ module TestSuite =
             while lo < hi do
                 let mid = (lo + hi + 1) / 2
 
-                if lineStarts.[mid] <= offset then lo <- mid else hi <- mid - 1
+                if lineStarts.[mid] <= offset then
+                    lo <- mid
+                else
+                    hi <- mid - 1
 
             lo + 1, offset - lineStarts.[lo] + 1
 
@@ -484,7 +511,11 @@ module TestSuite =
                 | JsonTokenType.Null -> add (scalar SuiteValue.Null "null" true)
                 | _ -> ()
         with :? JsonException as e ->
-            let line = if e.LineNumber.HasValue then int e.LineNumber.Value + 1 else 1
+            let line =
+                if e.LineNumber.HasValue then
+                    int e.LineNumber.Value + 1
+                else
+                    1
 
             let column =
                 if e.BytePositionInLine.HasValue then
@@ -493,7 +524,9 @@ module TestSuite =
                     1
 
             // "... LineNumber: 3 | BytePositionInLine: 7." repeats the position.
-            let message = Regex.Replace(e.Message, @"\s*LineNumber: \d+ \| BytePositionInLine: \d+\.?$", "")
+            let message =
+                Regex.Replace(e.Message, @"\s*LineNumber: \d+ \| BytePositionInLine: \d+\.?$", "")
+
             raise (Problem(line, column, $"not valid JSON: {message}"))
 
         match root with
@@ -601,7 +634,11 @@ module TestSuite =
         match n.Kind with
         | Scalar(_, raw, plain) ->
             match vars |> List.tryFind (fun (name, _) -> raw = "{" + name + "}") with
-            | Some(_, v) -> { v with Line = n.Line; Column = n.Column }
+            | Some(_, v) -> {
+                v with
+                    Line = n.Line
+                    Column = n.Column
+              }
             | None ->
                 let replaced =
                     vars
@@ -625,18 +662,17 @@ module TestSuite =
                         n with
                             Kind = Scalar(value, replaced, plain)
                     }
-        | Sequence items ->
-            {
-                n with
-                    Kind = Sequence(items |> List.map (substitute vars))
-            }
-        | Mapping pairs ->
-            {
-                n with
-                    Kind = Mapping(pairs |> List.map (fun (k, kn, v) -> k, kn, substitute vars v))
-            }
+        | Sequence items -> {
+            n with
+                Kind = Sequence(items |> List.map (substitute vars))
+          }
+        | Mapping pairs -> {
+            n with
+                Kind = Mapping(pairs |> List.map (fun (k, kn, v) -> k, kn, substitute vars v))
+          }
 
-    let private matrixName = Regex(@"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant)
+    let private matrixName =
+        Regex(@"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.CultureInvariant)
 
     /// The combinations a `matrix:` stands for: a mapping of name to values is their cross product
     /// (the last name varying fastest); a list of mappings is those combinations.
@@ -754,7 +790,10 @@ module TestSuite =
         |> List.map (fun (key, keyNode, values) ->
             match DaxParser.parseExpression key with
             | Ok { Kind = DaxAst.ExprKind.Qualified _ } -> ()
-            | _ -> fail keyNode $"a filter is on a column, written Table[Column] or 'My Table'[Column] ('{key}' is not one)"
+            | _ ->
+                fail
+                    keyNode
+                    $"a filter is on a column, written Table[Column] or 'My Table'[Column] ('{key}' is not one)"
 
             let values =
                 match values.Kind with
@@ -833,7 +872,11 @@ module TestSuite =
         match n.Kind with
         | Scalar(SuiteValue.Bool true, _, _) -> Some { Code = None; Message = None }
         | Scalar(SuiteValue.Bool false, _, _) -> None
-        | Scalar(SuiteValue.Text code, _, _) when code.Trim() <> "" -> Some { Code = Some(code.Trim()); Message = None }
+        | Scalar(SuiteValue.Text code, _, _) when code.Trim() <> "" ->
+            Some {
+                Code = Some(code.Trim())
+                Message = None
+            }
         | Mapping pairs ->
             checkKeys "error" [ "code"; "message" ] pairs
 
@@ -858,7 +901,9 @@ module TestSuite =
         let rows = asList "table" n |> List.map (asMap "a row of the expected table")
 
         let columns =
-            rows |> List.collect (fun row -> row |> List.map (fun (k, _, _) -> k)) |> List.distinct
+            rows
+            |> List.collect (fun row -> row |> List.map (fun (k, _, _) -> k))
+            |> List.distinct
 
         TableExpect.Rows(
             columns,
@@ -882,16 +927,7 @@ module TestSuite =
         else
             TableExpect.File path
 
-    let private queryExpectKeys = [
-        "rows"
-        "empty"
-        "columns"
-        "error"
-        "table"
-        "file"
-        "ordered"
-        "snapshot"
-    ]
+    let private queryExpectKeys = [ "rows"; "empty"; "columns"; "error"; "table"; "file"; "ordered"; "snapshot" ]
 
     /// `expect` of a query test: the reserved keys, and every other key a column of the result.
     let private queryExpect (d: Defaults) (inherited: SuiteTolerance) (n: Node) : Expect =
@@ -930,7 +966,10 @@ module TestSuite =
                 | None, Some f -> Some(tableFile d.Directory f)
                 | None, None -> None
             Ordered = reserved "ordered" |> Option.map (asBool "ordered")
-            Snapshot = reserved "snapshot" |> Option.map (asBool "snapshot") |> Option.defaultValue false
+            Snapshot =
+                reserved "snapshot"
+                |> Option.map (asBool "snapshot")
+                |> Option.defaultValue false
         }
 
         let others =
@@ -965,8 +1004,7 @@ module TestSuite =
                 |> Option.defaultValue false
 
             let hasValue =
-                pairs
-                |> List.exists (fun (k, _, _) -> k = "value" || List.contains k boundKeys)
+                pairs |> List.exists (fun (k, _, _) -> k = "value" || List.contains k boundKeys)
 
             if error.IsSome && (hasValue || snapshot) then
                 fail n "a test that expects an error can't expect anything else"
@@ -1044,7 +1082,9 @@ module TestSuite =
 
                     let text =
                         matrix
-                        |> List.fold (fun (s: string) (k, value) -> s.Replace("{" + k + "}", SuiteValue.text value)) text
+                        |> List.fold
+                            (fun (s: string) (k, value) -> s.Replace("{" + k + "}", SuiteValue.text value))
+                            text
 
                     TestBody.Query text
                 with
@@ -1126,7 +1166,8 @@ module TestSuite =
 
                 let named =
                     match tryKey "name" pairs with
-                    | Some { Kind = Scalar(_, raw, _) } -> vars |> List.exists (fun (name, _) -> raw.Contains("{" + name + "}"))
+                    | Some { Kind = Scalar(_, raw, _) } ->
+                        vars |> List.exists (fun (name, _) -> raw.Contains("{" + name + "}"))
                     | _ -> false
 
                 if named then
@@ -1142,15 +1183,7 @@ module TestSuite =
                             Name = $"{test.Name} [{suffix}]"
                     })
 
-    let private suiteKeys = [
-        "suite"
-        "description"
-        "connection"
-        "data"
-        "tables"
-        "defaults"
-        "tests"
-    ]
+    let private suiteKeys = [ "suite"; "description"; "connection"; "data"; "tables"; "defaults"; "tests" ]
 
     let private defaultsKeys = [ "tolerance"; "tolerance_abs"; "tags"; "filters" ]
 
@@ -1196,7 +1229,10 @@ module TestSuite =
             let field key (read: Node -> 'T) : 'T option =
                 get key |> Option.bind (fun v -> attempt (fun () -> read v))
 
-            match pairs |> List.tryPick (fun (k, keyNode, _) -> if k = "connection" then Some keyNode else None) with
+            match
+                pairs
+                |> List.tryPick (fun (k, keyNode, _) -> if k = "connection" then Some keyNode else None)
+            with
             | Some c ->
                 notes.Add(
                     issue c.Line c.Column "`connection` is not used: the model is the one given on the command line"
@@ -1254,8 +1290,7 @@ module TestSuite =
                     field "suite" (asText "suite")
                     |> Option.defaultValue (Path.GetFileName(stem file))
                 Description = field "description" (asText "description")
-                Data =
-                    field "data" (fun v -> Path.GetFullPath(Path.Combine(directory, asText "data" v)))
+                Data = field "data" (fun v -> Path.GetFullPath(Path.Combine(directory, asText "data" v)))
                 Tests = tests
                 Notes = List.ofSeq notes
             }

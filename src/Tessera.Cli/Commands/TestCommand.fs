@@ -69,7 +69,8 @@ type InitArgs =
         member this.Usage =
             match this with
             | Model _ -> "the model (model files, or xmla:<server>;<database>)."
-            | Output _ -> $"the suite file to write. Default: {suiteDirectoryName}/measures.test.yaml next to the model."
+            | Output _ ->
+                $"the suite file to write. Default: {suiteDirectoryName}/measures.test.yaml next to the model."
             | Data _ -> "the fixture directory the suite's tests evaluate over: written as the suite's `data`."
             | Snapshot ->
                 "write snapshot tests (`snapshot: true`) instead of pending ones: record them with `tess test snapshot`."
@@ -115,7 +116,8 @@ type CompareArgs =
             | Against _ ->
                 "the model to compare with: model files (another version of the model) or xmla:<server>;<database>."
             | Data _ -> "the fixture directory for model files, instead of the suites' own `data`."
-            | Against_Data _ -> "the fixture directory for --against, when it is model files. Default: the same as the model's."
+            | Against_Data _ ->
+                "the fixture directory for --against, when it is model files. Default: the same as the model's."
             | Tolerance _ -> "relative tolerance for numbers (0.001 is 0.1%), instead of the tests' own."
             | Tolerance_Abs _ -> "absolute tolerance for numbers, instead of the tests' own."
             | Types -> "also report values that differ in type only (a whole number 1 against a decimal 1.0)."
@@ -314,7 +316,13 @@ type private ReportOptions = {
     Force: bool
 }
 
-let private finding (severity: Findings.Severity) (code: string) (objectType: string) (name: string) (message: string) : Findings.Finding = {
+let private finding
+    (severity: Findings.Severity)
+    (code: string)
+    (objectType: string)
+    (name: string)
+    (message: string)
+    : Findings.Finding = {
     Severity = severity
     Source = "test"
     Code = code
@@ -342,18 +350,24 @@ let private detailText (details: string list) =
 let private findingsOf (r: Report) : Findings.Finding list = [
     for (file, issues) in r.Invalid do
         for i in issues ->
-            finding Findings.Severity.Error "TEST_SUITE_INVALID" "TestSuite" (Path.GetFileName file) (SuiteIssue.format i)
+            finding
+                Findings.Severity.Error
+                "TEST_SUITE_INVALID"
+                "TestSuite"
+                (Path.GetFileName file)
+                (SuiteIssue.format i)
 
     for s in r.Suites do
         for t in s.Results do
             match t.Outcome with
             | TestOutcome.Failed(message, details) ->
-                yield finding
-                    Findings.Severity.Error
-                    "TEST_FAIL"
-                    "Test"
-                    t.Test.Name
-                    (String.concat "\n" (message :: detailText details))
+                yield
+                    finding
+                        Findings.Severity.Error
+                        "TEST_FAIL"
+                        "Test"
+                        t.Test.Name
+                        (String.concat "\n" (message :: detailText details))
             | TestOutcome.Errored(code, message) ->
                 yield finding Findings.Severity.Error "TEST_ERROR" "Test" t.Test.Name $"{code}: {message}"
             | TestOutcome.Unsupported message ->
@@ -364,14 +378,18 @@ let private findingsOf (r: Report) : Findings.Finding list = [
     // A run that reached no verdict tested nothing: that is never a pass.
     if
         r.Invalid.IsEmpty
-        && not (r.Suites |> List.exists (fun s -> s.Results |> List.exists (fun t -> TestOutcome.isVerdict t.Outcome)))
+        && not (
+            r.Suites
+            |> List.exists (fun s -> s.Results |> List.exists (fun t -> TestOutcome.isVerdict t.Outcome))
+        )
     then
-        yield finding
-            Findings.Severity.Error
-            "TEST_NONE_RAN"
-            "TestSuite"
-            "(run)"
-            "no test was run to a verdict: none passed and none failed (they were filtered out, pending, skipped or unsupported)"
+        yield
+            finding
+                Findings.Severity.Error
+                "TEST_NONE_RAN"
+                "TestSuite"
+                "(run)"
+                "no test was run to a verdict: none passed and none failed (they were filtered out, pending, skipped or unsupported)"
 ]
 
 let private resultJson (t: TestResult) : JsonNode =
@@ -561,7 +579,10 @@ let private trx (r: Report) (strict: bool) (finished: DateTime) : XDocument =
         | TestOutcome.Skipped _ -> "NotExecuted"
 
     let all = tests |> List.map (fun (_, t, _, _) -> outcomeOf t.Outcome)
-    let n (outcome: string) = all |> List.filter ((=) outcome) |> List.length
+
+    let n (outcome: string) =
+        all |> List.filter ((=) outcome) |> List.length
+
     let bad = n "Failed" + n "Error" > 0 || not r.Invalid.IsEmpty
 
     XDocument(
@@ -1023,7 +1044,8 @@ let private snapshot (ctx: Ctx) (args: ParseResults<SnapshotArgs>) =
         let save = args.Contains SnapshotArgs.Save
 
         let options = {
-            Select = select (parseList (args.GetResults SnapshotArgs.Filter)) (parseList (args.GetResults SnapshotArgs.Tag))
+            Select =
+                select (parseList (args.GetResults SnapshotArgs.Filter)) (parseList (args.GetResults SnapshotArgs.Tag))
             FailFast = false
         }
 
@@ -1069,7 +1091,9 @@ let private snapshot (ctx: Ctx) (args: ParseResults<SnapshotArgs>) =
             | Ok(source, result) ->
                 match
                     result
-                    |> List.fold (fun (state: Result<unit, TessError>) s -> state |> Result.bind (fun () -> write s)) (Ok())
+                    |> List.fold
+                        (fun (state: Result<unit, TessError>) s -> state |> Result.bind (fun () -> write s))
+                        (Ok())
                 with
                 | Error e -> Failed e
                 | Ok() ->
@@ -1165,12 +1189,16 @@ let private snapshot (ctx: Ctx) (args: ParseResults<SnapshotArgs>) =
                             ctx.Out.WriteLine(("Recorded: " + plural changed "snapshot" "snapshots" + " changed."))
                         else
                             ctx.Out.WriteLine(
-                                "Dry run: " + plural changed "snapshot" "snapshots" + " would change (a difference reads: now, expected what is recorded). Use --save to record."
+                                "Dry run: "
+                                + plural changed "snapshot" "snapshots"
+                                + " would change (a difference reads: now, expected what is recorded). Use --save to record."
                             )
 
                         if notRecorded > 0 then
                             ctx.Err.WriteLine(
-                                "tess: " + plural notRecorded "snapshot" "snapshots" + " could not be recorded (see above)."
+                                "tess: "
+                                + plural notRecorded "snapshot" "snapshots"
+                                + " could not be recorded (see above)."
                             )
 
                     if notRecorded > 0 then DoneWith ExitCode.findings else Done
@@ -1182,7 +1210,11 @@ let private yamlText (s: string) =
     JsonSerializer.Serialize(s, jsonOptions)
 
 /// A suite with a test per measure, as YAML text.
-let private scaffold (db: Microsoft.AnalysisServices.Tabular.Database) (data: string option) (snapshots: bool) : string * int =
+let private scaffold
+    (db: Microsoft.AnalysisServices.Tabular.Database)
+    (data: string option)
+    (snapshots: bool)
+    : string * int =
     let sb = StringBuilder()
     let line (s: string) = sb.Append(s).Append('\n') |> ignore
 
@@ -1205,17 +1237,23 @@ let private scaffold (db: Microsoft.AnalysisServices.Tabular.Database) (data: st
     match data with
     | Some d -> line $"data: {yamlText d}"
     | None ->
-        line "# data: ../fixtures        # the fixture directory to evaluate over (see `tess data init`), or pass --data"
+        line
+            "# data: ../fixtures        # the fixture directory to evaluate over (see `tess data init`), or pass --data"
 
-    if measures.IsEmpty then
-        line "tests: []"
-    else
-        line "tests:"
+    if measures.IsEmpty then line "tests: []" else line "tests:"
 
     for (table, name) in measures do
         line ""
         line $"  - name: {yamlText name}"
-        line $"    description: {yamlText (ObjectRef.format { Kind = ObjectKind.Measure; Path = [ table; name ] })}"
+
+        line
+            $"    description: {yamlText (
+                                    ObjectRef.format {
+                                        Kind = ObjectKind.Measure
+                                        Path = [ table; name ]
+                                    }
+                                )}"
+
         line $"    measure: {yamlText name}"
 
         if snapshots then
@@ -1234,7 +1272,10 @@ let private init (ctx: Ctx) (args: ParseResults<InitArgs>) =
         | Some path -> Path.GetFullPath path
         | None -> Path.Combine(suiteDirectory model, "measures.test.yaml")
 
-    if not (TestSuite.isSuiteFile output) || output.EndsWith(".json", StringComparison.OrdinalIgnoreCase) then
+    if
+        not (TestSuite.isSuiteFile output)
+        || output.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+    then
         UsageError "--output must be a .test.yaml (or .test.yml) file: that is how suites are found"
     elif File.Exists output || Directory.Exists output then
         Failed(SaveFailed(output, "it already exists, and `test init` never overwrites a suite: give another --output"))
@@ -1246,9 +1287,7 @@ let private init (ctx: Ctx) (args: ParseResults<InitArgs>) =
             let data =
                 args.TryGetResult InitArgs.Data
                 |> Option.map (fun d ->
-                    Path
-                        .GetRelativePath(Path.GetDirectoryName output, Path.GetFullPath d)
-                        .Replace('\\', '/'))
+                    Path.GetRelativePath(Path.GetDirectoryName output, Path.GetFullPath d).Replace('\\', '/'))
 
             let text, tests = scaffold db data (args.Contains InitArgs.Snapshot)
 

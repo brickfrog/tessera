@@ -278,7 +278,11 @@ let tests' =
 
             Expect.equal
                 (outcomes r |> List.filter (fun (_, o) -> o <> "failed") |> List.map fst)
-                [ "inside the tolerance"; "inside the absolute tolerance"; "order ignored when asked" ]
+                [
+                    "inside the tolerance"
+                    "inside the absolute tolerance"
+                    "order ignored when asked"
+                ]
                 "everything else fails"
 
             Expect.equal (message r "wrong total") "[Value] is 625, expected 600" "value"
@@ -292,14 +296,22 @@ let tests' =
 
             Expect.equal
                 (differences r "bounds")
-                [ "[Value] is 17, expected more than 17"; "[Value] is 17, expected less than 10" ]
+                [
+                    "[Value] is 17, expected more than 17"
+                    "[Value] is 17, expected less than 10"
+                ]
                 "bounds"
 
             Expect.equal (message r "a false assertion") "the assertion is FALSE, not TRUE" "assert"
             Expect.equal (message r "a blank assertion") "the assertion is BLANK, not TRUE" "assert blank"
             let table = differences r "wrong table"
             Expect.contains table "2 rows, expected 3" "row count"
-            Expect.isTrue (table |> List.exists (fun d -> d.Contains "[Amount]: 140 (int64), expected 141 (int64)")) (string table)
+
+            Expect.isTrue
+                (table
+                 |> List.exists (fun d -> d.Contains "[Amount]: 140 (int64), expected 141 (int64)"))
+                (string table)
+
             Expect.isTrue (table |> List.exists (fun d -> d.Contains "is missing: [\"FR\", 1]")) (string table)
             Expect.isNonEmpty (differences r "wrong order") "ORDER BY makes the order count"
 
@@ -312,7 +324,11 @@ let tests' =
                 ]
                 "shape"
 
-            Expect.stringContains (message r "several rows") "the result has 2 rows; a column expectation needs exactly one" "rows"
+            Expect.stringContains
+                (message r "several rows")
+                "the result has 2 rows; a column expectation needs exactly one"
+                "rows"
+
             Expect.equal (message r "missing column") "there is no column b (the result has [a])" "column"
             Expect.equal (message r "no error") "expected an error, but the query returned 1 row(s)" "no error"
             Expect.stringStarts (message r "another error") "expected the error 'dax-error', got 'dax-invalid'" "code"
@@ -370,7 +386,17 @@ let tests' =
 
             Expect.equal
                 (outcomes r |> List.map snd)
-                [ "passed"; "error"; "error"; "error"; "unsupported"; "unsupported"; "passed"; "skipped"; "skipped" ]
+                [
+                    "passed"
+                    "error"
+                    "error"
+                    "error"
+                    "unsupported"
+                    "unsupported"
+                    "passed"
+                    "skipped"
+                    "skipped"
+                ]
                 "outcomes"
 
             Expect.equal (summary r) [ 2; 0; 3; 2; 2; 9 ] "summary"
@@ -424,8 +450,16 @@ let tests' =
             Expect.stringContains r.Out "3 tests: 1 passed, 1 unsupported, 1 skipped (" "counted"
 
             Expect.equal (tess [ "test"; "run"; path; "--strict" ]).Code ExitCode.findings "--strict"
-            Expect.equal (tess [ "test"; "run"; path; "--fail-on"; "warning" ]).Code ExitCode.findings "--fail-on warning"
-            Expect.equal (tess [ "test"; "run"; path; "--fail-on"; "info" ]).Code ExitCode.usage "--fail-on takes two levels"
+
+            Expect.equal
+                (tess [ "test"; "run"; path; "--fail-on"; "warning" ]).Code
+                ExitCode.findings
+                "--fail-on warning"
+
+            Expect.equal
+                (tess [ "test"; "run"; path; "--fail-on"; "info" ]).Code
+                ExitCode.usage
+                "--fail-on takes two levels"
 
             // Nothing passed and nothing failed: the run tested nothing, which is not a pass.
             let none = tess [ "test"; "run"; path; "--tag"; "labels" ]
@@ -462,9 +496,18 @@ let tests' =
                 outcomes (tess ([ "test"; "run"; path; "--json" ] @ args))
 
             Expect.equal (names [ "--filter"; "AMOUNT" ] |> List.map fst) [ "amount" ] "by name, ignoring case"
-            Expect.equal (names [ "--filter"; "money" ] |> List.map fst) [ "amount"; "orders" ] "--filter also matches tags"
+
+            Expect.equal
+                (names [ "--filter"; "money" ] |> List.map fst)
+                [ "amount"; "orders" ]
+                "--filter also matches tags"
+
             Expect.equal (names [ "--tag"; "counts" ] |> List.map fst) [ "wrong units"; "orders" ] "--tag"
-            Expect.equal (names [ "--tag"; "counts"; "--filter"; "o,x" ] |> List.map fst) [ "wrong units"; "orders" ] "both; lists"
+
+            Expect.equal
+                (names [ "--tag"; "counts"; "--filter"; "o,x" ] |> List.map fst)
+                [ "wrong units"; "orders" ]
+                "both; lists"
 
             Expect.equal
                 (names [ "--fail-fast" ])
@@ -517,7 +560,9 @@ tests:
             Expect.equal r.Code ExitCode.ok r.Out
             Expect.equal (summary r) [ 4; 0; 0; 0; 0; 4 ] r.Out
             // Nothing is left behind in the temp folder.
-            Expect.isEmpty (Directory.GetDirectories(Path.GetTempPath(), "tessera-test-*")) "temporary fixtures are deleted")
+            Expect.isEmpty
+                (Directory.GetDirectories(Path.GetTempPath(), "tessera-test-*"))
+                "temporary fixtures are deleted")
 
         testCase "fixture problems stop the run, naming the suite's line for inline rows" (fun () ->
             let t, path = setup ()
@@ -542,10 +587,17 @@ tests:
             use doc = json r
             let error = doc.RootElement.GetProperty "error"
             Expect.equal (error.GetProperty("code").GetString()) "invalid-fixture" "code"
-            Expect.stringContains (error.GetProperty("message").GetString()) $"{file}:2 (table 'Product', row 2)" "where"
+
+            Expect.stringContains
+                (error.GetProperty("message").GetString())
+                $"{file}:2 (table 'Product', row 2)"
+                "where"
 
             let unknown =
-                suite t "unknown.test.yaml" "tables:\n  Nope:\n    - { a: 1 }\ntests:\n  - name: t\n    measure: Amount\n    expect: 1\n"
+                suite
+                    t
+                    "unknown.test.yaml"
+                    "tables:\n  Nope:\n    - { a: 1 }\ntests:\n  - name: t\n    measure: Amount\n    expect: 1\n"
 
             let r = tess [ "test"; "run"; path; unknown ]
             Expect.equal r.Code ExitCode.input r.Err
@@ -578,7 +630,11 @@ tests:
             // Another fixture: the same suite, other numbers.
             write (t.Combine("other", "Sales.csv")) "Id,Qty,Price\n1,2,3\n"
             let other = tests t "  - name: t\n    measure: Amount\n    expect: 6\n"
-            Expect.equal (tess [ "test"; "run"; path; other; "--data"; t.Combine "other" ]).Code ExitCode.ok "--data wins over the suite's")
+
+            Expect.equal
+                (tess [ "test"; "run"; path; other; "--data"; t.Combine "other" ]).Code
+                ExitCode.ok
+                "--data wins over the suite's")
 
         testCase "an invalid suite stops everything, with file and line" (fun () ->
             let t, path = setup ()
@@ -590,7 +646,12 @@ tests:
 
             let r = tess [ "test"; "run"; path ]
             Expect.equal r.Code ExitCode.findings r.Out
-            Expect.stringContains r.Out $"{broken}:4:5: unknown key 'expcet' in a test (did you mean 'expect'?)" "where"
+
+            Expect.stringContains
+                r.Out
+                $"{broken}:4:5: unknown key 'expcet' in a test (did you mean 'expect'?)"
+                "where"
+
             Expect.stringContains r.Out "1 suite is not valid: nothing was run." "nothing ran"
             Expect.isFalse (r.Out.Contains "pass ") "the valid suite isn't run either"
 
@@ -616,11 +677,21 @@ tests:
             Expect.equal missing.Code ExitCode.input missing.Err
 
             Directory.CreateDirectory(t.Combine "empty") |> ignore
-            Expect.equal (tess [ "test"; "run"; path; t.Combine "empty" ]).Code ExitCode.input "a directory with no suites"
+
+            Expect.equal
+                (tess [ "test"; "run"; path; t.Combine "empty" ]).Code
+                ExitCode.input
+                "a directory with no suites"
 
             // Suites elsewhere: a directory (searched recursively) and a file, relative data included.
-            write (t.Combine("suites", "deep", "a.test.yaml")) "data: ../../data\ntests:\n  - name: a\n    measure: Amount\n    expect: 625\n"
-            write (t.Combine("suites", "b.test.json")) """{ "data": "../data", "tests": [ { "name": "b", "measure": "Units", "expect": 17 } ] }"""
+            write
+                (t.Combine("suites", "deep", "a.test.yaml"))
+                "data: ../../data\ntests:\n  - name: a\n    measure: Amount\n    expect: 625\n"
+
+            write
+                (t.Combine("suites", "b.test.json"))
+                """{ "data": "../data", "tests": [ { "name": "b", "measure": "Units", "expect": 17 } ] }"""
+
             let r = tess [ "test"; "run"; path; t.Combine "suites"; "--json" ]
             Expect.equal r.Code ExitCode.ok r.Out
             Expect.equal (outcomes r) [ "b", "passed"; "a", "passed" ] "both ran"
@@ -652,16 +723,28 @@ tests:
 
             let trx = t.Combine("out", "results.trx")
             let junit = t.Combine "results.xml"
-            let r = tess [ "test"; "run"; path; "--ci"; "github"; "--trx"; trx; "--junit"; junit ]
+
+            let r =
+                tess [ "test"; "run"; path; "--ci"; "github"; "--trx"; trx; "--junit"; junit ]
+
             Expect.equal r.Code ExitCode.findings r.Out
 
             Expect.equal
                 (lines r.Err |> List.map (fun l -> l.Substring(0, l.IndexOf("::", 2))))
-                [ "::error title=TEST_FAIL"; "::error title=TEST_ERROR"; "::warning title=TEST_UNSUPPORTED" ]
+                [
+                    "::error title=TEST_FAIL"
+                    "::error title=TEST_ERROR"
+                    "::warning title=TEST_UNSUPPORTED"
+                ]
                 "annotations"
 
             let azdo = tess [ "test"; "run"; path; "--ci"; "azdo" ]
-            Expect.stringContains azdo.Err "##vso[task.logissue type=error;code=TEST_FAIL][Value] is 17, expected 1" "azdo"
+
+            Expect.stringContains
+                azdo.Err
+                "##vso[task.logissue type=error;code=TEST_FAIL][Value] is 17, expected 1"
+                "azdo"
+
             Expect.equal (tess [ "test"; "run"; path; "--ci"; "jenkins" ]).Code ExitCode.usage "unknown --ci"
 
             let doc = XDocument.Load trx
@@ -684,12 +767,22 @@ tests:
             let counters = doc.Descendants(ns + "Counters") |> Seq.head
             Expect.equal (counters.Attribute(XName.Get "total").Value) "5" "total"
             Expect.equal (counters.Attribute(XName.Get "failed").Value) "1" "failed"
-            Expect.equal ((doc.Descendants(ns + "ResultSummary") |> Seq.head).Attribute(XName.Get "outcome").Value) "Failed" "outcome"
-            Expect.stringContains ((doc.Descendants(ns + "Message") |> Seq.head).Value) "[Value] is 17, expected 1" "message"
+
+            Expect.equal
+                ((doc.Descendants(ns + "ResultSummary") |> Seq.head).Attribute(XName.Get "outcome").Value)
+                "Failed"
+                "outcome"
+
+            Expect.stringContains
+                ((doc.Descendants(ns + "Message") |> Seq.head).Value)
+                "[Value] is 17, expected 1"
+                "message"
 
             // Every result points at a definition.
             let definitions =
-                doc.Descendants(ns + "UnitTest") |> Seq.map (fun e -> e.Attribute(XName.Get "id").Value) |> Set.ofSeq
+                doc.Descendants(ns + "UnitTest")
+                |> Seq.map (fun e -> e.Attribute(XName.Get "id").Value)
+                |> Set.ofSeq
 
             Expect.equal definitions.Count 5 "definitions"
 
@@ -703,7 +796,9 @@ tests:
             Expect.equal root.Name.LocalName "testsuites" "root"
 
             Expect.equal
-                [ for a in [ "tests"; "failures"; "errors"; "skipped" ] -> root.Attribute(XName.Get a).Value ]
+                [
+                    for a in [ "tests"; "failures"; "errors"; "skipped" ] -> root.Attribute(XName.Get a).Value
+                ]
                 [ "5"; "1"; "1"; "2" ]
                 "JUnit counts"
 
@@ -716,7 +811,11 @@ tests:
                 "JUnit cases"
 
             // A report replaces a report, but never another kind of file without --force.
-            Expect.equal (tess [ "test"; "run"; path; "--trx"; trx; "--junit"; junit ]).Code ExitCode.findings "written again"
+            Expect.equal
+                (tess [ "test"; "run"; path; "--trx"; trx; "--junit"; junit ]).Code
+                ExitCode.findings
+                "written again"
+
             let precious = tess [ "test"; "run"; path; "--trx"; path ]
             Expect.equal precious.Code ExitCode.output precious.Err
             Expect.stringContains (File.ReadAllText path) "\"model\"" "the model is untouched"
@@ -800,7 +899,12 @@ tests:
             // Recording again changes nothing, byte for byte.
             let again = tess [ "test"; "snapshot"; path; "--save"; "--json" ]
             use doc = json again
-            Expect.equal (doc.RootElement.GetProperty("files").[0].GetProperty("changed").GetBoolean()) false "unchanged"
+
+            Expect.equal
+                (doc.RootElement.GetProperty("files").[0].GetProperty("changed").GetBoolean())
+                false
+                "unchanged"
+
             Expect.equal (doc.RootElement.GetProperty("summary").GetProperty("unchanged").GetInt32()) 3 "unchanged"
             Expect.equal (File.ReadAllText snapshots) text "the same bytes"
 
@@ -814,14 +918,22 @@ tests:
             let regression = tess [ "test"; "run"; path; "--json" ]
             Expect.equal regression.Code ExitCode.findings regression.Out
             Expect.equal (message regression "total") "row 0, [Value]: 630 (int64), expected 625 (int64)" "difference"
-            Expect.equal (outcomes regression |> List.map snd) [ "failed"; "failed"; "failed"; "failed"; "unsupported" ] "outcomes"
+
+            Expect.equal
+                (outcomes regression |> List.map snd)
+                [ "failed"; "failed"; "failed"; "failed"; "unsupported" ]
+                "outcomes"
 
             let changed = tess [ "test"; "snapshot"; path; "--filter"; "total" ]
             Expect.equal changed.Code ExitCode.ok changed.Out
 
             Expect.equal
                 (lines changed.Out |> List.take 3)
-                [ snapshots; "  ~ total"; "      row 0, [Value]: 630 (int64), expected 625 (int64)" ]
+                [
+                    snapshots
+                    "  ~ total"
+                    "      row 0, [Value]: 630 (int64), expected 625 (int64)"
+                ]
                 "changed"
 
             Expect.equal (File.ReadAllText snapshots) text "still a dry run"
@@ -829,10 +941,18 @@ tests:
             // Refresh one; the others stay as recorded.
             Expect.equal (tess [ "test"; "snapshot"; path; "--filter"; "total"; "--save" ]).Code ExitCode.ok "saved"
             let after = tess [ "test"; "run"; path; "--json" ]
-            Expect.equal (outcomes after |> List.map snd) [ "passed"; "failed"; "failed"; "failed"; "unsupported" ] "only the refreshed one"
+
+            Expect.equal
+                (outcomes after |> List.map snd)
+                [ "passed"; "failed"; "failed"; "failed"; "unsupported" ]
+                "only the refreshed one"
 
             // A test that is gone loses its snapshot.
-            File.WriteAllText(file, "data: ../data\ntests:\n  - name: total\n    measure: Amount\n    expect: { snapshot: true }\n")
+            File.WriteAllText(
+                file,
+                "data: ../data\ntests:\n  - name: total\n    measure: Amount\n    expect: { snapshot: true }\n"
+            )
+
             let removed = tess [ "test"; "snapshot"; path; "--save" ]
             Expect.equal removed.Code ExitCode.ok removed.Out
             Expect.stringContains removed.Out "  - by country" "removed"
@@ -893,7 +1013,15 @@ tests:
 
             Expect.equal
                 (suite.Tests |> List.map _.Name)
-                [ "Amount"; "Units"; "Orders"; "Margin [%]: #1"; "\"quoted\" 'name'"; "  spaced & - yes"; "Año {x}" ]
+                [
+                    "Amount"
+                    "Units"
+                    "Orders"
+                    "Margin [%]: #1"
+                    "\"quoted\" 'name'"
+                    "  spaced & - yes"
+                    "Año {x}"
+                ]
                 "a test per measure, whatever its name"
 
             Expect.equal suite.Tests.[3].Body (TestBody.Scalar "[Margin [%]]: #1]") "the measure's reference"
@@ -912,21 +1040,39 @@ tests:
 
             // --snapshot: tests to record instead; the odd names work end to end.
             let other = t.Combine("elsewhere", "snap.test.yaml")
-            let s = tess [ "test"; "init"; path; "-o"; other; "--snapshot"; "--data"; t.Combine "data"; "--json" ]
+
+            let s =
+                tess [
+                    "test"
+                    "init"
+                    path
+                    "-o"
+                    other
+                    "--snapshot"
+                    "--data"
+                    t.Combine "data"
+                    "--json"
+                ]
+
             Expect.equal s.Code ExitCode.ok s.Out
             Expect.equal (tess [ "test"; "snapshot"; path; other; "--save" ]).Code ExitCode.ok "recorded"
             let run = tess [ "test"; "run"; path; other; "--json" ]
             Expect.equal run.Code ExitCode.ok run.Out
             Expect.equal (summary run) [ 7; 0; 0; 0; 0; 7 ] "all pass"
 
-            Expect.equal (tess [ "test"; "init"; path; "-o"; t.Combine "x.yaml" ]).Code ExitCode.usage "the name must be a suite's")
+            Expect.equal
+                (tess [ "test"; "init"; path; "-o"; t.Combine "x.yaml" ]).Code
+                ExitCode.usage
+                "the name must be a suite's")
 
         testCase "list checks suites without a model" (fun () ->
             let t, _ = setup ()
             use _ = t
 
             let file =
-                tests t "  - name: a\n    measure: Amount\n    tags: [x]\n    expect: 1\n  - name: b\n    measure: Units\n    pending: true\n"
+                tests
+                    t
+                    "  - name: a\n    measure: Amount\n    tags: [x]\n    expect: 1\n  - name: b\n    measure: Units\n    pending: true\n"
 
             let r = tess [ "test"; "list"; file ]
             Expect.equal r.Code ExitCode.ok r.Err
@@ -934,7 +1080,12 @@ tests:
             let j = tess [ "test"; "list"; t.Combine ".tess-tests"; "--json" ]
             use doc = json j
             let first = doc.RootElement.GetProperty("suites").[0].GetProperty("tests").[0]
-            Expect.equal (first.GetProperty("query").GetString()) "EVALUATE ROW ( \"Value\",\n[Amount]\n)" "the query it runs as"
+
+            Expect.equal
+                (first.GetProperty("query").GetString())
+                "EVALUATE ROW ( \"Value\",\n[Amount]\n)"
+                "the query it runs as"
+
             File.WriteAllText(file, "tests: 1\n")
             Expect.equal (tess [ "test"; "list"; file ]).Code ExitCode.findings "an invalid suite")
 
@@ -979,7 +1130,11 @@ tests:
                 [ "passed"; "passed"; "failed"; "passed"; "error"; "skipped" ]
                 "outcomes"
 
-            Expect.equal (testJson r "a server error" (fun t -> t.GetProperty("code").GetString())) "query-failed" "code"
+            Expect.equal
+                (testJson r "a server error" (fun t -> t.GetProperty("code").GetString()))
+                "query-failed"
+                "code"
+
             Expect.stringContains (message r "own data") "a server model is tested on the data it holds" "why skipped"
             use doc = json r
             Expect.equal (doc.RootElement.GetProperty("source").GetString()) $"xmla:{workspace};Test" "source"
@@ -989,13 +1144,19 @@ tests:
             Expect.equal server.Closed 1 "closed"
 
             Expect.equal
-                (server.Queries |> List.map (fun (db, dax, limit) -> db, dax, limit) |> List.item 1)
-                ("Test", "EVALUATE ROW ( \"Value\",\nCALCULATE (\n[Amount]\n, TREATAS ( { 2024 }, Date[Year] ) )\n)", None)
+                (server.Queries
+                 |> List.map (fun (db, dax, limit) -> db, dax, limit)
+                 |> List.item 1)
+                ("Test",
+                 "EVALUATE ROW ( \"Value\",\nCALCULATE (\n[Amount]\n, TREATAS ( { 2024 }, Date[Year] ) )\n)",
+                 None)
                 "the query sent"
 
             Expect.equal server.Queries.Length 5 "the skipped test is not sent"
 
-            let usage = tessOn server tokenEnv [ "test"; "run"; remote; file; "--data"; t.Combine "data" ]
+            let usage =
+                tessOn server tokenEnv [ "test"; "run"; remote; file; "--data"; t.Combine "data" ]
+
             Expect.equal usage.Code ExitCode.usage "--data is for model files"
 
             // A server that can't be reached stops the run with the connection's exit code.
@@ -1065,24 +1226,52 @@ tests:
             Expect.equal (doc.RootElement.GetProperty("command").GetString()) "test compare" "command"
             Expect.equal (doc.RootElement.GetProperty("against").GetString()) other "against"
 
-            let types = tess [ "test"; "compare"; path; "--against"; other; "--types"; "--json" ]
+            let types =
+                tess [ "test"; "compare"; path; "--against"; other; "--types"; "--json" ]
+
             Expect.equal (outcomes types |> List.map snd |> List.take 3) [ "failed"; "passed"; "failed" ] "--types"
             Expect.isTrue (differences types "orders" |> List.exists (fun d -> d.Contains "(type only)")) "type only"
 
-            let loose = tess [ "test"; "compare"; path; "--against"; other; "--tolerance"; "0.001" ]
+            let loose =
+                tess [ "test"; "compare"; path; "--against"; other; "--tolerance"; "0.001" ]
+
             Expect.equal loose.Code ExitCode.ok loose.Out
-            Expect.equal (tess [ "test"; "compare"; path; "--against"; other; "--tolerance-abs"; "0.01" ]).Code ExitCode.ok "absolute"
-            Expect.equal (tess [ "test"; "compare"; path; "--against"; other; "--tolerance"; "-1" ]).Code ExitCode.usage "negative"
+
+            Expect.equal
+                (tess [ "test"; "compare"; path; "--against"; other; "--tolerance-abs"; "0.01" ]).Code
+                ExitCode.ok
+                "absolute"
+
+            Expect.equal
+                (tess [ "test"; "compare"; path; "--against"; other; "--tolerance"; "-1" ]).Code
+                ExitCode.usage
+                "negative"
+
             Expect.equal (tess [ "test"; "compare"; path ]).Code ExitCode.usage "--against is needed"
 
             // The other side over another fixture.
             write (t.Combine("other", "Sales.csv")) "Id,Qty,Price\n1,2,3\n"
-            let data = tess [ "test"; "compare"; path; "--against"; path; "--against-data"; t.Combine "other"; "--json" ]
+
+            let data =
+                tess [
+                    "test"
+                    "compare"
+                    path
+                    "--against"
+                    path
+                    "--against-data"
+                    t.Combine "other"
+                    "--json"
+                ]
+
             Expect.equal (message data "units") "row 0, [Value]: 2 (int64), expected 17 (int64)" "--against-data"
 
             // Model files against the deployed model: the local engine against the server.
             let server = engineServer ()
-            let same = tessOn server tokenEnv [ "test"; "compare"; path; "--against"; remote; file; "--json" ]
+
+            let same =
+                tessOn server tokenEnv [ "test"; "compare"; path; "--against"; remote; file; "--json" ]
+
             Expect.equal same.Code ExitCode.ok same.Out
             Expect.equal (summary same) [ 5; 0; 0; 0; 1; 6 ] "the same everywhere"
             Expect.equal server.Requests.Length 1 "one connection"
@@ -1094,24 +1283,52 @@ tests:
                     else
                         [
                             {
-                                Columns = [ { Name = "[Value]"; Type = QueryType.Int64 } ]
+                                Columns = [
+                                    {
+                                        Name = "[Value]"
+                                        Type = QueryType.Int64
+                                    }
+                                ]
                                 Rows = [ [| QueryValue.Int64 1L |] ]
                                 Truncated = false
                             }
                         ]
 
-            let differs = tessOn server tokenEnv [ "test"; "compare"; path; "--against"; remote; file; "--json" ]
+            let differs =
+                tessOn server tokenEnv [ "test"; "compare"; path; "--against"; remote; file; "--json" ]
+
             Expect.equal differs.Code ExitCode.findings differs.Out
-            Expect.equal (message differs "amount") "row 0, [Value]: 1 (int64), expected 625 (int64)" "the server's value"
-            Expect.stringContains (message differs "units") "fails on the model compared against but not on the model: query-failed: Query failed: boom" "one side fails"
-            Expect.stringContains (message differs "fails on both") "fails on the model but not on the one compared against" "the other way")
+
+            Expect.equal
+                (message differs "amount")
+                "row 0, [Value]: 1 (int64), expected 625 (int64)"
+                "the server's value"
+
+            Expect.stringContains
+                (message differs "units")
+                "fails on the model compared against but not on the model: query-failed: Query failed: boom"
+                "one side fails"
+
+            Expect.stringContains
+                (message differs "fails on both")
+                "fails on the model but not on the one compared against"
+                "the other way")
 
         testCase "compare treats an unsupported side as unsupported, not as a difference" (fun () ->
             let t, path = setup ()
             use _ = t
-            tests t "  - name: label\n    measure: Label\n    expect: 1\n  - name: amount\n    measure: Amount\n    expect: 1\n" |> ignore
+
+            tests
+                t
+                "  - name: label\n    measure: Label\n    expect: 1\n  - name: amount\n    measure: Amount\n    expect: 1\n"
+            |> ignore
+
             let r = tess [ "test"; "compare"; path; "--against"; path; "--json" ]
             Expect.equal r.Code ExitCode.ok r.Out
             Expect.equal (outcomes r) [ "label", "unsupported"; "amount", "passed" ] "outcomes"
-            Expect.equal (tess [ "test"; "compare"; path; "--against"; path; "--strict" ]).Code ExitCode.findings "--strict")
+
+            Expect.equal
+                (tess [ "test"; "compare"; path; "--against"; path; "--strict" ]).Code
+                ExitCode.findings
+                "--strict")
     ]

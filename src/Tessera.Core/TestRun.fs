@@ -285,7 +285,12 @@ let private checkValue (column: QueryColumn) (actual: QueryValue) (e: ValueExpec
         let expected = expectedValue (QueryValue.typeOf actual) wanted
 
         let one (v: QueryValue) = {
-            Columns = [ { Name = column.Name; Type = typeOfValue v } ]
+            Columns = [
+                {
+                    Name = column.Name
+                    Type = typeOfValue v
+                }
+            ]
             Rows = [ [| v |] ]
             Truncated = false
         }
@@ -355,13 +360,7 @@ let private expectedTable (table: TableExpect) (actual: QueryResult) : Result<Qu
                 | Error(line, reason) -> Error $"{path}:{line}: {reason}"
                 | Ok false -> Ok(List.rev acc)
                 | Ok true when csv.IsBlankLine && acc.IsEmpty -> rows acc
-                | Ok true ->
-                    rows (
-                        [
-                            for i in 0 .. csv.FieldCount - 1 -> csv.FieldString i, csv.IsQuoted i
-                        ]
-                        :: acc
-                    )
+                | Ok true -> rows ([ for i in 0 .. csv.FieldCount - 1 -> csv.FieldString i, csv.IsQuoted i ] :: acc)
 
             match rows [] with
             | Error e -> Error e
@@ -369,9 +368,7 @@ let private expectedTable (table: TableExpect) (actual: QueryResult) : Result<Qu
             | Ok(header :: data) ->
                 let names = header |> List.map fst
                 // In a one-column file an empty line is a BLANK row; elsewhere it is skipped.
-                let data =
-                    data
-                    |> List.filter (fun row -> names.Length = 1 || row <> [ "", false ])
+                let data = data |> List.filter (fun row -> names.Length = 1 || row <> [ "", false ])
 
                 match data |> List.tryFindIndex (fun row -> row.Length <> names.Length) with
                 | Some i -> Error $"{path}: row {i + 1} has {data.[i].Length} fields, the header has {names.Length}"
@@ -523,7 +520,13 @@ module Snapshots =
 
         line "{"
         line "  \"version\": 1,"
-        line (if entries.IsEmpty then "  \"snapshots\": {}" else "  \"snapshots\": {")
+
+        line (
+            if entries.IsEmpty then
+                "  \"snapshots\": {}"
+            else
+                "  \"snapshots\": {"
+        )
 
         entries
         |> List.iteri (fun i (name, r) ->
@@ -536,7 +539,13 @@ module Snapshots =
                 line $"        {{ \"name\": {text c.Name}, \"type\": {text (QueryType.token c.Type)} }}{comma}")
 
             line "      ],"
-            line (if r.Rows.IsEmpty then "      \"rows\": []" else "      \"rows\": [")
+
+            line (
+                if r.Rows.IsEmpty then
+                    "      \"rows\": []"
+                else
+                    "      \"rows\": ["
+            )
 
             r.Rows
             |> List.iteri (fun j row ->
@@ -592,8 +601,7 @@ module Snapshots =
             Ok Map.empty
         else
             try
-                parse (File.ReadAllText path)
-                |> Result.mapError (fun e -> LoadFailed(path, e))
+                parse (File.ReadAllText path) |> Result.mapError (fun e -> LoadFailed(path, e))
             with
             | :? IOException
             | :? UnauthorizedAccessException as e -> Error(LoadFailed(path, e.Message))
@@ -651,7 +659,12 @@ let private loadFixture
                     match directory with
                     | None -> Ok()
                     | Some dir when File.Exists dir ->
-                        Error(InvalidFixture(dir, "it is a file; a fixture is a directory of <Table>.csv or <Table>.json files"))
+                        Error(
+                            InvalidFixture(
+                                dir,
+                                "it is a file; a fixture is a directory of <Table>.csv or <Table>.json files"
+                            )
+                        )
                     | Some dir when not (Directory.Exists dir) -> Error(PathNotFound dir)
                     | Some dir ->
                         for file in Directory.EnumerateFiles dir do
@@ -681,7 +694,12 @@ let private loadFixture
                                 tables
                                 |> List.tryFind (fun t ->
                                     match first.File with
-                                    | Some f -> String.Equals(Path.GetFullPath f, inlineFile t, StringComparison.OrdinalIgnoreCase)
+                                    | Some f ->
+                                        String.Equals(
+                                            Path.GetFullPath f,
+                                            inlineFile t,
+                                            StringComparison.OrdinalIgnoreCase
+                                        )
                                     | None -> false)
 
                             match from with
@@ -721,13 +739,14 @@ let localTarget (db: Database) (cliData: string option) : Target =
         let key =
             (defaultArg directory "")
             + "\u0000"
-            + (tables |> List.map (fun t -> t.Table + "\u0001" + t.Json) |> String.concat "\u0000")
+            + (tables
+               |> List.map (fun t -> t.Table + "\u0001" + t.Json)
+               |> String.concat "\u0000")
 
         match prepared.TryGetValue key with
         | true, p -> p
         | _ ->
-            let p =
-                loadFixture db suite directory tables |> Result.bind (Engine.prepare db)
+            let p = loadFixture db suite directory tables |> Result.bind (Engine.prepare db)
 
             prepared.[key] <- p
             p
@@ -750,7 +769,10 @@ let localTarget (db: Database) (cliData: string option) : Target =
 /// Why a test can't run on a server model: it brings its own data.
 let remoteRefusal (t: TestCase) : Refusal option =
     if t.Data.IsSome || not t.Tables.IsEmpty then
-        Some(Refusal.Skip "it has its own fixture data (`data` or `tables`); a server model is tested on the data it holds")
+        Some(
+            Refusal.Skip
+                "it has its own fixture data (`data` or `tables`); a server model is tested on the data it holds"
+        )
     else
         None
 
@@ -825,7 +847,10 @@ let private judge (snapshots: Map<string, QueryResult>) (t: TestCase) (dax: stri
 
             match snapshots.TryFind t.Name with
             | None ->
-                TestOutcome.Failed("no snapshot is recorded for this test (record it with `tess test snapshot <model> --save`)", [])
+                TestOutcome.Failed(
+                    "no snapshot is recorded for this test (record it with `tess test snapshot <model> --save`)",
+                    []
+                )
             | Some expected -> failed (compareResults t.Tolerance ordered true expected actual)
         | _ ->
             let ordered = defaultArg t.Expect.Ordered (hasOrderBy dax)
@@ -850,7 +875,9 @@ let private execute
 let private judgeError (t: TestCase) (e: TessError) : TestOutcome =
     match t.Expect.Error, e with
     // A refusal is only what a test expects when it says so.
-    | Some { Code = Some code }, DaxNotSupported _ when String.Equals(code, "not-supported", StringComparison.OrdinalIgnoreCase) ->
+    | Some { Code = Some code }, DaxNotSupported _ when
+        String.Equals(code, "not-supported", StringComparison.OrdinalIgnoreCase)
+        ->
         TestOutcome.Passed
     | _, DaxNotSupported _ -> TestOutcome.Unsupported(TessError.message e)
     | Some wanted, _ ->
@@ -894,7 +921,8 @@ let private runAll
                         timed t dax (fun () ->
                             match t.Skip, targets |> List.tryPick (fun target -> target.Refuses suite t) with
                             | Some reason, _ -> Ok(TestOutcome.Skipped reason)
-                            | None, _ when stopped -> Ok(TestOutcome.Skipped "not run: an earlier test failed (--fail-fast)")
+                            | None, _ when stopped ->
+                                Ok(TestOutcome.Skipped "not run: an earlier test failed (--fail-fast)")
                             | None, Some(Refusal.Skip reason) -> Ok(TestOutcome.Skipped reason)
                             | None, Some(Refusal.Error(code, message)) -> Ok(TestOutcome.Errored(code, message))
                             | None, None -> one suite t dax)
@@ -971,11 +999,20 @@ let compare
             | _, Error(DaxNotSupported _ as e) -> TestOutcome.Unsupported(TessError.message e)
             | Error _, Error _ when t.Expect.Error.IsSome -> TestOutcome.Passed
             | Error ea, Error eb ->
-                TestOutcome.Errored("both-failed", $"the query failed on both sides. Model: {describe ea}. Against: {describe eb}")
+                TestOutcome.Errored(
+                    "both-failed",
+                    $"the query failed on both sides. Model: {describe ea}. Against: {describe eb}"
+                )
             | Error e, Ok _ ->
-                TestOutcome.Failed($"the query fails on the model but not on the one compared against: {describe e}", [])
+                TestOutcome.Failed(
+                    $"the query fails on the model but not on the one compared against: {describe e}",
+                    []
+                )
             | Ok _, Error e ->
-                TestOutcome.Failed($"the query fails on the model compared against but not on the model: {describe e}", [])
+                TestOutcome.Failed(
+                    $"the query fails on the model compared against but not on the model: {describe e}",
+                    []
+                )
             | Ok left, Ok right ->
                 match single left, single right with
                 | Error outcome, _
@@ -1013,9 +1050,16 @@ type SuiteSnapshots = {
 /// Evaluate the selected snapshot tests and work out what recording them changes. Nothing is
 /// written. A snapshot whose test wasn't selected stays as it is; one whose test is gone (or is no
 /// longer a snapshot test) is removed.
-let snapshot (target: Target) (options: RunOptions) (suites: TestSuiteFile list) : Result<SuiteSnapshots list, TessError> =
+let snapshot
+    (target: Target)
+    (options: RunOptions)
+    (suites: TestSuiteFile list)
+    : Result<SuiteSnapshots list, TessError> =
     let isSnapshot (t: TestCase) = t.Expect.Snapshot && t.Skip.IsNone
-    let suites = suites |> List.filter (fun s -> s.Tests |> List.exists _.Expect.Snapshot)
+
+    let suites =
+        suites |> List.filter (fun s -> s.Tests |> List.exists _.Expect.Snapshot)
+
     let fresh = Dictionary<string, QueryResult>()
 
     let options = {
@@ -1027,7 +1071,13 @@ let snapshot (target: Target) (options: RunOptions) (suites: TestSuiteFile list)
     runAll [ target ] options suites (fun suite t dax ->
         execute target suite t dax
         |> Result.map (function
-            | Error e -> judgeError { t with Expect = { t.Expect with Error = None } } e
+            | Error e ->
+                judgeError
+                    {
+                        t with
+                            Expect = { t.Expect with Error = None }
+                    }
+                    e
             | Ok results ->
                 match single results with
                 | Error outcome -> outcome
