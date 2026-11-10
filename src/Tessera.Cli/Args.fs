@@ -32,6 +32,7 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Deploy of ParseResults<DeployCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Data of ParseResults<DataCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Refresh of ParseResults<RefreshCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Test of ParseResults<TestCommand.Args>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -63,3 +64,4 @@ type CliArgs =
             | Deploy _ -> DeployCommand.summary
             | Data _ -> DataCommand.summary
             | Refresh _ -> RefreshCommand.summary
+            | Test _ -> TestCommand.summary

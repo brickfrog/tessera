@@ -65,6 +65,8 @@
     <Compile Include="Engine/Eval.fs" />
     <Compile Include="Engine/Registry.fs" />
     <Compile Include="Engine/Engine.fs" />
+    <Compile Include="TestSuite.fs" />
+    <Compile Include="TestRun.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -75,6 +77,8 @@
     <PackageReference Include="Microsoft.AnalysisServices" Version="19.118.3" />
     <!-- Apache-2.0. Evaluates BPA rule expressions (Dynamic LINQ, as Tabular Editor uses). -->
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.4" />
+    <!-- MIT. Reads `tess test` suites (YAML); it makes no network calls. -->
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
 </Project>
