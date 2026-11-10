@@ -1,0 +1,51 @@
+{
+  "title": "FORMAT with \"H:nn AM/PM\": an upper-case H with AM/PM is the 12-hour clock, as h is",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"H:nn AM/PM\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1:23 PM"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Use the 12-hour clock and display an uppercase AM with any hour before noon; display an uppercase PM with any hour between noon and 11:59 P.M.",
+      "supports": "AM/PM turns h to the 12-hour clock; the example table shows \"h:nn:ss AMPM\" 1:23:45 PM"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "The format strings supported as an argument to the DAX FORMAT function are based on the format strings used by Visual Basic (OLE Automation), not on the format strings used by the .NET Framework.",
+      "supports": "DAX's format characters are Visual Basic's (OLE Automation), the case-insensitive ones"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/73ctwf33(v=vs.85)",
+      "quote": "Unlike in previous versions of Visual Basic, these format characters are case-sensitive.",
+      "supports": "the date/time format characters of Visual Basic before VB 2005 (VB6, VBA: OLE Automation) are not case-sensitive"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/ff452175(v=technet.10)",
+      "quote": "Formatting strings are case sensitive. Different formatting can be obtained by using a different case.",
+      "supports": "the 2010 (PowerPivot) DAX page describes .NET's case-sensitive characters; its h is the 12-hour clock, which the current page's \"h:nn:ss\" = 13:23:45 contradicts, so it no longer describes the engine"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Microsoft Learn: AM/PM uses the 12-hour clock, and \"h:nn:ss AMPM\" is 1:23:45 PM. Visual Basic's characters are not case-sensitive, so H reads as h: \"1:23 PM\".",
+  "uncertain": true,
+  "alternative": "The 2010 DAX page makes H the 24-hour clock (\"Displays the hour as a number without leading zeros using the 24-hour clock\"). With that reading the result would be \"13:23 PM\".",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "upper-case"
+  ]
+}

@@ -811,11 +811,68 @@ let formatTests =
                 refused $"FORMAT ( {dt}, \"Am/Pm\" )" "the letter a"
                 // A time alone has no date to show; DAX is not reliable before March 1, 1900.
                 refusedAt 3 "FORMAT ( T[At], \"yyyy\" )" "March 1, 1900")
-            // "\QQ yyyy" shows Q is q; no page shows another letter in upper case.
-            testCase "upper-case letters other than Q are refused" (fun () ->
-                refused "FORMAT ( dt\"2019-03-28\", \"yyyy-MM-dd\" )" "upper-case letter M"
-                refused "FORMAT ( dt\"2019-03-28\", \"YYYY\" )" "upper-case letter Y"
-                is (p ()) "FORMAT ( dt\"2019-03-28\", \"Q\" )" "1")
+            // dax.guide/format: "\QQ yyyy" is Q1 2019. Power BI's auto date/time table has
+            // Month = FORMAT([Date], "MMMM") (sqlbi.com, "Continuous axis for any Date table in Power
+            // BI"), and Microsoft Learn ("Auto date/time in Power BI Desktop") shows its rows for
+            // January 2019 as "January".
+            testCase "upper-case letters the pages show" (fun () ->
+                is (p ()) "FORMAT ( dt\"2019-03-28\", \"\\QQ yyyy\" )" "Q1 2019"
+                is (p ()) "FORMAT ( dt\"2019-03-28\", \"Q\" )" "1"
+                is (p ()) "FORMAT ( dt\"2019-01-01\", \"MMMM\" )" "January")
+            // "Unlike in previous versions of Visual Basic, these format characters are
+            // case-sensitive" (VB 2005, "User-Defined Date/Time Formats (Format Function)"); VB6 writes
+            // "Nn", "N" and "Hh" ("Format Function for Visual Basic 6.0 Users"). So each value is
+            // Microsoft Learn's for the lower-case format, for Thursday, June 25, 2020, 1:23:45 PM.
+            testCase "upper-case letters read as Visual Basic reads them" (fun () ->
+                let dt = "dt\"2020-06-25T13:23:45\""
+
+                let check (format: string) (expected: string) =
+                    is (p ()) $"FORMAT ( {dt}, \"{format}\" )" expected
+
+                check "DD" "25" // "dd" 25
+                check "DDD" "Thu" // "ddd" Thu
+                check "DDDD" "Thursday" // "dddd" Thursday
+                check "DDDDDD" "Thursday, June 25, 2020" // "dddddd"
+                check "W" "5" // "w" 5
+                check "MM" "06" // "mm" 06
+                check "MMM" "Jun" // "mmm" Jun
+                check "MMMM" "June" // "mmmm" June
+                check "YY" "20" // "yy" 20
+                check "YYYY" "2020" // "yyyy" 2020
+                check "yyyy \\QQ" "2020 Q2" // "yyyy \Qq" 2020 Q2
+                check "DD/MM/YYYY" "25/06/2020" // "dd/mm/yyyy" 25/06/2020
+                check "MM/DD/YYYY" "06/25/2020" // "mm/dd/yyyy" 06/25/2020
+                check "H:NN:SS" "13:23:45" // "h:nn:ss" 13:23:45
+                check "HH:NN:SS" "13:23:45" // "hh:nn:ss" 13:23:45
+                check "HH:mm:ss" "13:23:45" // dax.guide: "hh:mm:ss" is 15:30:00, mm after hh is minutes
+                // VB6 writes "Nn" and "Hh": the case of each letter in a run doesn't matter.
+                check "Hh:Nn:Ss" "13:23:45"
+                check "Mmm Dd, Yyyy" "Jun 25, 2020"
+                // The sample model's Date table (spaceparts-analytics): "MMM DD", "DDD", "DDDD".
+                check "MMM DD" "Jun 25")
+            testCase "upper-case letters the 2010 DAX pages read otherwise are refused" (fun () ->
+                let dt = "dt\"2020-06-25T13:23:45\""
+                // "The M character displays the month ... The m character displays the minutes".
+                refused $"FORMAT ( {dt}, \"hh:MM\" )" "upper-case M after h"
+                refused $"FORMAT ( {dt}, \"HH:MM:SS\" )" "upper-case M after h"
+                // "H ... using the 24-hour clock"; h with AM/PM is the 12-hour clock in Visual Basic.
+                refused $"FORMAT ( {dt}, \"H:nn AM/PM\" )" "upper-case H with AM/PM"
+                refused $"FORMAT ( {dt}, \"HH:nn AMPM\" )" "upper-case H with AM/PM"
+                // "The Y and y characters display the year"; y alone is the day of the year.
+                refused $"FORMAT ( {dt}, \"Y-mm\" )" "the letter Y alone"
+                // "M", "D" and "Y" were predefined formats.
+                refused $"FORMAT ( {dt}, \"D\" )" "predefined format in the 2010 DAX pages"
+                refused $"FORMAT ( {dt}, \"M\" )" "predefined format in the 2010 DAX pages"
+                refused $"FORMAT ( {dt}, \"Y\" )" "predefined format in the 2010 DAX pages"
+                // Settled whatever the case: c, ttttt, MMMMM, and m next to seconds.
+                refused $"FORMAT ( {dt}, \"C\" )" "the date format c"
+                refused $"FORMAT ( {dt}, \"TTTTT\" )" "ttttt"
+                refused $"FORMAT ( {dt}, \"MMMMM\" )" "5 times"
+                refused $"FORMAT ( {dt}, \"MM:SS\" )" "minutes or the month"
+                // Lower case is unchanged.
+                is (p ()) $"FORMAT ( {dt}, \"d\" )" "25"
+                is (p ()) $"FORMAT ( {dt}, \"y\" )" "177"
+                is (p ()) $"FORMAT ( {dt}, \"h:nn AM/PM\" )" "1:23 PM")
         ]
 
         testList "culture" [

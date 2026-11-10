@@ -1,0 +1,52 @@
+{
+  "title": "FORMAT with \"DDD\" and \"DDDD\" (upper case) gives the weekday names, as ddd and dddd do",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"DDD\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"DDD\" ), \"DDDD\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"DDDD\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[DDD]",
+          "type": "string"
+        },
+        {
+          "name": "[DDDD]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Thu",
+          "Thursday"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Display the day as an abbreviation (Sun-Sat). Localized.",
+      "supports": "the example table shows \"ddd\" Thu and \"dddd\" Thursday for June 25, 2020"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "The format strings supported as an argument to the DAX FORMAT function are based on the format strings used by Visual Basic (OLE Automation), not on the format strings used by the .NET Framework.",
+      "supports": "DAX's format characters are Visual Basic's (OLE Automation), the case-insensitive ones"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/73ctwf33(v=vs.85)",
+      "quote": "Unlike in previous versions of Visual Basic, these format characters are case-sensitive.",
+      "supports": "the date/time format characters of Visual Basic before VB 2005 (VB6, VBA: OLE Automation) are not case-sensitive"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Microsoft Learn: \"ddd\" is Thu and \"dddd\" Thursday for Thursday, June 25, 2020. Visual Basic's (OLE Automation) characters are not case-sensitive, so DDD and DDDD read as ddd and dddd: \"Thu\" and \"Thursday\".",
+  "uncertain": true,
+  "alternative": "No DAX page shows an upper-case D. The 2010 DAX page lists only a lower-case d in custom formats; if the engine took D as literal text, the results would be \"DDD\" and \"DDDD\".",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "upper-case"
+  ],
+  "notes": "spaceparts-analytics' Date table uses FORMAT ( [Date], \"DDD\" ) and \"DDDD\" for columns it names \"Weekday Short (ie Mon)\" and \"Weekday Name (ie Monday)\"."
+}

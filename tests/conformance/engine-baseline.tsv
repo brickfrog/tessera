@@ -99,13 +99,14 @@ division/iserror-of-division-by-zero	fail
 division/iserror-of-zero-by-zero	fail
 earlier/rank-in-query-calculated-column	not-supported
 earlier/running-total-in-query-calculated-column	not-supported
-format/date-iso-pattern-upper-case-month	not-supported
 format/locale-general-date-en-gb	not-supported
 format/locale-ignored-for-fixed-pattern	not-supported
 format/locale-month-name-pt	not-supported
 format/locale-number-de	not-supported
 format/percent-large-number	not-supported
 format/result-is-text	not-supported
+format/time-upper-case-hour-with-am-pm	not-supported
+format/time-upper-case-month-after-hour	not-supported
 grouping/groupby-extension-column	error
 grouping/summarize-group-by-extension-column	error
 grouping/summarizecolumns-fact-table-as-filter	not-supported

@@ -1,0 +1,52 @@
+{
+  "title": "FORMAT with \"MMM\" and \"MMM DD\" (upper case) gives the month abbreviation and the day",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"MMM\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"MMM\" ), \"MMM DD\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"MMM DD\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[MMM]",
+          "type": "string"
+        },
+        {
+          "name": "[MMM DD]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Jun",
+          "Jun 25"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Display the month as an abbreviation (Jan-Dec). Localized.",
+      "supports": "the example table shows \"mmm\" Jun and \"dd\" 25 for June 25, 2020"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "The format strings supported as an argument to the DAX FORMAT function are based on the format strings used by Visual Basic (OLE Automation), not on the format strings used by the .NET Framework.",
+      "supports": "DAX's format characters are Visual Basic's (OLE Automation), the case-insensitive ones"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/73ctwf33(v=vs.85)",
+      "quote": "Unlike in previous versions of Visual Basic, these format characters are case-sensitive.",
+      "supports": "the date/time format characters of Visual Basic before VB 2005 (VB6, VBA: OLE Automation) are not case-sensitive"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Microsoft Learn: \"mmm\" is Jun and \"dd\" 25 for June 25, 2020. Visual Basic's characters are not case-sensitive, so MMM and DD read as mmm and dd: \"Jun\" and \"Jun 25\". The 2010 DAX page agrees for MMM (\"Displays the month as an abbreviation\").",
+  "uncertain": true,
+  "alternative": "No current DAX page shows an upper-case MMM. If the engine took M or D as literal text, the results would be \"MMM\" and \"MMM DD\".",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "upper-case"
+  ],
+  "notes": "spaceparts-analytics' Date table uses \"MMM\" and \"MMM DD\" (columns \"Calendar Month (ie Jan)\" and \"Calendar Month Day (ie Jan 05)\")."
+}
