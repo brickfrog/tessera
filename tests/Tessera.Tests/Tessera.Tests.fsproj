@@ -74,6 +74,8 @@
     <Compile Include="DataStoreTests.fs" />
     <Compile Include="FixtureTests.fs" />
     <Compile Include="DataCommandTests.fs" />
+    <Compile Include="EngineHelpers.fs" />
+    <Compile Include="EngineSmokeTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

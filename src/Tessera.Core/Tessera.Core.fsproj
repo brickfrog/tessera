@@ -51,6 +51,16 @@
     <Compile Include="DataStore.fs" />
     <Compile Include="Fixture.fs" />
     <Compile Include="FixtureInit.fs" />
+    <Compile Include="Engine/Types.fs" />
+    <Compile Include="Engine/Context.fs" />
+    <Compile Include="Engine/Typing.fs" />
+    <Compile Include="Engine/Functions/Aggregation.fs" />
+    <Compile Include="Engine/Functions/Logical.fs" />
+    <Compile Include="Engine/Functions/Filter.fs" />
+    <Compile Include="Engine/Functions/TableFunctions.fs" />
+    <Compile Include="Engine/Eval.fs" />
+    <Compile Include="Engine/Registry.fs" />
+    <Compile Include="Engine/Engine.fs" />
   </ItemGroup>
 
   <ItemGroup>

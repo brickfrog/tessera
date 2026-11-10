@@ -85,6 +85,17 @@ type TessError =
     | DeployFailed of server: string * database: string * messages: string list
     /// A fixture data directory that can't be used at all (problems inside one are findings).
     | InvalidFixture of path: string * reason: string
+    /// DAX that can't be parsed, at a 1-based line and column of `source` ("query", or an object).
+    | DaxSyntax of source: string * line: int * column: int * message: string
+    /// The local DAX engine doesn't implement this (a function, an argument form, a model feature),
+    /// so it refuses rather than guess. `where` is "<source> <line>:<column>", or "" for the model.
+    | DaxNotSupported of feature: string * where: string
+    /// DAX the engine can't evaluate because it is wrong: an unknown name, the wrong arguments...
+    | DaxInvalid of message: string * where: string
+    /// An error raised while evaluating DAX: ERROR(), a conversion that fails, an overflow...
+    | DaxEvaluation of message: string * where: string
+    /// The fixture data has errors, so the local engine won't evaluate against it.
+    | FixtureHasErrors of directory: string * errors: int
 
 module TessError =
 
@@ -142,6 +153,11 @@ module TessError =
         | DeployIntroducesErrors _ -> "deploy-introduces-errors"
         | DeployFailed _ -> "deploy-failed"
         | InvalidFixture _ -> "invalid-fixture"
+        | DaxSyntax _ -> "dax-syntax"
+        | DaxNotSupported _ -> "not-supported"
+        | DaxInvalid _ -> "dax-invalid"
+        | DaxEvaluation _ -> "dax-error"
+        | FixtureHasErrors _ -> "fixture-has-errors"
 
     let rec message =
         function
@@ -264,3 +280,16 @@ module TessError =
             let list = messages |> List.map (fun m -> $"  {m}") |> String.concat "\n"
             $"Deploying '{database}' to {server} failed:\n{list}"
         | InvalidFixture(path, reason) -> $"Can't use {path} as fixture data: {reason}"
+        | DaxSyntax(source, line, column, msg) -> $"{source} {line}:{column}: {msg}"
+        | DaxNotSupported(feature, where) ->
+            let at = if where = "" then "" else $" ({where})"
+            $"Not supported by the local DAX engine: {feature}{at}"
+        | DaxInvalid(msg, where) ->
+            let at = if where = "" then "" else $"{where}: "
+            $"{at}{msg}"
+        | DaxEvaluation(msg, where) ->
+            let at = if where = "" then "" else $"{where}: "
+            $"{at}{msg}"
+        | FixtureHasErrors(directory, n) ->
+            let errors = if n = 1 then "1 error" else $"{n} errors"
+            $"The fixture data in {directory} has {errors}; fix them first (`tess data check` lists them)"
