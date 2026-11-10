@@ -75,6 +75,7 @@
     <Compile Include="FixtureTests.fs" />
     <Compile Include="DataCommandTests.fs" />
     <Compile Include="QueryCompareTests.fs" />
+    <Compile Include="EmbedTests.fs" />
     <Compile Include="Conformance.fs" />
     <Compile Include="ConformanceTests.fs" />
     <Compile Include="Main.fs" />

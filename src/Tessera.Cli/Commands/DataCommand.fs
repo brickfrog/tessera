@@ -11,7 +11,7 @@ open Tessera.Cli.Common
 
 /// One-line description, shown in `tess --help`.
 let summary =
-    "fixture data for the local DAX engine: create (init), check or summarize a directory of CSV/JSON files."
+    "fixture data for the local DAX engine: create (init), check, summarize (info) or embed in a model a directory of CSV/JSON files."
 
 type InitArgs =
     | [<MainCommand; ExactlyOnce>] Target of model: string * directory: string
@@ -56,10 +56,25 @@ type InfoArgs =
             match this with
             | Target _ -> "the model, and the fixture directory."
 
+type EmbedArgs =
+    | [<MainCommand; ExactlyOnce>] Target of model: string * directory: string * destination: string
+    | [<AltCommandLine("-f")>] Format of format: string
+    | Force
+
+    interface IArgParserTemplate with
+        member this.Usage =
+            match this with
+            | Target _ -> "the model, the fixture directory, and where to write the model with the data inside it."
+            | Format _ ->
+                "output format: bim | tmdl | pbip. Default: inferred from the destination "
+                + "(*.bim -> bim, *.SemanticModel -> pbip, otherwise a tmdl folder)."
+            | Force -> "overwrite a non-empty destination."
+
 type Args =
     | [<CliPrefix(CliPrefix.None)>] Init of ParseResults<InitArgs>
     | [<CliPrefix(CliPrefix.None)>] Check of ParseResults<CheckArgs>
     | [<CliPrefix(CliPrefix.None)>] Info of ParseResults<InfoArgs>
+    | [<CliPrefix(CliPrefix.None)>] Embed of ParseResults<EmbedArgs>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -71,6 +86,9 @@ type Args =
                 "check a fixture against the model: files, columns, data types, keys and relationships "
                 + "(exit 1: errors)."
             | Info _ -> "list the fixture's tables with row counts, and distinct and BLANK counts per column."
+            | Embed _ ->
+                "write a copy of the model whose loaded tables are calculated tables holding the fixture's rows, "
+                + "so it can be deployed with no data source (refuses to overwrite without --force)."
 
 // ---- init --------------------------------------------------------------------------------------
 
@@ -376,9 +394,95 @@ let private info (ctx: Ctx) (args: ParseResults<InfoArgs>) =
 
             Done
 
+// ---- embed -------------------------------------------------------------------------------------
+
+let private embed (ctx: Ctx) (args: ParseResults<EmbedArgs>) =
+    let model, directory, destination = args.GetResult EmbedArgs.Target
+
+    let format =
+        match args.TryGetResult EmbedArgs.Format with
+        | None -> Ok(ModelIO.OutputFormat.infer destination)
+        | Some f ->
+            ModelIO.OutputFormat.tryParse f
+            |> Option.map Ok
+            |> Option.defaultValue (Error $"unknown format '{f}' (expected bim, tmdl or pbip)")
+
+    match format with
+    | Error message -> UsageError message
+    | Ok format ->
+        let result =
+            ModelIO.loadPath model
+            |> Result.bind (fun (source, db) ->
+                Fixture.loadAndCheck db directory
+                |> Result.bind (fun (loaded, issues) ->
+                    // Invalid values are BLANK in the store: embedding them would deploy other data
+                    // than the fixture says.
+                    match issues |> List.filter (fun i -> i.Severity = Severity.Error) with
+                    | [] -> Ok loaded
+                    | errors ->
+                        let n =
+                            if errors.Length = 1 then
+                                "1 error"
+                            else
+                                $"{errors.Length} errors"
+
+                        Error(InvalidFixture(loaded.Directory, $"it has {n}; run `tess data check` to see them"))
+                    |> Result.bind (fun loaded ->
+                        FixtureEmbed.embed db loaded.Store
+                        |> Result.bind (fun embedded ->
+                            let opts = {
+                                ModelIO.SaveOptions.defaults with
+                                    Eol = ModelIO.Eol.resolveAuto source.Path destination
+                            }
+
+                            ModelIO.save format opts (args.Contains EmbedArgs.Force) embedded.Database destination
+                            |> Result.map (fun saved -> loaded, embedded, saved)))))
+
+        match result with
+        | Error e -> Failed e
+        | Ok(loaded, embedded, saved) ->
+            if ctx.Json then
+                writeJson
+                    ctx.Out
+                    (obj [
+                        "command", str "data embed"
+                        "directory", str loaded.Directory
+                        "output",
+                        obj [
+                            "format", str (ModelIO.OutputFormat.token saved.Format)
+                            "path", str saved.Path
+                            "files", arr [ for f in saved.Files -> str f ]
+                        ]
+                        "tables",
+                        arr [
+                            for t in embedded.Tables ->
+                                obj [ "table", str t.Table; "rows", num t.Rows; "columns", num t.Columns ]
+                        ]
+                        "warnings", arr (embedded.Warnings |> List.map str)
+                    ])
+            else
+                let count = embedded.Tables.Length
+                let tables = if count = 1 then "1 table" else $"{count} tables"
+
+                ctx.Out.WriteLine(
+                    $"Wrote {ModelIO.OutputFormat.token saved.Format}  {saved.Path}  ({tables} now hold their fixture rows)"
+                )
+
+                let width = embedded.Tables |> List.map (fun t -> t.Table.Length) |> List.fold max 0
+
+                for t in embedded.Tables do
+                    let rows = if t.Rows = 1 then "1 row" else $"{t.Rows} rows"
+                    ctx.Out.WriteLine($"  {t.Table.PadRight width}  {rows}")
+
+                for w in embedded.Warnings do
+                    ctx.Err.WriteLine($"warning: {w}")
+
+            Done
+
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     match args.TryGetSubCommand() with
     | Some(Init a) -> init ctx a
     | Some(Check a) -> check ctx a
     | Some(Info a) -> info ctx a
+    | Some(Embed a) -> embed ctx a
     | None -> UsageError(args.Parser.PrintUsage())

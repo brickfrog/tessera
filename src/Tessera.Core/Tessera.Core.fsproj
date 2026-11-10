@@ -51,6 +51,7 @@
     <Compile Include="DataStore.fs" />
     <Compile Include="Fixture.fs" />
     <Compile Include="FixtureInit.fs" />
+    <Compile Include="FixtureEmbed.fs" />
   </ItemGroup>
 
   <ItemGroup>
