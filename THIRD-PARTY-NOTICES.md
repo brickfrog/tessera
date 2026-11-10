@@ -34,6 +34,7 @@ terms for that component.
 | .NET runtime, in the self-contained binaries (its own notices: <https://github.com/dotnet/runtime/blob/main/THIRD-PARTY-NOTICES.TXT>) | © .NET Foundation and Contributors |
 | FSharp.Core | © Microsoft Corporation (.NET Foundation) |
 | Argu | © 2019 Argu contributors (<https://github.com/fsprojects/Argu>) |
+| YamlDotNet | © Antoine Aubry and contributors (<https://github.com/aaubry/YamlDotNet>) |
 | Tabular Editor 2: small portions adapted in `src/Tessera.Core` (for example the BPA token codes in `BpaDaxToken.fs`), marked in the source | © 2017 Daniel Otykier (<https://github.com/TabularEditor/TabularEditor>) |
 
 The MIT license text:

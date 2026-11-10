@@ -9,7 +9,6 @@ namespace Tessera.DaxEngine.Functions
 
 open System
 open System.Globalization
-open System.Text.RegularExpressions
 open Tessera
 open Tessera.DaxAst
 open Tessera.DaxEngine
@@ -19,81 +18,25 @@ module Coerce =
 
     let private inv = CultureInfo.InvariantCulture
 
-    let private slashDate =
-        Regex(@"^(\d{1,2})/(\d{1,2})/(\d{4})$", RegexOptions.CultureInvariant)
+    /// The serial number of text that is a date, a time, or both, as the date functions read it
+    /// (`DateText.read`, with the model's culture: ISO 8601 under any culture, and under en-US the
+    /// forms the documentation shows results for, such as "10/23/2020", "23/10/2020" and "6:05 PM").
+    /// ValueNone for text it doesn't read.
+    let tryDateText (ctx: Ctx) (_: Span) (text: string) : float voption =
+        match DateText.read ctx.Model.Culture text with
+        | Some r ->
+            let day =
+                match r.Date with
+                | ValueSome d -> DaxValue.serialOfDateTime d
+                | ValueNone -> 0.0
 
-    let private clockTime =
-        Regex(@"^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AaPp][Mm])?$", RegexOptions.CultureInvariant)
+            let time =
+                match r.Time with
+                | ValueSome t -> float (t.Ticks / TimeSpan.TicksPerMillisecond) / 86400000.0
+                | ValueNone -> 0.0
 
-    let private dateOf (year: int) (month: int) (day: int) : float voption =
-        if
-            year >= 1
-            && month >= 1
-            && month <= 12
-            && day >= 1
-            && day <= DateTime.DaysInMonth(year, month)
-        then
-            ValueSome(DaxValue.serialOfDateTime (DateTime(year, month, day)))
-        else
-            ValueNone
-
-    /// The serial number of text that is a date or a time in a form no culture reads another way:
-    ///
-    /// - ISO 8601 (`2020-10-23`, with an optional time): "VALUE ( "2020-10-23" )" is 44127;
-    /// - `10/23/2020` and `23/10/2020`, both of which dax.guide/value shows as 44127 (and
-    ///   "CONVERT ( "12/25/1966", DATETIME )" as 1966-12-25): a date with slashes is read whichever
-    ///   way makes a date. When both ways do, and they differ (`1/2/2024`), the model's culture
-    ///   decides, and the engine doesn't model cultures: that is refused;
-    /// - a time of day: `10:23:45`, `18:05:00`, `6:05:00 pm`, `6:05pm` (dax.guide/value).
-    ///
-    /// ValueNone for text that is none of these.
-    let tryDateText (ctx: Ctx) (span: Span) (text: string) : float voption =
-        let t = text.Trim()
-
-        match DaxValue.parseIsoSerial (t.AsSpan()) with
-        | ValueSome serial -> ValueSome serial
-        | ValueNone ->
-            let m = slashDate.Match t
-
-            if m.Success then
-                let a = int m.Groups.[1].Value
-                let b = int m.Groups.[2].Value
-                let year = int m.Groups.[3].Value
-
-                match dateOf year a b, dateOf year b a with
-                | ValueSome x, ValueSome y when x <> y ->
-                    Fail.notSupported
-                        ctx
-                        span
-                        $"the text \"{text}\" read as a date (day first or month first depends on the model's culture)"
-                | ValueSome x, _ -> ValueSome x
-                | ValueNone, y -> y
-            else
-                let m = clockTime.Match t
-
-                if m.Success then
-                    let hour = int m.Groups.[1].Value
-                    let minute = int m.Groups.[2].Value
-                    let second = if m.Groups.[3].Success then int m.Groups.[3].Value else 0
-                    let half = m.Groups.[4].Value.ToUpperInvariant()
-
-                    let hour =
-                        match half with
-                        | "AM" when hour = 12 -> 0
-                        | "PM" when hour < 12 -> hour + 12
-                        | _ -> hour
-
-                    if
-                        hour > 23
-                        || minute > 59
-                        || second > 59
-                        || (half <> "" && int m.Groups.[1].Value > 12)
-                    then
-                        ValueNone
-                    else
-                        ValueSome(float (hour * 3600 + minute * 60 + second) / 86400.0)
-                else
-                    ValueNone
+            ValueSome(day + time)
+        | None -> ValueNone
 
     /// Text that is neither a number nor a date the engine reads: an error DAX raises ("If text
     /// is not in one of these formats, an error is returned": Microsoft Learn, VALUE) when it

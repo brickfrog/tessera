@@ -18,8 +18,12 @@ module Registry =
             Statistical.functions
             Information.functions
             Text.functions
+            DateAndTime.functions
+            Formatting.functions
             Filter.functions
             TableFunctions.functions
+            NonBlank.functions
+            TimeIntelligence.functions
         ]
 
     let byName: IReadOnlyDictionary<string, DaxFunction> =

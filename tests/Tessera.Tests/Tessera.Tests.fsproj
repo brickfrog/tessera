@@ -90,9 +90,14 @@
     <Compile Include="EngineContextTests.fs" />
     <Compile Include="EngineTableTests.fs" />
     <Compile Include="EnginePropertyTests.fs" />
+    <Compile Include="EngineTextTests.fs" />
+    <Compile Include="EngineTimeIntelligenceTests.fs" />
     <Compile Include="EngineCommandTests.fs" />
+    <Compile Include="EngineDateTimeTests.fs" />
     <Compile Include="EngineSampleTests.fs" />
     <Compile Include="EnginePerfTests.fs" />
+    <Compile Include="TestSuiteTests.fs" />
+    <Compile Include="TestCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

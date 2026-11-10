@@ -100,6 +100,8 @@ type TessError =
     | DaxEvaluation of message: string * where: string
     /// The fixture data has errors, so the local engine won't evaluate against it.
     | FixtureHasErrors of directory: string * errors: int
+    /// `test`: no suite files where they were looked for.
+    | NoTestSuites of where: string
 
 module TessError =
 
@@ -164,6 +166,7 @@ module TessError =
         | DaxInvalid _ -> "dax-invalid"
         | DaxEvaluation _ -> "dax-error"
         | FixtureHasErrors _ -> "fixture-has-errors"
+        | NoTestSuites _ -> "no-test-suites"
 
     let rec message =
         function
@@ -303,3 +306,5 @@ module TessError =
         | FixtureHasErrors(directory, n) ->
             let errors = if n = 1 then "1 error" else $"{n} errors"
             $"The fixture data in {directory} has {errors}; fix them first (`tess data check` lists them)"
+        | NoTestSuites where ->
+            $"No test suites (*.test.yaml, *.test.yml, *.test.json) found in {where}. `tess test init <model>` writes one to start from."

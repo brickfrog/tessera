@@ -18,7 +18,14 @@ let private engine: Evaluate option =
 /// Tags the engine isn't expected to handle yet. A case with one of them is reported as skipped
 /// unless it passes; remove a tag here when its area is implemented.
 let private expectedUnsupported: Set<string> =
-    set laterAreas |> Set.remove "math-functions"
+    set laterAreas
+    - set [
+        "date-functions"
+        "text-functions"
+        "format"
+        "time-intelligence"
+        "math-functions"
+    ]
 
 /// Which of the engine's errors mean "not implemented" (see `RunConfig.defaults`).
 let private engineConfig = RunConfig.defaults
@@ -55,15 +62,17 @@ let assumptions = [
     "currency-rounding", "a fifth decimal is rounded half away from zero when a number becomes a currency"
     "date-to-text", "a date becomes text in the en-US general date form"
     "text-to-date", "text is read as a date in ISO 8601 and the culture's formats"
-    "exact-number-comparison", "an integer above 2^53 is compared exactly with a decimal number"
+    "exact-number-comparison",
+    "an integer above 2^53 against a decimal number: exact where rounding agrees, else refused"
     "blank-sorts-first", "ORDER BY puts BLANK before negative numbers"
-    "integer-overflow", "integer arithmetic that overflows is an error"
+    "integer-overflow", "integer arithmetic that overflows wraps around (refused at the two reserved values)"
     "date-multiplication", "a date multiplied by a number is a decimal number"
     "integer-divided-by-currency", "an integer divided by a currency is a decimal number"
     "power-result-type", "the result of ^ is always a decimal number"
-    "logical-blank", "&& and || give TRUE or FALSE, never BLANK"
+    "logical-blank", "&& and || give TRUE or FALSE; BLANK with BLANK, and NOT of BLANK, are refused"
     "convert-integer-rounding", "converting to an integer rounds half away from zero"
-    "text-to-number-separators", "text with thousands separators or a currency symbol is not a number"
+    "text-to-number-separators",
+    "text with spaces, thousands separators or a currency symbol read as a number is refused"
 ]
 
 /// The assumptions that are no longer made: `DaxValue.fs` now follows a source that settles
@@ -217,6 +226,25 @@ let corpusTests =
 
 // ---- The engine against the corpus ----------------------------------------------------------------
 
+/// TESSERA_CONFORMANCE_REPORT=<file>: every case's outcome is appended to it as
+/// `<case id><tab><kind><tab><why>`, to see what the baseline's refusals are about.
+let private reportFile =
+    match Environment.GetEnvironmentVariable "TESSERA_CONFORMANCE_REPORT" with
+    | null
+    | "" -> None
+    | path -> Some path
+
+let private reportLock = obj ()
+
+let private record (c: Case) (kind: string) (lines: string list) =
+    match reportFile with
+    | None -> ()
+    | Some path ->
+        let why =
+            (String.concat " | " lines).Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ')
+
+        lock reportLock (fun () -> File.AppendAllText(path, $"{c.Id}\t{kind}\t{why}\n"))
+
 let private report (c: Case) (lines: string list) =
     let uncertain =
         match c.Alternative with
@@ -247,6 +275,8 @@ let engineTests =
                         | Outcome.NotSupported reason -> "not-supported", [ $"not supported: {reason}" ]
                         | Outcome.Error message -> "error", [ $"error: {message}" ]
                         | Outcome.Fail mismatch -> "fail", Mismatch.describe mismatch
+
+                    record c kind lines
 
                     match kind, Map.tryFind c.Id known with
                     | "pass", None -> ()

@@ -1,5 +1,6 @@
 namespace Tessera.DaxEngine
 
+open System
 open Tessera
 open Tessera.DaxAst
 
@@ -103,6 +104,10 @@ module Typing =
             | _, StaticType.Blank -> StaticType.Blank
             | StaticType.Known x, StaticType.Known y ->
                 match x, y with
+                // The documentation's multiplication table (see `DaxValue.multiply`).
+                | DaxType.DateTime, _ -> StaticType.Unknown
+                | DaxType.Integer, DaxType.DateTime -> known DaxType.Integer
+                | (DaxType.Currency | DaxType.Decimal), DaxType.DateTime -> known DaxType.Decimal
                 | DaxType.Integer, DaxType.Integer -> known DaxType.Integer
                 | DaxType.Currency, DaxType.Currency -> known DaxType.Decimal
                 | DaxType.Currency, _
@@ -190,6 +195,13 @@ module Convert =
                 span
                 "a date converted to text (the format depends on the model's culture; FORMAT is not implemented)"
         | DaxValue.Boolean _ -> Fail.notSupported ctx span "TRUE or FALSE converted to text"
+        // The decimal separator is the culture's: 1.5 is "1,5" in a German model.
+        | DaxValue.Decimal d when d <> Math.Floor d ->
+            Culture.requireModel ctx span "a number with decimals converted to text"
+            DaxValue.toText v
+        | DaxValue.Currency c when c % 10000L <> 0L ->
+            Culture.requireModel ctx span "a number with decimals converted to text"
+            DaxValue.toText v
         | _ -> DaxValue.toText v
 
     /// An operand of arithmetic. Text that reads as a number is that number; text that would only
@@ -205,6 +217,46 @@ module Convert =
                     "text read as a date in arithmetic (how a date is written depends on the model's culture)"
             | _ -> ()
         | _ -> ()
+
+/// `&&`, `||`, AND and OR.
+module Logic =
+
+    /// `left && right` or `left || right`, the left side already evaluated. The right side is not
+    /// evaluated when the left decides, except to tell whether both sides are BLANK: Microsoft's
+    /// table of BLANK in operations gives BLANK for that, SQLBI says a logical expression is
+    /// never BLANK, so it is refused (see `DaxValue.bothBlank`).
+    let connective (ev: IEval) (ctx: Ctx) (isAnd: bool) (span: Span) (left: DaxValue) (right: Expr) : DaxValue =
+        let toBool (v: DaxValue) =
+            Fail.dax ctx span (DaxValue.toBoolean v)
+
+        if DaxValue.isBlank left then
+            let r =
+                try
+                    ev.Scalar(ctx, right)
+                with DaxRuntimeException _ when isAnd ->
+                    // BLANK && <an error>: FALSE if the right side is never looked at.
+                    Fail.notSupported
+                        ctx
+                        span
+                        "BLANK && an expression that raises an error (whether the right side is evaluated is not documented)"
+
+            if DaxValue.isBlank r then
+                Fail.notSupported ctx span DaxValue.bothBlank
+            elif isAnd then
+                // Evaluated only to rule out BLANK; it must still be a condition.
+                toBool r |> ignore
+                DaxValue.Boolean false
+            else
+                DaxValue.Boolean(toBool r)
+        elif isAnd then
+            if not (toBool left) then
+                DaxValue.Boolean false
+            else
+                DaxValue.Boolean(toBool (ev.Scalar(ctx, right)))
+        elif toBool left then
+            DaxValue.Boolean true
+        else
+            DaxValue.Boolean(toBool (ev.Scalar(ctx, right)))
 
 /// Sorting where the sources leave the order open.
 module Sorting =

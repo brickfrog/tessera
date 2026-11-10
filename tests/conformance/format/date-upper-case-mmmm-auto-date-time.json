@@ -1,0 +1,39 @@
+{
+  "title": "FORMAT with \"MMMM\" (upper case) gives the full month name: January",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( DATE ( 2019, 1, 1 ), \"MMMM\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "January"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/continuous-axis-for-any-date-table-in-power-bi/",
+      "quote": "column Month = FORMAT([Date], \"MMMM\")",
+      "supports": "the TMDL of the hidden table Power BI's auto date/time creates: its Month column is FORMAT([Date], \"MMMM\")"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-auto-date-time",
+      "quote": "Each table also includes six calculated columns: Day, MonthNo, Month, QuarterNo, Quarter, and Year.",
+      "supports": "the screenshot of the table's rows shows Month = January for 01/01/2019"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Two published sources joined: SQLBI prints the auto date/time table's Month column as FORMAT([Date], \"MMMM\"), and Microsoft Learn shows that column as January on the row for 01/01/2019. So FORMAT ( DATE ( 2019, 1, 1 ), \"MMMM\" ) is \"January\". Not `published`, since no one page shows the formula with its output, and Learn says the rows \"would look similar to\" its example.",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "upper-case"
+  ]
+}

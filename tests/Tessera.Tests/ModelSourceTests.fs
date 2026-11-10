@@ -22,6 +22,13 @@ let private writeBim (path: string) =
 [<Tests>]
 let tests =
     testList "ModelSource.resolve" [
+        testCase "an empty path is an input error, not a crash"
+        <| fun () ->
+            for input in [ ""; "   " ] do
+                match ModelSource.resolve input with
+                | Error(PathNotFound _) -> ()
+                | other -> failtestf "%A" other
+
         testCase "a .bim file"
         <| fun () ->
             use t = new TempDir()

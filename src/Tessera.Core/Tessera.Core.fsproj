@@ -55,19 +55,26 @@
     <Compile Include="FixtureEmbed.fs" />
     <Compile Include="Engine/Types.fs" />
     <Compile Include="Engine/Context.fs" />
+    <Compile Include="Engine/Culture.fs" />
     <Compile Include="Engine/Typing.fs" />
     <Compile Include="Engine/Functions/Aggregation.fs" />
     <Compile Include="Engine/Functions/Logical.fs" />
+    <Compile Include="Engine/Functions/DateTime.fs" />
     <Compile Include="Engine/Functions/Conversion.fs" />
     <Compile Include="Engine/Functions/Math.fs" />
     <Compile Include="Engine/Functions/Statistical.fs" />
     <Compile Include="Engine/Functions/Information.fs" />
     <Compile Include="Engine/Functions/Text.fs" />
+    <Compile Include="Engine/Functions/Format.fs" />
     <Compile Include="Engine/Functions/Filter.fs" />
     <Compile Include="Engine/Functions/TableFunctions.fs" />
+    <Compile Include="Engine/Functions/NonBlank.fs" />
+    <Compile Include="Engine/Functions/TimeIntelligence.fs" />
     <Compile Include="Engine/Eval.fs" />
     <Compile Include="Engine/Registry.fs" />
     <Compile Include="Engine/Engine.fs" />
+    <Compile Include="TestSuite.fs" />
+    <Compile Include="TestRun.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -78,6 +85,8 @@
     <PackageReference Include="Microsoft.AnalysisServices" Version="19.118.3" />
     <!-- Apache-2.0. Evaluates BPA rule expressions (Dynamic LINQ, as Tabular Editor uses). -->
     <PackageReference Include="System.Linq.Dynamic.Core" Version="1.7.4" />
+    <!-- MIT. Reads `tess test` suites (YAML); it makes no network calls. -->
+    <PackageReference Include="YamlDotNet" Version="18.1.0" />
   </ItemGroup>
 
 </Project>

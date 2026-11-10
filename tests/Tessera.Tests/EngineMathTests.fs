@@ -135,9 +135,12 @@ let tests =
                 is (p ()) "CONVERT ( \"1966-12-25\", DATETIME )" (DateTime(1966, 12, 25))
                 is (p ()) "CONVERT ( 12345, DATETIME )" (DateTime(1933, 10, 18))
                 is (p ()) "CONVERT ( FALSE, DATETIME )" (DateTime(1899, 12, 30))
-                // Day first or month first is the culture's choice.
-                refused "CONVERT ( \"1/2/2024\", DATETIME )"
-                refused "CONVERT ( \"Jan 2 2024\", DATETIME )"
+                // Text is read as the date functions read it, by the model's culture (en-US here):
+                // month first, day first only when month first is no date (Microsoft Learn, DATEVALUE).
+                is (p ()) "CONVERT ( \"1/2/2024\", DATETIME )" (DateTime(2024, 1, 2))
+                is (p ()) "CONVERT ( \"23/10/2020\", DATETIME )" (DateTime(2020, 10, 23))
+                is (p ()) "CONVERT ( \"Jan 2 2024\", DATETIME )" (DateTime(2024, 1, 2))
+                refused "CONVERT ( \"2.1.2024\", DATETIME )"
                 refused "CONVERT ( -1, DATETIME )"
                 daxError "CONVERT ( \"abc\", DATETIME )")
             testCase "to STRING, DOUBLE and BOOLEAN" (fun () ->

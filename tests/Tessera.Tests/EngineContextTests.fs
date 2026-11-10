@@ -311,6 +311,28 @@ let tests =
                     (p ())
                     "SUMX ( Sales, CALCULATE ( COUNTROWS ( Sales ), ALL ( 'Date' ), USERELATIONSHIP ( Sales[ShipDate], 'Date'[Date] ) ) )"
                     7)
+            // The expanded table is fixed when the table is evaluated: "Date[Month] contained in
+            // SalesB is related to Sales[DueDate], not to Sales[Date]" (SQLBI, "Expanded tables in
+            // DAX"). Ship months of rows 1..7: Jan Feb Jan Feb Feb Jan Feb; order months: Jan Jan
+            // Jan Feb Feb Dec Feb.
+            testCase "RELATED follows the relationships in force when its table was evaluated" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE VAR S = CALCULATETABLE ( Sales, USERELATIONSHIP ( Sales[ShipDate], 'Date'[Date] ) ) RETURN SELECTCOLUMNS ( S, \"Id\", Sales[Id], \"Month\", RELATED ( 'Date'[Month] ) )"
+                    [
+                        [ 1; "Jan" ]
+                        [ 2; "Feb" ]
+                        [ 3; "Jan" ]
+                        [ 4; "Feb" ]
+                        [ 5; "Feb" ]
+                        [ 6; "Jan" ]
+                        [ 7; "Feb" ]
+                    ]
+
+                is
+                    (p ())
+                    "VAR S = Sales RETURN CALCULATE ( CONCATENATEX ( S, RELATED ( 'Date'[Month] ), \",\", Sales[Id] ), USERELATIONSHIP ( Sales[ShipDate], 'Date'[Date] ) )"
+                    "Jan,Jan,Jan,Feb,Feb,Dec,Feb")
             // "follows a chain of one or more many-to-one relationships to fetch the value"
             // (dax.guide/related). Red rows: 1, 2, 3, 6, 7 with Qty 2 + 1 + 3 + 5 + 1.
             testCase "RELATED" (fun () ->
@@ -482,12 +504,12 @@ let tests =
                 let m =
                     prepare {
                         star with
-                            Measures = star.Measures @ [ "Sales", "Formatted", "1 +\n  FORMAT ( [Amount], \"0\" )" ]
+                            Measures = star.Measures @ [ "Sales", "Formatted", "1 +\n  PATHITEM ( [Amount], 1 )" ]
                     }
 
                 match scalarError m "[Formatted]" with
                 | DaxNotSupported(what, at) ->
-                    Expect.equal what "the function FORMAT" "what"
+                    Expect.equal what "the function PATHITEM" "what"
                     Expect.equal at "measure 'Sales'[Formatted] 2:3" "where"
                 | other -> failtestf "%A" other)
             // "val (eager evaluation): The expression is evaluated once before invoking the

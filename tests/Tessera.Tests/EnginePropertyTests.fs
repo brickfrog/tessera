@@ -559,6 +559,81 @@ let tests =
                 | Error(DaxNotSupported(what, _)) when w.Both && what.Contains "keeps all of its rows" -> ()
                 | Error e -> failtestf "seed %d: %s: %s\n%s\n%A" seed t.Name (TessError.message e) query s
 
+        // SUMMARIZECOLUMNS ( D1[A], "n", COUNTROWS ( F ) ) under the scenario's outer filters (in
+        // CALCULATETABLE, or as its own filter arguments): a row per value of D1[A], the blank row's
+        // BLANK included, for which the count is not BLANK, and that count is the one the
+        // definition gives with D1[A] = the value as one more filter. A filter on D1[A] together
+        // with other columns is left out: whether the group-by value replaces or narrows it is not
+        // what this checks.
+        testPropertyWithConfig
+            { config with maxTest = 600 }
+            "SUMMARIZECOLUMNS groups and counts are the ones the definition of the filter context gives"
+        <| fun (seed: int) ->
+            let s = { scenario seed with Inner = Nothing }
+            let w = s.World
+
+            let mixed =
+                s.Outer
+                |> List.exists (fun f ->
+                    match f with
+                    | Treatas(cols, _) -> cols.Length > 1 && List.contains ("D1", "A") cols
+                    | Above _ -> false)
+
+            if not mixed then
+                let p = prepare (model w)
+                let filters = Oracle.filters s
+                let d1 = Oracle.tab w "D1"
+                let f = Oracle.tab w "F"
+
+                let expected =
+                    Oracle.rows w "D1"
+                    |> List.map (Oracle.cell d1 "A")
+                    |> List.distinct
+                    |> List.choose (fun a ->
+                        let group = {
+                            Cols = [ "D1", "A" ]
+                            Tuples = set [ [ a ] ]
+                        }
+
+                        let n =
+                            (Oracle.visible w (filters @ [ group ]) "F"
+                             |> List.filter (fun r -> List.contains r f.Rows))
+                                .Length
+
+                        if n = 0 then None else Some(a, n))
+                    |> List.sort
+
+                let outer = s.Outer |> List.map (fun f -> ", " + outerDax f) |> String.concat ""
+
+                for query in
+                    [
+                        $"EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( D1[A], \"n\", COUNTROWS ( F ) ){outer} )"
+                        $"EVALUATE SUMMARIZECOLUMNS ( D1[A]{outer}, \"n\", COUNTROWS ( F ) )"
+                    ] do
+                    match Engine.evaluateQuery p query with
+                    | Ok(r :: _) ->
+                        let got =
+                            r.Rows
+                            |> List.map (fun (row: QueryValue array) ->
+                                let a =
+                                    match row.[0] with
+                                    | QueryValue.String x -> Some x
+                                    | QueryValue.Blank -> None
+                                    | other -> failtestf "seed %d: %A" seed other
+
+                                let n =
+                                    match row.[1] with
+                                    | QueryValue.Int64 n -> int n
+                                    | other -> failtestf "seed %d: %A" seed other
+
+                                a, n)
+                            |> List.sort
+
+                        Expect.equal got expected $"seed {seed}\n{query}\n%A{s}"
+                    | Ok [] -> failtest "no result"
+                    | Error(DaxNotSupported(what, _)) when w.Both && what.Contains "keeps all of its rows" -> ()
+                    | Error e -> failtestf "seed %d: %s\n%s\n%A" seed (TessError.message e) query s
+
         // The property above is only worth what its scenarios reach: check that they do reach the
         // cases they are for, with results that the filters actually decide.
         testCase "the scenarios cover two facts, a chain, both directions and inner CALCULATEs"

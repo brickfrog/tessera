@@ -261,27 +261,260 @@ let tests =
                     [ [ "Red"; 570; 175 ]; [ "Black"; 15; 175 ] ])
             testCase "no group-by column: one row" (fun () ->
                 returns (p ()) "EVALUATE SUMMARIZECOLUMNS ( \"A\", [Amount], \"U\", [Units] )" [ [ 625; 17 ] ])
+            // "GroupBy columns within SummarizeColumns will no longer be filtered by columns from
+            // external tables, even if a relationship exists between them" (Microsoft Learn,
+            // SUMMARIZECOLUMNS, "SelfValue semantics"); the expressions are filtered. Bob (UK) has
+            // rows 2 (Red, 100) and 5 (no product, 40); the Safety products are Red and Black.
+            testCase "under an outer filter" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], \"A\", [Amount] ), Customer[Country] = \"UK\" )"
+                    [ [ "Red"; 100 ]; [ null; 40 ] ]
+
+                // A filter on the group-by table restricts the groups.
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color] ), Product[Category] = \"Safety\" )"
+                    [ [ "Red" ]; [ "Black" ] ]
+
+                // A filter on a related table does not: every customer key of Sales, though only
+                // customer 3 bought the Black product.
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Sales[CustomerKey] ), Product[Color] = \"Black\" )"
+                    [ [ 1 ]; [ 2 ]; [ 3 ] ]
+
+                // With an expression, only the groups where it isn't BLANK are left.
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Sales[CustomerKey], \"A\", [Amount] ), Product[Color] = \"Black\" )"
+                    [ [ 3; 15 ] ])
+            // "normal filters (which override existing filters) and filters with KeepFilters
+            // specified" (Microsoft Learn).
+            testCase "a filter argument replaces the outer filter on its column, unless under KEEPFILTERS" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], TREATAS ( { \"Red\" }, Product[Color] ), \"A\", [Amount] ), Product[Color] = \"Black\" )"
+                    [ [ "Red"; 570 ] ]
+
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], KEEPFILTERS ( TREATAS ( { \"Red\" }, Product[Color] ) ), \"A\", [Amount] ), Product[Color] = \"Black\" )"
+                    []
+
+                returns
+                    (p ())
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], KEEPFILTERS ( TREATAS ( { \"Red\", \"Black\" }, Product[Color] ) ), \"A\", [Amount] ), Product[Color] = \"Black\" )"
+                    [ [ "Black"; 15 ] ])
+            // "contextual SummarizeColumns ... allows SummarizeColumns to be evaluated in any context
+            // transition" (Microsoft Learn). Colours with an amount: Ann (rows 1, 3, 7) Red; Bob
+            // (2, 5) Red and no product; Cy (4, 6) Black and Red.
+            testCase "in a measure, after a context transition" (fun () ->
+                returns
+                    (p ())
+                    "DEFINE MEASURE Sales[Colours] = COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], \"A\", [Amount] ) )
+                     EVALUATE ADDCOLUMNS ( VALUES ( Customer[Name] ), \"N\", [Colours] )"
+                    [ [ "Ann"; 1 ]; [ "Bob"; 2 ]; [ "Cy"; 2 ] ]
+
+                returns
+                    (p ())
+                    "EVALUATE ROW ( \"x\", SUMX ( VALUES ( Customer[Name] ), CALCULATE ( COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], \"A\", [Amount] ) ) ) ) )"
+                    [ [ 5 ] ])
+            // "SUMMARIZECOLUMNS ( year, color, Sales )" is "SUMMARIZE ( Sales, year, color )" (SQLBI,
+            // "Introducing SUMMARIZECOLUMNS"): the table has the columns of its expanded table, so
+            // it pairs the two group-by tables. Rows 1, 3, 6, 7 are Red in the US (200 + 60 + 100 +
+            // 110), row 2 Red in the UK, row 4 Black in the US, row 5 no product in the UK.
+            testCase "a model table as a filter pairs the group-by tables it relates to" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales, \"A\", [Amount] )"
+                    [
+                        [ "Red"; "US"; 470 ]
+                        [ "Red"; "UK"; 100 ]
+                        [ "Black"; "US"; 15 ]
+                        [ null; "UK"; 40 ]
+                    ]
+
+                returns (p ()) "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales )" [
+                    [ "Red"; "US" ]
+                    [ "Red"; "UK" ]
+                    [ "Black"; "US" ]
+                    [ null; "UK" ]
+                ]
+
+                // The same as SUMMARIZE.
+                Expect.equal
+                    (sortedRows (p ()) "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales )")
+                    (sortedRows (p ()) "EVALUATE SUMMARIZE ( Sales, Product[Color], Customer[Country] )")
+                    ""
+
+                // Only the Sales rows a filter on one of the tables leaves.
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales, TREATAS ( { \"UK\" }, Customer[Country] ) )"
+                    [ [ "Red"; "UK" ]; [ null; "UK" ] ])
+            // "Rows for which all expressions not using IGNORE return BLANK/NULL will be excluded
+            // independent of whether the expressions which do use IGNORE evaluate to BLANK/NULL or
+            // not"; with every expression ignored, "they're included since there are no unignored
+            // expressions which return blank" (Microsoft Learn).
+            testCase "IGNORE" (fun () ->
+                returns (p ()) "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"A\", IGNORE ( [Amount] ) )" [
+                    [ "Red"; 570 ]
+                    [ "Black"; 15 ]
+                    [ "Blue"; null ]
+                    [ null; 40 ]
+                ]
+
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"A\", IGNORE ( [Amount] ), \"Big\", IF ( [Amount] > 100, 1 ) )"
+                    [ [ "Red"; 570; 1 ] ]
+
+                Expect.equal
+                    (queryCode (p ()) "EVALUATE ROW ( \"x\", IGNORE ( 1 ) )")
+                    "dax-invalid"
+                    "only in SUMMARIZECOLUMNS")
+            // dax.guide/rollupaddissubtotal: the subtotal row has a blank group and TRUE in the
+            // named column; the result is the group-by columns, the subtotal columns, the
+            // expressions.
+            testCase "ROLLUPADDISSUBTOTAL" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"T\" ), \"A\", [Amount] )"
+                    [
+                        [ "Red"; false; 570 ]
+                        [ "Black"; false; 15 ]
+                        [ null; false; 40 ]
+                        [ null; true; 625 ]
+                    ]
+
+                Expect.equal
+                    ((query
+                        (p ())
+                        "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Customer[Country], \"CT\" ), ROLLUPADDISSUBTOTAL ( Product[Category], \"PT\" ), \"A\", [Amount] )")
+                         .Columns
+                     |> List.map _.Name)
+                    [ "Customer[Country]"; "Product[Category]"; "[CT]"; "[PT]"; "[A]" ]
+                    "columns"
+
+                // The filters stay on a subtotal: the Safety products only (60 + 100 + 15).
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"T\" ), TREATAS ( { \"Safety\" }, Product[Category] ), \"A\", [Amount] )"
+                    [ [ "Red"; false; 160 ]; [ "Black"; false; 15 ]; [ null; true; 175 ] ])
+            // Cycling is rows 1, 2, 7 (410), Safety rows 3, 4, 6 (175), no product row 5 (40); the
+            // US is 485 and the UK 140. Two calls roll up independently ("matrices of subtotals").
+            testCase "several ROLLUPADDISSUBTOTAL" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Customer[Country], \"CT\" ), ROLLUPADDISSUBTOTAL ( Product[Category], \"PT\" ), \"A\", [Amount] )"
+                    [
+                        [ "US"; "Cycling"; false; false; 310 ]
+                        [ "US"; "Safety"; false; false; 175 ]
+                        [ "UK"; "Cycling"; false; false; 100 ]
+                        [ "UK"; null; false; false; 40 ]
+                        [ "US"; null; false; true; 485 ]
+                        [ "UK"; null; false; true; 140 ]
+                        [ null; "Cycling"; true; false; 410 ]
+                        [ null; "Safety"; true; false; 175 ]
+                        [ null; null; true; false; 40 ]
+                        [ null; null; true; true; 625 ]
+                    ])
+            // "multiple ROLLUP columns in the same ROLLUPADDISSUBTOTAL ... including only the group
+            // totals at higher levels following the hierarchy of columns specified"
+            // (dax.guide/rollupaddissubtotal); ROLLUPGROUP: "rolled together when reporting a
+            // subtotal" (Microsoft Learn).
+            testCase "levels in one ROLLUPADDISSUBTOTAL, and ROLLUPGROUP" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Customer[Country], \"CT\", Product[Category], \"PT\" ), \"A\", [Amount] )"
+                    [
+                        [ "US"; "Cycling"; false; false; 310 ]
+                        [ "US"; "Safety"; false; false; 175 ]
+                        [ "UK"; "Cycling"; false; false; 100 ]
+                        [ "UK"; null; false; false; 40 ]
+                        [ "US"; null; false; true; 485 ]
+                        [ "UK"; null; false; true; 140 ]
+                        [ null; null; true; true; 625 ]
+                    ]
+
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( ROLLUPGROUP ( Customer[Country], Product[Category] ), \"T\" ), \"A\", [Amount] )"
+                    [
+                        [ "US"; "Cycling"; false; 310 ]
+                        [ "US"; "Safety"; false; 175 ]
+                        [ "UK"; "Cycling"; false; 100 ]
+                        [ "UK"; null; false; 40 ]
+                        [ null; null; true; 625 ]
+                    ])
+            // "ISINSCOPE checks whether there is a filter placed on the column derived either from
+            // context transition or from a group by column placed by SUMMARIZECOLUMNS"
+            // (dax.guide/isinscope); "at the grand total ... Brand neither has one value, nor is it
+            // in scope" (SQLBI, "Distinguishing HASONEVALUE from ISINSCOPE").
+            testCase "ISINSCOPE" (fun () ->
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"T\" ), \"S\", ISINSCOPE ( Product[Color] ), \"C\", ISINSCOPE ( Product[Category] ), \"X\", CALCULATE ( ISINSCOPE ( Product[Color] ), ALL ( Product[Color] ) ) )"
+                    [
+                        [ "Red"; false; true; false; false ]
+                        [ "Black"; false; true; false; false ]
+                        [ "Blue"; false; true; false; false ]
+                        [ null; false; true; false; false ]
+                        [ null; true; false; false; false ]
+                    ]
+
+                // A filter from a context transition counts; the measure sees it too.
+                returns
+                    (p ())
+                    "DEFINE MEASURE Sales[In] = ISINSCOPE ( Customer[Country] )
+                     EVALUATE ADDCOLUMNS ( VALUES ( Customer[Country] ), \"a\", CALCULATE ( ISINSCOPE ( Customer[Country] ) ), \"b\", [In], \"c\", CALCULATE ( [In], Customer[Country] = \"US\" ) )"
+                    [ [ "US"; true; true; false ]; [ "UK"; true; true; false ] ]
+
+                returns (p ()) "EVALUATE ROW ( \"x\", ISINSCOPE ( Product[Color] ) )" [ [ false ] ]
+
+                notSupported
+                    (p ())
+                    "EVALUATE ADDCOLUMNS ( VALUES ( Product[Color] ), \"s\", ISINSCOPE ( Product[Color] ) )"
+                    "ISINSCOPE inside a row context"
+
+                // The transition over Sales also filters Product: whether that counts is not said.
+                notSupported
+                    (p ())
+                    "EVALUATE ROW ( \"x\", SUMX ( Sales, IF ( CALCULATE ( ISINSCOPE ( Product[Color] ) ), 1 ) ) )"
+                    "related")
             testCase "what is not supported says so" (fun () ->
                 notSupported
                     (p ())
-                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"s\" ), \"A\", [Amount] )"
-                    "ROLLUPADDISSUBTOTAL"
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"s\", VALUES ( Product[Color] ) ), \"A\", [Amount] )"
+                    "ROLLUPADDISSUBTOTAL with a filter"
+
+                notSupported
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ), \"A\", [Amount] )"
+                    "NONVISUAL"
 
                 notSupported
                     (p ())
                     "EVALUATE ROW ( \"x\", SUMX ( Product, COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color] ) ) ) )"
-                    "SUMMARIZECOLUMNS"
+                    "SUMMARIZECOLUMNS inside a row context"
 
                 notSupported
                     (p ())
-                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Color], \"A\", [Amount] ), Customer[Country] = \"UK\" )"
-                    "SUMMARIZECOLUMNS"
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], KEEPFILTERS ( VALUES ( Product[Color] ) ), VALUES ( Product[Category] ) )"
+                    "KEEPFILTERS"
 
-                // A filter that pairs columns of two group-by tables.
+                // A filter that pairs columns of two group-by tables and isn't a model table.
                 notSupported
                     (p ())
-                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales, \"A\", [Amount] )"
-                    "more than one")
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], TREATAS ( { ( \"Red\", \"US\" ) }, Product[Color], Customer[Country] ) )"
+                    "more than one"
+
+                // No group and nothing to show: is the one row returned?
+                notSupported
+                    (p ())
+                    "EVALUATE SUMMARIZECOLUMNS ( \"A\", CALCULATE ( [Amount], Product[Color] = \"Blue\" ) )"
+                    "total row")
         ]
 
         testList "other table functions" [
@@ -323,6 +556,91 @@ let tests =
                 // "data comparison with no type coercion": the whole number 1 is not the decimal 1.
                 returns (p ()) "EVALUATE INTERSECT ( { 1 }, { 1.0 } )" []
                 Expect.equal (queryCode (p ()) "EVALUATE UNION ( { 1 }, { ( 1, 2 ) } )") "dax-invalid" "column counts")
+            // "Tables are joined on common columns (by name)"; "If the two tables have no common
+            // column names, an error is returned"; "Columns being joined on must have the same data
+            // type in both tables" (Microsoft Learn, NATURALINNERJOIN). "A row of the left table
+            // without a match is returned once, with blank values in the columns of the right
+            // table" (dax.guide/naturalleftouterjoin).
+            testCase "NATURALINNERJOIN and NATURALLEFTOUTERJOIN" (fun () ->
+                let left =
+                    "DATATABLE ( \"K\", INTEGER, \"A\", STRING, { { 1, \"x\" }, { 2, \"y\" } } )"
+
+                let right =
+                    "DATATABLE ( \"K\", INTEGER, \"B\", STRING, { { 2, \"p\" }, { 2, \"q\" }, { 3, \"r\" } } )"
+
+                let inner = $"EVALUATE NATURALINNERJOIN ( {left}, {right} )"
+                // K = 2 matches twice; 1 and 3 have no partner.
+                returns (p ()) inner [ [ 2; "y"; "p" ]; [ 2; "y"; "q" ] ]
+
+                Expect.equal
+                    (columns (query (p ()) inner))
+                    [ "[K]", "int64"; "[A]", "string"; "[B]", "string" ]
+                    "the key once"
+
+                returns (p ()) $"EVALUATE NATURALLEFTOUTERJOIN ( {left}, {right} )" [
+                    [ 1; "x"; null ]
+                    [ 2; "y"; "p" ]
+                    [ 2; "y"; "q" ]
+                ]
+
+                Expect.equal
+                    (queryCode (p ()) "EVALUATE NATURALINNERJOIN ( { 1 }, ROW ( \"x\", 1 ) )")
+                    "dax-invalid"
+                    "no common column"
+
+                Expect.equal
+                    (queryCode
+                        (p ())
+                        "EVALUATE NATURALINNERJOIN ( DATATABLE ( \"K\", INTEGER, { { 1 } } ), DATATABLE ( \"K\", DOUBLE, { { 1 } } ) )")
+                    "dax-invalid"
+                    "different data types"
+
+                notSupported (p ()) "EVALUATE NATURALINNERJOIN ( Sales, Product )" "lineage"
+                notSupported (p ()) "EVALUATE NATURALINNERJOIN ( { 1, BLANK () }, { 1 } )" "BLANK")
+            // "all the unique combinations of the columns in the table specified in the first
+            // argument that are not listed in the following arguments" (dax.guide/allexcept).
+            testCase "ALLEXCEPT as a table" (fun () ->
+                returns (p ()) "EVALUATE ALLEXCEPT ( Customer, Customer[CustomerKey], Customer[Name] )" [
+                    [ "US" ]
+                    [ "UK" ]
+                ]
+                // No filter applies to it.
+                Expect.equal
+                    (rows
+                        (p ())
+                        "EVALUATE CALCULATETABLE ( ALLEXCEPT ( Customer, Customer[CustomerKey] ), Customer[Country] = \"UK\" )")
+                        .Length
+                    3
+                    "all of Name, Country"
+                // Product has the blank row of Sales' product 9.
+                notSupported (p ()) "EVALUATE ALLEXCEPT ( Product, Product[ProductKey] )" "blank row"
+                notSupported (p ()) "EVALUATE ALLEXCEPT ( Customer, Customer )" "table"
+                notSupported (p ()) "EVALUATE ALLEXCEPT ( Sales, Sales[Id], Product[Color] )" "related")
+            // "Returns the first value in the column for which the expression has a non blank
+            // value"; a column reference "is replaced by CALCULATETABLE ( DISTINCT ( <ColumnName> )
+            // )" (dax.guide/firstnonblank). FIRSTNONBLANKVALUE is "CALCULATE ( <Expression>,
+            // FIRSTNONBLANK ( <ColumnName>, CALCULATE ( <Expression> ) ) )"
+            // (dax.guide/firstnonblankvalue).
+            testCase "FIRSTNONBLANK, LASTNONBLANK and their VALUE forms" (fun () ->
+                // Ann has sales (200 + 60 + 110).
+                returns (p ()) "EVALUATE FIRSTNONBLANK ( Customer[Name], [Amount] )" [ [ "Ann" ] ]
+                // Bike, Helmet, Lock, Pump: Pump has no sales; the blank row is not among the values.
+                returns (p ()) "EVALUATE LASTNONBLANK ( Product[Name], [Amount] )" [ [ "Lock" ] ]
+                is (p ()) "FIRSTNONBLANKVALUE ( Product[Name], [Amount] )" 410
+                is (p ()) "LASTNONBLANKVALUE ( Product[Name], [Amount] )" 15
+                // Cy: 15 + 100.
+                is (p ()) "LASTNONBLANKVALUE ( Customer[Name], [Amount] )" 115
+                // The column's values come after a context transition: per country, its customers.
+                returns
+                    (p ())
+                    "EVALUATE ADDCOLUMNS ( VALUES ( Customer[Country] ), \"f\", FIRSTNONBLANK ( Customer[Name], [Amount] ) )"
+                    [ [ "US"; "Ann" ]; [ "UK"; "Bob" ] ]
+                // A table of one column, in a row context on each value.
+                returns (p ()) "EVALUATE FIRSTNONBLANK ( { 3, 1, 2 }, IF ( [Value] > 1, 1 ) )" [ [ 2 ] ]
+                returns (p ()) "EVALUATE LASTNONBLANK ( { 3, 1, 2 }, IF ( [Value] < 3, 1 ) )" [ [ 2 ] ]
+                returns (p ()) "EVALUATE FIRSTNONBLANK ( Customer[Name], BLANK () )" []
+                notSupported (p ()) "EVALUATE FIRSTNONBLANK ( Customer[Name] = \"Ann\", 1 )" "Boolean"
+                notSupported (p ()) "EVALUATE FIRSTNONBLANK ( { 1, \"a\" }, 1 )" "different data types")
             // "Column names from table arguments must all be different in all tables or an error
             // is returned" (Microsoft Learn, CROSSJOIN).
             testCase "CROSSJOIN" (fun () ->
@@ -382,6 +700,20 @@ let tests =
 
                 notSupported (p ()) "EVALUATE GROUPBY ( Sales, Sales[CustomerKey], \"A\", [Amount] )" "CURRENTGROUP"
 
+                // "GROUPBY is useful to group by columns with no lineage" (dax.guide/groupby). Qty is
+                // 2, 1, 3, 1, 4, 5, 1: above 1 in rows 1, 3, 5, 6 (2 + 3 + 4 + 5), not in 2, 4, 7.
+                returns
+                    (p ())
+                    "EVALUATE GROUPBY ( ADDCOLUMNS ( Sales, \"Size\", IF ( Sales[Qty] > 1, \"Large\", \"Small\" ) ), [Size], \"Q\", SUMX ( CURRENTGROUP (), Sales[Qty] ), \"N\", COUNTX ( CURRENTGROUP (), 1 ) )"
+                    [ [ "Large"; 14; 4 ]; [ "Small"; 3; 3 ] ]
+
+                // "SUMMARIZE has the option of grouping by columns computed in the query"
+                // (dax.guide/summarize).
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZE ( ADDCOLUMNS ( VALUES ( Sales[Qty] ), \"Size\", IF ( Sales[Qty] > 1, \"Large\", \"Small\" ) ), [Size] )"
+                    [ [ "Large" ]; [ "Small" ] ]
+
                 Expect.equal
                     (queryCode (p ()) "EVALUATE { COUNTROWS ( CURRENTGROUP () ) }")
                     "dax-invalid"
@@ -389,6 +721,163 @@ let tests =
         ]
 
         testList "queries" [
+            // "The syntax after COLUMN defines a query column, which has a data lineage and it is
+            // populated in an empty filter context before the query is executed"
+            // (dax.guide/st/column). Units: Bike rows 1, 2, 7 (2 + 1 + 1), Helmet rows 3, 6 (3 + 5),
+            // Lock row 4, Pump none.
+            testCase "DEFINE COLUMN" (fun () ->
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Sold] = [Units]
+                     EVALUATE SELECTCOLUMNS ( Product, \"n\", Product[Name], \"u\", Product[Sold] )"
+                    [ [ "Bike"; 4 ]; [ "Helmet"; 8 ]; [ "Lock"; 1 ]; [ "Pump"; null ] ]
+
+                // Computed before the query's filters exist.
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Sold] = [Units]
+                     EVALUATE CALCULATETABLE ( SELECTCOLUMNS ( Product, \"n\", Product[Name], \"u\", Product[Sold] ), Customer[Country] = \"UK\" )"
+                    [ [ "Bike"; 4 ]; [ "Helmet"; 8 ]; [ "Lock"; 1 ]; [ "Pump"; null ] ]
+
+                // No context transition without CALCULATE: the grand total in every row.
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[All] = SUM ( Sales[Qty] )
+                     EVALUATE SELECTCOLUMNS ( Product, \"n\", Product[Name], \"u\", Product[All] )"
+                    [ [ "Bike"; 17 ]; [ "Helmet"; 17 ]; [ "Lock"; 17 ]; [ "Pump"; 17 ] ]
+
+                // A column like any other: grouped by, filtered on. The Bike is 410, the Helmet and
+                // the Lock 175, and row 5 has no product.
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Kind] = IF ( Product[Name] = \"Bike\", \"B\", \"S\" )
+                     EVALUATE SUMMARIZECOLUMNS ( Product[Kind], \"A\", [Amount] )"
+                    [ [ "B"; 410 ]; [ "S"; 175 ]; [ null; 40 ] ]
+
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Kind] = IF ( Product[Name] = \"Bike\", \"B\", \"S\" )
+                            MEASURE Sales[Small] = CALCULATE ( [Amount], Product[Kind] = \"S\" )
+                     EVALUATE ROW ( \"x\", [Small] )"
+                    [ [ 175 ] ])
+            // "Definitions can reference other definitions that appear before or after the current
+            // definition" (Microsoft Learn, "DAX queries").
+            testCase "a query column uses a query measure defined after it, and another query column" (fun () ->
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Twice] = [Q2] + Product[One]
+                            COLUMN Product[One] = 1
+                            MEASURE Sales[Q2] = SUM ( Sales[Qty] ) * 2
+                     EVALUATE SELECTCOLUMNS ( Product, \"n\", Product[Name], \"u\", Product[Twice] )"
+                    [ [ "Bike"; 9 ]; [ "Helmet"; 17 ]; [ "Lock"; 3 ]; [ "Pump"; 1 ] ])
+            // "The syntax after TABLE defines a query table, which has a data lineage" of its own
+            // (dax.guide/st/table): it doesn't filter Product unless TREATAS says so.
+            testCase "DEFINE TABLE" (fun () ->
+                let result =
+                    query (p ()) "DEFINE TABLE Colors = DISTINCT ( Product[Color] ) EVALUATE Colors"
+
+                Expect.equal (result.Columns |> List.map _.Name) [ "Colors[Color]" ] "its columns are its own"
+
+                returns (p ()) "DEFINE TABLE Colors = DISTINCT ( Product[Color] ) EVALUATE Colors" [
+                    [ "Red" ]
+                    [ "Black" ]
+                    [ "Blue" ]
+                ]
+
+                returns
+                    (p ())
+                    "DEFINE TABLE Colors = DISTINCT ( Product[Color] )
+                     EVALUATE ADDCOLUMNS ( Colors, \"A\", [Amount] )"
+                    [ [ "Red"; 625 ]; [ "Black"; 625 ]; [ "Blue"; 625 ] ]
+
+                returns
+                    (p ())
+                    "DEFINE TABLE Colors = DISTINCT ( Product[Color] )
+                     EVALUATE ADDCOLUMNS ( Colors, \"A\", CALCULATE ( [Amount], TREATAS ( { Colors[Color] }, Product[Color] ) ) )"
+                    [ [ "Red"; 570 ]; [ "Black"; 15 ]; [ "Blue"; null ] ]
+
+                // A measure on the query table; the table uses a model measure. Only the Pump has
+                // no order.
+                returns
+                    (p ())
+                    "DEFINE TABLE Unsold = FILTER ( Product, [Orders] + 0 = 0 )
+                            MEASURE Unsold[N] = COUNTROWS ( Unsold )
+                     EVALUATE { [N] }"
+                    [ [ 1 ] ])
+            testCase "what a query defines is the query's own: the prepared model doesn't change" (fun () ->
+                let prepared = p ()
+
+                returns prepared "DEFINE COLUMN Product[One] = 1 EVALUATE ROW ( \"x\", SUM ( Product[One] ) )" [
+                    [ 4 ]
+                ]
+
+                Expect.equal (queryCode prepared "EVALUATE ROW ( \"x\", SUM ( Product[One] ) )") "dax-invalid" "gone"
+
+                returns prepared "DEFINE TABLE T2 = Product EVALUATE ROW ( \"x\", COUNTROWS ( T2 ) )" [ [ 4 ] ]
+                Expect.equal (queryCode prepared "EVALUATE T2") "dax-invalid" "gone"
+                Expect.equal (rows prepared "EVALUATE Product").Head.Length 4 "Product has its four columns")
+            testCase "DEFINE COLUMN and DEFINE TABLE: errors and refusals" (fun () ->
+                notSupported (p ()) "DEFINE COLUMN Product[Name] = 1 EVALUATE Product" "already has a column"
+                notSupported (p ()) "DEFINE TABLE Product = Customer EVALUATE Product" "already has a table"
+
+                Expect.equal
+                    (queryCode (p ()) "DEFINE COLUMN Nope[x] = 1 EVALUATE Product")
+                    "dax-invalid"
+                    "no such table"
+
+                match
+                    queryError
+                        (p ())
+                        "DEFINE COLUMN Product[A] = Product[B] + 1 COLUMN Product[B] = Product[A] + 1 EVALUATE Product"
+                with
+                | DaxInvalid(message, _) -> Expect.stringContains message "circular" ""
+                | other -> failtestf "%A" other
+
+                // A query column that fails is an error only for the queries that read it.
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Bad] = ERROR ( \"no\" ) EVALUATE ROW ( \"x\", COUNTROWS ( Customer ) )"
+                    [ [ 3 ] ]
+
+                Expect.equal
+                    (queryCode (p ()) "DEFINE COLUMN Product[Bad] = ERROR ( \"no\" ) EVALUATE VALUES ( Product[Bad] )")
+                    "dax-error"
+                    ""
+
+                notSupported (p ()) "DEFINE VAR v = 1 COLUMN Product[C] = v EVALUATE Product" "uses the query variable")
+            // The model's own calculated column and table are taken as `prepare` computed them.
+            testCase "DEFINE COLUMN in a model with calculated columns and tables" (fun () ->
+                let prepared =
+                    prepare {
+                        star with
+                            Tables =
+                                (star.Tables
+                                 |> List.map (fun t ->
+                                     if t.Name = "Product" then
+                                         t |> withCalculated [ "Double", DataType.Int64, "Product[ProductKey] * 2" ]
+                                     else
+                                         t))
+                                @ [
+                                    calculatedTable
+                                        "Colours"
+                                        [ "Color", DataType.String ]
+                                        "DISTINCT ( Product[Color] )"
+                                ]
+                    }
+
+                returns
+                    prepared
+                    "DEFINE COLUMN Product[Triple] = Product[Double] + Product[ProductKey]
+                     EVALUATE SELECTCOLUMNS ( Product, \"t\", Product[Triple] )"
+                    [ [ 3 ]; [ 6 ]; [ 9 ]; [ 12 ] ]
+
+                returns prepared "DEFINE COLUMN Product[Z] = 1 EVALUATE Colours" [ [ "Red" ]; [ "Black" ]; [ "Blue" ] ]
+
+                returns prepared "DEFINE COLUMN Colours[Len] = IF ( Colours[Color] = \"Red\", 3, 0 ) EVALUATE Colours" [
+                    [ "Red"; 3 ]
+                    [ "Black"; 0 ]
+                    [ "Blue"; 0 ]
+                ])
             testCase "ORDER BY" (fun () ->
                 returnsInOrder (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] DESC" [
                     [ "Cy" ]
@@ -447,13 +936,46 @@ let tests =
                     (p ())
                     "DEFINE VAR t = FILTER ( Customer, Customer[Country] = \"US\" ) EVALUATE ROW ( \"n\", COUNTROWS ( t ) )"
                     [ [ 2 ] ])
+            // "defines the rows to skip before the specified values according to the sort order
+            // specified in the ORDER BY section" (dax.guide/st/start-at); "The second argument in
+            // START AT defines the starting value in column 2 of the ORDER BY columns within the
+            // rows that meet the first value for column 1"; "There can be as many arguments in
+            // START AT as there are in ORDER BY, but not more" (Microsoft Learn, START AT).
+            testCase "START AT" (fun () ->
+                returnsInOrder (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] START AT \"B\"" [
+                    [ "Bob" ]
+                    [ "Cy" ]
+                ]
+                // A value that is not in the result: Bob sorts before "Bz".
+                returnsInOrder (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] START AT \"Bz\"" [
+                    [ "Cy" ]
+                ]
+                // (UK, Bob) and (US, Ann) come before (US, "B").
+                returnsInOrder
+                    (p ())
+                    "EVALUATE ALL ( Customer[Country], Customer[Name] ) ORDER BY Customer[Country], Customer[Name] START AT \"US\", \"B\""
+                    [ [ "US"; "Cy" ] ]
+                // Only the first key: every US row.
+                returnsInOrder
+                    (p ())
+                    "EVALUATE ALL ( Customer[Country], Customer[Name] ) ORDER BY Customer[Country], Customer[Name] START AT \"US\""
+                    [ [ "US"; "Ann" ]; [ "US"; "Cy" ] ]
+                // Descending: Pump, Lock, Helmet, Bike.
+                returnsInOrder
+                    (p ())
+                    "EVALUATE DISTINCT ( Product[Name] ) ORDER BY Product[Name] DESC START AT \"Helmet\""
+                    [ [ "Helmet" ]; [ "Bike" ] ]
+
+                Expect.equal
+                    (queryCode (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] START AT \"A\", 1")
+                    "dax-invalid"
+                    "more values than keys"
+
+                notSupported (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] START AT 1" "data type"
+                notSupported (p ()) "EVALUATE VALUES ( Product[Name] ) ORDER BY Product[Name] START AT \"B\"" "BLANK")
             testCase "what a query can't have yet" (fun () ->
-                notSupported (p ()) "DEFINE TABLE T = { 1 } EVALUATE T" "DEFINE TABLE"
-                notSupported (p ()) "DEFINE COLUMN Sales[X] = 1 EVALUATE Sales" "DEFINE COLUMN"
-                notSupported (p ()) "EVALUATE Customer ORDER BY Customer[Name] START AT \"B\"" "START AT"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", @p )" "@p"
-                notSupported (p ()) "EVALUATE DATESYTD ( 'Date'[Date] )" "DATESYTD"
-                notSupported (p ()) "EVALUATE ROW ( \"v\", FORMAT ( 1, \"0\" ) )" "FORMAT"
+                notSupported (p ()) "EVALUATE ROW ( \"v\", PATHITEM ( 1, 1 ) )" "PATHITEM"
                 notSupported (p ()) "EVALUATE ADDCOLUMNS ( Customer, \"r\", ROWNUMBER () )" "ROWNUMBER")
             testCase "a syntax error in a query" (fun () ->
                 match queryError (p ()) "EVALUATE FILTER ( Sales, " with
@@ -571,7 +1093,7 @@ let tests =
                                     if t.Name = "Customer" then
                                         t
                                         |> withCalculated [
-                                            "Label", DataType.String, "FORMAT ( Customer[CustomerKey], \"000\" )"
+                                            "Label", DataType.String, "PATHITEM ( Customer[CustomerKey], 1 )"
                                         ]
                                     else
                                         t)
@@ -580,14 +1102,14 @@ let tests =
                 match Engine.failures m with
                 | [ (ref, DaxNotSupported(what, at)) ] ->
                     Expect.equal (ObjectRef.format ref) "column:Customer/Label" "which"
-                    Expect.equal what "the function FORMAT" "what"
+                    Expect.equal what "the function PATHITEM" "what"
                     Expect.equal at "column 'Customer'[Label] 1:1" "where"
                 | other -> failtestf "%A" other
 
                 is m "[Amount]" 625
                 is m "CALCULATE ( [Amount], Customer[Country] = \"US\" )" 485
-                notSupported m "EVALUATE Customer" "FORMAT"
-                notSupported m "EVALUATE VALUES ( Customer[Label] )" "FORMAT")
+                notSupported m "EVALUATE Customer" "PATHITEM"
+                notSupported m "EVALUATE VALUES ( Customer[Label] )" "PATHITEM")
         ]
 
         testList "model shapes that are refused" [
@@ -728,20 +1250,23 @@ let tests =
                                 star.Tables
                                 |> List.map (fun t ->
                                     if t.Name = "Customer" then
-                                        t |> withCalculated [ "Label", DataType.String, "UPPER ( Customer[Name] )" ]
+                                        t
+                                        |> withCalculated [
+                                            "Label", DataType.String, "PATHITEM ( Customer[Name], 1 )"
+                                        ]
                                     else
                                         t)
                             Measures =
                                 star.Measures
                                 @ [
-                                    "Sales", "Formatted", "FORMAT ( [Amount], \"0\" )"
+                                    "Sales", "Formatted", "PATHITEM ( [Amount], 1 )"
                                     "Sales", "Uses Formatted", "[Formatted] & \"!\""
                                     "Sales", "Selected", "CALCULATE ( [Amount], ALLSELECTED ( Product ) )"
                                     "Sales", "Rolled", "COUNTROWS ( SUMMARIZE ( Sales, ROLLUP ( Sales[Qty] ) ) )"
                                     "Sales", "By Label", "CALCULATE ( [Amount], Customer[Label] = \"ANN\" )"
                                     "Sales", "Via Function", "Shout ( \"a\" )"
                                 ]
-                            Functions = [ "Shout", "( t : STRING ) => UPPER ( t ) & \"!\"" ]
+                            Functions = [ "Shout", "( t : STRING ) => PATHITEM ( t, 1 ) & \"!\"" ]
                     }
 
                 let coverage =
@@ -750,26 +1275,24 @@ let tests =
                     |> Map.ofList
 
                 Expect.equal coverage.["measure:Sales/Amount"] [] "supported"
-                Expect.equal coverage.["measure:Sales/Formatted"] [ "FORMAT" ] "a function"
-                Expect.equal coverage.["measure:Sales/Uses Formatted"] [ "FORMAT" ] "through a measure"
+                Expect.equal coverage.["measure:Sales/Formatted"] [ "PATHITEM" ] "a function"
+                Expect.equal coverage.["measure:Sales/Uses Formatted"] [ "PATHITEM" ] "through a measure"
                 Expect.equal coverage.["measure:Sales/Selected"] [ "ALLSELECTED" ] "an argument form"
                 Expect.equal coverage.["measure:Sales/Rolled"] [ "ROLLUP in SUMMARIZE"; "ROLLUP" ] "a helper"
-                Expect.equal coverage.["measure:Sales/By Label"] [ "UPPER" ] "through a calculated column"
-                Expect.equal coverage.["measure:Sales/Via Function"] [ "UPPER" ] "through a function"
-                Expect.equal coverage.["column:Customer/Label"] [ "UPPER" ] "a calculated column")
+                Expect.equal coverage.["measure:Sales/By Label"] [ "PATHITEM" ] "through a calculated column"
+                Expect.equal coverage.["measure:Sales/Via Function"] [ "PATHITEM" ] "through a function"
+                Expect.equal coverage.["column:Customer/Label"] [ "PATHITEM" ] "a calculated column")
             // What can be told from the arguments alone is told by coverage, with the words the
             // evaluator uses.
             testCase "argument forms that are refused show in coverage, and when evaluated" (fun () ->
                 let forms = [
-                    "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name], \", \" )",
-                    "CONCATENATEX without an order-by"
                     "COUNTROWS ( SUMMARIZE ( Sales, \"x\", 1 ) )", "SUMMARIZE without a group-by column"
                     "COUNTROWS ( GROUPBY ( Sales ) )", "GROUPBY without a group-by column"
                     "CALCULATE ( [Amount], CROSSFILTER ( Sales[ProductKey], Product[ProductKey], ONEWAY_LEFTFILTERSRIGHT ) )",
                     "CROSSFILTER direction"
                     "CALCULATE ( [Amount], ALLSELECTED () )", "ALLSELECTED"
-                    "COUNTROWS ( SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"s\" ) ) )",
-                    "ROLLUPADDISSUBTOTAL"
+                    "COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ) ) )",
+                    "NONVISUAL"
                 ]
 
                 let model = {
@@ -827,7 +1350,7 @@ let tests =
                             @ [
                                 "Sales", "Share", "DIVIDE ( [Amount], CALCULATE ( [Amount], ALL ( Product ) ) )"
                                 "Sales", "Best", "MAXX ( VALUES ( Product[Name] ), [Amount] )"
-                                "Sales", "Formatted", "FORMAT ( [Amount], \"0\" )"
+                                "Sales", "Formatted", "PATHITEM ( [Amount], 1 )"
                             ]
                 }
 

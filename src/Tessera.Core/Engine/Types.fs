@@ -311,6 +311,13 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     member val Computing = false with get, set
     /// For a column of a calculated table: the column of the expression's result it holds.
     member val SourceName: string = null with get, set
+    /// The expression of a query column (DEFINE COLUMN), already parsed: its spans are the query's.
+    member val Parsed: Expr option = None with get, set
+    /// The model's own word on this being the date column of a date table: 2 when the table is
+    /// marked as a date table on this column (data category Time, and the column is its key),
+    /// 1 when the column is a date column and the table's key but the table isn't marked, else 0.
+    /// See `DateTable` in Context.fs.
+    member val DateKey = 0 with get, set
     member _.IsReady = not (obj.ReferenceEquals(store, null))
 
     member this.SetData(column: StoreColumn) =
@@ -380,7 +387,11 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
                         )
 
                     match DaxValue.convertTo d.DataType value with
-                    | Ok converted when DaxValue.compare d.Collation converted value = Ok 0 -> d.TryFindId converted
+                    | Ok converted ->
+                        match DaxValue.compare d.Collation converted value with
+                        | Ok 0 -> d.TryFindId converted
+                        | Error(Unsettled what) -> raise (EngineException(DaxNotSupported(what, "")))
+                        | _ -> -1
                     | Error(Unsettled what) -> raise (EngineException(DaxNotSupported(what, "")))
                     | _ -> -1
                 else
@@ -401,6 +412,8 @@ and [<Sealed; AllowNullLiteral>] BTable(id: int, model: Model, name: string) =
     member val ColumnByName = Dictionary<string, BColumn>(StringComparer.OrdinalIgnoreCase) with get
     /// The DAX expression of a calculated table; None for a table that has data.
     member val Expression: SourceText option = None with get, set
+    /// The expression of a query table (DEFINE TABLE), already parsed: its spans are the query's.
+    member val Parsed: Expr option = None with get, set
     member val Failure: TessError option = None with get, set
     member val Computing = false with get, set
     /// Why queries can't use this table (a relationship or model feature the engine doesn't do).
@@ -738,6 +751,14 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     member val ForceColumn: BColumn -> unit = ignore with get, set
     member val ForceTable: BTable -> unit = ignore with get, set
     member val ForceBlankRow: BTable -> unit = ignore with get, set
+    /// The instant TODAY and NOW see (local time), fixed when the model is prepared: every
+    /// calculated table and column and every query sees the same one.
+    member val Now: DateTime = DateTime.MinValue with get, set
+    /// The same instant in UTC, for UTCTODAY and UTCNOW.
+    member val UtcNow: DateTime = DateTime.MinValue with get, set
+    /// The model's culture name ("en-US"), or "" when it has none: how text is read as a date, and
+    /// what FORMAT and number-to-text follow (see `Culture`).
+    member val Culture: string = "" with get, set
 
     member this.Config(active: bool array, both: bool array) : RelConfig =
         let c = RelConfig(this, active, both)
@@ -833,12 +854,28 @@ type Filter =
     /// `FilterCtx` the configuration is always the context's own (see `Filters.build`).
     | Rows of BTable * RowSet * RelConfig
 
+/// How a column came to be filtered, as ISINSCOPE asks: "whether there is a filter placed on the
+/// column derived either from context transition or from a group by column placed by
+/// SUMMARIZECOLUMNS" (dax.guide/isinscope). A filter context keeps these marks, newest first.
+type ScopeMark =
+    /// Group-by columns of the SUMMARIZECOLUMNS row being computed.
+    | Grouped of BColumn array
+    /// A context transition: the columns of the table that was iterated, and a test for the
+    /// columns of the tables related to it (which the transition also filters; whether those
+    /// count as in scope is not documented).
+    | Transitioned of own: BColumn array * related: (BColumn -> bool)
+    /// The filters on these columns were removed or replaced.
+    | Unfiltered of (BColumn -> bool)
+
 /// A filter context: filters, and the relationships in force. Immutable; the caches belong to one
 /// evaluation (one thread).
 [<Sealed; AllowNullLiteral>]
-type FilterCtx(filters: Filter list, config: RelConfig) =
+type FilterCtx(filters: Filter list, config: RelConfig, scope: ScopeMark list) =
+    new(filters: Filter list, config: RelConfig) = FilterCtx(filters, config, [])
     member _.Filters = filters
     member _.Config = config
+    /// See `ScopeMark`. Part of the context: a measure's value may depend on it.
+    member _.Scope = scope
     member val Visible = Dictionary<int, RowSet>() with get
     member val InProgress = HashSet<int>() with get
     member val Measures = Dictionary<obj, DaxValue>(HashIdentity.Reference) with get
@@ -954,7 +991,8 @@ module Fail =
     let dax (ctx: Ctx) (span: Span) (r: Result<'a, DaxError>) : 'a =
         match r with
         | Ok v -> v
-        // What the sources leave open is refused, not raised as an error IFERROR could catch.
+        // What the sources leave open is refused, not raised as a DAX error (IFERROR must not
+        // turn it into a value).
         | Error(Unsettled what) -> notSupported ctx span what
         | Error e -> runtime ctx span (DaxError.message e)
 

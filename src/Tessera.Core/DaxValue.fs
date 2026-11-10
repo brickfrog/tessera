@@ -166,7 +166,7 @@ module DaxError =
             $"Cannot convert value '{value}' of type {typeLabel source} to type {typeLabel target}."
         | Overflow(operation, resultType) ->
             $"The result of {operation} is out of range for type {typeLabel resultType}."
-        | Unsettled what -> $"Not settled by the published sources: {what}."
+        | Unsettled what -> $"Not supported by the local DAX engine: {what}"
 
 /// How strings compare. One object answers equality, hashing and ordering, so the three always
 /// agree. Trailing spaces never count: the engine drops them when it stores text, and `"a " = "a"`.
@@ -445,6 +445,10 @@ module DaxValue =
     let private dateText (serial: float) =
         // ASSUMPTION: the engine formats dates with the model's culture ("General Date"); this is
         // the en-US form, with the time left out at midnight and the date left out for a time alone.
+        // Two published results agree with the en-US form: FORMAT ( UTCTODAY (), "General Date" )
+        // is "2/2/2018" and FORMAT ( UTCNOW (), "General Date" ) is "2/2/2018 4:48:08 AM"
+        // (Microsoft Learn, UTCTODAY and UTCNOW). What another culture gives is still open, so
+        // the local engine refuses a date turned into text (`Convert.toText`).
         match dateTimeOfSerial serial with
         | None -> floatText serial
         | Some dt ->
@@ -570,6 +574,12 @@ module DaxValue =
 
     /// A date written as text. ASSUMPTION: the engine reads the model culture's date formats; this
     /// reads ISO 8601 and then whatever .NET's invariant culture reads ("1/31/2024", "Jan 1 2009").
+    /// The first half is documented: "DATEVALUE uses the locale and date/time settings of the model
+    /// ... If conversion using the locale and date/time settings of the model fails, DATEVALUE will
+    /// attempt to use other date formats" (Microsoft Learn, DATEVALUE). Which other formats is not,
+    /// so the second half stays a guess: the local engine doesn't use this for its date functions
+    /// (they read only the forms a source shows a result for: `DateText` in
+    /// Engine/Functions/DateTime.fs) and refuses text read as a date in arithmetic.
     let private parseDate (s: string) : DaxValue option =
         match parseIsoDateTime s with
         | Some v -> Some v
@@ -639,7 +649,7 @@ module DaxValue =
 
     let private cultureNumber (s: string) =
         Unsettled
-            $"the text \"{s}\" read as a number (whether thousands separators, currency symbols and other culture-dependent forms are accepted is not documented)"
+            $"the text \"{s}\" read as a number (which separators and symbols the engine accepts in a number depends on the model's culture and is not documented)"
 
     /// The operand of an arithmetic operator: TRUE is 1 and FALSE 0; text is read as a number, or
     /// failing that as a date ("22" + 22 = 44). None for BLANK, which each operator treats its own way.
@@ -652,14 +662,33 @@ module DaxValue =
         | DaxValue.DateTime d -> Ok(ValueSome(NDate d))
         | DaxValue.Boolean b -> Ok(ValueSome(NInt(if b then 1L else 0L)))
         | DaxValue.String s ->
+            // "the string is automatically converted into a corresponding number, as long as the
+            // string is a valid representation of a number" (SQLBI, "Understanding numeric data
+            // type conversions in DAX"): digits with a sign and a decimal point are; whether
+            // spaces around them, thousands separators or a currency symbol are is not said.
+            let decorated =
+                s.Length > 0
+                && s |> Seq.exists Char.IsAsciiDigit
+                && s
+                   |> Seq.forall (fun ch ->
+                       Char.IsAsciiDigit ch
+                       || Char.IsWhiteSpace ch
+                       || Char.GetUnicodeCategory ch = UnicodeCategory.CurrencySymbol
+                       || "+-.,eE()%".Contains ch)
+
             match parseNumber s with
+            | Some _ when s <> s.Trim() ->
+                Error(
+                    Unsettled
+                        $"the text \"{s}\" read as a number (whether spaces around a number are accepted is not documented)"
+                )
             | Some(DaxValue.Integer i) -> Ok(ValueSome(NInt i))
             | Some(DaxValue.Decimal d) -> Ok(ValueSome(NReal d))
-            | _ when isCultureNumber s -> Error(cultureNumber s)
             | _ when isCultureNumber s -> Error(cultureNumber s)
             | _ ->
                 match parseDate s with
                 | Some(DaxValue.DateTime d) -> Ok(ValueSome(NDate d))
+                | _ when decorated -> Error(cultureNumber s)
                 | _ -> Error(CannotConvert(s, DaxType.String, target))
 
     let private scaledOfInt (i: int64) =
@@ -905,29 +934,25 @@ module DaxValue =
         wide <= Int128.op_Implicit Int64.MaxValue
         && wide >= Int128.op_Implicit Int64.MinValue
 
+    /// A whole-number operation with a null synonym (see `isNullSynonym`) as an operand or the
+    /// result: an operand may already be BLANK to the engine.
+    let private atTheLimits (op: string) =
+        Error(
+            Unsettled
+                $"{op} with 9223372036854775807 or -9223372036854775808 as an operand or as the result (values the documentation puts outside the range of whole numbers)"
+        )
+
     /// The 64-bit result of a whole-number operation (an Integer, or the scaled integer of a
     /// Currency). With `wrap`, a result out of range keeps its low 64 bits: "there is an overflow
     /// condition, but there is no overflow error and the result is the least significant
     /// representable digits. ... CONVERT ( 5E18, INTEGER ) + CONVERT ( 5E18, INTEGER ) ... the
     /// outcome of the expression is a negative number: -8,446,744,073,709,551,616", and a Currency
     /// sum is "subject to the behavior of integers in case of overflow" (SQLBI, "Rounding errors
-    /// with different data types in DAX"). Without `wrap` (the running total of an aggregation,
-    /// about which the article says nothing) a result out of range is `Unsettled`.
-    let private wholeResult (op: string) (wrap: bool) (wide: Int128) : Result<int64, DaxError> =
+    /// with different data types in DAX"). An aggregation's total is checked by the aggregation.
+    let private wholeResult (op: string) (wide: Int128) : Result<int64, DaxError> =
         let r: int64 = Int128.op_Explicit wide
 
-        if not wrap && not (fitsInt64 wide) then
-            Error(
-                Unsettled
-                    $"{op} beyond the range of a 64-bit number inside an aggregation (the + operator wraps around; what an aggregation does is not documented)"
-            )
-        elif isNullSynonym r then
-            Error(
-                Unsettled
-                    $"{op} whose result is the largest or smallest 64-bit value, which the documentation gives as a synonym of null"
-            )
-        else
-            Ok r
+        if isNullSynonym r then atTheLimits op else Ok r
 
     let private tooLargeForCurrency (op: string) =
         Unsettled
@@ -938,7 +963,7 @@ module DaxValue =
         | Error e -> Error e
         | Ok x -> toNum DaxType.Decimal b |> Result.map (fun y -> x, y)
 
-    let private addOrSubtract (op: string) (subtract: bool) (wrap: bool) (a: DaxValue) (b: DaxValue) =
+    let private addOrSubtract (op: string) (subtract: bool) (a: DaxValue) (b: DaxValue) =
         match operands a b with
         | Error e -> Error e
         | Ok(ValueNone, ValueNone) -> Ok DaxValue.Blank
@@ -968,7 +993,7 @@ module DaxValue =
 
             let whole (l: int64) (r: int64) =
                 let l, r = Int128.op_Implicit l, Int128.op_Implicit r
-                wholeResult op wrap (if subtract then l - r else l + r)
+                wholeResult op (if subtract then l - r else l + r)
 
             let scaled (n: Num) =
                 match n with
@@ -986,6 +1011,7 @@ module DaxValue =
                 | _ -> Error(tooLargeForCurrency op)
             | _ ->
                 match x, y with
+                | NInt l, NInt r when isNullSynonym l || isNullSynonym r -> atTheLimits op
                 | NInt l, NInt r -> whole l r |> Result.map DaxValue.Integer
                 | _ -> Ok(DaxValue.Decimal f)
 
@@ -993,15 +1019,10 @@ module DaxValue =
     /// date, else Decimal if either is, else Currency if either is, else Integer. TRUE is 1; text is
     /// read as a number or a date. An Integer or Currency result out of range wraps around (see
     /// `wholeResult`).
-    let add (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> = addOrSubtract "addition" false true a b
+    let add (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> = addOrSubtract "addition" false a b
 
     /// `-`. As `add`, except that a number minus a date is a Decimal (date - anything is a date).
-    let subtract (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> =
-        addOrSubtract "subtraction" true true a b
-
-    /// `add` for the running total of an aggregation (SUMX, AVERAGEX): the same, except that a
-    /// total out of the range of its type is `Unsettled` instead of wrapping around.
-    let addToTotal (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> = addOrSubtract "a sum" false false a b
+    let subtract (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> = addOrSubtract "subtraction" true a b
 
     let private twoTo53 = 9007199254740992.0
     let private twoTo63 = 9223372036854775808.0
@@ -1068,7 +1089,7 @@ module DaxValue =
                 )
             | NInt i, NDate d ->
                 if d = Math.Truncate d && abs d < twoTo53 then
-                    wholeResult op true (Int128.op_Implicit i * Int128.op_Implicit (int64 d))
+                    wholeResult op (Int128.op_Implicit i * Int128.op_Implicit (int64 d))
                     |> Result.map DaxValue.Integer
                 else
                     Error(
@@ -1076,15 +1097,16 @@ module DaxValue =
                             "a whole number multiplied by a date with a time of day (the result is a whole number; how the fraction of a day becomes one is not documented)"
                     )
             | (NCur _ | NReal _), NDate _ -> Ok(DaxValue.Decimal(numFloat x * numFloat y))
+            | NInt l, NInt r when isNullSynonym l || isNullSynonym r -> atTheLimits op
             | NInt l, NInt r ->
-                wholeResult op true (Int128.op_Implicit l * Int128.op_Implicit r)
+                wholeResult op (Int128.op_Implicit l * Int128.op_Implicit r)
                 |> Result.map DaxValue.Integer
             | NCur c, NInt i
             | NInt i, NCur c ->
                 let wide = Int128.op_Implicit c * Int128.op_Implicit i
 
                 if fitsInt64 wide then
-                    wholeResult op true wide |> Result.map DaxValue.Currency
+                    wholeResult op wide |> Result.map DaxValue.Currency
                 else
                     Error(
                         Unsettled
@@ -1183,12 +1205,9 @@ module DaxValue =
         | Ok ValueNone -> Ok DaxValue.Blank
         | Ok(ValueSome n) ->
             match n with
-            | NInt i ->
-                wholeResult "negation" true (-(Int128.op_Implicit i))
-                |> Result.map DaxValue.Integer
-            | NCur c ->
-                wholeResult "negation" true (-(Int128.op_Implicit c))
-                |> Result.map DaxValue.Currency
+            | NInt i when isNullSynonym i -> atTheLimits "negation"
+            | NInt i -> wholeResult "negation" (-(Int128.op_Implicit i)) |> Result.map DaxValue.Integer
+            | NCur c -> wholeResult "negation" (-(Int128.op_Implicit c)) |> Result.map DaxValue.Currency
             | NReal r -> Ok(DaxValue.Decimal(-r))
             | NDate d -> Ok(DaxValue.DateTime(-d))
 
@@ -1219,10 +1238,16 @@ module DaxValue =
             | "FALSE" -> Ok false
             | _ -> Error(CannotConvert(s, DaxType.String, DaxType.Boolean))
 
+    /// What `&&` and `||` refuse: Microsoft's table of BLANK in operations gives BLANK for BLANK AND
+    /// BLANK and BLANK OR BLANK, SQLBI says a logical expression is never BLANK.
+    let bothBlank =
+        "&& or || with BLANK on both sides (BLANK according to Microsoft's table of BLANK in operations, FALSE according to SQLBI)"
+
     /// `&&`. ASSUMPTION: always TRUE or FALSE, BLANK counting as FALSE (the current engine, per
-    /// SQLBI; the docs' table still shows BLANK AND BLANK = BLANK).
+    /// SQLBI; the docs' table still shows BLANK AND BLANK = BLANK, so that one case is `Unsettled`).
     let logicalAnd (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> =
         match toBoolean a, toBoolean b with
+        | _ when isBlank a && isBlank b -> Error(Unsettled bothBlank)
         | Ok x, Ok y -> Ok(DaxValue.Boolean(x && y))
         | Error e, _
         | _, Error e -> Error e
@@ -1230,13 +1255,18 @@ module DaxValue =
     /// `||`. See `logicalAnd`.
     let logicalOr (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> =
         match toBoolean a, toBoolean b with
+        | _ when isBlank a && isBlank b -> Error(Unsettled bothBlank)
         | Ok x, Ok y -> Ok(DaxValue.Boolean(x || y))
         | Error e, _
         | _, Error e -> Error e
 
-    /// NOT. NOT BLANK is TRUE.
+    /// NOT. NOT of BLANK is `Unsettled`: TRUE if the BLANK counts as FALSE, as in a condition;
+    /// BLANK if it passes through, as in arithmetic. No source shows it.
     let logicalNot (a: DaxValue) : Result<DaxValue, DaxError> =
-        toBoolean a |> Result.map (fun x -> DaxValue.Boolean(not x))
+        if isBlank a then
+            Error(Unsettled "NOT of BLANK (TRUE or BLANK: no source shows which)")
+        else
+            toBoolean a |> Result.map (fun x -> DaxValue.Boolean(not x))
 
     /// What storing a value in a typed column does, and the conversions behind CONVERT (whose own
     /// rules, such as BLANK to BOOLEAN, are the CONVERT function's).

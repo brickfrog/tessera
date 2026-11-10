@@ -138,6 +138,56 @@ module Filter =
             sameTable ctx call.Span name cols |> ignore
             fun c -> cols |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
 
+    /// ALLEXCEPT as a table: "all the unique combinations of the columns in the table specified
+    /// in the first argument that are not listed in the following arguments"
+    /// (dax.guide/allexcept), with no filter applied. Whether the blank row of an invalid
+    /// relationship is among them isn't stated, so a table that has one is refused; so is a table
+    /// as a kept argument, a kept column of a related table, and listing every column.
+    let private allExceptTable (ev: IEval) (ctx: Ctx) (call: Call) : TableVal =
+        let t =
+            match ev.TryModelTable(ctx, call.Args.Head) with
+            | Some t -> t
+            | None -> Fail.invalid ctx call.Args.Head.Span "the first argument of ALLEXCEPT is a table"
+
+        let kept =
+            call.Args.Tail
+            |> List.map (fun k ->
+                if (ev.TryModelTable(ctx, k)).IsSome then
+                    Fail.notSupported ctx k.Span "ALLEXCEPT as a table with a table among the kept arguments"
+
+                let kc = ev.Column(ctx, k)
+
+                if not (ctx.Filter.Config.IsExpanded(t, kc.Table)) then
+                    Fail.invalid
+                        ctx
+                        k.Span
+                        $"'{kc.Table.Name}'[{kc.Name}] is not a column of '{t.Name}' or of a table related to it"
+
+                // Whether the result then has the columns of the related tables (the expanded
+                // table's) is not documented.
+                if not (obj.ReferenceEquals(kc.Table, t)) then
+                    Fail.notSupported
+                        ctx
+                        k.Span
+                        $"ALLEXCEPT as a table keeping a column of '{kc.Table.Name}', a table related to '{t.Name}'"
+
+                kc)
+
+        let rest =
+            t.Columns
+            |> Array.filter (fun c -> not (kept |> List.exists (fun k -> obj.ReferenceEquals(k, c))))
+
+        if rest.Length = 0 then
+            Fail.notSupported ctx call.Span "ALLEXCEPT as a table that lists every column of the table"
+
+        if t.HasBlankRow then
+            Fail.notSupported
+                ctx
+                call.Span
+                $"ALLEXCEPT as a table over '{t.Name}', which has a blank row for an invalid relationship (whether it is returned isn't documented)"
+
+        combinations rest (allRows t false)
+
     let private relationship (ev: IEval) (ctx: Ctx) (call: Call) : BRel =
         let a = ev.Column(ctx, call.Args.[0])
         let b = ev.Column(ctx, call.Args.[1])
@@ -335,6 +385,9 @@ module Filter =
         for m in args |> List.choose (isCallTo removers) do
             fc <- Filters.remove fc (removal ev ctx config m)
 
+        // A filter on the date column of a date table first removes the filters on that table.
+        fc <- DateTable.onFilterArguments ctx call.Span fc filters
+
         // 5. The filters: each replaces the filters on its columns, unless under KEEPFILTERS.
         fc <- Filters.add fc (filters |> List.filter (fun (_, keep) -> not keep) |> List.collect fst) false
         fc <- Filters.add fc (filters |> List.filter snd |> List.collect fst) true
@@ -416,12 +469,7 @@ module Filter =
 
         {
             Fn.modifier "ALLEXCEPT" "Filter" (2, -1) with
-                Table =
-                    fun _ ctx call ->
-                        Fail.notSupported
-                            ctx
-                            call.Span
-                            "ALLEXCEPT as a table (it is supported as a filter argument of CALCULATE)"
+                Table = allExceptTable
         }
 
         Fn.table "ALL" "Filter" (0, -1) (allTable "ALL" true)
@@ -541,6 +589,41 @@ module Filter =
 
                 DaxValue.Boolean false)
 
+        // "ISINSCOPE checks whether there is a filter placed on the column derived either from
+        // context transition or from a group by column placed by SUMMARIZECOLUMNS"
+        // (dax.guide/isinscope); "at the grand total ... Brand neither has one value, nor is it in
+        // scope" (SQLBI, "Distinguishing HASONEVALUE from ISINSCOPE"). A filter that CALCULATE
+        // puts on the column, or removes from it, ends that.
+        Fn.scalar "ISINSCOPE" "Information" (1, 1) (Fn.typeIs DaxType.Boolean) (fun ev ctx call ->
+            let c = ev.Column(ctx, call.Args.[0])
+
+            if not ctx.Rows.IsEmpty then
+                Fail.notSupported
+                    ctx
+                    call.Span
+                    "ISINSCOPE inside a row context (whether a column being iterated is in scope before a context transition is not documented)"
+
+            let has (cols: BColumn array) =
+                cols |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
+
+            let rec inScope (marks: ScopeMark list) =
+                match marks with
+                | [] -> false
+                | Grouped cols :: rest -> has cols || inScope rest
+                | Transitioned(own, related) :: rest ->
+                    if has own then
+                        true
+                    elif related c then
+                        Fail.notSupported
+                            ctx
+                            call.Span
+                            $"ISINSCOPE of '{c.Table.Name}'[{c.Name}] after a context transition over a table related to '{c.Table.Name}' (whether the columns of related tables are then in scope is not documented)"
+                    else
+                        inScope rest
+                | Unfiltered gone :: rest -> not (gone c) && inScope rest
+
+            DaxValue.Boolean(inScope ctx.Filter.Scope))
+
         // "COUNTROWS ( FILTERS ( <ColumnName> ) ) = 1": "the number of directly filtered values"
         // (dax.guide/hasonefilter). Answered when the column has one filter of its own.
         Fn.scalar "HASONEFILTER" "Filter" (1, 1) (Fn.typeIs DaxType.Boolean) (fun ev ctx call ->
@@ -602,21 +685,20 @@ module Filter =
                 ctx.Rows
                 |> List.tryPick (fun rc ->
                     let t = rc.Table
+                    // The expanded table is fixed when the table is evaluated: "Date[Month] contained
+                    // in SalesB is related to Sales[DueDate], not to Sales[Date]" for a table
+                    // evaluated under USERELATIONSHIP (SQLBI, "Expanded tables in DAX"). So the row
+                    // follows the relationships in force then, not the ones in force now.
+                    let config = if isNull t.Config then ctx.Filter.Config else t.Config
 
-                    if not (isNull t.BaseTable) && ctx.Filter.Config.IsExpanded(t.BaseTable, c.Table) then
+                    if not (isNull t.BaseTable) && config.IsExpanded(t.BaseTable, c.Table) then
                         if not t.IsPureBase then
                             Fail.notSupported
                                 ctx
                                 call.Span
                                 $"RELATED in a row context on a table built on '{t.BaseTable.Name}' with columns added"
 
-                        if not (obj.ReferenceEquals(t.Config, ctx.Filter.Config)) then
-                            Fail.notSupported
-                                ctx
-                                call.Span
-                                "RELATED on a table evaluated under other relationships than the ones now in force"
-
-                        let map = ctx.Filter.Config.RowMap(t.BaseTable, c.Table)
+                        let map = config.RowMap(t.BaseTable, c.Table)
                         Some(c.ValueAt map.[t.BaseRows.[rc.Row]])
                     else
                         None)

@@ -1,0 +1,51 @@
+{
+  "title": "FORMAT with \"HH:NN:SS\" (upper case) gives the time, as hh:nn:ss does",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( DATE ( 2020, 6, 25 ) + TIME ( 13, 23, 45 ), \"HH:NN:SS\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "13:23:45"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Display the minute as a number with a leading zero (00-59).",
+      "supports": "the example table shows \"hh:nn:ss\" 13:23:45 for 1:23:45 PM"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "The format strings supported as an argument to the DAX FORMAT function are based on the format strings used by Visual Basic (OLE Automation), not on the format strings used by the .NET Framework.",
+      "supports": "DAX's format characters are Visual Basic's (OLE Automation), the case-insensitive ones"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/73ctwf33(v=vs.85)",
+      "quote": "Unlike in previous versions of Visual Basic, these format characters are case-sensitive.",
+      "supports": "the date/time format characters of Visual Basic before VB 2005 (VB6, VBA: OLE Automation) are not case-sensitive"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-2008/wb216dct(v=vs.90)",
+      "quote": "To display a minute as a number with or without leading zeros, you use either the \"Nn\" or the \"N\" format specifier.",
+      "supports": "Microsoft writes the Visual Basic 6.0 minute specifiers as Nn and N (it may be only the sentence's capitals)"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Microsoft Learn: \"hh:nn:ss\" is 13:23:45 for June 25, 2020, 1:23:45 PM. Visual Basic's characters are not case-sensitive, so HH:NN:SS reads as hh:nn:ss: \"13:23:45\". The 2010 DAX page's HH is the 24-hour clock too.",
+  "uncertain": true,
+  "alternative": "No DAX page shows upper-case H, N or S. If the engine took them as literal text, the result would be \"HH:NN:SS\".",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "upper-case"
+  ]
+}
