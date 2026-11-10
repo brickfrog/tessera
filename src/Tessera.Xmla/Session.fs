@@ -33,6 +33,28 @@ type ConnectionRequest = {
     Notify: string -> unit
 }
 
+/// One event from a server's trace of a session, as the client library reports it. Fields the
+/// event doesn't carry are empty (or None).
+type XmlaTraceEvent = {
+    /// The event class's name, e.g. "ProgressReportEnd".
+    EventClass: string
+    /// The subclass's name, e.g. "ReadData"; "" if the event has none.
+    EventSubclass: string
+    ObjectName: string
+    ObjectPath: string
+    Text: string
+    /// For a data-reading progress event, the rows read so far.
+    IntegerData: int64 option
+    DurationMs: int64 option
+}
+
+/// What a traced script returned, and whether the trace worked.
+type XmlaTracedResult = {
+    Messages: XmlaMessage list
+    /// Why there were no (or not all) trace events, if tracing failed. The script ran regardless.
+    TraceFailure: string option
+}
+
 /// The server reported an error in a query (as opposed to the connection failing).
 exception XmlaQueryError of message: string
 
@@ -47,6 +69,10 @@ type IXmlaSession =
     abstract ReadDatabase: name: string -> Database
     /// Run a TMSL or XMLA script.
     abstract Execute: script: string -> XmlaMessage list
+    /// Run a TMSL or XMLA script while tracing the session: `onEvent` gets every event the server
+    /// reports for it, as they arrive and on another thread. Throws only for what Execute would:
+    /// a trace that can't be started or stopped is reported in the result instead.
+    abstract ExecuteTraced: script: string * onEvent: (XmlaTraceEvent -> unit) -> XmlaTracedResult
     /// Run a DAX query: one result per EVALUATE. With maxRows, each result holds at most that many
     /// rows and says whether there were more. Raises XmlaQueryError for an error in the query.
     abstract Query: database: string * dax: string * maxRows: int option -> QueryResult list

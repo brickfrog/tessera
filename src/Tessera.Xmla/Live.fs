@@ -112,6 +112,40 @@ module private Live =
                 | _ -> None)
             |> List.ofArray
 
+    /// A trace event's columns, read through the indexer: it gives null for a column the event
+    /// doesn't have, where the typed properties may throw.
+    let traceEvent (e: Microsoft.AnalysisServices.Tabular.TraceEventArgs) : XmlaTraceEvent =
+        let column (c: Microsoft.AnalysisServices.TraceColumn) =
+            try
+                match e.[c] with
+                | null -> ""
+                | v -> v
+            with _ ->
+                ""
+
+        let number (c: Microsoft.AnalysisServices.TraceColumn) =
+            match
+                Int64.TryParse(column c, Globalization.NumberStyles.Integer, Globalization.CultureInfo.InvariantCulture)
+            with
+            | true, n -> Some n
+            | _ -> None
+
+        let name (get: unit -> string) =
+            try
+                get ()
+            with _ ->
+                ""
+
+        {
+            EventClass = name (fun () -> string e.EventClass)
+            EventSubclass = name (fun () -> string e.EventSubclass)
+            ObjectName = column Microsoft.AnalysisServices.TraceColumn.ObjectName
+            ObjectPath = column Microsoft.AnalysisServices.TraceColumn.ObjectPath
+            Text = column Microsoft.AnalysisServices.TraceColumn.TextData
+            IntegerData = number Microsoft.AnalysisServices.TraceColumn.IntegerData
+            DurationMs = number Microsoft.AnalysisServices.TraceColumn.Duration
+        }
+
 type private LiveSession(request: ConnectionRequest) =
     // None for credentials that live in the connection string (or nowhere).
     let token: (unit -> AmoToken) option =
@@ -149,6 +183,15 @@ type private LiveSession(request: ConnectionRequest) =
             s.Dispose()
             reraise ()
 
+    let execute (script: string) = [
+        for result in server.Execute script |> Seq.cast<Microsoft.AnalysisServices.XmlaResult> do
+            for message in result.Messages |> Seq.cast<Microsoft.AnalysisServices.XmlaMessage> ->
+                {
+                    IsError = (message :? Microsoft.AnalysisServices.XmlaError)
+                    Text = message.Description
+                }
+    ]
+
     interface IXmlaSession with
         member _.Server = {
             Version = server.Version
@@ -176,14 +219,67 @@ type private LiveSession(request: ConnectionRequest) =
 
                 ResultReader.detach db
 
-        member _.Execute(script: string) = [
-            for result in server.Execute script |> Seq.cast<Microsoft.AnalysisServices.XmlaResult> do
-                for message in result.Messages |> Seq.cast<Microsoft.AnalysisServices.XmlaMessage> ->
-                    {
-                        IsError = (message :? Microsoft.AnalysisServices.XmlaError)
-                        Text = message.Description
-                    }
-        ]
+        member _.Execute(script: string) = execute script
+
+        member _.ExecuteTraced(script: string, onEvent: XmlaTraceEvent -> unit) =
+            // The session trace is the client library's public way to watch one's own session
+            // (Server.SessionTrace): events come on a thread of the library's while Execute blocks.
+            let failure: string option ref = ref None
+
+            let failed (what: string) (e: exn) =
+                lock failure (fun () ->
+                    if failure.Value.IsNone then
+                        failure.Value <- Some(what + ": " + (Failures.messages e |> String.concat ": ")))
+
+            let onTraceEvent =
+                Microsoft.AnalysisServices.Tabular.TraceEventHandler(fun _ e ->
+                    try
+                        onEvent (Live.traceEvent e)
+                    with e ->
+                        failed "the trace event couldn't be read" e)
+
+            let onStopped =
+                Microsoft.AnalysisServices.Tabular.TraceStoppedEventHandler(fun _ e ->
+                    if not (isNull e.Exception) then
+                        failed "the trace stopped" e.Exception)
+
+            let trace =
+                try
+                    let t = server.SessionTrace
+                    t.OnEvent.AddHandler onTraceEvent
+                    t.add_Stopped onStopped
+                    t.Start()
+                    Some t
+                with e ->
+                    failed "the trace couldn't be started" e
+                    None
+
+            let stop () =
+                match trace with
+                | None -> ()
+                | Some t ->
+                    try
+                        try
+                            t.Stop()
+                        with e ->
+                            failed "the trace couldn't be stopped" e
+                    finally
+                        try
+                            t.OnEvent.RemoveHandler onTraceEvent
+                            t.remove_Stopped onStopped
+                        with _ ->
+                            ()
+
+            let messages =
+                try
+                    execute script
+                finally
+                    stop ()
+
+            {
+                Messages = messages
+                TraceFailure = lock failure (fun () -> failure.Value)
+            }
 
         member _.Query(database: string, dax: string, maxRows: int option) =
             use connection =
