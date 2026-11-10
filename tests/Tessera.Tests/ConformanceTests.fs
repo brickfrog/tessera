@@ -202,6 +202,23 @@ let corpusTests =
 
 // ---- The engine against the corpus ----------------------------------------------------------------
 
+/// TESSERA_CONFORMANCE_REPORT=<file>: every case's outcome is appended to it as
+/// `<case id><tab><kind><tab><why>`, to see what the baseline's refusals are about.
+let private reportFile =
+    match Environment.GetEnvironmentVariable "TESSERA_CONFORMANCE_REPORT" with
+    | null
+    | "" -> None
+    | path -> Some path
+
+let private reportLock = obj ()
+
+let private record (c: Case) (kind: string) (lines: string list) =
+    match reportFile with
+    | None -> ()
+    | Some path ->
+        let why = (String.concat " | " lines).Replace('\t', ' ').Replace('\n', ' ').Replace('\r', ' ')
+        lock reportLock (fun () -> File.AppendAllText(path, $"{c.Id}\t{kind}\t{why}\n"))
+
 let private report (c: Case) (lines: string list) =
     let uncertain =
         match c.Alternative with
@@ -232,6 +249,8 @@ let engineTests =
                         | Outcome.NotSupported reason -> "not-supported", [ $"not supported: {reason}" ]
                         | Outcome.Error message -> "error", [ $"error: {message}" ]
                         | Outcome.Fail mismatch -> "fail", Mismatch.describe mismatch
+
+                    record c kind lines
 
                     match kind, Map.tryFind c.Id known with
                     | "pass", None -> ()
