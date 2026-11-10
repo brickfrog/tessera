@@ -382,6 +382,20 @@ let tests =
 
                 notSupported (p ()) "EVALUATE GROUPBY ( Sales, Sales[CustomerKey], \"A\", [Amount] )" "CURRENTGROUP"
 
+                // "GROUPBY is useful to group by columns with no lineage" (dax.guide/groupby). Qty is
+                // 2, 1, 3, 1, 4, 5, 1: above 1 in rows 1, 3, 5, 6 (2 + 3 + 4 + 5), not in 2, 4, 7.
+                returns
+                    (p ())
+                    "EVALUATE GROUPBY ( ADDCOLUMNS ( Sales, \"Size\", IF ( Sales[Qty] > 1, \"Large\", \"Small\" ) ), [Size], \"Q\", SUMX ( CURRENTGROUP (), Sales[Qty] ), \"N\", COUNTX ( CURRENTGROUP (), 1 ) )"
+                    [ [ "Large"; 14; 4 ]; [ "Small"; 3; 3 ] ]
+
+                // "SUMMARIZE has the option of grouping by columns computed in the query"
+                // (dax.guide/summarize).
+                returns
+                    (p ())
+                    "EVALUATE SUMMARIZE ( ADDCOLUMNS ( VALUES ( Sales[Qty] ), \"Size\", IF ( Sales[Qty] > 1, \"Large\", \"Small\" ) ), [Size] )"
+                    [ [ "Large" ]; [ "Small" ] ]
+
                 Expect.equal
                     (queryCode (p ()) "EVALUATE { COUNTROWS ( CURRENTGROUP () ) }")
                     "dax-invalid"

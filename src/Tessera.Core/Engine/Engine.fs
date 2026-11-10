@@ -674,8 +674,36 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
             let source = SourceText.query dax
             let defs = QueryDefs()
             let mutable ctx = Context.root p.Model defs source true
+            let queryVars = ResizeArray<Ident * Lazy<Value> * bool>()
+
+            // Whether the rest of the query refers to a variable: a later variable (until one of
+            // the same name hides it) or an EVALUATE. Measures and functions don't see variables.
+            let usedLater (name: string) (after: Definition list) =
+                let name = name.ToUpperInvariant()
+
+                let rec inDefinitions (rest: Definition list) =
+                    match rest with
+                    | [] ->
+                        query.Evaluates
+                        |> List.exists (fun e ->
+                            Variables.refersTo name e.Table
+                            || e.OrderBy |> List.exists (fun k -> Variables.refersTo name k.Expr)
+                            || e.StartAt |> List.exists (Variables.refersTo name))
+                    | d :: tail ->
+                        match d.Kind with
+                        | DefinitionKind.Var(other, value) ->
+                            Variables.refersTo name value
+                            || (other.Name.ToUpperInvariant() <> name && inDefinitions tail)
+                        | DefinitionKind.Table(_, value) -> Variables.refersTo name value || inDefinitions tail
+                        | _ -> inDefinitions tail
+
+                inDefinitions after
+
+            let mutable remaining = query.Definitions
 
             for d in query.Definitions do
+                remaining <- remaining.Tail
+
                 match d.Kind with
                 | DefinitionKind.Measure(table, name, value) ->
                     match p.Model.TableByName.TryGetValue table.Name with
@@ -685,6 +713,13 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                     defs.Functions.[name.Name] <- BFunction(name.Name, source, lazy def)
                 | DefinitionKind.Var(name, value) ->
                     // A query variable: in scope in everything after it, evaluated once.
+                    if p.Model.TableByName.ContainsKey name.Name then
+                        // "Names of existing tables aren't allowed" (Microsoft Learn, VAR).
+                        Fail.invalid
+                            ctx
+                            name.Span
+                            $"a variable can't be named {name.Name}: that is the name of a table of the model"
+
                     let definedIn = ctx
                     let isTable = ev.IsTable(definedIn, value)
                     let lazyValue = lazy (ev.Value(definedIn, value))
@@ -695,6 +730,8 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                                  StaticType.Unknown
                              else
                                  ev.TypeOf(definedIn, value))
+
+                    queryVars.Add((name, lazyValue, usedLater name.Name remaining))
 
                     ctx <- {
                         ctx with
@@ -711,7 +748,10 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                 | DefinitionKind.Column(_, name, _) -> Fail.notSupported ctx name.Span "DEFINE COLUMN"
                 | DefinitionKind.MParameter(name, _) -> Fail.notSupported ctx name.Span "DEFINE MPARAMETER"
 
-            query.Evaluates |> List.map (evaluateOne ctx))
+            let results = query.Evaluates |> List.map (evaluateOne ctx)
+            // A variable the query refers to and didn't need is still evaluated (see `settle`).
+            Variables.settle ctx (List.ofSeq queryVars)
+            results)
 
 /// Evaluate one scalar expression with no filter context and no row context, as `EVALUATE ROW (
 /// "v", <expression> )` would.

@@ -139,6 +139,9 @@ type DaxError =
     | CannotConvert of value: string * source: DaxType * target: DaxType
     /// A result outside the range of its type (Integer, Currency or DateTime).
     | Overflow of operation: string * resultType: DaxType
+    /// A result the public sources leave open, or disagree on: the engine refuses it (a
+    /// `not-supported` error, which IFERROR doesn't catch) rather than pick one.
+    | Unsettled of what: string
 
 module DaxError =
 
@@ -162,6 +165,7 @@ module DaxError =
             $"Cannot convert value '{value}' of type {typeLabel source} to type {typeLabel target}."
         | Overflow(operation, resultType) ->
             $"The result of {operation} is out of range for type {typeLabel resultType}."
+        | Unsettled what -> $"Not supported by the local DAX engine: {what}"
 
 /// How strings compare. One object answers equality, hashing and ordering, so the three always
 /// agree. Trailing spaces never count: the engine drops them when it stores text, and `"a " = "a"`.
@@ -550,12 +554,36 @@ module DaxValue =
         | DaxValue.DateTime d -> Ok(ValueSome(NDate d))
         | DaxValue.Boolean b -> Ok(ValueSome(NInt(if b then 1L else 0L)))
         | DaxValue.String s ->
+            // "the string is automatically converted into a corresponding number, as long as the
+            // string is a valid representation of a number" (SQLBI, "Understanding numeric data
+            // type conversions in DAX"): digits with a sign and a decimal point are; whether
+            // spaces around them, thousands separators or a currency symbol are is not said.
+            let decorated =
+                s.Length > 0
+                && s |> Seq.exists Char.IsAsciiDigit
+                && s
+                   |> Seq.forall (fun ch ->
+                       Char.IsAsciiDigit ch
+                       || Char.IsWhiteSpace ch
+                       || Char.GetUnicodeCategory ch = UnicodeCategory.CurrencySymbol
+                       || "+-.,eE()%".Contains ch)
+
             match parseNumber s with
+            | Some _ when s <> s.Trim() ->
+                Error(
+                    Unsettled
+                        $"the text \"{s}\" read as a number (whether spaces around a number are accepted is not documented)"
+                )
             | Some(DaxValue.Integer i) -> Ok(ValueSome(NInt i))
             | Some(DaxValue.Decimal d) -> Ok(ValueSome(NReal d))
             | _ ->
                 match parseDate s with
                 | Some(DaxValue.DateTime d) -> Ok(ValueSome(NDate d))
+                | _ when decorated ->
+                    Error(
+                        Unsettled
+                            $"the text \"{s}\" read as a number (which separators and symbols the engine accepts in a number depends on the model's culture and is not documented)"
+                    )
                 | _ -> Error(CannotConvert(s, DaxType.String, target))
 
     let private scaledOfInt (i: int64) =
@@ -657,6 +685,7 @@ module DaxValue =
     ///   behaviour, where Boolean > text > number; that ranking is what `sortCompare` uses.
     ///
     /// ASSUMPTION: numbers compare exactly (an Integer above 2^53 is not rounded to a float first).
+    /// Where rounding it would change the answer the comparison is `Unsettled`.
     /// Not transitive across BLANK: BLANK = 0 and BLANK = "", yet 0 and "" don't compare.
     let compare (collation: Collation) (a: DaxValue) (b: DaxValue) : Result<int, DaxError> =
         let zeroOf =
@@ -682,7 +711,36 @@ module DaxValue =
         | DaxValue.Boolean x, DaxValue.Boolean y -> Ok(Operators.compare x y)
         | _ ->
             match asNum a, asNum b with
-            | ValueSome x, ValueSome y -> Ok(compareNum x y)
+            | ValueSome x, ValueSome y ->
+                let exact = compareNum x y
+
+                let mixed =
+                    match x, y with
+                    | (NInt _ | NCur _), (NReal _ | NDate _)
+                    | (NReal _ | NDate _), (NInt _ | NCur _) -> true
+                    | _ -> false
+
+                // The docs' comparison table makes both sides REAL. A fixed decimal number becomes
+                // the nearest REAL (0.1 as a currency equals the REAL 0.1); above 2^53 the
+                // conversion rounds the digits themselves, and the exact values can differ where
+                // the rounded ones are equal.
+                let asReal = sign ((numFloat x).CompareTo(numFloat y))
+
+                let large =
+                    match x, y with
+                    | (NInt i | NCur i), _
+                    | _, (NInt i | NCur i) -> i > 9007199254740992L || i < -9007199254740992L
+                    | _ -> false
+
+                if not mixed || asReal = sign exact then
+                    Ok exact
+                elif not large then
+                    Ok asReal
+                else
+                    Error(
+                        Unsettled
+                            "comparing a whole or fixed decimal number too large for a decimal number to hold exactly with a decimal number (whether the engine compares the exact values is not documented)"
+                    )
             | _ ->
                 match typeOf a, typeOf b with
                 | Some l, Some r -> Error(IncomparableTypes(l, r))
@@ -759,20 +817,54 @@ module DaxValue =
 
     let private overflow op t = Error(Overflow(op, t))
 
+    let private outOfRange (wide: Int128) =
+        wide > Int128.op_Implicit Int64.MaxValue
+        || wide < Int128.op_Implicit Int64.MinValue
+
+    /// The two 64-bit values the documentation puts outside the range of whole numbers ("between
+    /// -2^63+1 and 2^63-2": Microsoft Learn, "Data types in Power BI Desktop") and lists as
+    /// synonyms of null ("Data types supported in Analysis Services tabular models").
+    let private reserved (i: int64) =
+        i = Int64.MaxValue || i = Int64.MinValue
+
+    let private atTheLimits (op: string) =
+        Error(
+            Unsettled
+                $"{op} with 9223372036854775807 or -9223372036854775808 as an operand or as the result (values the documentation puts outside the range of whole numbers)"
+        )
+
+    /// The low 64 bits: "there is an overflow condition, but there is no overflow error and the
+    /// result is the least significant representable digits" (SQLBI, "Rounding errors with
+    /// different data types in DAX", of the sum, subtraction and multiplication of integers, and
+    /// of the sum and subtraction of currencies).
+    let private low64 (wide: Int128) : int64 = Int128.op_Explicit wide
+
+    /// An Integer result of the operands `l` and `r`, wrapping on overflow.
+    let private wrappedInt op (l: int64) (r: int64) (wide: Int128) =
+        let result = low64 wide
+
+        if reserved l || reserved r || reserved result then
+            atTheLimits op
+        else
+            Ok(DaxValue.Integer result)
+
+    /// A Currency result (scaled) of a sum or subtraction, wrapping on overflow as an Integer does.
+    let private wrappedCurrency op (wide: Int128) =
+        let result = low64 wide
+
+        if reserved result then
+            atTheLimits op
+        else
+            Ok(DaxValue.Currency result)
+
     let private checkedInt op (wide: Int128) =
-        if
-            wide > Int128.op_Implicit Int64.MaxValue
-            || wide < Int128.op_Implicit Int64.MinValue
-        then
+        if outOfRange wide then
             overflow op DaxType.Integer
         else
             Ok(DaxValue.Integer(Int128.op_Explicit wide: int64))
 
     let private checkedCurrency op (wide: Int128) =
-        if
-            wide > Int128.op_Implicit Int64.MaxValue
-            || wide < Int128.op_Implicit Int64.MinValue
-        then
+        if outOfRange wide then
             overflow op DaxType.Currency
         else
             Ok(DaxValue.Currency(Int128.op_Explicit wide: int64))
@@ -827,14 +919,24 @@ module DaxValue =
             | DaxType.DateTime -> Ok(DaxValue.DateTime f)
             | DaxType.Decimal -> Ok(DaxValue.Decimal f)
             | DaxType.Currency ->
-                let l, r = wideScaled x, wideScaled y
-                checkedCurrency op (if subtract then l - r else l + r)
+                // An Integer too large to be a Currency has no scaled form to wrap from.
+                let fits =
+                    function
+                    | NInt i -> (scaledOfInt i).IsSome
+                    | _ -> true
+
+                if not (fits x && fits y) then
+                    overflow op DaxType.Currency
+                else
+                    let l, r = wideScaled x, wideScaled y
+                    wrappedCurrency op (if subtract then l - r else l + r)
             | _ ->
                 match x, y with
                 | NInt l, NInt r ->
-                    let l, r = Int128.op_Implicit l, Int128.op_Implicit r
-                    // ASSUMPTION: Integer overflow is an error rather than wrapping or widening.
-                    checkedInt op (if subtract then l - r else l + r)
+                    // ASSUMPTION: Integer overflow wraps (SQLBI says so outright); at the two values
+                    // the documentation reserves, the result is `Unsettled`.
+                    let wl, wr = Int128.op_Implicit l, Int128.op_Implicit r
+                    wrappedInt op l r (if subtract then wl - wr else wl + wr)
                 | _ -> Ok(DaxValue.Decimal f)
 
     /// `+`. BLANK + BLANK is BLANK; otherwise BLANK is 0. Result type: DateTime if either side is a
@@ -858,9 +960,20 @@ module DaxValue =
         | Ok(_, ValueNone) -> Ok DaxValue.Blank
         | Ok(ValueSome x, ValueSome y) ->
             match x, y with
-            | NInt l, NInt r -> checkedInt op (Int128.op_Implicit l * Int128.op_Implicit r)
+            | NInt l, NInt r -> wrappedInt op l r (Int128.op_Implicit l * Int128.op_Implicit r)
             | NCur c, NInt i
-            | NInt i, NCur c -> checkedCurrency op (Int128.op_Implicit c * Int128.op_Implicit i)
+            | NInt i, NCur c ->
+                let wide = Int128.op_Implicit c * Int128.op_Implicit i
+
+                if outOfRange wide then
+                    // "never produces an overflow error, but it might result in an inaccurate
+                    // number in case of an overflow" (SQLBI, the same article): which number?
+                    Error(
+                        Unsettled
+                            "a fixed decimal number multiplied by a whole number, out of range (the engine returns an inaccurate number, and no source says which)"
+                    )
+                else
+                    checkedCurrency op wide
             | NCur _, NCur _ -> Ok(DaxValue.Decimal(numFloat x * numFloat y))
             | NCur _, _
             | _, NCur _ -> currencyOfFloat op (numFloat x * numFloat y)
@@ -913,6 +1026,7 @@ module DaxValue =
         | Ok ValueNone -> Ok DaxValue.Blank
         | Ok(ValueSome n) ->
             match n with
+            | NInt i when reserved i -> atTheLimits "negation"
             | NInt i -> checkedInt "negation" (-(Int128.op_Implicit i))
             | NCur c -> checkedCurrency "negation" (-(Int128.op_Implicit c))
             | NReal r -> Ok(DaxValue.Decimal(-r))
@@ -945,10 +1059,16 @@ module DaxValue =
             | "FALSE" -> Ok false
             | _ -> Error(CannotConvert(s, DaxType.String, DaxType.Boolean))
 
+    /// What `&&` and `||` refuse: Microsoft's table of BLANK in operations gives BLANK for BLANK AND
+    /// BLANK and BLANK OR BLANK, SQLBI says a logical expression is never BLANK.
+    let bothBlank =
+        "&& or || with BLANK on both sides (BLANK according to Microsoft's table of BLANK in operations, FALSE according to SQLBI)"
+
     /// `&&`. ASSUMPTION: always TRUE or FALSE, BLANK counting as FALSE (the current engine, per
-    /// SQLBI; the docs' table still shows BLANK AND BLANK = BLANK).
+    /// SQLBI; the docs' table still shows BLANK AND BLANK = BLANK, so that one case is `Unsettled`).
     let logicalAnd (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> =
         match toBoolean a, toBoolean b with
+        | _ when isBlank a && isBlank b -> Error(Unsettled bothBlank)
         | Ok x, Ok y -> Ok(DaxValue.Boolean(x && y))
         | Error e, _
         | _, Error e -> Error e
@@ -956,13 +1076,18 @@ module DaxValue =
     /// `||`. See `logicalAnd`.
     let logicalOr (a: DaxValue) (b: DaxValue) : Result<DaxValue, DaxError> =
         match toBoolean a, toBoolean b with
+        | _ when isBlank a && isBlank b -> Error(Unsettled bothBlank)
         | Ok x, Ok y -> Ok(DaxValue.Boolean(x || y))
         | Error e, _
         | _, Error e -> Error e
 
-    /// NOT. NOT BLANK is TRUE.
+    /// NOT. NOT of BLANK is `Unsettled`: TRUE if the BLANK counts as FALSE, as in a condition;
+    /// BLANK if it passes through, as in arithmetic. No source shows it.
     let logicalNot (a: DaxValue) : Result<DaxValue, DaxError> =
-        toBoolean a |> Result.map (fun x -> DaxValue.Boolean(not x))
+        if isBlank a then
+            Error(Unsettled "NOT of BLANK (TRUE or BLANK: no source shows which)")
+        else
+            toBoolean a |> Result.map (fun x -> DaxValue.Boolean(not x))
 
     /// CONVERT(value, type), and what storing a value in a typed column does.
     ///

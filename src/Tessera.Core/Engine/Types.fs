@@ -348,7 +348,11 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
             | Some t when t <> d.DataType && d.DataType <> DaxType.Variant && DaxType.isNumeric t ->
                 if DaxType.isNumeric d.DataType then
                     match DaxValue.convertTo d.DataType value with
-                    | Ok converted when DaxValue.compare d.Collation converted value = Ok 0 -> d.TryFindId converted
+                    | Ok converted ->
+                        match DaxValue.compare d.Collation converted value with
+                        | Ok 0 -> d.TryFindId converted
+                        | Error(Unsettled what) -> raise (EngineException(DaxNotSupported(what, "")))
+                        | _ -> -1
                     | _ -> -1
                 else
                     -1
@@ -917,6 +921,9 @@ module Fail =
     let dax (ctx: Ctx) (span: Span) (r: Result<'a, DaxError>) : 'a =
         match r with
         | Ok v -> v
+        // What the sources leave open is refused, not raised as a DAX error (IFERROR must not
+        // turn it into a value).
+        | Error(Unsettled what) -> notSupported ctx span what
         | Error e -> runtime ctx span (DaxError.message e)
 
 module Fn =

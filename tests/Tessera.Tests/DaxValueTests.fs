@@ -273,16 +273,24 @@ let tests =
                 Expect.isTrue (V.equals ci (int' 1) (dec 1.0) |> ok) ""
                 Expect.isTrue (V.strictEquals ci (int' 1) (cur 1m) |> ok) ""
                 Expect.isTrue (V.equals ci (cur 0.5m) (dec 0.5) |> ok) ""
-                Expect.equal (V.compare ci (cur 0.1m) (dec 0.1) |> ok) -1 "0.1 as a float is a little above 1/10"
+                // "CURRENCY compared with REAL is REAL" (the comparison table of the data types page).
+                Expect.equal (V.compare ci (cur 0.1m) (dec 0.1) |> ok) 0 "both sides become decimal numbers"
                 Expect.equal (V.compare ci (date 2024 1 15) (int' 45306) |> ok) 0 ""
                 Expect.equal (V.compare ci (date 2024 1 15) (dec 45306.5) |> ok) -1 ""
                 Expect.equal (V.compare ci (int' 2) (cur 1.9999m) |> ok) 1 ""
 
-            testCase "integers above 2^53 are not rounded to compare"
+            testCase "integers above 2^53: exact against integers, unsettled where rounding to a decimal number matters"
             <| fun () ->
                 let big = DaxValue.Integer 9007199254740993L
-                Expect.equal (V.compare ci big (dec 9007199254740992.0) |> ok) 1 ""
-                Expect.equal (V.compare ci (DaxValue.Integer Int64.MaxValue) (dec 9223372036854775808.0) |> ok) -1 ""
+                Expect.equal (V.compare ci big (DaxValue.Integer 9007199254740992L) |> ok) 1 ""
+                // Exactly, 2^53 + 1 is above 2^53; as decimal numbers the two are equal.
+                Expect.isTrue
+                    (match V.compare ci big (dec 9007199254740992.0) with
+                     | Error(Unsettled _) -> true
+                     | _ -> false)
+                    "the two readings differ"
+
+                Expect.equal (V.compare ci big (dec 9007199254740000.0) |> ok) 1 "the two readings agree"
 
                 Expect.equal
                     (V.compare ci (DaxValue.Integer Int64.MinValue) (dec -9223372036854775808.0)
@@ -543,15 +551,69 @@ let tests =
                 Expect.isError (V.add (str "NaN") (int' 1)) "not a number in DAX"
                 Expect.isError (V.negate (str "Infinity")) ""
 
-            testCase "overflow is an error"
+            // "there is an overflow condition, but there is no overflow error and the result is the
+            // least significant representable digits" (SQLBI, "Rounding errors with different data
+            // types in DAX"), whose examples are the first and the third here.
+            testCase "whole and fixed decimal numbers wrap around on overflow"
             <| fun () ->
+                let unsettled r =
+                    match r with
+                    | Error(Unsettled _) -> true
+                    | _ -> false
+
+                let five = DaxValue.Integer 5000000000000000000L
+                Expect.equal (V.add five five |> ok) (DaxValue.Integer -8446744073709551616L) "5E18 + 5E18"
+
+                Expect.equal
+                    (V.multiply (DaxValue.Integer 3037000500L) (DaxValue.Integer 3037000500L) |> ok)
+                    (DaxValue.Integer -9223372036709301616L)
+                    "9223372037000250000 - 2^64"
+
+                Expect.equal
+                    (V.add (cur 500000000000000m) (cur 500000000000000m) |> ok)
+                    (cur -844674407370955.1616m)
+                    "5E14 + 5E14 as currencies"
+
+                Expect.equal
+                    (V.subtract (DaxValue.Integer -5000000000000000000L) five |> ok)
+                    (DaxValue.Integer 8446744073709551616L)
+                    ""
+
+                // The two values the documentation puts outside the range.
                 let max = DaxValue.Integer Int64.MaxValue
-                Expect.equal (V.add max (int' 1)) (Error(Overflow("addition", DaxType.Integer))) ""
-                Expect.isError (V.multiply max (int' 2)) ""
-                Expect.isError (V.negate (DaxValue.Integer Int64.MinValue)) ""
-                Expect.isError (V.add (DaxValue.Currency Int64.MaxValue) (cur 0.0001m)) ""
+                Expect.isTrue (unsettled (V.add max (int' 1))) "an operand at the limit"
+
+                Expect.isTrue
+                    (unsettled (V.add (DaxValue.Integer(Int64.MaxValue - 1L)) (int' 1)))
+                    "a result at the limit"
+
+                Expect.isTrue (unsettled (V.negate (DaxValue.Integer Int64.MinValue))) ""
+                Expect.isTrue (unsettled (V.add (DaxValue.Currency(Int64.MaxValue - 1L)) (cur 0.0001m))) ""
+                // "might result in an inaccurate number in case of an overflow": which one?
+                Expect.isTrue (unsettled (V.multiply (cur 1e14m) (int' 100))) ""
                 Expect.isError (V.add max (cur 1m)) "an Integer too large for a Currency"
-                Expect.isError (V.multiply (cur 1e14m) (dec 100.0)) ""
+                // "produces an overflow error if the result cannot be represented as a currency".
+                Expect.equal
+                    (V.multiply (cur 1e14m) (dec 100.0))
+                    (Error(Overflow("multiplication", DaxType.Currency)))
+                    ""
+
+            testCase "text read as a number: digits, a sign, a decimal point; anything else is unsettled or an error"
+            <| fun () ->
+                let unsettled r =
+                    match r with
+                    | Error(Unsettled _) -> true
+                    | _ -> false
+
+                Expect.equal (V.add (str "22") (int' 22) |> ok) (int' 44) "\"22\" + 22 = 44 (the data types page)"
+                Expect.equal (V.add (str "-1.5") (int' 1) |> ok) (dec -0.5) ""
+                Expect.isTrue (unsettled (V.add (str " 12 ") (int' 1))) "spaces"
+                Expect.isTrue (unsettled (V.add (str "$5") (int' 1))) "a currency symbol"
+
+                Expect.equal
+                    (V.add (str "abc") (int' 1))
+                    (Error(CannotConvert("abc", DaxType.String, DaxType.Decimal)))
+                    ""
 
             prop "addition commutes; multiplication commutes; neither throws"
             <| fun (a: DaxValue, b: DaxValue) ->
@@ -588,15 +650,24 @@ let tests =
         ]
 
         testList "logic" [
-            testCase "BLANK is FALSE; the result is always TRUE or FALSE"
+            testCase "next to a value BLANK is FALSE; BLANK with BLANK, and NOT of BLANK, are unsettled"
             <| fun () ->
                 let t, f = DaxValue.Boolean true, DaxValue.Boolean false
+
+                let unsettled r =
+                    match r with
+                    | Error(Unsettled _) -> true
+                    | _ -> false
+
                 Expect.equal (V.logicalAnd blank t |> ok) f "BLANK && TRUE"
                 Expect.equal (V.logicalOr blank t |> ok) t "BLANK || TRUE"
                 Expect.equal (V.logicalOr f blank |> ok) f "FALSE OR BLANK"
                 Expect.equal (V.logicalAnd t blank |> ok) f "TRUE AND BLANK"
-                Expect.equal (V.logicalOr blank blank |> ok) f ""
-                Expect.equal (V.logicalNot blank |> ok) t ""
+                // Microsoft's table of BLANK in operations says BLANK, SQLBI says FALSE.
+                Expect.isTrue (unsettled (V.logicalOr blank blank)) "BLANK OR BLANK"
+                Expect.isTrue (unsettled (V.logicalAnd blank blank)) "BLANK AND BLANK"
+                Expect.isTrue (unsettled (V.logicalNot blank)) "NOT BLANK"
+                Expect.equal (V.logicalNot f |> ok) t ""
                 Expect.equal (V.logicalAnd (int' 2) (dec 0.5) |> ok) t "non-zero numbers are TRUE"
                 Expect.equal (V.toBoolean (str "TRUE") |> ok) true ""
                 Expect.isError (V.toBoolean (str "yes")) ""

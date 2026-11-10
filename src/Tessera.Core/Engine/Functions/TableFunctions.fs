@@ -50,29 +50,46 @@ module TableFunctions =
 
     /// The columns to group a table by: columns of the table itself, or for the rows of a model
     /// table, columns of the tables related to it ("in the table (or in a related table)").
+    ///
+    /// `[Name]` is a column the table expression added ("SUMMARIZE has the option of grouping by
+    /// columns computed in the query": dax.guide/summarize; "GROUPBY is useful to group by columns
+    /// with no lineage": dax.guide/groupby).
     let private groupColumn (ev: IEval) (ctx: Ctx) (fn: string) (table: TableVal) (e: Expr) : ColInfo * DaxValue array =
-        let c = ev.Column(ctx, e)
+        let added =
+            match (Fn.unparen e).Kind with
+            | Bracketed name ->
+                table.Cols
+                |> Array.tryFindIndex (fun c ->
+                    isNull c.Table
+                    && String.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase))
+            | _ -> None
 
-        match Tables.columnIndexOfLineage table c with
-        | i when i >= 0 -> table.Cols.[i], table.Column i
-        | _ ->
-            if
-                not (isNull table.BaseTable)
-                && table.Config.IsExpanded(table.BaseTable, c.Table)
-            then
-                if not table.IsPureBase then
-                    Fail.notSupported
+        match added with
+        | Some i -> table.Cols.[i], table.Column i
+        | None ->
+
+            let c = ev.Column(ctx, e)
+
+            match Tables.columnIndexOfLineage table c with
+            | i when i >= 0 -> table.Cols.[i], table.Column i
+            | _ ->
+                if
+                    not (isNull table.BaseTable)
+                    && table.Config.IsExpanded(table.BaseTable, c.Table)
+                then
+                    if not table.IsPureBase then
+                        Fail.notSupported
+                            ctx
+                            e.Span
+                            $"{fn} by a column of a related table, over a table built on '{table.BaseTable.Name}' with columns added"
+
+                    let map = table.Config.RowMap(table.BaseTable, c.Table)
+                    Tables.modelColumn c, Array.init table.Count (fun row -> c.ValueAt map.[table.BaseRows.[row]])
+                else
+                    Fail.invalid
                         ctx
                         e.Span
-                        $"{fn} by a column of a related table, over a table built on '{table.BaseTable.Name}' with columns added"
-
-                let map = table.Config.RowMap(table.BaseTable, c.Table)
-                Tables.modelColumn c, Array.init table.Count (fun row -> c.ValueAt map.[table.BaseRows.[row]])
-            else
-                Fail.invalid
-                    ctx
-                    e.Span
-                    $"{fn}: '{c.Table.Name}'[{c.Name}] is not a column of the table, or of a table it has a many-to-one relationship to"
+                        $"{fn}: '{c.Table.Name}'[{c.Name}] is not a column of the table, or of a table it has a many-to-one relationship to"
 
     /// Group rows by key values: each group's key, and the positions of its rows, in order of
     /// first appearance.
