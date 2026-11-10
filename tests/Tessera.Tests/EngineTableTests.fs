@@ -452,7 +452,6 @@ let tests =
                 notSupported (p ()) "DEFINE COLUMN Sales[X] = 1 EVALUATE Sales" "DEFINE COLUMN"
                 notSupported (p ()) "EVALUATE Customer ORDER BY Customer[Name] START AT \"B\"" "START AT"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", @p )" "@p"
-                notSupported (p ()) "EVALUATE DATESYTD ( 'Date'[Date] )" "DATESYTD"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", FORMAT ( 1, \"0\" ) )" "FORMAT"
                 notSupported (p ()) "EVALUATE ADDCOLUMNS ( Customer, \"r\", ROWNUMBER () )" "ROWNUMBER")
             testCase "a syntax error in a query" (fun () ->
