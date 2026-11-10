@@ -2090,13 +2090,14 @@ Refused, because the sources don't settle them (each error says which):
 - `DATEADD` of the last day of a month, selected without the day before it, to a longer month; `PARALLELPERIOD` of
   a selection that skips a whole month, quarter or year; `DATESINPERIOD` from a day the other month doesn't have
   (unless it is a month end), or from a BLANK start;
-- the date-table rule where it is not documented and would change the result: a context transition that filters
-  the date column while other filters on the date table hide that date (a measure iterated over
-  `ALL ( 'Date'[Date] )` under a filter on the year), or while a filter the rule would remove also restricts another
-  table (a snowflaked table, a filter pairing a Date column with another table's, `SUMMARIZE`'s own extension
-  columns). Over `VALUES ( 'Date'[Date] )`, or `ADDCOLUMNS ( SUMMARIZE ( … ) )` by date under a filter on the
-  year it is fine, as is `SUMMARIZECOLUMNS` by date with the year as its filter argument; `KEEPFILTERS` on a date filter, a filter that pairs the date column with other columns, a key column of
-  a table that is not marked, the key of a relationship that is not active.
+- the date-table rule where it is not documented and would change the result: `KEEPFILTERS` on a date filter, a
+  filter that pairs the date column with other columns, a key column of a table that is not marked, the key of a
+  relationship that is not active, and a context transition that filters the date column while other filters on
+  the date table hide that date (a measure iterated over `ALL ( 'Date'[Date] )` under a filter on the year) or
+  while a filter the rule would remove also restricts another table (a snowflaked table, a filter pairing a Date
+  column with another table's, `SUMMARIZE`'s own extension columns). Iterating `VALUES ( 'Date'[Date] )` or
+  `ADDCOLUMNS ( SUMMARIZE ( … ) )` by date under a filter on the year is fine, as is `SUMMARIZECOLUMNS` by date
+  with the year as its filter argument.
 
 On a date column that is not unique or has gaps (a fact table's), `DATEADD` and `SAMEPERIODLASTYEAR` of a selection
 with gaps are an error, with the message the Power BI community quotes from the engine: "Function 'DATEADD' expects a contiguous selection when the date column is
