@@ -810,6 +810,12 @@ module Formatting =
 
                 let run = j - i
 
+                // "\QQ yyyy" shows Q read as q (dax.guide/format). No page shows another letter
+                // in upper case ("yyyy-MM-dd" could be the month or the text MM).
+                if letter <> 'q' && format.Substring(i, run) <> String(letter, run) then
+                    refuse
+                        $"the upper-case letter {Char.ToUpperInvariant letter} in a date format (the pages write the date and time characters in lower case)"
+
                 let ok =
                     match letter with
                     | 'd' ->
@@ -992,10 +998,15 @@ module Formatting =
                 | DateToken.Field('q', _) -> num ((dt.Month - 1) / 3 + 1)
                 // "Display the day of the week as a number (1 for Sunday through 7 for Saturday)."
                 | DateToken.Field('w', 1) -> num (weekday + 1)
-                // "Display the week of the year as a number (1-54)": weeks start on Sunday and the
-                // first is the one January 1 is in, which is what gives 54 at most and 26 for
-                // June 25, 2020 (Microsoft Learn's example).
+                // "Display the week of the year as a number (1-54)": the week January 1 is in is
+                // the first, which is what allows 54. The one example (26 for Thursday, June 25,
+                // 2020) doesn't say whether a week starts on Sunday or on Monday, so a Sunday, the
+                // one day on which the two differ, is refused.
                 | DateToken.Field('w', _) ->
+                    if weekday = 0 then
+                        refuse
+                            "the week of the year (ww) of a Sunday (whether weeks start on Sunday or on Monday is not documented)"
+
                     let first = int (DateTime(dt.Year, 1, 1).DayOfWeek)
                     num ((dt.DayOfYear - 1 + first) / 7 + 1)
                 | DateToken.Field _ -> refuse "a date format"
@@ -1011,14 +1022,14 @@ module Formatting =
         match format with
         | None
         | Some "General Date" ->
-            // "Displays a date and/or time. For example, 3/12/2008 11:07:31 AM"; as "c" is
-            // described, "Display only date information if there is no fractional part to the date
-            // serial number; display only time information if there is no integer portion".
+            // "Displays a date and/or time. For example, 3/12/2008 11:07:31 AM"; "1/2/2021
+            // 3:30:00 PM". What it shows of a date with no time, or of a time alone, is said of
+            // "c" only, on which the pages disagree.
             match DaxValue.dateTimeOfSerial serial with
-            | Some dt when serial >= 0.0 ->
-                if dt.TimeOfDay = TimeSpan.Zero then custom "m/d/yyyy"
-                elif serial < 1.0 then custom "h:nn:ss AM/PM"
-                else custom "m/d/yyyy h:nn:ss AM/PM"
+            | Some dt when serial >= 1.0 && dt.TimeOfDay <> TimeSpan.Zero -> custom "m/d/yyyy h:nn:ss AM/PM"
+            | Some _ when serial >= 0.0 ->
+                refuse
+                    "General Date of a date with no time, or of a time alone (the pages show it with both; whether the missing part is left out is said of \"c\" only)"
             | _ -> refuse "a date before December 30, 1899 or after the year 9999"
         // "Saturday, January 2, 2021".
         | Some "Long Date" -> custom "dddd, mmmm d, yyyy"

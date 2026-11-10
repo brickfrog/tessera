@@ -189,6 +189,8 @@ let textTests =
             testCase "REPT" (fun () ->
                 is (p ()) "REPT ( \"85\", 3 )" "858585"
                 is (p ()) "REPT ( \"Text\", 2 )" "TextText"
+                is (p ()) "REPT ( \"\", 9000000000000000 )" ""
+                fails "REPT ( \"a\", 9000000000000000 )"
                 is (p ()) "LEN ( REPT ( \"a\", 32767 ) )" 32767
                 fails "REPT ( \"a\", 32768 )"
                 is (p ()) "IFERROR ( REPT ( \"ab\", 20000 ), \"too long\" )" "too long")
@@ -303,7 +305,11 @@ let textTests =
                 refused "SEARCH ( \"か\", \"カ\" )" "kana"
                 refused "SEARCH ( \"é\", \"École\" )" "outside ASCII"
                 refused "SEARCH ( \"a\", \"á\" )" "combining mark"
-                refused "SEARCH ( \"k\", \"K\" )" "outside ASCII")
+                refused "SEARCH ( \"k\", \"K\" )" "outside ASCII"
+                // A linguistic comparison may find "ss" in "Straße", "fi" in the ligature.
+                refused "SEARCH ( \"ss\", \"Straße\", 1, 0 )" "linguistic"
+                refused "CONTAINSSTRING ( \"ﬁn\", \"fi\" )" "linguistic"
+                refused "SEARCH ( \"2\", \"m²\", 1, 0 )" "linguistic")
             // "Searching for "á" finds the first occurrence of 'á' but no occurrences of 'a'".
             testCase "an accented letter in the text is not its base letter" (fun () ->
                 is (p ()) "SEARCH ( \"e\", \"café e\" )" 6
@@ -708,13 +714,11 @@ let formatTests =
                 is (p ()) "FORMAT ( dt\"2020-12-15T12:30:59\", BLANK () )" "12/15/2020 12:30:59 PM"
                 is (p ()) "FORMAT ( dt\"2008-03-12T11:07:31\", \"General Date\" )" "3/12/2008 11:07:31 AM"
                 is (p ()) "FORMAT ( dt\"2008-03-12T00:07:31\", \"Long Time\" )" "12:07:31 AM")
-            // "Displays a date and/or time"; "Display only date information if there is no
-            // fractional part to the date serial number; display only time information if there is
-            // no integer portion" (Microsoft Learn).
-            testCase "General Date shows what there is" (fun () ->
-                is (p ()) "FORMAT ( dt\"2021-01-02\", \"General Date\" )" "1/2/2021"
-                isAt 3 "FORMAT ( T[At], \"General Date\" )" "3:30:00 PM"
-                isAt 2 "FORMAT ( T[At], BLANK () )" "1/2/2021")
+            // General Date is shown with a date and a time only; what it leaves out is said of "c".
+            testCase "General Date of a date alone or a time alone is refused" (fun () ->
+                refused "FORMAT ( dt\"2021-01-02\", \"General Date\" )" "no time"
+                refusedAt 3 "FORMAT ( T[At], \"General Date\" )" "no time"
+                refusedAt 2 "FORMAT ( T[At], BLANK () )" "no time")
             // Microsoft Learn's table for Thursday, June 25, 2020, 1:23:45 PM (en-US).
             testCase "custom characters: the documented table" (fun () ->
                 let check (format: string) (expected: string) =
@@ -780,10 +784,13 @@ let formatTests =
             testCase "week numbers at the ends of the year" (fun () ->
                 is (p ()) "FORMAT ( dt\"2020-01-01\", \"ww\" )" "1"
                 is (p ()) "FORMAT ( dt\"2020-01-04\", \"ww\" )" "1"
-                is (p ()) "FORMAT ( dt\"2020-01-05\", \"ww\" )" "2"
+                is (p ()) "FORMAT ( dt\"2020-01-06\", \"ww\" )" "2"
+                // A Sunday: week 1 if weeks start on Monday, week 2 if on Sunday.
+                refused "FORMAT ( dt\"2020-01-05\", \"ww\" )" "Sunday"
                 is (p ()) "FORMAT ( dt\"2020-12-31\", \"ww\" )" "53"
                 // 2000 began on a Saturday and was a leap year: December 31 is in week 54.
-                is (p ()) "FORMAT ( dt\"2000-12-31\", \"ww\" )" "54"
+                is (p ()) "FORMAT ( dt\"2000-12-30\", \"ww\" )" "53"
+                refused "FORMAT ( dt\"2000-12-31\", \"ww\" )" "Sunday"
                 is (p ()) "FORMAT ( dt\"2020-12-31\", \"y\" )" "366")
             testCase "what the sources leave open is refused" (fun () ->
                 let dt = "dt\"2020-06-25T13:23:45\""
@@ -804,9 +811,11 @@ let formatTests =
                 refused $"FORMAT ( {dt}, \"Am/Pm\" )" "the letter a"
                 // A time alone has no date to show; DAX is not reliable before March 1, 1900.
                 refusedAt 3 "FORMAT ( T[At], \"yyyy\" )" "March 1, 1900")
-            testCase "upper-case letters are the same characters" (fun () ->
-                // "\QQ yyyy" shows Q is q.
-                is (p ()) "FORMAT ( dt\"2019-03-28\", \"YYYY-MM-DD\" )" "2019-03-28")
+            // "\QQ yyyy" shows Q is q; no page shows another letter in upper case.
+            testCase "upper-case letters other than Q are refused" (fun () ->
+                refused "FORMAT ( dt\"2019-03-28\", \"yyyy-MM-dd\" )" "upper-case letter M"
+                refused "FORMAT ( dt\"2019-03-28\", \"YYYY\" )" "upper-case letter Y"
+                is (p ()) "FORMAT ( dt\"2019-03-28\", \"Q\" )" "1")
         ]
 
         testList "culture" [
@@ -888,9 +897,11 @@ let formatTests =
             // A whole number through "0" is its digits: reading them back gives the number.
             testProperty "FORMAT of a whole number with \"0\" reads back as the number"
             <| fun (n: int64) ->
-                let s = text $"FORMAT ( {n}, \"0\" )"
-                Expect.equal (Int64.Parse(s, CultureInfo.InvariantCulture)) n s
-                Expect.equal (text $"FORMAT ( {n}, \"General Number\" )") s "General Number"
+                let n = max n (Int64.MinValue + 1L)
+                let literal = n.ToString CultureInfo.InvariantCulture
+                let s = text $"FORMAT ( {literal}, \"0\" )"
+                Expect.equal s literal "the digits"
+                Expect.equal (text $"FORMAT ( {literal}, \"General Number\" )") s "General Number"
 
             // Thousand separators add nothing but commas.
             testProperty "\"#,0\" is \"0\" with commas every three digits"
@@ -904,7 +915,9 @@ let formatTests =
             // Decimals a whole number doesn't have are zeros.
             testProperty "\"0.00\" of a whole number is the number and two zeros"
             <| fun (n: int64) ->
-                Expect.equal (text $"FORMAT ( {n}, \"0.00\" )") (text $"FORMAT ( {n}, \"0\" )" + ".00") ""
+                let n = max n (Int64.MinValue + 1L)
+                let literal = n.ToString CultureInfo.InvariantCulture
+                Expect.equal (text $"FORMAT ( {literal}, \"0.00\" )") (literal + ".00") literal
 
             // A date written as yyyy-mm-dd hh:nn:ss is the date.
             testProperty "FORMAT of a date with yyyy-mm-dd hh:nn:ss reads back as the date"

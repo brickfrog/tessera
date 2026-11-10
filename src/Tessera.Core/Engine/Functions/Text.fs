@@ -175,6 +175,18 @@ module Text =
     let private isKanaOrWidth (ch: char) =
         (ch >= '぀' && ch <= 'ヿ') || (ch >= 'ㇰ' && ch <= 'ㇿ') || (ch >= '＀' && ch <= '￯')
 
+    /// A character that a linguistic comparison may find equal to other characters: one with a
+    /// compatibility form (the ligature fi, a superscript 2, the fraction one half, the trade mark
+    /// sign), and the letters that stand for two (sharp s, ae, oe, thorn, eth). Whether SEARCH finds
+    /// "ss" in "Straße" is not documented.
+    let private isExpansion (ch: char) =
+        let s = string ch
+
+        s.Normalize(NormalizationForm.FormKD) <> s.Normalize(NormalizationForm.FormD)
+        || "\u00DF\u1E9E\u00E6\u00C6\u0153\u0152\u00FE\u00DE\u00F0\u00D0\u0133\u0132\u0149\u00F8\u00D8\u0142\u0141\u0111\u0110"
+            .Contains
+            ch
+
     /// SEARCH "is case insensitive", "kanatype-insensitive, width-insensitive" and "accent
     /// sensitive" (Microsoft Learn). The engine folds the case of ASCII letters and compares every
     /// other character as it is, so it refuses the characters for which that is not the whole story:
@@ -205,6 +217,9 @@ module Text =
                             refuse "a letter outside ASCII to find without regard to case"
                         elif upper < '\u0080' || lower < '\u0080' then
                             refuse "a letter outside ASCII whose other case is an ASCII letter"
+                        elif isExpansion ch then
+                            refuse
+                                "a character a linguistic comparison may read as other characters (a ligature, a superscript, a fraction)"
 
     let private foldAscii (ch: char) =
         if ch >= 'a' && ch <= 'z' then char (int ch - 32) else ch
@@ -480,7 +495,9 @@ module Text =
                     ctx
                     call.Args.[1].Span
                     "REPT zero times (BLANK according to Microsoft Learn, an empty text according to DAX Guide)"
-            elif int64 s.Length * n > 32767L then
+            elif s = "" then
+                DaxValue.String ""
+            elif n > 32767L || int64 s.Length * n > 32767L then
                 Fail.runtime ctx call.Span "The result of REPT is longer than 32,767 characters."
             else
                 DaxValue.String(String.replicate (int n) s))
