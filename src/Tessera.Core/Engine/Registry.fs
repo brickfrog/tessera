@@ -20,6 +20,7 @@ module Registry =
             Filter.functions
             TableFunctions.functions
             NonBlank.functions
+            TimeIntelligence.functions
         ]
 
     let byName: IReadOnlyDictionary<string, DaxFunction> =

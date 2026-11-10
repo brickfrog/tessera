@@ -975,7 +975,6 @@ let tests =
                 notSupported (p ()) "EVALUATE VALUES ( Product[Name] ) ORDER BY Product[Name] START AT \"B\"" "BLANK")
             testCase "what a query can't have yet" (fun () ->
                 notSupported (p ()) "EVALUATE ROW ( \"v\", @p )" "@p"
-                notSupported (p ()) "EVALUATE DATESYTD ( 'Date'[Date] )" "DATESYTD"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", PATHITEM ( 1, 1 ) )" "PATHITEM"
                 notSupported (p ()) "EVALUATE ADDCOLUMNS ( Customer, \"r\", ROWNUMBER () )" "ROWNUMBER")
             testCase "a syntax error in a query" (fun () ->

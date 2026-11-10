@@ -2137,6 +2137,66 @@ model's culture is read from the model; `FORMAT`'s locale argument overrides it.
 - A measure's format string (`FormatString`, or a format string expression) is **not** applied to query results: the
   real engine doesn't apply it either.
 
+#### Time intelligence
+
+The classic time intelligence functions, over a date column:
+
+| | Functions |
+|---|---|
+| First and last | `FIRSTDATE` `LASTDATE` `STARTOFMONTH` `STARTOFQUARTER` `STARTOFYEAR` `ENDOFMONTH` `ENDOFQUARTER` `ENDOFYEAR` |
+| To date | `DATESMTD` `DATESQTD` `DATESYTD` `TOTALMTD` `TOTALQTD` `TOTALYTD` |
+| Shifting | `DATEADD` `SAMEPERIODLASTYEAR` `PARALLELPERIOD` `PREVIOUSDAY` `PREVIOUSMONTH` `PREVIOUSQUARTER` `PREVIOUSYEAR` `NEXTDAY` `NEXTMONTH` `NEXTQUARTER` `NEXTYEAR` |
+| Ranges | `DATESBETWEEN` `DATESINPERIOD` |
+| Balances | `OPENINGBALANCEMONTH` `OPENINGBALANCEQUARTER` `OPENINGBALANCEYEAR` `CLOSINGBALANCEMONTH` `CLOSINGBALANCEQUARTER` `CLOSINGBALANCEYEAR` |
+
+Each is implemented to the definition DAX Guide, SQLBI or Microsoft Learn publish for it (the header of
+`Engine/Functions/TimeIntelligence.fs` lists them):
+
+- **The dates argument** is a date column, which reads as `CALCULATETABLE ( DISTINCT ( column ) )` (so in a row
+  context the row becomes the filter), or a table expression of one column that has the lineage of a date column
+  (`VALUES ( 'Date'[Date] )`, a variable, the result of another of these functions).
+- **The result** has the lineage of that column and only dates the column has, so it filters the column as a
+  `CALCULATE` argument. `FIRSTDATE` and `LASTDATE` are also values.
+- **`DATEADD`** by `MONTH`, `QUARTER` or `YEAR` works month by month: a month whose every date (of those the column
+  has) is selected becomes the whole other month; otherwise each day moves, to the last day of a shorter month, and
+  a selection with the last two days of its month runs to the end of the other month. `PARALLELPERIOD` returns
+  whole months, quarters or years.
+- **Year end dates** (`DATESYTD`, `TOTALYTD`, `STARTOFYEAR`, `ENDOFYEAR`, `PREVIOUSYEAR`, `NEXTYEAR`, the year
+  balances) are a text literal: `"6/30"`, `"06-30"`, `"2000-06-30"`.
+- **The date-table rule:** a filter argument of `CALCULATE` on the date column of a date table also removes the
+  filters on every other column of that table, as if `ALL ( 'Date' )` were written next to it. A date table is one
+  marked as a date table (data category `Time`, with the date column as its key), or one whose date column is the
+  one side of an active relationship from another date column. A filter on any other column removes nothing else.
+
+Refused, because the sources don't settle them (each error says which):
+
+- calendar-based time intelligence: a calendar as the dates argument, the `WEEK` interval and the week functions,
+  `DATEADD`'s Extension and Truncation and `DATESINPERIOD`'s EndBehavior;
+- a True/False expression as the dates argument; a table of dates that are not the values of a model column; a date
+  column with a time of day;
+- a year end date that reads differently by culture (`"6/7"`, the day first as in `"30/6"`, a month name) or is in
+  February;
+- `FIRSTDATE` / `LASTDATE` as a table, and `DATESMTD` / `QTD` / `YTD`, when no date is selected; `DATESMTD` /
+  `QTD` / `YTD` (and `TOTALMTD` / `QTD` / `YTD`) when other filters hide the first date of the period, where SQLBI's
+  and DAX Guide's definitions give different dates;
+- `DATEADD` and `SAMEPERIODLASTYEAR` of a selection of dates with gaps on a complete date table: Microsoft Learn
+  says it is an error, SQLBI moves each month on its own;
+- `DATEADD` of the last day of a month, selected without the day before it, to a longer month; `PARALLELPERIOD` of
+  a selection that skips a whole month, quarter or year; `DATESINPERIOD` from a day the other month doesn't have
+  (unless it is a month end), or from a BLANK start;
+- the date-table rule where it is not documented and would change the result: `KEEPFILTERS` on a date filter, a
+  filter that pairs the date column with other columns, a key column of a table that is not marked, the key of a
+  relationship that is not active, and a context transition that filters the date column while other filters on
+  the date table hide that date (a measure iterated over `ALL ( 'Date'[Date] )` under a filter on the year) or
+  while a filter the rule would remove also restricts another table (a snowflaked table, a filter pairing a Date
+  column with another table's, `SUMMARIZE`'s own extension columns). Iterating `VALUES ( 'Date'[Date] )` or
+  `ADDCOLUMNS ( SUMMARIZE ( … ) )` by date under a filter on the year is fine, as is `SUMMARIZECOLUMNS` by date
+  with the year as its filter argument.
+
+On a date column that is not unique or has gaps (a fact table's), `DATEADD` and `SAMEPERIODLASTYEAR` of a selection
+with gaps are an error, with the message the Power BI community quotes from the engine: "Function 'DATEADD' expects a contiguous selection when the date column is
+not unique, has gaps or it contains time portion."
+
 #### What it refuses
 
 - **Not implemented yet:** time intelligence, `ALLSELECTED`, `FORMAT` and most text, math and statistical
