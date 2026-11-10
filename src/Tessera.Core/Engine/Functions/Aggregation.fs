@@ -18,6 +18,27 @@ module Aggregate =
         | Some t -> DaxType.name t
         | None -> "BLANK"
 
+    let private exact (v: DaxValue) : decimal voption =
+        match v with
+        | DaxValue.Integer i -> ValueSome(decimal i)
+        | DaxValue.Currency c -> ValueSome(DaxValue.currencyValue c)
+        | _ -> ValueNone
+
+    /// `total + v` for an aggregation. The `+` operator wraps around when whole or fixed decimal
+    /// numbers overflow (SQLBI, "Rounding errors with different data types in DAX"); that article
+    /// is about the operators, and no source says what an aggregation does, so an overflow here
+    /// is refused.
+    let private accumulate (ctx: Ctx) (span: Span) (name: string) (total: DaxValue) (v: DaxValue) : DaxValue =
+        let sum = Fail.dax ctx span (DaxValue.add total v)
+
+        match exact total, exact v, exact sum with
+        | ValueSome a, ValueSome b, ValueSome c when a + b <> c ->
+            Fail.notSupported
+                ctx
+                span
+                $"{name} whose total is out of the range of its data type (whether an aggregation wraps around as + does is not documented)"
+        | _ -> sum
+
     /// SUMX: BLANKs are skipped; no value at all is BLANK. Numbers only: what a sum of text, dates
     /// or Booleans is isn't documented, so it is refused.
     let sum (ctx: Ctx) (span: Span) (name: string) (values: DaxValue seq) : DaxValue =
@@ -28,7 +49,7 @@ module Aggregate =
             | DaxValue.Blank -> ()
             | DaxValue.Integer _
             | DaxValue.Decimal _
-            | DaxValue.Currency _ -> total <- Fail.dax ctx span (DaxValue.add total v)
+            | DaxValue.Currency _ -> total <- accumulate ctx span name total v
             | _ -> Fail.notSupported ctx span $"{name} of {typeName v} values"
 
         total
@@ -51,7 +72,7 @@ module Aggregate =
                  | DaxValue.Currency _ -> ()
                  | _ -> currency <- false)
 
-                total <- Fail.dax ctx span (DaxValue.add total v)
+                total <- accumulate ctx span name total v
                 n <- n + 1L
             | _ -> Fail.notSupported ctx span $"{name} of {typeName v} values"
 
@@ -64,10 +85,53 @@ module Aggregate =
             Fail.dax ctx span (DaxValue.divide total (DaxValue.Integer n))
 
     /// MINX / MAXX: BLANKs are skipped ("MINX ignores it": dax.guide/min); numbers and dates
-    /// compare as numbers, text by the collation. Booleans, and a mix of text with numbers, are
-    /// refused (the pages say MIN "ignores logical values" without saying what a column of them
-    /// gives).
-    let extreme (ctx: Ctx) (span: Span) (name: string) (wantMax: bool) (values: DaxValue seq) : DaxValue =
+    /// compare as numbers, text by the collation. Booleans are refused (the pages say MIN "ignores
+    /// logical values" without saying what a column of them gives).
+    ///
+    /// `variant`: the third argument of MINX and MAXX. "If the expression has variant or mixed
+    /// value types such as text and number, then by default MAXX considers only numbers. If
+    /// <variant> = TRUE, the maximum value is returned", "the highest value based on ORDER BY
+    /// DESC" (Microsoft Learn, MAXX; the same on MINX). The order of values of different types is
+    /// one the sources disagree on (see `Sorting.check`), so that case is refused.
+    let extremeOf
+        (ctx: Ctx)
+        (span: Span)
+        (name: string)
+        (wantMax: bool)
+        (variant: bool)
+        (values: DaxValue seq)
+        : DaxValue =
+        let values = Array.ofSeq values
+
+        let isText (v: DaxValue) =
+            match v with
+            | DaxValue.String _ -> true
+            | _ -> false
+
+        let isNumber (v: DaxValue) =
+            match v with
+            | DaxValue.Integer _
+            | DaxValue.Decimal _
+            | DaxValue.Currency _ -> true
+            | _ -> false
+
+        let values =
+            if values |> Array.exists isText && values |> Array.exists isNumber then
+                if variant then
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"{name} of text mixed with numbers with its third argument TRUE (how values of different data types are ordered is not settled by the sources)"
+                elif
+                    values
+                    |> Array.exists (fun v -> not (isText v || isNumber v || DaxValue.isBlank v))
+                then
+                    Fail.notSupported ctx span $"{name} of text mixed with numbers and dates or TRUE/FALSE values"
+                else
+                    values |> Array.filter (fun v -> not (isText v))
+            else
+                values
+
         let mutable best = DaxValue.Blank
 
         for v in values do
@@ -97,6 +161,9 @@ module Aggregate =
                         best <- v
 
         best
+
+    let extreme (ctx: Ctx) (span: Span) (name: string) (wantMax: bool) (values: DaxValue seq) : DaxValue =
+        extremeOf ctx span name wantMax false values
 
     /// COUNTX / COUNTAX: the values that are not BLANK ("An empty string is a value"); none is
     /// BLANK, not 0. COUNTX "cannot" count Booleans (dax.guide/countx).
@@ -209,7 +276,11 @@ module Aggregation =
                 total > Int128.op_Implicit Int64.MaxValue
                 || total < Int128.op_Implicit Int64.MinValue
             then
-                Fail.runtime ctx call.Span (DaxError.message (Overflow("SUM", c.Data.DataType)))
+                // The + operator wraps around; no source says what an aggregation does.
+                Fail.notSupported
+                    ctx
+                    call.Span
+                    "SUM whose total is out of the range of its data type (whether an aggregation wraps around as + does is not documented)"
             elif c.Data.DataType = DaxType.Integer then
                 DaxValue.Integer(Int128.op_Explicit total: int64)
             else
@@ -255,6 +326,15 @@ module Aggregation =
                                     yield values.[id]
                         }))
         |> Fn.withCheck (fun args -> if args.Length = 1 then columnOnly name args else None)
+
+    /// The third argument of MINX and MAXX: TRUE or FALSE (FALSE when left out).
+    let private variantArgument (ev: IEval) (ctx: Ctx) (call: Call) : bool =
+        match List.tryItem 2 call.Args with
+        | Some a when not (Fn.isOmitted a) ->
+            match ev.Scalar(ctx, a) with
+            | DaxValue.Boolean b -> b
+            | _ -> Fail.notSupported ctx a.Span "a third argument of MINX or MAXX that is not TRUE or FALSE"
+        | _ -> false
 
     let private order (ctx: Ctx) (e: Expr) : bool =
         // TRUE: descending.
@@ -385,11 +465,11 @@ module Aggregation =
         Fn.scalar "AVERAGEX" "Aggregation" (2, 2) (fun ev ctx args -> averageType ev ctx args.[1]) (fun ev ctx call ->
             Aggregate.average ctx call.Span "AVERAGEX" (iterate ev ctx call))
 
-        Fn.scalar "MINX" "Aggregation" (2, 2) (Fn.typeOfArg 1) (fun ev ctx call ->
-            Aggregate.extreme ctx call.Span "MINX" false (iterate ev ctx call))
+        Fn.scalar "MINX" "Aggregation" (2, 3) (Fn.typeOfArg 1) (fun ev ctx call ->
+            Aggregate.extremeOf ctx call.Span "MINX" false (variantArgument ev ctx call) (iterate ev ctx call))
 
-        Fn.scalar "MAXX" "Aggregation" (2, 2) (Fn.typeOfArg 1) (fun ev ctx call ->
-            Aggregate.extreme ctx call.Span "MAXX" true (iterate ev ctx call))
+        Fn.scalar "MAXX" "Aggregation" (2, 3) (Fn.typeOfArg 1) (fun ev ctx call ->
+            Aggregate.extremeOf ctx call.Span "MAXX" true (variantArgument ev ctx call) (iterate ev ctx call))
 
         Fn.scalar "COUNTX" "Aggregation" (2, 2) (Fn.typeIs DaxType.Integer) (fun ev ctx call ->
             Aggregate.count ctx call.Span "COUNTX" false (iterate ev ctx call))
@@ -421,7 +501,8 @@ module Aggregation =
         // "A BLANK value of Expression becomes an empty string, but CONCATENATEX still adds the
         // delimiter"; "The result is BLANK when Table has no rows"; "Delimiter is not evaluated in
         // the row context of Table" (dax.guide/concatenatex). Without an order-by the order is not
-        // defined by the engine, so that form is refused.
+        // defined by the engine: all the rows tie, and the result is refused unless the order can't
+        // change it (no rows, or the same text in each).
         Fn.scalar "CONCATENATEX" "Aggregation" (2, -1) (Fn.typeIs DaxType.String) (fun ev ctx call ->
             let table = ev.Table(ctx, call.Args.[0])
 
@@ -491,14 +572,12 @@ module Aggregation =
                     Fail.notSupported
                         ctx
                         call.Span
-                        "CONCATENATEX over rows that tie on the order-by expressions with different texts"
+                        (if keys.IsEmpty then
+                             "CONCATENATEX without an order-by expression, over rows with different texts (the engine doesn't define their order)"
+                         else
+                             "CONCATENATEX over rows that tie on the order-by expressions with different texts")
 
                 DaxValue.String(String.Join(delimiter, sorted |> List.map fst)))
-        |> Fn.withCheck (fun args ->
-            if args.Length < 4 then
-                Some "CONCATENATEX without an order-by expression (the engine doesn't define the order of the texts)"
-            else
-                None)
 
         // dax.guide/rankx and Microsoft Learn RANKX: the expression is evaluated for each row of
         // the table; the value (the expression again when omitted) in the context of the call;

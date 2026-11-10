@@ -21,6 +21,10 @@ open Tessera.DaxEngine
 /// A model bound to its data, ready for queries.
 type Prepared = internal {
     Model: Tessera.DaxEngine.Model
+    /// What the model was bound from: a query that defines columns or tables binds it again,
+    /// with those added, for itself.
+    Database: Database
+    Store: DataStore
     /// Calculated columns and tables that couldn't be computed, and tables whose blank row
     /// can't be decided: queries that touch them fail with the same error.
     Failures: (ObjectRef * TessError) list
@@ -248,15 +252,52 @@ let private isCircular (e: TessError) =
 
 // ---- prepare -----------------------------------------------------------------------------------
 
-let private bind
+/// What a query's DEFINE COLUMN and DEFINE TABLE add to the model, for that query alone.
+type private QueryObjects = {
+    Source: SourceText
+    Defs: QueryDefs
+    /// DEFINE COLUMN: the table, the column's name, its expression.
+    Columns: (TableName * Ident * Expr) list
+    /// DEFINE TABLE: the table's name, its expression.
+    Tables: (TableName * Expr) list
+    /// Called once the tables exist and before anything is computed: the query's measures and
+    /// functions are registered here, so the query's columns and tables can use them.
+    Bound: Tessera.DaxEngine.Model -> unit
+    /// The model as `prepare` bound it: what it computed is taken from there.
+    Prepared: Tessera.DaxEngine.Model
+}
+
+let private bindWith
     (clock: Clock)
     (db: Database)
     (store: DataStore)
+    (query: QueryObjects option)
     : Tessera.DaxEngine.Model * (ObjectRef * TessError) list =
     let model = Tessera.DaxEngine.Model(store.Collation)
     model.Now <- clock.Now
     model.UtcNow <- clock.UtcNow
     model.Culture <- (if isNull db.Model.Culture then "" else db.Model.Culture)
+
+    /// The table as `prepare` computed it, when binding again for a query.
+    let computed (name: string) : BTable option =
+        match query with
+        | Some q ->
+            match q.Prepared.TableByName.TryGetValue name with
+            | true, t -> Some t
+            | _ -> None
+        | None -> None
+
+    /// Take what `prepare` computed for a calculated column: its values, or why it has none.
+    let reuse (original: BColumn) (column: BColumn) =
+        column.DataType <- original.DataType
+        column.SourceName <- original.SourceName
+
+        match original.Failure with
+        | Some e -> column.Failure <- Some e
+        | None ->
+            if original.IsReady then
+                column.SetData original.Data
+
     let gates = staticGates db
     let tables = ResizeArray<BTable>()
     let mutable columnId = 0
@@ -328,6 +369,77 @@ let private bind
 
         if calculated.IsNone then
             table.SetRowCount rows
+
+        // Binding again for a query: the calculated columns and tables are not computed twice.
+        match computed t.Name with
+        | Some original ->
+            if calculated.IsSome && (original.IsReady || original.Failure.IsSome) then
+                // A calculated table's columns are those its expression returned.
+                let copies =
+                    original.Columns
+                    |> Array.map (fun o ->
+                        let c = nextColumn table o.Name o.DataType
+                        c.Expression <- o.Expression
+                        reuse o c
+                        c)
+
+                table.ColumnByName.Clear()
+
+                for c in copies do
+                    table.ColumnByName.[c.Name] <- c
+
+                table.Columns <- copies
+                table.Failure <- original.Failure
+
+                if original.IsReady then
+                    table.SetRowCount original.RowCount
+            else
+                for c in table.Columns do
+                    match c.Expression, original.ColumnByName.TryGetValue c.Name with
+                    | Some _, (true, o) -> reuse o c
+                    | _ -> ()
+        | None -> ()
+
+    // What the query defines. Whether a query column or table may take the name of one the
+    // model has is not documented.
+    match query with
+    | Some q ->
+        let refuse (span: Span) (what: string) =
+            raise (EngineException(DaxNotSupported(what, SourceText.where q.Source span)))
+
+        for (name, expr) in q.Tables do
+            if model.TableByName.ContainsKey name.Name then
+                refuse name.Span $"DEFINE TABLE '{name.Name}': the model already has a table of that name"
+
+            let table = BTable(tables.Count, model, name.Name)
+            table.Expression <- Some q.Source
+            table.Parsed <- Some expr
+            tables.Add table
+            model.TableByName.[name.Name] <- table
+
+        for (tableName, name, expr) in q.Columns do
+            match model.TableByName.TryGetValue tableName.Name with
+            | true, table ->
+                if table.ColumnByName.ContainsKey name.Name then
+                    refuse
+                        name.Span
+                        $"DEFINE COLUMN '{table.Name}'[{name.Name}]: the table already has a column of that name"
+
+                if table.Parsed.IsSome then
+                    refuse name.Span $"DEFINE COLUMN on the query table '{table.Name}'"
+
+                let column = nextColumn table name.Name DaxType.Variant
+                column.Expression <- Some q.Source
+                column.Parsed <- Some expr
+                table.Columns <- Array.append table.Columns [| column |]
+                table.ColumnByName.[name.Name] <- column
+            | _ ->
+                raise (
+                    EngineException(
+                        DaxInvalid($"there is no table '{tableName.Name}'", SourceText.where q.Source tableName.Span)
+                    )
+                )
+    | None -> ()
 
     model.Tables <- tables.ToArray()
 
@@ -453,8 +565,15 @@ let private bind
                     fail (fun e -> c.Failure <- Some e) (fun () ->
                         let t = c.Table
                         let n = t.RowCount
-                        let expr = parseExpression source
-                        let ctx = Context.root model null source false
+
+                        // A query column: "populated in an empty filter context before the query
+                        // is executed" (dax.guide/st/column), and it "can use any of the defined
+                        // entities" (Microsoft Learn, DEFINE).
+                        let expr, ctx =
+                            match c.Parsed, query with
+                            | Some parsed, Some q -> parsed, Context.root model q.Defs source true
+                            | _ -> parseExpression source, Context.root model null source false
+
                         let table = Tables.ofBase model.DefaultConfig t (Array.init n id)
 
                         let values =
@@ -486,8 +605,13 @@ let private bind
 
                 try
                     fail (fun e -> t.Failure <- Some e) (fun () ->
-                        let expr = parseExpression source
-                        let ctx = Context.root model null source false
+                        // A query table: "populated in an empty filter context before the query is
+                        // executed" (dax.guide/st/table).
+                        let expr, ctx =
+                            match t.Parsed, query with
+                            | Some parsed, Some q -> parsed, Context.root model q.Defs source true
+                            | _ -> parseExpression source, Context.root model null source false
+
                         let result = ev.Table(ctx, expr)
 
                         // The model lists the table's columns by the result column each holds.
@@ -594,6 +718,10 @@ let private bind
                 finally
                     deciding.Remove t.Id |> ignore
 
+    match query with
+    | Some q -> q.Bound model
+    | None -> ()
+
     // Compute everything now, so that nothing changes once `prepare` has returned.
     let failures = ResizeArray<ObjectRef * TessError>()
 
@@ -636,11 +764,17 @@ let prepareWith (options: Options) (db: Database) (store: DataStore) : Result<Pr
     else
         let clock = options.Clock |> Option.defaultWith Clock.system
 
-        run (fun () -> bind clock db store)
+        run (fun () -> bindWith clock db store None)
         |> Result.bind (fun (model, failures) ->
             match failures |> List.tryFind (fun (_, e) -> isCircular e) with
             | Some(_, e) -> Error e
-            | None -> Ok { Model = model; Failures = failures })
+            | None ->
+                Ok {
+                    Model = model
+                    Database = db
+                    Store = store
+                    Failures = failures
+                })
 
 /// `prepareWith` with the defaults: the date functions see the machine's clock, read once here.
 let prepare (db: Database) (store: DataStore) : Result<Prepared, TessError> = prepareWith Options.defaults db store
@@ -722,8 +856,8 @@ let private toResult (t: TableVal) (order: int array) : QueryResult =
 // ---- Queries -----------------------------------------------------------------------------------
 
 let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
-    if not e.StartAt.IsEmpty then
-        Fail.notSupported ctx e.StartAt.Head.Span "START AT"
+    if e.StartAt.Length > e.OrderBy.Length then
+        Fail.invalid ctx e.StartAt.Head.Span "START AT has more values than ORDER BY has keys"
 
     let table = ev.Table(ctx, e.Table)
 
@@ -774,13 +908,61 @@ let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
                 c
 
             // Stable: rows that tie keep the order they were produced in.
-            List.init table.Count id |> List.sortWith compare |> Array.ofList
+            let sorted = List.init table.Count id |> List.sortWith compare |> Array.ofList
+
+            if e.StartAt.IsEmpty then
+                sorted
+            else
+                // "defines the rows to skip before the specified values according to the sort
+                // order specified in the ORDER BY section" (dax.guide/st/start-at); "The second
+                // argument in START AT defines the starting value in column 2 of the ORDER BY
+                // columns within the rows that meet the first value for column 1" (Microsoft
+                // Learn, START AT): the rows whose first keys come before the values, in the
+                // order of the keys and their directions, are skipped.
+                let starts =
+                    e.StartAt
+                    |> List.map (fun v ->
+                        let value = ev.Scalar(ctx, v)
+
+                        if DaxValue.isBlank value then
+                            Fail.notSupported ctx v.Span "a START AT value that is BLANK"
+
+                        v.Span, value)
+
+                let before (row: int) =
+                    let mutable c = 0
+                    let mutable rest = List.zip (List.take starts.Length keys) starts
+
+                    while c = 0 && not rest.IsEmpty do
+                        let (values: DaxValue array, descending), (span, start) = rest.Head
+
+                        // Where BLANK sorts against the value is not settled by `compare`.
+                        if DaxValue.isBlank values.[row] then
+                            Fail.notSupported ctx span "START AT on a key that is BLANK in some row"
+
+                        c <-
+                            match DaxValue.compare ctx.Model.Collation values.[row] start with
+                            | Ok c -> c
+                            | Error _ ->
+                                Fail.notSupported
+                                    ctx
+                                    span
+                                    "a START AT value of a different data type than its ORDER BY key"
+
+                        if descending then
+                            c <- -c
+
+                        rest <- rest.Tail
+
+                    c < 0
+
+                sorted |> Array.filter (fun row -> not (before row))
 
     toResult table order
 
 /// Run a DAX query: one result per EVALUATE.
 ///
-/// DEFINE MEASURE, VAR and FUNCTION are supported; ORDER BY sorts by any expressions over the
+/// DEFINE MEASURE, VAR, FUNCTION, COLUMN and TABLE are supported; ORDER BY sorts by any expressions over the
 /// result's columns. Without ORDER BY the rows come in the order the engine produced them, which
 /// (as on a server) is not defined.
 let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessError> =
@@ -790,18 +972,134 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
         run (fun () ->
             let source = SourceText.query dax
             let defs = QueryDefs()
-            let mutable ctx = Context.root p.Model defs source true
+
+            // The query's measures and functions: any definition can use any other, whatever
+            // their order ("Definitions can reference other definitions that appear before or
+            // after the current definition": Microsoft Learn, "DAX queries").
+            let register (model: Tessera.DaxEngine.Model) =
+                for d in query.Definitions do
+                    match d.Kind with
+                    | DefinitionKind.Measure(table, name, value) ->
+                        match model.TableByName.TryGetValue table.Name with
+                        | true, t -> defs.Measures.[name.Name] <- BMeasure(name.Name, t, source, lazy value)
+                        | _ ->
+                            raise (
+                                EngineException(
+                                    DaxInvalid($"there is no table '{table.Name}'", SourceText.where source table.Span)
+                                )
+                            )
+                    | DefinitionKind.Function(name, def) ->
+                        defs.Functions.[name.Name] <- BFunction(name.Name, source, lazy def)
+                    | _ -> ()
+
+            let columns =
+                query.Definitions
+                |> List.choose (fun d ->
+                    match d.Kind with
+                    | DefinitionKind.Column(table, name, value) -> Some(table, name, value)
+                    | _ -> None)
+
+            let tables =
+                query.Definitions
+                |> List.choose (fun d ->
+                    match d.Kind with
+                    | DefinitionKind.Table(name, value) -> Some(name, value)
+                    | _ -> None)
+
+            // DEFINE COLUMN and DEFINE TABLE: the model is bound again for this query with them
+            // in it, and they are computed before anything else (`p` itself never changes).
+            let model =
+                if columns.IsEmpty && tables.IsEmpty then
+                    register p.Model
+                    p.Model
+                else
+                    // They are computed before the query's variables exist.
+                    for d in query.Definitions do
+                        match d.Kind with
+                        | DefinitionKind.Var(name, _) ->
+                            let upper = name.Name.ToUpperInvariant()
+
+                            let uses =
+                                (columns |> List.exists (fun (_, _, e) -> Variables.refersTo upper e))
+                                || (tables |> List.exists (fun (_, e) -> Variables.refersTo upper e))
+
+                            if uses then
+                                raise (
+                                    EngineException(
+                                        DaxNotSupported(
+                                            $"a query column or table that uses the query variable {name.Name}",
+                                            SourceText.where source name.Span
+                                        )
+                                    )
+                                )
+                        | _ -> ()
+
+                    let model, failures =
+                        bindWith
+                            {
+                                Now = p.Model.Now
+                                UtcNow = p.Model.UtcNow
+                            }
+                            p.Database
+                            p.Store
+                            (Some {
+                                Source = source
+                                Defs = defs
+                                Columns = columns
+                                Tables = tables
+                                Bound = register
+                                Prepared = p.Model
+                            })
+
+                    match failures |> List.tryFind (fun (_, e) -> isCircular e) with
+                    | Some(_, e) -> raise (EngineException e)
+                    | None -> model
+
+            let mutable ctx = Context.root model defs source true
+            let queryVars = ResizeArray<Ident * Lazy<Value> * bool>()
+
+            // Whether the rest of the query refers to a variable: a later variable (until one of
+            // the same name hides it) or an EVALUATE. Measures and functions don't see variables.
+            let usedLater (name: string) (after: Definition list) =
+                let name = name.ToUpperInvariant()
+
+                let rec inDefinitions (rest: Definition list) =
+                    match rest with
+                    | [] ->
+                        query.Evaluates
+                        |> List.exists (fun e ->
+                            Variables.refersTo name e.Table
+                            || e.OrderBy |> List.exists (fun k -> Variables.refersTo name k.Expr)
+                            || e.StartAt |> List.exists (Variables.refersTo name))
+                    | d :: tail ->
+                        match d.Kind with
+                        | DefinitionKind.Var(other, value) ->
+                            Variables.refersTo name value
+                            || (other.Name.ToUpperInvariant() <> name && inDefinitions tail)
+                        | DefinitionKind.Table(_, value) -> Variables.refersTo name value || inDefinitions tail
+                        | _ -> inDefinitions tail
+
+                inDefinitions after
+
+            let mutable remaining = query.Definitions
 
             for d in query.Definitions do
+                remaining <- remaining.Tail
+
                 match d.Kind with
-                | DefinitionKind.Measure(table, name, value) ->
-                    match p.Model.TableByName.TryGetValue table.Name with
-                    | true, t -> defs.Measures.[name.Name] <- BMeasure(name.Name, t, source, lazy value)
-                    | _ -> Fail.invalid ctx table.Span $"there is no table '{table.Name}'"
-                | DefinitionKind.Function(name, def) ->
-                    defs.Functions.[name.Name] <- BFunction(name.Name, source, lazy def)
+                | DefinitionKind.Measure _
+                | DefinitionKind.Function _
+                | DefinitionKind.Table _
+                | DefinitionKind.Column _ -> ()
                 | DefinitionKind.Var(name, value) ->
                     // A query variable: in scope in everything after it, evaluated once.
+                    if model.TableByName.ContainsKey name.Name then
+                        // "Names of existing tables aren't allowed" (Microsoft Learn, VAR).
+                        Fail.invalid
+                            ctx
+                            name.Span
+                            $"a variable can't be named {name.Name}: that is the name of a table of the model"
+
                     let definedIn = ctx
                     let isTable = ev.IsTable(definedIn, value)
                     let lazyValue = lazy (ev.Value(definedIn, value))
@@ -812,6 +1110,8 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                                  StaticType.Unknown
                              else
                                  ev.TypeOf(definedIn, value))
+
+                    queryVars.Add((name, lazyValue, usedLater name.Name remaining))
 
                     ctx <- {
                         ctx with
@@ -824,11 +1124,12 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                                         )
                             }
                     }
-                | DefinitionKind.Table(name, _) -> Fail.notSupported ctx name.Span "DEFINE TABLE"
-                | DefinitionKind.Column(_, name, _) -> Fail.notSupported ctx name.Span "DEFINE COLUMN"
                 | DefinitionKind.MParameter(name, _) -> Fail.notSupported ctx name.Span "DEFINE MPARAMETER"
 
-            query.Evaluates |> List.map (evaluateOne ctx))
+            let results = query.Evaluates |> List.map (evaluateOne ctx)
+            // A variable the query refers to and didn't need is still evaluated (see `settle`).
+            Variables.settle ctx (List.ofSeq queryVars)
+            results)
 
 /// Evaluate one scalar expression with no filter context and no row context, as `EVALUATE ROW (
 /// "v", <expression> )` would.

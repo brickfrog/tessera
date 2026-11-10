@@ -10,6 +10,72 @@ open System.Runtime.CompilerServices
 open Tessera
 open Tessera.DaxAst
 
+/// Variables: which are used, and what happens to the ones a result didn't need.
+module Variables =
+
+    /// Whether the code refers to the variable `name` (upper case), not counting a part where an
+    /// inner variable of the same name hides it.
+    let rec refersTo (name: string) (e: Expr) : bool =
+        RuntimeHelpers.EnsureSufficientExecutionStack()
+
+        match e.Kind with
+        | Identifier n -> n.ToUpperInvariant() = name
+        | VarBlock(vars, body) ->
+            let rec go (vars: VarDecl list) =
+                match vars with
+                | [] -> refersTo name body
+                | v :: rest -> refersTo name v.Value || (v.Name.Name.ToUpperInvariant() <> name && go rest)
+
+            go vars
+        | _ -> children e |> List.exists (refersTo name)
+
+    let private usedCache = ConditionalWeakTable<Expr, bool array>()
+
+    /// For each variable of a VAR block: whether the block's result, or a later variable that
+    /// is itself used, refers to it.
+    let used (block: Expr) (vars: VarDecl list) (body: Expr) : bool array =
+        usedCache.GetValue(
+            block,
+            fun _ ->
+                let vars = Array.ofList vars
+                let flags = Array.zeroCreate<bool> vars.Length
+
+                for i in vars.Length - 1 .. -1 .. 0 do
+                    let name = vars.[i].Name.Name.ToUpperInvariant()
+                    let mutable hidden = false
+                    let mutable found = false
+
+                    for j in i + 1 .. vars.Length - 1 do
+                        if not hidden then
+                            if flags.[j] && refersTo name vars.[j].Value then
+                                found <- true
+
+                            if vars.[j].Name.Name.ToUpperInvariant() = name then
+                                hidden <- true
+
+                    flags.[i] <- found || (not hidden && refersTo name body)
+
+                flags
+        )
+
+    /// "A variable that is referenced in the code is always evaluated, unless the DAX engine
+    /// removes the variable references through a static analysis of the code" (SQLBI, "When are
+    /// variables evaluated in DAX?"). The value of the result is the same either way; what
+    /// differs is an error in a variable the result didn't need, which the engine raises unless
+    /// its analysis removed the variable. So: evaluate what is referenced and wasn't needed,
+    /// and if that raises an error, refuse, since which of the two the engine does can't be told
+    /// here.
+    let settle (ctx: Ctx) (bound: (Ident * Lazy<Value> * bool) list) : unit =
+        for (name, value, isUsed) in bound do
+            if isUsed && not value.IsValueCreated then
+                try
+                    value.Force() |> ignore
+                with DaxRuntimeException(text, _) ->
+                    Fail.notSupported
+                        ctx
+                        name.Span
+                        $"the variable {name.Name}, which raises an error ({text}) although the result doesn't need its value (the engine raises that error unless it can tell before running that the variable is not used; it can't be told here which)"
+
 [<Sealed>]
 type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
     let ev = this :> IEval
@@ -282,10 +348,19 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
     let unknownFunction (ctx: Ctx) (call: Call) : 'a =
         Fail.notSupported ctx call.Name.Span $"the function {upper call.Name.Name}"
 
-    let bindVars (ctx: Ctx) (vars: VarDecl list) : Ctx =
+    let bindVarsWith (ctx: Ctx) (vars: VarDecl list) : Ctx * (Ident * Lazy<Value>) list =
         let mutable c = ctx
+        let bound = ResizeArray<Ident * Lazy<Value>>()
 
         for v in vars do
+            // "Names of existing tables aren't allowed" (Microsoft Learn, VAR); "The variable name
+            // cannot be a table name" (dax.guide/st/var).
+            if ctx.Model.TableByName.ContainsKey v.Name.Name then
+                Fail.invalid
+                    ctx
+                    v.Name.Span
+                    $"a variable can't be named {v.Name.Name}: that is the name of a table of the model"
+
             // A variable is evaluated in the context where it is defined, on first use, once.
             let definedIn = c
             let isTable = ev.IsTable(definedIn, v.Value)
@@ -298,6 +373,8 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                      else
                          ev.TypeOf(definedIn, v.Value))
 
+            bound.Add((v.Name, value))
+
             c <- {
                 c with
                     Scope = {
@@ -306,7 +383,18 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                     }
             }
 
-        c
+        c, List.ofSeq bound
+
+    let bindVars (ctx: Ctx) (vars: VarDecl list) : Ctx = bindVarsWith ctx vars |> fst
+
+    /// A VAR block's result, then the variables it referred to and didn't need (see
+    /// `Variables.settle`).
+    let varBlock (ctx: Ctx) (block: Expr) (vars: VarDecl list) (body: Expr) (eval: Ctx -> 'a) : 'a =
+        let inner, bound = bindVarsWith ctx vars
+        let result = eval inner
+        let used = Variables.used block vars body
+        Variables.settle ctx (bound |> List.mapi (fun i (name, value) -> name, value, used.[i]))
+        result
 
     let toBool (ctx: Ctx) (span: Span) (v: DaxValue) : bool =
         Fail.dax ctx span (DaxValue.toBoolean v)
@@ -378,17 +466,8 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
         let coll = ctx.Model.Collation
 
         match op with
-        | BinaryOp.And ->
-            // The right side is not evaluated when the left decides.
-            if not (toBool ctx span l) then
-                DaxValue.Boolean false
-            else
-                DaxValue.Boolean(toBool ctx span (ev.Scalar(ctx, right)))
-        | BinaryOp.Or ->
-            if toBool ctx span l then
-                DaxValue.Boolean true
-            else
-                DaxValue.Boolean(toBool ctx span (ev.Scalar(ctx, right)))
+        | BinaryOp.And
+        | BinaryOp.Or -> Logic.connective ev ctx (op = BinaryOp.And) span l right
         | BinaryOp.In -> DaxValue.Boolean(contains ctx span [| l |] (ev.Table(ctx, right)))
         | _ ->
             let r = ev.Scalar(ctx, right)
@@ -408,10 +487,21 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                 | DaxValue.DateTime _ -> true
                 | _ -> false
 
+            let isReal (v: DaxValue) =
+                match v with
+                | DaxValue.Decimal _ -> true
+                | _ -> false
+
             match op with
+            // The documentation's multiplication table has a Date/time column and no Date/time
+            // row: REAL by a date is REAL. Its INTEGER and CURRENCY by a date can't be right for
+            // a date with a time of day, and a date on the left isn't there at all.
+            | BinaryOp.Multiply when isDate r && isReal l -> Fail.dax ctx span (DaxValue.multiply l r)
             | BinaryOp.Multiply when isDate l || isDate r ->
-                // The documentation's table has no row for a date in a multiplication.
-                Fail.notSupported ctx span "multiplying a date"
+                Fail.notSupported
+                    ctx
+                    span
+                    "multiplying a date (only a decimal number times a date is documented well enough)"
             | BinaryOp.Add -> Fail.dax ctx span (DaxValue.add l r)
             | BinaryOp.Subtract -> Fail.dax ctx span (DaxValue.subtract l r)
             | BinaryOp.Multiply -> Fail.dax ctx span (DaxValue.multiply l r)
@@ -532,7 +622,7 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                     acc <- binary ctx op acc right
 
                 acc
-            | VarBlock(vars, body) -> ev.Scalar(bindVars ctx vars, body)
+            | VarBlock(vars, body) -> varBlock ctx e vars body (fun inner -> ev.Scalar(inner, body))
             | Call(name, args) ->
                 let call = {
                     Name = name
@@ -570,7 +660,7 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                 | Some(ExprParam(expr, scope)) -> ev.Table({ ctx with Scope = scope }, expr)
                 | None -> modelTable name
             | TableConstructor rows -> tableConstructor ctx e.Span rows
-            | VarBlock(vars, body) -> ev.Table(bindVars ctx vars, body)
+            | VarBlock(vars, body) -> varBlock ctx e vars body (fun inner -> ev.Table(inner, body))
             | Call(name, args) ->
                 let call = {
                     Name = name

@@ -214,6 +214,46 @@ module Convert =
             | _ -> ()
         | _ -> ()
 
+/// `&&`, `||`, AND and OR.
+module Logic =
+
+    /// `left && right` or `left || right`, the left side already evaluated. The right side is not
+    /// evaluated when the left decides, except to tell whether both sides are BLANK: Microsoft's
+    /// table of BLANK in operations gives BLANK for that, SQLBI says a logical expression is
+    /// never BLANK, so it is refused (see `DaxValue.bothBlank`).
+    let connective (ev: IEval) (ctx: Ctx) (isAnd: bool) (span: Span) (left: DaxValue) (right: Expr) : DaxValue =
+        let toBool (v: DaxValue) =
+            Fail.dax ctx span (DaxValue.toBoolean v)
+
+        if DaxValue.isBlank left then
+            let r =
+                try
+                    ev.Scalar(ctx, right)
+                with DaxRuntimeException _ when isAnd ->
+                    // BLANK && <an error>: FALSE if the right side is never looked at.
+                    Fail.notSupported
+                        ctx
+                        span
+                        "BLANK && an expression that raises an error (whether the right side is evaluated is not documented)"
+
+            if DaxValue.isBlank r then
+                Fail.notSupported ctx span DaxValue.bothBlank
+            elif isAnd then
+                // Evaluated only to rule out BLANK; it must still be a condition.
+                toBool r |> ignore
+                DaxValue.Boolean false
+            else
+                DaxValue.Boolean(toBool r)
+        elif isAnd then
+            if not (toBool left) then
+                DaxValue.Boolean false
+            else
+                DaxValue.Boolean(toBool (ev.Scalar(ctx, right)))
+        elif toBool left then
+            DaxValue.Boolean true
+        else
+            DaxValue.Boolean(toBool (ev.Scalar(ctx, right)))
+
 /// Sorting where the sources leave the order open.
 module Sorting =
 

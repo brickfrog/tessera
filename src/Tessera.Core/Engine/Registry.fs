@@ -19,6 +19,7 @@ module Registry =
             Formatting.functions
             Filter.functions
             TableFunctions.functions
+            NonBlank.functions
         ]
 
     let byName: IReadOnlyDictionary<string, DaxFunction> =

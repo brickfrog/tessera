@@ -13,6 +13,12 @@ let private p () = starPrepared.Value
 let private isError (code: string) (dax: string) =
     Expect.equal (TessError.code (scalarError (p ()) dax)) code dax
 
+/// The expression is refused, with a reason that mentions this.
+let private refused (dax: string) (mentions: string) =
+    match scalarError (p ()) dax with
+    | DaxNotSupported(what, _) -> Expect.stringContains what mentions dax
+    | other -> failtestf "expected not-supported, got %A\n%s" other dax
+
 [<Tests>]
 let tests =
     testList "Engine scalars" [
@@ -48,8 +54,7 @@ let tests =
                 // arguments are BLANK, the result is BLANK" (dax.guide, & and CONCATENATE).
                 is (p ()) "BLANK () & BLANK ()" null
                 is (p ()) "ISBLANK ( BLANK () & \"\" )" false
-                is (p ()) "IF ( BLANK (), 1, 2 )" 2
-                is (p ()) "NOT BLANK ()" true)
+                is (p ()) "IF ( BLANK (), 1, 2 )" 2)
         ]
 
         testList "operators" [
@@ -122,6 +127,38 @@ let tests =
             testCase "IF evaluates one branch" (fun () ->
                 is (p ()) "IF ( FALSE, ERROR ( \"no\" ), 1 )" 1
                 is (p ()) "IF ( TRUE, 1, ERROR ( \"no\" ) )" 1)
+            // "It uses an eager execution plan which always executes the branch expressions
+            // regardless of the condition expression" (Microsoft Learn, IF.EAGER).
+            testCase "IF.EAGER evaluates both branches" (fun () ->
+                is (p ()) "IF.EAGER ( TRUE, 1, 2 )" 1
+                is (p ()) "IF.EAGER ( FALSE, 1, 2.5 )" 2.5
+                is (p ()) "IF.EAGER ( FALSE, 1 )" null
+                isError "dax-error" "IF.EAGER ( TRUE, 1, ERROR ( \"no\" ) )"
+                isError "dax-error" "IF.EAGER ( FALSE, ERROR ( \"no\" ), 1 )")
+            // SQLBI, "BLANK handling in DAX": the table gives FALSE, TRUE, TRUE, FALSE for these
+            // four, and "When <expression> is of Boolean data type, IF is of Boolean data type and
+            // an implicit cast is applied to BLANK which converts to FALSE"; "a BLANK value is
+            // never returned by IF in case the result should be a Boolean data type".
+            testCase "IF with a BLANK branch and a True/False branch is never BLANK" (fun () ->
+                is (p ()) "IF ( 1 = 1, BLANK (), TRUE )" false
+                is (p ()) "IF ( 1 <> 1, BLANK (), TRUE )" true
+                is (p ()) "IF ( 1 = 1, TRUE, BLANK () )" true
+                is (p ()) "IF ( 1 <> 1, TRUE, BLANK () )" false
+                // A branch left out is a BLANK ("If omitted, a BLANK is returned").
+                is (p ()) "IF ( 1 <> 1, TRUE )" false
+                is (p ()) "IF.EAGER ( 1 = 1, BLANK (), TRUE )" false
+                // "SWITCH can be rewritten as nested IF".
+                is (p ()) "SWITCH ( 3, 1, TRUE, 2, FALSE )" false
+                is (p ()) "SWITCH ( 3, 1, TRUE, BLANK () )" false
+                // Any other type keeps the BLANK.
+                is (p ()) "IF ( 1 = 1, BLANK (), 1 )" null
+                is (p ()) "IF ( 1 = 1, BLANK (), \"x\" )" null
+                is (p ()) "SWITCH ( 3, 1, 10, 2, 20 )" null)
+            // "there is no cast, hence BLANK is preserved" (the same note): a True/False
+            // expression that is BLANK stays BLANK. MAXX of no rows is one.
+            testCase "IF keeps the BLANK of a True/False expression" (fun () ->
+                is (p ()) "ISBLANK ( IF ( TRUE, IF ( FALSE, 1 ) = 1 && FALSE ) )" false
+                is (p ()) "VAR b = BLANK () RETURN IF ( TRUE, b, TRUE )" false)
             // "SWITCH compares Expression with each Value like the == operator ... BLANK does not
             // match 0 or an empty string" (dax.guide/switch).
             testCase "SWITCH" (fun () ->
@@ -137,7 +174,20 @@ let tests =
                 is (p ()) "AND ( FALSE, ERROR ( \"no\" ) )" false
                 is (p ()) "OR ( TRUE, ERROR ( \"no\" ) )" true
                 is (p ()) "TRUE && 1" true
-                is (p ()) "BLANK () || BLANK ()" false)
+                is (p ()) "BLANK () && TRUE" false
+                is (p ()) "BLANK () || TRUE" true
+                is (p ()) "FALSE || BLANK ()" false)
+            // Microsoft's table of BLANK in operations gives BLANK for BLANK AND BLANK and BLANK OR
+            // BLANK; SQLBI ("BLANK handling in DAX") says a logical expression is never BLANK.
+            testCase "BLANK on both sides of && or ||, and NOT of BLANK, are refused" (fun () ->
+                refused "BLANK () || BLANK ()" "BLANK on both sides"
+                refused "BLANK () && BLANK ()" "BLANK on both sides"
+                refused "AND ( BLANK (), BLANK () )" "BLANK on both sides"
+                refused "OR ( BLANK (), BLANK () )" "BLANK on both sides"
+                refused "BLANK () && ERROR ( \"no\" )" "whether the right side is evaluated"
+                refused "NOT BLANK ()" "NOT of BLANK"
+                // IFERROR doesn't turn a refusal into a value.
+                refused "IFERROR ( NOT BLANK (), 1 )" "NOT of BLANK")
             // "COALESCE returns the first argument that is not BLANK ... An empty string and 0 are
             // not BLANK" (dax.guide/coalesce).
             testCase "COALESCE" (fun () ->
@@ -166,6 +216,39 @@ let tests =
                 is (p ()) "ISERROR ( ERROR ( \"x\" ) )" true
                 is (p ()) "ISERROR ( 1 )" false
                 is (p ()) "IFERROR ( 1 + \"a\", -1 )" -1)
+            // "The following example returns 9999 if the expression 25/0 evaluates to an error"
+            // (Microsoft Learn, IFERROR); "ISERROR also returns TRUE when the value is positive
+            // infinity, negative infinity or NaN ... IFERROR has the same behavior"; the page's
+            // example gives TRUE, TRUE, TRUE, FALSE, FALSE (dax.guide/iserror).
+            testCase "IFERROR and ISERROR count the infinities and NaN as errors" (fun () ->
+                is (p ()) "IFERROR ( 25 / 0, 9999 )" 9999.0
+                is (p ()) "ISERROR ( 1 / 0 )" true
+                is (p ()) "ISERROR ( -1 / 0 )" true
+                is (p ()) "ISERROR ( 0 / 0 )" true
+                is (p ()) "ISERROR ( DIVIDE ( 1, 0 ) )" false
+                is (p ()) "ISERROR ( DIVIDE ( 0, 0 ) )" false
+                is (p ()) "IFERROR ( 1 / 4, 9999 )" 0.25)
+            // "Names of existing tables aren't allowed" (Microsoft Learn, VAR).
+            testCase "a variable can't have the name of a table" (fun () ->
+                isError "dax-invalid" "VAR Sales = 1 RETURN Sales + 1"
+                is (p ()) "VAR SalesX = 1 RETURN SalesX + 1" 2)
+            // "a variable that is referenced in the code is always evaluated, unless the DAX
+            // engine removes the variable references through a static analysis of the code"; "If
+            // the variable is defined but not referenced, then it is not evaluated" (SQLBI, "When
+            // are variables evaluated in DAX?"). An error in a referenced variable the result
+            // didn't need is raised or not depending on that analysis: refused.
+            testCase "a variable that is referenced and not needed" (fun () ->
+                is (p ()) "VAR e = ERROR ( \"x\" ) RETURN 1" 1
+                is (p ()) "VAR a = 1 VAR b = 2 RETURN IF ( TRUE, a, b )" 1
+                refused "VAR e = ERROR ( \"x\" ) RETURN IF ( FALSE, e, 1 )" "the variable e"
+                refused "VAR e = ERROR ( \"x\" ) VAR f = e + 1 RETURN IF ( FALSE, f, 1 )" "the variable"
+                // Not referenced by anything that is used: never evaluated.
+                is (p ()) "VAR e = ERROR ( \"x\" ) VAR f = e + 1 RETURN 1" 1
+                // An inner variable of the same name hides it: the outer one isn't referenced.
+                is (p ()) "VAR e = ERROR ( \"x\" ) RETURN VAR e = 2 RETURN e" 2
+                // Needed: the error is the result.
+                isError "dax-error" "VAR e = ERROR ( \"x\" ) RETURN IF ( TRUE, e, 1 )"
+                refused "IFERROR ( VAR e = ERROR ( \"x\" ) RETURN IF ( FALSE, e, 1 ), 2 )" "the variable e")
             testCase "an ERROR is reported with its text and position" (fun () ->
                 match scalarError (p ()) "1 + ERROR ( \"boom\" )" with
                 | DaxEvaluation(text, at) ->
@@ -186,6 +269,51 @@ let tests =
                 match scalarError (p ()) "1 +\n  * 2" with
                 | DaxSyntax("expression", 2, 3, _) -> ()
                 | other -> failtestf "%A" other)
+        ]
+
+        testList "what the sources leave open" [
+            // "there is an overflow condition, but there is no overflow error and the result is the
+            // least significant representable digits" (SQLBI, "Rounding errors with different data
+            // types in DAX"): 3037000500^2 = 9223372037000250000, minus 2^64.
+            testCase "whole numbers wrap around" (fun () ->
+                is (p ()) "3037000500 * 3037000500" -9223372036709301616L
+                is (p ()) "5000000000000000000 + 5000000000000000000" -8446744073709551616L
+                // The documentation's range ends at 2^63 - 2.
+                refused "9223372036854775807 + 1" "outside the range of whole numbers"
+                refused "9223372036854775806 + 1" "outside the range of whole numbers")
+            // The article is about the operators; nothing says an aggregation wraps.
+            testCase "an aggregation that overflows is refused" (fun () ->
+                refused "SUMX ( { 5000000000000000000, 5000000000000000000 }, [Value] )" "out of the range"
+                is (p ()) "SUMX ( { 5000000000000000000, -5000000000000000000, 1 }, [Value] )" 1)
+            // The comparison table of the data types page makes both sides REAL; 2^53 + 1 has no
+            // REAL of its own, and whether the engine compares the exact values is not said.
+            testCase "a whole number above 2^53 against a decimal number" (fun () ->
+                refused "9007199254740993 = 9007199254740992.0" "too large for a decimal number"
+                refused "9007199254740993 > 9007199254740992.0" "too large for a decimal number"
+                is (p ()) "9007199254740993 = 9007199254740992" false
+                is (p ()) "9007199254740993 > 1.5" true)
+            // The multiplication table of the data types page has a Date/time column and no
+            // Date/time row: REAL by a date is REAL. 2020-10-23 is day 44127.
+            testCase "a decimal number times a date" (fun () ->
+                is (p ()) "2.0 * dt\"2020-10-23\"" 88254.0
+                is (p ()) "2.0 * dt\"2020-10-23T12:00:00\"" 88255.0
+                refused "2 * dt\"2020-10-23\"" "multiplying a date"
+                refused "dt\"2020-10-23\" * 2.0" "multiplying a date")
+            testCase "text with spaces, separators or a currency symbol as a number" (fun () ->
+                is (p ()) "\"22\" + 22" 44
+                refused "\" 12 \" + 1" "spaces around a number"
+                refused "\"$5\" + 1" "separators and symbols"
+                refused "\"1,234\" + 1" ""
+                isError "dax-error" "\"abc\" + 1")
+            // "If the expression has variant or mixed value types such as text and number, then by
+            // default MAXX considers only numbers. If <variant> = TRUE, the maximum value is
+            // returned" (Microsoft Learn, MAXX and MINX). Qty is 2, 1, 3, 1, 4, 5, 1.
+            testCase "MAXX and MINX over text mixed with numbers" (fun () ->
+                is (p ()) "MAXX ( Sales, IF ( Sales[Qty] = 5, \"x\", Sales[Qty] ) )" 4
+                is (p ()) "MINX ( Sales, IF ( Sales[Qty] = 1, \"x\", Sales[Qty] ) )" 2
+                is (p ()) "MAXX ( Sales, Sales[Qty], TRUE )" 5
+                is (p ()) "MAXX ( Sales, Sales[Qty], FALSE )" 5
+                refused "MAXX ( Sales, IF ( Sales[Qty] = 5, \"x\", Sales[Qty] ), TRUE )" "third argument TRUE")
         ]
 
         testList "math" [
@@ -258,7 +386,9 @@ let tests =
                 is (p ()) "AVERAGEX ( Sales, Sales[Qty] * Sales[Price] )" (625.0 / 7.0)
                 // Qty above 2: 3, 4 and 5.
                 is (p ()) "COUNTX ( Sales, IF ( Sales[Qty] > 2, 1 ) )" 3
-                is (p ()) "COUNTAX ( Sales, IF ( Sales[Qty] > 2, TRUE ) )" 3
+                is (p ()) "COUNTAX ( Sales, IF ( Sales[Qty] > 2, \"big\" ) )" 3
+                // A True/False IF is never BLANK (see "IF with a BLANK branch"): all 7 rows count.
+                is (p ()) "COUNTAX ( Sales, IF ( Sales[Qty] > 2, TRUE ) )" 7
                 is (p ()) "PRODUCTX ( { 2, 3, 4 }, [Value] )" 24.0
                 is (p ()) "SUMX ( FILTER ( Sales, FALSE ), Sales[Qty] )" null)
             // "COUNTX ( Customer, \"\" ) returns the number of rows in Customer, and COUNTX (
@@ -281,8 +411,19 @@ let tests =
 
                 is (p ()) "CONCATENATEX ( FILTER ( Customer, FALSE ), Customer[Name], \",\", Customer[Name] )" null
                 is (p ()) "CONCATENATEX ( { 1, 2 }, IF ( [Value] = 1, \"a\" ), \"-\", [Value] )" "a-")
-            testCase "CONCATENATEX without an order is refused: the engine doesn't define one" (fun () ->
-                isError "not-supported" "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name] )")
+            // Without an order-by the engine doesn't define the order, so the result is given only
+            // when no order could change it: "The result is BLANK when Table has no rows"
+            // (dax.guide/concatenatex), or every text is the same.
+            testCase "CONCATENATEX without an order is refused unless the order can't matter" (fun () ->
+                isError "not-supported" "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name] )"
+                is (p ()) "CONCATENATEX ( FILTER ( Customer, FALSE ), Customer[Name], \",\" )" null
+                // Two US customers: "US" twice.
+                is
+                    (p ())
+                    "CONCATENATEX ( FILTER ( Customer, Customer[Country] = \"US\" ), Customer[Country], \"/\" )"
+                    "US/US"
+
+                is (p ()) "CONCATENATEX ( { 7 }, [Value] )" "7")
             // Amount per product name: Bike 410, Helmet 160, Lock 15, Pump BLANK, and the blank row
             // 40. "If expression or value evaluates to BLANK it is treated as a 0" (Microsoft Learn,
             // RANKX); order DESC and ties SKIP by default.
