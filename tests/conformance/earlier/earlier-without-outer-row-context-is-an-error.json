@@ -1,0 +1,21 @@
+{
+  "title": "EARLIER with no outer row context is an error",
+  "model": "sales",
+  "query": "EVALUATE FILTER ( Product, Product[Price] > EARLIER ( Product[Price] ) )",
+  "expected": {
+    "error": "there is only one row context on Product (the one FILTER opens), so EARLIER has no earlier row context to read"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+    "quote": "EARLIER succeeds if there is a row context prior to the beginning of the table scan. Otherwise it returns an error.",
+    "supports": "EARLIER needs an outer row context"
+  },
+  "confidence": "derived",
+  "derivation": "The query has a single scan of Product, by FILTER. There is no row context before that scan, so EARLIER fails.",
+  "tags": [
+    "earlier",
+    "filter",
+    "row-context",
+    "error"
+  ]
+}

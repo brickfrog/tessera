@@ -1,0 +1,67 @@
+{
+  "title": "CROSSFILTER BOTH makes the fact table filter a dimension for one calculation",
+  "model": "sales",
+  "query": [
+    "DEFINE",
+    "    MEASURE Sales[Customers] = COUNTROWS ( Customer )",
+    "    MEASURE Sales[Customers Buying] = CALCULATE ( [Customers], CROSSFILTER ( Sales[CustomerKey], Customer[CustomerKey], BOTH ) )",
+    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Customers\", [Customers], \"Customers Buying\", [Customers Buying] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Customers]",
+          "type": "int64"
+        },
+        {
+          "name": "[Customers Buying]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          4,
+          3
+        ],
+        [
+          "Blue",
+          4,
+          2
+        ],
+        [
+          "Green",
+          4,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/crossfilter/",
+      "quote": "the cross-filter direction, which can be BOTH, ONEWAY, NONE",
+      "supports": "the page's example has this shape: Customers is the same on every row, Customers Buying is filtered through Sales"
+    },
+    {
+      "url": "https://dax.guide/countrows/",
+      "quote": "If the table has no rows, COUNTROWS returns BLANK , not 0",
+      "supports": "no customer bought a Green product: COUNTROWS of an empty table is BLANK"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Customers: the color does not reach Customer (single direction), 4 on every row. Customers Buying, with both directions: Red (products 1, 2) is Sales rows 1, 2, 3, 5, 7 with customers 1, 1, 2, 3, 1: 3 distinct. Blue (product 3) is rows 4, 6 with customers 2, 3: 2. Green (product 4) has no sales, so no customer: BLANK. The Green row stays because Customers is 4.",
+  "tags": [
+    "summarizecolumns",
+    "calculate",
+    "crossfilter",
+    "countrows",
+    "relationship",
+    "bidirectional"
+  ]
+}

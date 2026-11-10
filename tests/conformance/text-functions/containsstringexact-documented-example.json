@@ -1,0 +1,46 @@
+{
+  "title": "CONTAINSSTRINGEXACT matches case and takes wildcards literally",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"Case 1\", CONTAINSSTRINGEXACT ( \"abcd\", \"bc\" ), \"Case 2\", CONTAINSSTRINGEXACT ( \"abcd\", \"BC\" ), \"Case 3\", CONTAINSSTRINGEXACT ( \"abcd\", \"a*d\" ), \"Case 4\", CONTAINSSTRINGEXACT ( \"abcd\", \"ef\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Case 1]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Case 2]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Case 3]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Case 4]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true,
+          false,
+          false,
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/containsstringexact-function-dax",
+    "quote": "CONTAINSSTRINGEXACT is case-sensitive.",
+    "supports": "the documented query returns TRUE FALSE FALSE FALSE"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "containsstringexact",
+    "case-sensitive"
+  ]
+}

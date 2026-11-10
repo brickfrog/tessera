@@ -1,0 +1,54 @@
+{
+  "title": "A bare SUM inside ADDCOLUMNS ignores the current row and gives the grand total on every row",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( 'Product'[Color] ), \"Qty\", SUM ( Sales[Quantity] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Qty]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          15
+        ],
+        [
+          "Blue",
+          15
+        ],
+        [
+          "Green",
+          15
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition-in-dax/",
+      "quote": "Remember: the row context iterates, it does not filter.",
+      "supports": "a row context does not filter, so SUM sees the whole Sales table on every row"
+    },
+    {
+      "url": "https://dax.guide/addcolumns/",
+      "quote": "you need to invoke context transition to generate a filter",
+      "supports": "the example's '@Quantity Wrong' column, SUM ( Sales[Quantity] ) with no CALCULATE, shows the same total (140,180) on every row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The three colors are Red, Blue, Green. No CALCULATE, so no context transition: SUM ( Sales[Quantity] ) is evaluated in the empty filter context on every row: 1 + 2 + 1 + 5 + 2 + 3 + 1 = 15.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "sum",
+    "row-context",
+    "no-context-transition"
+  ]
+}

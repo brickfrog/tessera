@@ -1,0 +1,41 @@
+{
+  "title": "RELATEDTABLE performs a context transition: it returns only the rows related to the current row",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( 'Product', COUNTROWS ( RELATEDTABLE ( Sales ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/relatedtable/",
+      "quote": "The RELATEDTABLE function performs a context transition from row context(s) to a filter context",
+      "supports": "RELATEDTABLE turns the row context into a filter context, like CALCULATETABLE with no filters"
+    },
+    {
+      "url": "https://dax.guide/countrows/",
+      "quote": "If the table has no rows, COUNTROWS returns BLANK",
+      "supports": "COUNTROWS of the empty table for Scooter is BLANK, which SUMX skips"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows per product: Bike 3 (rows 1, 5, 7), Helmet 2 (rows 2, 3), Lock 2 (rows 4, 6), Scooter none (BLANK). 3 + 2 + 2 = 7. Without the transition, COUNTROWS ( Sales ) is 7 for each product and the sum is 28.",
+  "tags": [
+    "sumx",
+    "countrows",
+    "relatedtable",
+    "context-transition",
+    "relationship"
+  ]
+}

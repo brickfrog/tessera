@@ -1,0 +1,43 @@
+{
+  "title": "A time with no date concatenated to text reads 1:05:00 PM",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", TIME ( 13, 5, 0 ) & \"\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1:05:00 PM"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/concatenate/",
+      "quote": "CONCATENATE converts numbers, dates, and Boolean values to text with the default format",
+      "supports": "a date joined to text takes the default format; the page says & gives the same result as CONCATENATE"
+    },
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "FORMAT accepts a set of predefined format strings for Date/Time",
+      "supports": "the example shows General Date of 2021-01-02 15:30 as 1/2/2021 3:30:00 PM and Long Time as 3:30:00 PM"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "TIME ( 13, 5, 0 ) is a datetime with a zero day part (1899-12-30). General Date shows 'a date and/or time': with no date part only the time is shown, in the en-US long time form 1:05:00 PM.",
+  "uncertain": true,
+  "alternative": "No source shows the implicit conversion of a time-only value. If the date part were printed the result would be 12/30/1899 1:05:00 PM.",
+  "tags": [
+    "assumption:date-to-text",
+    "operator-concatenate",
+    "time",
+    "implicit-conversion",
+    "date-functions"
+  ]
+}

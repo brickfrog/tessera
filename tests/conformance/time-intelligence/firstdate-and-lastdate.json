@@ -1,0 +1,46 @@
+{
+  "title": "FIRSTDATE and LASTDATE return the first and last selected date, each as a table",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( FIRSTDATE ( 'Date'[Date] ), 'Date'[Date] >= DATE ( 2024, 2, 10 ) && 'Date'[Date] <= DATE ( 2024, 3, 10 ) ) EVALUATE CALCULATETABLE ( LASTDATE ( 'Date'[Date] ), 'Date'[Date] >= DATE ( 2024, 2, 10 ) && 'Date'[Date] <= DATE ( 2024, 3, 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-02-10T00:00:00"
+        ]
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-03-10T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/firstdate/",
+    "quote": "FIRSTDATE returns the minimum date selected, as a table.",
+    "supports": "the example with two EVALUATE statements returns the first and the last date of the selection"
+  },
+  "confidence": "derived",
+  "derivation": "The selection is 2024-02-10 to 2024-03-10: the first date is 2024-02-10 and the last 2024-03-10. Two EVALUATE statements give two results.",
+  "tags": [
+    "time-intelligence",
+    "firstdate",
+    "lastdate",
+    "multiple-evaluate"
+  ]
+}

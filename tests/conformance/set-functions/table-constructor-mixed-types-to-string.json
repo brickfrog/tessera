@@ -1,0 +1,49 @@
+{
+  "title": "A one-column table constructor mixing a number, a date, a Boolean and text gives a column of strings",
+  "model": "scalar",
+  "query": "EVALUATE { 1, DATE ( 2017, 1, 1 ), TRUE, \"A\" }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1"
+        ],
+        [
+          "1/1/2017"
+        ],
+        [
+          "TRUE"
+        ],
+        [
+          "A"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/table-constructor",
+      "quote": "Returns the following table of a single column of String data type:",
+      "supports": "the page shows this query and the values 1, 1/1/2017, TRUE, A"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/table-constructor",
+      "quote": "When the data types of the values for a column are different in different rows, all values are converted to a common data type.",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "table-constructor",
+    "type-coercion",
+    "string",
+    "column-names"
+  ],
+  "notes": "The strings are spelled as the page prints them. How the date and the Boolean are written as text (1/1/2017, TRUE) depends on the engine and on the en-US culture; the page may have printed them loosely."
+}

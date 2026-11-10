@@ -1,0 +1,8 @@
+{
+  "description": "For cases that need no data: scalar expressions in ROW(...) or a table constructor. T is there so the model has a table.",
+  "tables": [
+    { "name": "T",
+      "columns": [ { "name": "n", "type": "int64" } ],
+      "rows": [ [1], [2], [3] ] }
+  ]
+}

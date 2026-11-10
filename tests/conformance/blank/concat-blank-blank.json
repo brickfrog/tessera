@@ -1,0 +1,46 @@
+{
+  "title": "BLANK & BLANK is BLANK, not an empty string",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () & BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/concatenate/",
+      "quote": "A BLANK argument is an empty string. If both arguments are BLANK , the result is BLANK",
+      "supports": "CONCATENATE of two BLANKs is BLANK"
+    },
+    {
+      "url": "https://dax.guide/concatenate/",
+      "quote": "CONCATENATE ( Text1, Text2 ) gives the same result as Text1 & Text2",
+      "supports": "the & operator gives what CONCATENATE gives"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "a blank value is always converted to 0 or to an empty string, depending on the data type requested by the expression",
+      "supports": "the general rule, which read alone would give an empty string"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CONCATENATE of two BLANK arguments is BLANK, and & gives the same result as CONCATENATE, so BLANK () & BLANK () is BLANK.",
+  "uncertain": true,
+  "alternative": "Each BLANK is converted to an empty string, as SQLBI's general rule says, and the result is the empty string \"\" (a string, not BLANK).",
+  "tags": [
+    "blank",
+    "operator-concatenate",
+    "empty-string"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

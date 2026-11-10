@@ -1,0 +1,69 @@
+{
+  "title": "RELATED reads a column of the one-side row for each many-side row",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Sales, \"SalesKey\", Sales[SalesKey], \"Color\", RELATED ( Product[Color] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[SalesKey]",
+          "type": "int64"
+        },
+        {
+          "name": "[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Red"
+        ],
+        [
+          2,
+          "Red"
+        ],
+        [
+          3,
+          "Red"
+        ],
+        [
+          4,
+          "Blue"
+        ],
+        [
+          5,
+          "Red"
+        ],
+        [
+          6,
+          "Blue"
+        ],
+        [
+          7,
+          "Red"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/using-related-and-relatedtable-in-dax/",
+      "quote": "RELATED works from the many-side of a relationship towards the one-side",
+      "supports": "RELATED goes from the many side to the one side"
+    },
+    {
+      "url": "https://dax.guide/related/",
+      "quote": "the function follows a chain of one or more many-to-one relationships to fetch the value from the specified column in the related table",
+      "supports": "it follows the many-to-one relationship"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "ProductKey per Sales row: 1, 2, 2, 3, 1, 3, 1. Colors: 1 Bike Red, 2 Helmet Red, 3 Lock Blue. So Red, Red, Red, Blue, Red, Blue, Red.",
+  "tags": [
+    "related",
+    "selectcolumns",
+    "relationship",
+    "row-context"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "title": "{ 1, DATE(2017, 1, 1), TRUE, \"A\" } is a string column: the date becomes 1/1/2017",
+  "model": "scalar",
+  "query": "EVALUATE { 1, DATE ( 2017, 1, 1 ), TRUE, \"A\" }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1"
+        ],
+        [
+          "1/1/2017"
+        ],
+        [
+          "TRUE"
+        ],
+        [
+          "A"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/table-constructor",
+      "quote": "Returns the following table of a single column of String data type",
+      "supports": "the example { 1, DATE(2017, 1, 1), TRUE, \"A\" } is shown returning 1, 1/1/2017, TRUE, A as strings"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/table-constructor",
+      "quote": "all values are converted to a common data type",
+      "supports": "mixed types in one column are converted to one type"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "assumption:date-to-text",
+    "table-constructor",
+    "date",
+    "implicit-conversion",
+    "mixed-types",
+    "date-functions"
+  ],
+  "notes": "The page is the only published output found of a date converted to text without FORMAT: month/day/year with no leading zeros and no time part. It also shows 1 as \"1\" and TRUE as \"TRUE\"."
+}

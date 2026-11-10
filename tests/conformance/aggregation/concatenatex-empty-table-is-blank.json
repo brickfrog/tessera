@@ -1,0 +1,32 @@
+{
+  "title": "CONCATENATEX over no rows is BLANK, not an empty string",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CONCATENATEX ( FILTER ( Product, FALSE ), Product[Product], \",\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/concatenatex/",
+    "quote": "CONCATENATEX returns BLANK when Table is empty.",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "concatenatex",
+    "filter",
+    "blank",
+    "empty-table"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

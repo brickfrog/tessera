@@ -1,0 +1,42 @@
+{
+  "title": "ALL ( column ) as a modifier removes the filter, so orphan rows count again",
+  "model": "sales-orphans",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CALCULATE ( [Sales Amount], ALL ( 'Product'[Color] ) ) ), 'Product'[Color] = \"Red\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          200.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "This function removes the corresponding filters from the filter context, just as REMOVEFILTERS does.",
+      "supports": "ALL removes the filter from the column"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+      "quote": "when used as a CALCULATE filter, removes a filter. It does not return a table result.",
+      "supports": "as a CALCULATE filter ALL removes a filter and does not return a table"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Under Color = Red the amount is Bike 100. With the filter removed nothing filters Sales: 100 + 30 + 50 + 20 = 200, orphans included.",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "all",
+    "blank-row",
+    "filter-removal"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

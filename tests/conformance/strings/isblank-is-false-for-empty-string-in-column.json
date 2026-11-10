@@ -1,0 +1,34 @@
+{
+  "title": "ISBLANK over a text column counts the BLANK row but not the empty-string row",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( Empty, ISBLANK ( Empty[Txt] ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isblank/",
+    "quote": "An empty string and 0 are not considered blank by ISBLANK",
+    "supports": "ISBLANK is FALSE for an empty string"
+  },
+  "confidence": "derived",
+  "derivation": "Empty[Txt] holds '' (Id 1), BLANK (Id 2), x (Id 3). ISBLANK is TRUE only for the BLANK in row 2: 1 row.",
+  "tags": [
+    "isblank",
+    "filter",
+    "countrows",
+    "empty-string",
+    "blank"
+  ]
+}

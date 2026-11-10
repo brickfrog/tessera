@@ -1,0 +1,33 @@
+{
+  "title": "USERELATIONSHIP gives the same result with the one-side column first",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], 'Date'[Year] = 2023, USERELATIONSHIP ( 'Date'[Date], Sales[DeliveryDate] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          160.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/using-userelationship-in-dax/",
+    "quote": "the opposite order does not alter the result",
+    "supports": "the order of the two columns does not change the result"
+  },
+  "confidence": "derived",
+  "derivation": "Rows delivered in 2023: 1 (2023-02-10), 2 (2023-01-15), 3 (2023-12-31) = 100 + 40 + 20 = 160. By OrderDate it would be 210.",
+  "tags": [
+    "calculate",
+    "userelationship",
+    "relationship",
+    "inactive-relationship"
+  ]
+}

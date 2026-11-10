@@ -1,0 +1,58 @@
+{
+  "title": "FILTER over VALUES of the column, unlike ALL, keeps the existing filter",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[OnlyRed Values] = CALCULATE ( [Sales Amount], FILTER ( VALUES ( 'Product'[Color] ), 'Product'[Color] = \"Red\" ) )",
+    "EVALUATE ADDCOLUMNS ( VALUES ( 'Product'[Color] ), \"OnlyRed\", [OnlyRed Values] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[OnlyRed]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ],
+        [
+          "Blue",
+          null
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/using-keepfilters-in-dax/",
+      "quote": "in the OnlyRed_Values measure the filter over the Color column intersects the filter of the color in the row",
+      "supports": "with VALUES the filter on Color intersects the color of the row"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "CALCULATE evaluates all the explicit filter arguments in the original evaluation context, each one independently from the others.",
+      "supports": "VALUES ( Product[Color] ) is evaluated in the context of the row, where only that row's color is visible"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "On the Red row VALUES ( Product[Color] ) is { Red }; the filter keeps Red: 460. On the Blue and Green rows VALUES holds only that color, FILTER returns no rows, and an empty filter gives BLANK.",
+  "tags": [
+    "calculate",
+    "filter",
+    "values",
+    "addcolumns",
+    "define-measure"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

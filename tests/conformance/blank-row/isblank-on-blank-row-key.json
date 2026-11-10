@@ -1,0 +1,63 @@
+{
+  "title": "The key column of the blank row is BLANK",
+  "model": "sales-orphans",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Product[ProductKey] ), \"IsBlank\", ISBLANK ( Product[ProductKey] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "[IsBlank]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          false
+        ],
+        [
+          2,
+          false
+        ],
+        [
+          3,
+          false
+        ],
+        [
+          null,
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "If a relationship is invalid, the VertiPaq engine automatically adds a row containing BLANK in every column of the table on the one-side of the relationship",
+      "supports": "the blank row has BLANK in every column, the key included"
+    },
+    {
+      "url": "https://dax.guide/isblank/",
+      "quote": "A Boolean value of TRUE if the value is blank; otherwise FALSE",
+      "supports": "ISBLANK is TRUE for a blank value"
+    },
+    {
+      "url": "https://dax.guide/values/",
+      "quote": "VALUES includes the blank row caused by an invalid relationship, if present",
+      "supports": "VALUES returns the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "VALUES ( Product[ProductKey] ) is 1, 2, 3 and the blank row's BLANK. The orphan key 9 is not a value of Product[ProductKey]. ISBLANK is TRUE only on the blank row.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "isblank",
+    "blank-row",
+    "relationship"
+  ]
+}

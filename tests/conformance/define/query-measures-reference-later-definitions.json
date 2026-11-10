@@ -1,0 +1,45 @@
+{
+  "title": "A query measure can reference measures defined after it in the same DEFINE",
+  "model": "sales",
+  "query": [
+    "DEFINE",
+    "  MEASURE Sales[Avg Price] = [Amt] / [Qty]",
+    "  MEASURE Sales[Amt] = SUM ( Sales[Amount] )",
+    "  MEASURE Sales[Qty] = SUM ( Sales[Quantity] )",
+    "EVALUATE ROW ( \"r\", [Avg Price] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          36.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "Definitions can reference other definitions that appear before or after the current definition.",
+      "supports": "the order of the definitions does not matter"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "Division (/)",
+      "supports": "the division table gives REAL for CURRENCY / INTEGER"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "[Amt] = 540 and [Qty] = 15, both defined after [Avg Price]. 540 / 15 = 36. A fixed decimal divided by an integer is a double.",
+  "tags": [
+    "define-measure",
+    "measure-dependency",
+    "operator-divide"
+  ]
+}

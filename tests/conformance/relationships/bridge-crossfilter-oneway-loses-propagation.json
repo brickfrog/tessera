@@ -1,0 +1,52 @@
+{
+  "title": "Without the both-direction filter on the bridge every customer shows the total",
+  "model": "c-bridge",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Customer[Customer], \"Balance\", CALCULATE ( SUM ( Transactions[Amount] ), CROSSFILTER ( AccountCustomer[AccountID], Account[AccountID], ONEWAY ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Customer]",
+          "type": "string"
+        },
+        {
+          "name": "[Balance]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Customer-91",
+          275
+        ],
+        [
+          "Customer-92",
+          275
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-many-to-many",
+      "quote": "Each customer in this visual has the same balance as the total balance",
+      "supports": "the page states that with single-direction relationships each customer shows 275"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/crossfilter-function-dax",
+      "quote": "CROSSFILTER will override any existing cross-filtering setting",
+      "supports": "CROSSFILTER ONEWAY replaces the model's both-direction setting"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "With ONEWAY the Account relationship only filters from Account to AccountCustomer. A Customer filter reaches AccountCustomer and stops: Account and Transactions are unfiltered, so every customer gets 100 + 200 - 25 = 275.",
+  "tags": [
+    "summarizecolumns",
+    "calculate",
+    "crossfilter",
+    "sum",
+    "relationship",
+    "many-to-many",
+    "bridge"
+  ]
+}

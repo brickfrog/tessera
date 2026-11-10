@@ -1,0 +1,65 @@
+{
+  "title": "A table function whose EXPR parameter is a measure evaluates it for each iterated row",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION BestCustomers = ( metricExpr : EXPR ) =>",
+    "  VAR AverageMetric = AVERAGEX ( Customer, metricExpr )",
+    "  VAR BestCustomersResult = FILTER ( Customer, metricExpr > AverageMetric )",
+    "  RETURN BestCustomersResult",
+    "EVALUATE BestCustomers ( [Sales Amount] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[CustomerKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Customer[Customer]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Ann",
+          "US"
+        ],
+        [
+          3,
+          "Cho",
+          "JP"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "metricExpr is invoked in two different row contexts during two distinct iterations, and it needs to evaluate the sales of the customer being iterated through the context transition every time",
+      "supports": "the article gives this function; the measure is evaluated per customer"
+    },
+    {
+      "url": "https://dax.guide/averagex/",
+      "quote": "AVERAGEX ignores the blank values that Expression returns.",
+      "supports": "the customer with no sales does not count in the average"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Per customer: Ann 240, Bob 70, Cho 230, Dee BLANK. The average ignores the blank: ( 240 + 70 + 230 ) / 3 = 180. Above it: Ann (240) and Cho (230). Bob (70) and Dee (BLANK, which is not above 180) are not. Counting the blank as 0 would give 135 and the same two customers.",
+  "tags": [
+    "udf",
+    "define-function",
+    "expr-parameter",
+    "table-function",
+    "averagex",
+    "filter",
+    "context-transition",
+    "var"
+  ]
+}

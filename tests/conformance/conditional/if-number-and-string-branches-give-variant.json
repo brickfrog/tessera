@@ -1,0 +1,53 @@
+{
+  "title": "IF with a number branch and a string branch returns a variant",
+  "model": "scalar",
+  "query": "EVALUATE ADDCOLUMNS ( T, \"x\", IF ( T[n] > 1, T[n], \"small\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "T[n]",
+          "type": "int64"
+        },
+        {
+          "name": "[x]",
+          "type": "variant"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "small"
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/if/",
+      "quote": "In that case, the IF function returns a -- VARIANT datatype",
+      "supports": "the page shows an IF with a number and a string branch returning both kinds of value"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+      "quote": "The IF function can return a variant data type if value_if_true and value_if_false are of different data types",
+      "supports": "different branch types give a variant"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "n = 1 fails the test and gets the string; 2 and 3 get their own integer value. The values keep their types and the column is a variant.",
+  "tags": [
+    "if",
+    "result-type",
+    "variant",
+    "addcolumns"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "title": "FORMAT with a BLANK format string and the locale \"en-GB\" is the general date, day first and 24-hour",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( dt\"2020-12-15T12:30:59\", BLANK (), \"en-GB\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "15/12/2020 12:30:59"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Where day precedes month and time is 24-hour format.",
+      "supports": "the example = FORMAT( dt\"2020-12-15T12:30:59\", BLANK(), \"en-GB\" ) returns 15/12/2020 12:30:59"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "If format_string is BLANK, the value is formatted with a \"General Number\" or \"General Date\" format (according to value data type).",
+      "supports": "a BLANK format string"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "locale",
+    "blank",
+    "datetime-literal"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "title": "DATE ( 8, 1, 2 ) is January 2, 2008: years 0 to 49 have 2000 added",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 8, 1, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2008-01-02T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/date-function-dax",
+      "quote": "The following formula returns January 2, 2008: (2000+08).",
+      "supports": "the example = DATE(08,1,2)"
+    },
+    {
+      "url": "https://dax.guide/date/",
+      "quote": "If Year is between 0 and 49 (inclusive), DATE adds 2000 to the value.",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "date",
+    "two-digit-year"
+  ]
+}

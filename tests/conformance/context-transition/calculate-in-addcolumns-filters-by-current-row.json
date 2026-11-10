@@ -1,0 +1,59 @@
+{
+  "title": "CALCULATE with no filter arguments inside ADDCOLUMNS turns the current row into a filter",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( 'Product'[Color] ), \"Qty\", CALCULATE ( SUM ( Sales[Quantity] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Qty]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          7
+        ],
+        [
+          "Blue",
+          8
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/calculate-function-dax",
+      "quote": "Using the CALCULATE function without filters achieves a specific requirement. It transitions row context to filter context.",
+      "supports": "CALCULATE without filters performs the context transition"
+    },
+    {
+      "url": "https://dax.guide/addcolumns/",
+      "quote": "you need to invoke context transition to generate a filter",
+      "supports": "the example's '@Quantity Correct' column, CALCULATE ( SUM ( Sales[Quantity] ) ), gives each row its own total"
+    },
+    {
+      "url": "https://dax.guide/sum/",
+      "quote": "The result is blank in case there are no rows in the table with a non-blank value.",
+      "supports": "SUM over no rows is BLANK"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The row context on Product[Color] becomes a filter on that color. Red (Bike, Helmet): Sales rows 1, 2, 3, 5, 7 with Quantity 1 + 2 + 1 + 2 + 1 = 7. Blue (Lock): rows 4, 6: 5 + 3 = 8. Green (Scooter): no Sales rows, BLANK. ADDCOLUMNS keeps the Green row.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "calculate",
+    "sum",
+    "context-transition"
+  ]
+}

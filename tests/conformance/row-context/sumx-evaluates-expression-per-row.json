@@ -1,0 +1,40 @@
+{
+  "title": "SUMX evaluates a column expression once per row of the iterated table",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( Sales, Sales[Quantity] * Sales[Quantity] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          45
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+      "quote": "You have a row context whenever you iterate a table, either explicitly (using an iterator) or implicitly (in a calculated column)",
+      "supports": "an iterator creates a row context, in which a column reference gives the value in the current row"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The operator determines the type of conversion DAX performs by casting the values it requires before doing the requested operation.",
+      "supports": "the multiplication table gives INTEGER * INTEGER as INTEGER"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales[Quantity] over the 7 rows is 1, 2, 1, 5, 2, 3, 1. Squared per row: 1 + 4 + 1 + 25 + 4 + 9 + 1 = 45. A sum of squares (45) differs from the square of the sum (15 * 15 = 225), so the expression must be evaluated row by row.",
+  "tags": [
+    "sumx",
+    "row-context",
+    "iterator"
+  ],
+  "notes": "Type: learn.microsoft.com gives 'A decimal number' as the return value of both SUM and SUMX; the result is taken to have the type of the summed expression, an integer."
+}

@@ -1,0 +1,32 @@
+{
+  "title": "SEARCH accepts ? as a wildcard for one character",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SEARCH ( \"b?x\", \"Big red box\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          9
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/search-function-dax",
+    "quote": "A question mark matches any single character; an asterisk matches any sequence of characters.",
+    "supports": "the wildcard rule"
+  },
+  "confidence": "derived",
+  "derivation": "\"b?x\" needs a b, any one character, then x. At position 1 \"Big\" ends in g, not x. \"box\" starts at position 9 (B1 i2 g3 space4 r5 e6 d7 space8 b9).",
+  "tags": [
+    "text-functions",
+    "search",
+    "wildcard"
+  ]
+}

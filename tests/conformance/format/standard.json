@@ -1,0 +1,37 @@
+{
+  "title": "FORMAT with \"Standard\" has two decimals and thousand separators",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( 12345.67, \"Standard\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "12,345.67"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "FORMAT accepts a set of predefined format strings to format numbers",
+      "supports": "the example table lists each predefined format applied to 12345.67"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "\"Standard\" displays at least one digit to the left of the decimal separator and two digits to the right of the decimal separator, and includes thousand separators.",
+      "supports": "Microsoft Learn shows 12,345.67"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "predefined-numeric-format"
+  ]
+}

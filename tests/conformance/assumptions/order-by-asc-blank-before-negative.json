@@ -1,0 +1,64 @@
+{
+  "title": "ORDER BY ASC puts BLANK before negative numbers",
+  "model": "a2-sort",
+  "query": "EVALUATE Nums ORDER BY Nums[N] ASC",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Nums[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Nums[N]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2,
+          null
+        ],
+        [
+          1,
+          -5
+        ],
+        [
+          4,
+          -1
+        ],
+        [
+          3,
+          3
+        ],
+        [
+          5,
+          10
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/orderby-statement-dax",
+      "quote": "Ascending sort order",
+      "supports": "ASC is the default and sorts ascending; the page does not say where BLANK goes"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "Blank evaluates to zero when performing a comparison",
+      "supports": "in a comparison BLANK counts as zero (or the empty string, or FALSE)"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Nums[N] by Id: -5 (1), BLANK (2), 3 (3), -1 (4), 10 (5). BLANK is taken as lower than every number, so ascending order is BLANK, -5, -1, 3, 10: Ids 2, 1, 4, 3, 5.",
+  "uncertain": true,
+  "alternative": "No source states where ORDER BY puts BLANK. Comparison operators treat BLANK as 0; if the sort does too, the order is -5, -1, BLANK, 3, 10: Ids 1, 4, 2, 3, 5.",
+  "tags": [
+    "assumption:blank-sorts-first",
+    "order-by",
+    "blank",
+    "negative"
+  ]
+}

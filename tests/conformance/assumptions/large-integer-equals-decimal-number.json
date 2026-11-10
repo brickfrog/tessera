@@ -1,0 +1,37 @@
+{
+  "title": "9007199254740993 = 9007199254740992.0 is TRUE: an integer compared with a decimal number is converted to one",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 9007199254740993 = 9007199254740992.0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "DAX does implicit conversions for numeric or date/time types as the following table describes",
+    "supports": "the comparison table that follows gives REAL for INTEGER compared with REAL, and INTEGER for INTEGER with INTEGER"
+  },
+  "confidence": "derived",
+  "derivation": "The comparison table gives REAL for INTEGER compared with REAL: both sides become floating point. 9007199254740993 is 2^53 + 1, which has no exact double; it converts to 2^53 = 9007199254740992 (round half to even). The two sides are then equal.",
+  "uncertain": true,
+  "alternative": "If the engine compares the exact values, 2^53 + 1 is not 2^53 and the result is FALSE.",
+  "tags": [
+    "assumption:exact-number-comparison",
+    "operator-equals",
+    "comparison",
+    "int64",
+    "double",
+    "precision"
+  ]
+}

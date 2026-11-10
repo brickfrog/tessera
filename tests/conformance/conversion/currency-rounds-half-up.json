@@ -1,0 +1,33 @@
+{
+  "title": "CURRENCY ( 0.03125 ) is 0.0313: a fifth decimal of exactly 5 rounds up",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( 0.03125 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          0.0313
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/currency-function-dax",
+    "quote": "Rounding up occurs if the 5th significant decimal is equal or larger than 5",
+    "supports": "a fifth decimal of 5 rounds the fourth up"
+  },
+  "confidence": "derived",
+  "derivation": "0.03125 is 1/32, which a double holds exactly, so the fifth decimal is exactly 5 with nothing after it. It rounds up: 0.0313 (round-half-even would give 0.0312).",
+  "tags": [
+    "conversion",
+    "currency",
+    "rounding",
+    "assumption:currency-rounding"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "title": "CONTAINSSTRING ignores case and accepts wildcards",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"Case 1\", CONTAINSSTRING ( \"abcd\", \"bc\" ), \"Case 2\", CONTAINSSTRING ( \"abcd\", \"BC\" ), \"Case 3\", CONTAINSSTRING ( \"abcd\", \"a*d\" ), \"Case 4\", CONTAINSSTRING ( \"abcd\", \"ef\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Case 1]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Case 2]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Case 3]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Case 4]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true,
+          true,
+          true,
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/containsstring-function-dax",
+    "quote": "CONTAINSSTRING is case-insensitive, kanatype-insensitive, width-insensitive and accent sensitive.",
+    "supports": "the documented query returns TRUE TRUE TRUE FALSE"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "containsstring",
+    "case-insensitive",
+    "wildcard"
+  ]
+}

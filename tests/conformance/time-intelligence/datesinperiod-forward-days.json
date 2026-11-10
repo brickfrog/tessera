@@ -1,0 +1,40 @@
+{
+  "title": "DATESINPERIOD going forward 3 days starts on the start date",
+  "model": "f-calendar",
+  "query": "EVALUATE DATESINPERIOD ( 'Date'[Date], DATE ( 2024, 2, 28 ), 3, DAY ) ORDER BY 'Date'[Date]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-02-28T00:00:00"
+        ],
+        [
+          "2024-02-29T00:00:00"
+        ],
+        [
+          "2024-03-01T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/datesinperiod/",
+    "quote": "The second query returns 3 days, starting from August 15, 2008",
+    "supports": "the example with 3, DAY returns the start date and the two days after it"
+  },
+  "confidence": "derived",
+  "derivation": "Three days starting 2024-02-28: February 28, the leap day February 29, and March 1.",
+  "tags": [
+    "time-intelligence",
+    "datesinperiod",
+    "leap-year",
+    "order-by"
+  ]
+}

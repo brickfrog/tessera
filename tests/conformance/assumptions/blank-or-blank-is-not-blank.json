@@ -1,0 +1,47 @@
+{
+  "title": "BLANK () || BLANK () is FALSE, not BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ISBLANK ( BLANK () || BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "only when both expressions are FALSE is the result FALSE",
+      "supports": "|| returns TRUE or FALSE"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "a BLANK in a logical expression is converted to a FALSE value",
+      "supports": "a logical expression returns TRUE or FALSE; BLANK counts as FALSE"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "BLANK OR BLANK",
+      "supports": "the other reading: the table of BLANK in operations gives BLANK for BLANK OR BLANK"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "|| returns TRUE if either side is TRUE and FALSE when both are FALSE. BLANK counts as FALSE, so the result is FALSE, and ISBLANK of FALSE is FALSE.",
+  "uncertain": true,
+  "alternative": "Microsoft's table of BLANK in operations lists BLANK OR BLANK as BLANK. Under that reading ISBLANK gives TRUE.",
+  "tags": [
+    "assumption:logical-blank",
+    "operator-or",
+    "isblank",
+    "blank"
+  ]
+}

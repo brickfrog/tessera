@@ -1,0 +1,49 @@
+{
+  "title": "Integer / currency is a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 10 / CURRENCY ( 4 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency.",
+      "supports": "the result type of / and of DIVIDE"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a division operation combines an integer with a currency value, DAX converts both values to real numbers, and the result is also a real number",
+      "supports": "the sentence under the Microsoft table agrees with SQLBI"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "Division (/) In the following table, the row header is the numerator and the column header is the denominator. INTEGER CURRENCY REAL Date/time INTEGER REAL CURRENCY REAL REAL",
+      "supports": "the Microsoft table itself gives CURRENCY for INTEGER / CURRENCY: the other reading"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "By SQLBI's table the result is a currency only when a currency is the numerator. Here the numerator is an integer, so the result is a decimal number: 10 / 4 = 2.5.",
+  "uncertain": true,
+  "alternative": "The Microsoft table's cell for an INTEGER numerator and a CURRENCY denominator says CURRENCY: 2.5 as a decimal (currency).",
+  "tags": [
+    "conversion",
+    "operator-divide",
+    "result-type",
+    "currency",
+    "assumption:integer-divided-by-currency"
+  ],
+  "notes": "The Microsoft table disagrees with the sentence under it and with SQLBI."
+}

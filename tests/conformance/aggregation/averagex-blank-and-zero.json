@@ -1,0 +1,51 @@
+{
+  "title": "AVERAGEX ignores BLANK but counts zero",
+  "model": "scalar",
+  "query": [
+    "EVALUATE",
+    "VAR ValsWithBlank = { 1, 2, 3, BLANK () }",
+    "VAR ValsWithZero = { 1, 2, 3, 0 }",
+    "RETURN",
+    "    {",
+    "        ( \"Average with BLANK\", AVERAGEX ( ValsWithBlank, [Value] ) ),",
+    "        ( \"Average with zero\", AVERAGEX ( ValsWithZero, [Value] ) )",
+    "    }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value1]",
+          "type": "string"
+        },
+        {
+          "name": "[Value2]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          "Average with BLANK",
+          2.0
+        ],
+        [
+          "Average with zero",
+          1.5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/averagex/",
+    "quote": "-- AVERAGEX ignores blanks, it considers zeroes",
+    "supports": "the page shows this query with the results 2.00 and 1.50"
+  },
+  "confidence": "published",
+  "derivation": "(1 + 2 + 3) / 3 = 2; (1 + 2 + 3 + 0) / 4 = 1.5.",
+  "tags": [
+    "averagex",
+    "blank",
+    "table-constructor",
+    "var"
+  ]
+}

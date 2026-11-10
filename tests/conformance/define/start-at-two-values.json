@@ -1,0 +1,54 @@
+{
+  "title": "START AT skips the rows before the given values of the ORDER BY columns",
+  "model": "sales",
+  "query": "EVALUATE ALL ( Product[Category], Product[Color] ) ORDER BY Product[Category], Product[Color] START AT \"Accessories\", \"Red\"",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Accessories",
+          "Red"
+        ],
+        [
+          "Vehicles",
+          "Green"
+        ],
+        [
+          "Vehicles",
+          "Red"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/st/start-at/",
+      "quote": "defines the rows to skip before the specified values according to the sort order specified in the ORDER BY section of EVALUATE",
+      "supports": "the page shows this query shape and a result that begins at the given pair"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/startat-statement-dax",
+      "quote": "The second argument in the START AT statement defines the starting value in column 2 of the ORDER BY columns within the rows that meet the first value for column 1.",
+      "supports": "the second value applies within the first"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sorted: (Accessories, Blue), (Accessories, Red), (Vehicles, Green), (Vehicles, Red). The result starts at (Accessories, Red), so the first row is skipped and three remain.",
+  "tags": [
+    "start-at",
+    "order-by",
+    "all",
+    "evaluate"
+  ]
+}

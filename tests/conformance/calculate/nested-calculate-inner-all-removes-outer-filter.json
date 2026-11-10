@@ -1,0 +1,34 @@
+{
+  "title": "In nested CALCULATE an inner ALL removes the outer filter",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( CALCULATE ( [Sales Amount], ALL ( Customer[Country] ) ), Customer[Country] = \"JP\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/order-of-evaluation-in-calculate-parameters/",
+    "quote": "the ALL ( Customer[Country] ) removes any of the effects of the external filter",
+    "supports": "the outer filter is applied first and the inner ALL on the same column then removes it"
+  },
+  "confidence": "derived",
+  "derivation": "Outer: Country = JP. Inner: ALL ( Customer[Country] ) removes that filter. Grand total 540.",
+  "tags": [
+    "calculate",
+    "all",
+    "nested-calculate",
+    "evaluation-order"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

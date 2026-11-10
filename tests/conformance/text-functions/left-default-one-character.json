@@ -1,0 +1,31 @@
+{
+  "title": "LEFT with no count returns one character",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", LEFT ( \"abc\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "a"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/left-function-dax",
+    "quote": "The number of characters you want LEFT to extract; if omitted, 1.",
+    "supports": "the default count is 1"
+  },
+  "confidence": "derived",
+  "derivation": "The count is omitted, so 1: the first character of \"abc\" is \"a\".",
+  "tags": [
+    "text-functions",
+    "left"
+  ]
+}

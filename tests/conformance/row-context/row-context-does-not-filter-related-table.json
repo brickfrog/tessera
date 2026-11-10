@@ -1,0 +1,34 @@
+{
+  "title": "A row context on Product does not filter Sales",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( 'Product', COUNTROWS ( Sales ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          28
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+    "quote": "A row context does not propagate through relationships.",
+    "supports": "the row context on Product does not propagate to Sales, so COUNTROWS ( Sales ) counts every row for each product"
+  },
+  "confidence": "derived",
+  "derivation": "Product has 4 rows. For each, COUNTROWS ( Sales ) is evaluated in the empty filter context: 7. 4 * 7 = 28. With propagation it would be 3 + 2 + 2 = 7.",
+  "tags": [
+    "sumx",
+    "countrows",
+    "row-context",
+    "relationship",
+    "no-context-transition"
+  ]
+}

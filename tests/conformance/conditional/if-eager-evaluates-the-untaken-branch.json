@@ -1,0 +1,27 @@
+{
+  "title": "IF.EAGER evaluates both branches, so an error in the untaken branch is raised",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", IF.EAGER ( [Order Count] > 0, 1, ERROR ( \"untaken branch\" ) ) )",
+  "expected": {
+    "error": "IF.EAGER evaluates the else branch although the condition is TRUE, and it raises an error"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/if-eager-function-dax",
+      "quote": "It uses an eager execution plan which always executes the branch expressions regardless of the condition expression.",
+      "supports": "both branches are always evaluated"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+      "quote": "even though we never return the Err variable, DAX needs to evaluate its value",
+      "supports": "IF.EAGER is documented as equal to variables for the branches; a referenced variable holding ERROR fails"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "IF.EAGER ( c, a, b ) is documented as VAR t = a VAR f = b RETURN IF ( c, t, f ). The else branch is ERROR, which is evaluated although [Order Count] = 7 > 0, so the query fails. With IF the result would be 1.",
+  "tags": [
+    "if.eager",
+    "error",
+    "eager-evaluation"
+  ]
+}

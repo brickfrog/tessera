@@ -1,0 +1,30 @@
+{
+  "title": "INT ( BLANK ) is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "INT ( BLANK () ) Blank value",
+    "supports": "the table of expressions with a blank value"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "int"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

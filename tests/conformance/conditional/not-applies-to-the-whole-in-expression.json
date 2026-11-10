@@ -1,0 +1,39 @@
+{
+  "title": "NOT binds looser than IN: NOT ( FALSE ) IN { FALSE, TRUE } is NOT ( FALSE IN { ... } )",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", NOT ( FALSE ) IN { FALSE, TRUE } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/not/",
+      "quote": "NOT is not a real function; it is an operator that can be used as a function because of the equivalent syntax.",
+      "supports": "the page shows NOT ( FALSE ) IN { FALSE, TRUE } as false and ( NOT FALSE ) IN { FALSE, TRUE } as true"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/containsrow-function-dax",
+      "quote": "To perform the logical negation of the IN operator, put NOT in front of the entire expression.",
+      "supports": "NOT in front negates the whole IN expression"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "not",
+    "in",
+    "operator-precedence"
+  ],
+  "notes": "Read as a function call, NOT ( FALSE ) would be TRUE and TRUE IN { FALSE, TRUE } would be TRUE."
+}

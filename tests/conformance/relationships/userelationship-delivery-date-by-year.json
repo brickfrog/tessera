@@ -1,0 +1,59 @@
+{
+  "title": "USERELATIONSHIP activates the inactive DeliveryDate relationship in place of the OrderDate one",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Delivery Amount] = CALCULATE ( [Sales Amount], USERELATIONSHIP ( Sales[DeliveryDate], 'Date'[Date] ) )",
+    "EVALUATE SUMMARIZECOLUMNS ( 'Date'[Year], \"Sales Amount\", [Sales Amount], \"Delivery Amount\", [Delivery Amount] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Year]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales Amount]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Delivery Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2023,
+          210.0,
+          160.0
+        ],
+        [
+          2024,
+          330.0,
+          380.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/using-userelationship-in-dax/",
+      "quote": "which instructs CALCULATE to temporarily activate the relationship",
+      "supports": "the article's Delivery Amount measure, on our model"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/userelationship-function-dax",
+      "quote": "Even if the relationship is inactive, it will be used and overrides any other active relationships that might be present in the model but not mentioned in the function arguments",
+      "supports": "the named inactive relationship is used and overrides the active one between the same tables"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "By OrderDate: 2023 is rows 1 to 4 = 100 + 40 + 20 + 50 = 210; 2024 is rows 5 to 7 = 200 + 30 + 100 = 330. By DeliveryDate: rows 1, 2, 3 are delivered in 2023 (2023-02-10, 2023-01-15, 2023-12-31) = 160; rows 4, 5, 6, 7 in 2024 = 50 + 200 + 30 + 100 = 380.",
+  "tags": [
+    "summarizecolumns",
+    "calculate",
+    "userelationship",
+    "relationship",
+    "inactive-relationship"
+  ]
+}

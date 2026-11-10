@@ -1,0 +1,38 @@
+{
+  "title": "WEEKNUM ( DATE ( 2010, 2, 14 ), 2 ) is 7",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", WEEKNUM ( DATE ( 2010, 2, 14 ), 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/weeknum-function-dax",
+      "quote": "The following example returns the week number for February 14, 2010. This calculation assumes weeks begin on Monday.",
+      "supports": "the documented example, with the date given by DATE instead of text"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/weeknum-function-dax",
+      "quote": "The week containing January 1 is the first week of the year and is numbered week 1.",
+      "supports": "system 1"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "January 1, 2010 is a Friday, so with Monday weeks week 1 is Jan 1 to 3, week 2 Jan 4 to 10, week 3 Jan 11 to 17, week 4 Jan 18 to 24, week 5 Jan 25 to 31, week 6 Feb 1 to 7, week 7 Feb 8 to 14. February 14 (a Sunday) is the last day of week 7.",
+  "tags": [
+    "date-functions",
+    "weeknum"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "title": "A filter on another column of the filtering table reaches the other table through the values of the related column",
+  "model": "c-weak",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Target\", SUM ( Target[TargetQuantity] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Target]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Green",
+          220
+        ],
+        [
+          "Blue",
+          330
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-many-to-many",
+    "quote": "because the color blue is used by products from two categories, those categories are used to filter the targets",
+    "supports": "the page describes this model shape: the categories of the products in the filter are what filters Target"
+  },
+  "confidence": "derived",
+  "derivation": "Green is the T-shirt, category Clothing: 100 + 120 = 220. Blue is Jeans (Clothing) and Hat (Accessories): both categories filter Target: 220 + 110 = 330.",
+  "tags": [
+    "summarizecolumns",
+    "sum",
+    "relationship",
+    "many-to-many-cardinality",
+    "limited-relationship"
+  ]
+}

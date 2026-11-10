@@ -1,0 +1,34 @@
+{
+  "title": "CROSSFILTER BOTH gives the same result with the one-side column first",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( COUNTROWS ( Customer ), Product[Color] = \"Blue\", CROSSFILTER ( Customer[CustomerKey], Sales[CustomerKey], BOTH ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/crossfilter/",
+    "quote": "The order of the two column arguments is not important for None, OneWay, and Both",
+    "supports": "for BOTH the order of the two columns does not matter"
+  },
+  "confidence": "derived",
+  "derivation": "Blue is product 3: Sales rows 4 and 6, customers 2 and 3. With both directions on Sales[CustomerKey] -> Customer[CustomerKey], Customer is filtered to those 2 rows.",
+  "tags": [
+    "calculate",
+    "crossfilter",
+    "countrows",
+    "relationship",
+    "bidirectional"
+  ]
+}

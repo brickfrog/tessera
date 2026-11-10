@@ -1,0 +1,39 @@
+{
+  "title": "COUNTROWS of a table reference does not count the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( Product ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "the blank row is never returned, as if it were not part of the table",
+      "supports": "a table reference never returns the blank row"
+    },
+    {
+      "url": "https://dax.guide/distinct/",
+      "quote": "Worth remembering that a table reference does not return",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows 3 and 4 have ProductKey 9, which Product lacks, so the relationship is invalid and Product gets a blank row. A plain table reference does not include it: 3 rows.",
+  "tags": [
+    "countrows",
+    "blank-row",
+    "relationship"
+  ]
+}

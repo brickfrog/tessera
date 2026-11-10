@@ -1,0 +1,30 @@
+{
+  "title": "IF with a BLANK condition takes the false branch",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IF ( BLANK (), \"true\", \"false\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "false"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "IF ( BLANK (), \"true\", \"false\" ) false",
+    "supports": "the table of comparisons shows this expression and its result"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "if"
+  ]
+}

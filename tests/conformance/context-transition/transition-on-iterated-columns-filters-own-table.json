@@ -1,0 +1,60 @@
+{
+  "title": "After the transition an aggregation over the iterated table sees only the current row",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( ALL ( 'Product'[Product], 'Product'[Price] ), \"Own price\", CALCULATE ( SUM ( 'Product'[Price] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Own price]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          100.0,
+          100.0
+        ],
+        [
+          "Helmet",
+          20.0,
+          20.0
+        ],
+        [
+          "Lock",
+          10.0,
+          10.0
+        ],
+        [
+          "Scooter",
+          50.0,
+          50.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+    "quote": "The row context, which contains a single row, is transformed into a filter context that contains the same row.",
+    "supports": "with CALCULATE, SUM runs in a filter context holding the current row and returns that row's value only"
+  },
+  "confidence": "derived",
+  "derivation": "The transition filters Product[Product] and Product[Price] to the current row's values. Each combination matches one product, so the sum is that product's price. Without CALCULATE every row would show 180.",
+  "tags": [
+    "addcolumns",
+    "all",
+    "calculate",
+    "sum",
+    "context-transition"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

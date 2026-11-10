@@ -1,0 +1,63 @@
+{
+  "description": "A small star schema with no orphans. Totals: Amount 540, Quantity 15, 7 orders. By Color: Red 460, Blue 80 (Green has no sales). By Category: Vehicles 400, Accessories 140. By Year of OrderDate: 2023 210, 2024 330. By Country: US 310, JP 230 (FR has no sales). Sales[DeliveryDate] -> Date[Date] is inactive.",
+  "tables": [
+    { "name": "Product",
+      "columns": [
+        { "name": "ProductKey", "type": "int64", "key": true },
+        { "name": "Product", "type": "string" },
+        { "name": "Color", "type": "string" },
+        { "name": "Category", "type": "string" },
+        { "name": "Price", "type": "decimal" } ],
+      "rows": [
+        [1, "Bike", "Red", "Vehicles", 100.0],
+        [2, "Helmet", "Red", "Accessories", 20.0],
+        [3, "Lock", "Blue", "Accessories", 10.0],
+        [4, "Scooter", "Green", "Vehicles", 50.0] ] },
+    { "name": "Customer",
+      "columns": [
+        { "name": "CustomerKey", "type": "int64", "key": true },
+        { "name": "Customer", "type": "string" },
+        { "name": "Country", "type": "string" } ],
+      "rows": [ [1, "Ann", "US"], [2, "Bob", "US"], [3, "Cho", "JP"], [4, "Dee", "FR"] ] },
+    { "name": "Date",
+      "columns": [
+        { "name": "Date", "type": "dateTime", "key": true },
+        { "name": "Year", "type": "int64" },
+        { "name": "MonthNo", "type": "int64" },
+        { "name": "Month", "type": "string", "sortBy": "MonthNo" } ],
+      "rows": [
+        ["2023-01-15T00:00:00", 2023, 1, "Jan"],
+        ["2023-02-10T00:00:00", 2023, 2, "Feb"],
+        ["2023-12-31T00:00:00", 2023, 12, "Dec"],
+        ["2024-01-05T00:00:00", 2024, 1, "Jan"],
+        ["2024-02-20T00:00:00", 2024, 2, "Feb"],
+        ["2024-03-01T00:00:00", 2024, 3, "Mar"] ] },
+    { "name": "Sales",
+      "columns": [
+        { "name": "SalesKey", "type": "int64" },
+        { "name": "ProductKey", "type": "int64" },
+        { "name": "CustomerKey", "type": "int64" },
+        { "name": "OrderDate", "type": "dateTime" },
+        { "name": "DeliveryDate", "type": "dateTime" },
+        { "name": "Quantity", "type": "int64" },
+        { "name": "Amount", "type": "decimal" } ],
+      "measures": [
+        { "name": "Sales Amount", "expression": "SUM ( Sales[Amount] )" },
+        { "name": "Total Quantity", "expression": "SUM ( Sales[Quantity] )" },
+        { "name": "Order Count", "expression": "COUNTROWS ( Sales )" } ],
+      "rows": [
+        [1, 1, 1, "2023-01-15T00:00:00", "2023-02-10T00:00:00", 1, 100.0],
+        [2, 2, 1, "2023-01-15T00:00:00", "2023-01-15T00:00:00", 2, 40.0],
+        [3, 2, 2, "2023-02-10T00:00:00", "2023-12-31T00:00:00", 1, 20.0],
+        [4, 3, 2, "2023-12-31T00:00:00", "2024-01-05T00:00:00", 5, 50.0],
+        [5, 1, 3, "2024-01-05T00:00:00", "2024-02-20T00:00:00", 2, 200.0],
+        [6, 3, 3, "2024-02-20T00:00:00", "2024-03-01T00:00:00", 3, 30.0],
+        [7, 1, 1, "2024-03-01T00:00:00", "2024-03-01T00:00:00", 1, 100.0] ] }
+  ],
+  "relationships": [
+    { "from": "Sales[ProductKey]", "to": "Product[ProductKey]" },
+    { "from": "Sales[CustomerKey]", "to": "Customer[CustomerKey]" },
+    { "from": "Sales[OrderDate]", "to": "Date[Date]" },
+    { "from": "Sales[DeliveryDate]", "to": "Date[Date]", "active": false }
+  ]
+}

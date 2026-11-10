@@ -1,0 +1,56 @@
+{
+  "title": "Iterating ALL ( column ) with a measure gives the orphan rows' total on the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ADDCOLUMNS ( ALL ( 'Product'[Color] ), \"Amount\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          100.0
+        ],
+        [
+          "Blue",
+          30.0
+        ],
+        [
+          null,
+          70.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "it links all the orphaned rows on the many-side to the blank row on the one-side",
+      "supports": "the orphan Sales rows are linked to the blank row of Product"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "In every case, ALL includes in the result the additional blank row generated for invalid relationships",
+      "supports": "ALL returns the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Red is Bike (100) and Bell (no sales): 100. Blue is Lock: 30. The blank row's color is BLANK; the context transition filters Color to BLANK, which selects the blank row and so the orphan Sales rows 3 and 4: 50 + 20 = 70.",
+  "tags": [
+    "all",
+    "addcolumns",
+    "measure",
+    "blank-row",
+    "context-transition",
+    "relationship"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

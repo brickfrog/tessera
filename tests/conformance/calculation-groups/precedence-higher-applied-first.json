@@ -1,0 +1,39 @@
+{
+  "title": "Two calculation groups: the one with the higher precedence wraps the other, so ( 10 + 2 ) * 2 = 24",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Ten], Adjust[Adjustment] = \"Plus 2\", Scale[Scaling] = \"Times 2\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          24
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "quote": "( ( 10 ) + 2 ) * 2 = 24",
+      "supports": "the page's precedence example is this model: a measure equal to 10, a group of precedence 100 with SELECTEDMEASURE() + 2 and a group of precedence 200 with SELECTEDMEASURE() * 2, both applied; it gives 24 and says the output won't be 14"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-calculation-group-precedence/",
+      "quote": "the calculation group with the higher precedence is applied first",
+      "supports": "Scale (200) is applied first, so its SELECTEDMEASURE () is then replaced by Adjust's expression"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "calculation-groups",
+    "selectedmeasure",
+    "calculate",
+    "precedence"
+  ]
+}

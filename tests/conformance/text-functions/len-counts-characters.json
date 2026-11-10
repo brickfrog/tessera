@@ -1,0 +1,30 @@
+{
+  "title": "LEN ( \"DAX is so cool!\" ) is 15",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", LEN ( \"DAX is so cool!\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          15
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/len/",
+    "quote": "LEFT, RIGHT, MID and LEN are the basic string-manipulation functions",
+    "supports": "the example lists LEN ( Val ) with the result 15; Return values: a single integer value"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "len"
+  ]
+}

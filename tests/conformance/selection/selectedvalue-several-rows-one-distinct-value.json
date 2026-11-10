@@ -1,0 +1,32 @@
+{
+  "title": "SELECTEDVALUE counts distinct values, not rows",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( SELECTEDVALUE ( Product[Color], \"Many\" ), Product[Product] IN { \"Bike\", \"Helmet\" } ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/selectedvalue-function-dax",
+    "quote": "Returns the value when the context for columnName has been filtered down to one distinct value only.",
+    "supports": "one distinct value is enough"
+  },
+  "confidence": "derived",
+  "derivation": "Two Product rows are visible, Bike and Helmet, and both are Red: one distinct value of Product[Color], which is returned.",
+  "tags": [
+    "selectedvalue",
+    "calculate",
+    "in"
+  ]
+}

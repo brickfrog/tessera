@@ -1,0 +1,55 @@
+{
+  "title": "TOPN with N above the row count returns the whole table",
+  "model": "d-values",
+  "query": "EVALUATE TOPN ( 10, Player, Player[Score], DESC )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          90
+        ],
+        [
+          "Bob",
+          80
+        ],
+        [
+          "Cho",
+          80
+        ],
+        [
+          "Dee",
+          70
+        ],
+        [
+          "Eve",
+          70
+        ],
+        [
+          "Fay",
+          50
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/topn-function-dax",
+    "quote": "Returns the top N rows of the specified table.",
+    "supports": "there are only 6 rows to return"
+  },
+  "confidence": "derived",
+  "derivation": "Player has 6 rows, fewer than 10, so all 6 are returned.",
+  "tags": [
+    "topn"
+  ]
+}

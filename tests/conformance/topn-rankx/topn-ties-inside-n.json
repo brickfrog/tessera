@@ -1,0 +1,52 @@
+{
+  "title": "TOPN with a tie at the N-th row returns the whole tie, here 5 rows for N = 4",
+  "model": "d-values",
+  "query": "EVALUATE TOPN ( 4, Player, Player[Score], DESC )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          90
+        ],
+        [
+          "Bob",
+          80
+        ],
+        [
+          "Cho",
+          80
+        ],
+        [
+          "Dee",
+          70
+        ],
+        [
+          "Eve",
+          70
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/topn-function-dax",
+    "quote": "If there is a tie, in Order_By values, at the N-th row of the table, then all tied rows are returned.",
+    "supports": "ties at the N-th row are all returned"
+  },
+  "confidence": "derived",
+  "derivation": "Player scores: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. Descending: 90, 80, 80, 70, 70, 50. The fourth row (70) ties with the fifth, so 5 rows are returned. The tie of Bob and Cho lies inside the first four and adds nothing.",
+  "tags": [
+    "topn",
+    "ties"
+  ]
+}

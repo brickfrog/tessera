@@ -1,0 +1,39 @@
+{
+  "title": "DIVIDE ( 4, 2 ) is a decimal number, 2.0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DIVIDE ( 4, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/divide-function-dax",
+      "quote": "Return value A decimal number",
+      "supports": "the result type"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency.",
+      "supports": "the result type of / and of DIVIDE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "4 / 2 = 2. DIVIDE of two integers returns a decimal number, as / does: 2.0.",
+  "tags": [
+    "division",
+    "divide",
+    "result-type"
+  ]
+}

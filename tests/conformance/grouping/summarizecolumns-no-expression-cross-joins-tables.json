@@ -1,0 +1,68 @@
+{
+  "title": "SUMMARIZECOLUMNS without expressions cross joins columns of different tables",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          "US"
+        ],
+        [
+          "Red",
+          "JP"
+        ],
+        [
+          "Red",
+          "FR"
+        ],
+        [
+          "Blue",
+          "US"
+        ],
+        [
+          "Blue",
+          "JP"
+        ],
+        [
+          "Blue",
+          "FR"
+        ],
+        [
+          "Green",
+          "US"
+        ],
+        [
+          "Green",
+          "JP"
+        ],
+        [
+          "Green",
+          "FR"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-summarizecolumns/",
+    "quote": "However, if you do not include any expression, you obtain a crossjoin as a result.",
+    "supports": "no expression: every combination of the two columns"
+  },
+  "confidence": "derived",
+  "derivation": "3 colours (Red, Blue, Green) times 3 countries (US, JP, FR) = 9 rows, including pairs with no sales such as Green FR.",
+  "tags": [
+    "summarizecolumns",
+    "crossjoin"
+  ]
+}

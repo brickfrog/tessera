@@ -1,0 +1,40 @@
+{
+  "title": "CROSSFILTER NONE on a single-direction relationship makes the dimension filter ineffective",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], Product[Color] = \"Blue\", CROSSFILTER ( Sales[ProductKey], Product[ProductKey], NONE ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "Modifies the relationship cross filter direction (to one or both), or it disables filter propagation (none)",
+      "supports": "none disables filter propagation"
+    },
+    {
+      "url": "https://dax.guide/crossfilter/",
+      "quote": "the cross-filter direction, which can be BOTH, ONEWAY, NONE",
+      "supports": "the page's example with NONE returns the unfiltered count on every row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "With the relationship disabled the filter Product[Color] = Blue does not reach Sales: the measure is the total, 100 + 40 + 20 + 50 + 200 + 30 + 100 = 540. With the relationship it would be 80.",
+  "tags": [
+    "calculate",
+    "crossfilter",
+    "relationship",
+    "filter-propagation"
+  ]
+}

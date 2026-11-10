@@ -1,0 +1,57 @@
+{
+  "title": "SAMEPERIODLASTYEAR of February 29 is February 28 of the year before",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = SAMEPERIODLASTYEAR ( 'Date'[Date] ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] = DATE ( 2024, 2, 29 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2023-02-28T00:00:00",
+          "2023-02-28T00:00:00",
+          1,
+          40.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/sameperiodlastyear/",
+      "quote": "Internally SAMEPERIODLASTYEAR corresponds to the following call of DATEADD :",
+      "supports": "SAMEPERIODLASTYEAR is DATEADD ( <Dates>, -1, YEAR )"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "The last day of the shifted month is returned if the day does not exist in the shifted month.",
+      "supports": "a day that does not exist in the target month becomes its last day"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "February 2024 is not fully selected, so the day is shifted on its own. February 29, 2023 does not exist; the last day of the shifted month, February 28, 2023, is returned. Sales on that date: 40.",
+  "uncertain": true,
+  "alternative": "SQLBI states the \"last day of the shifted month\" rule in its sentence about the DAY interval. If a date with no counterpart is dropped instead, the result is an empty table: [Min] and [Max] BLANK, [Days] BLANK, [Sales] BLANK.",
+  "tags": [
+    "time-intelligence",
+    "sameperiodlastyear",
+    "dateadd",
+    "leap-year"
+  ]
+}

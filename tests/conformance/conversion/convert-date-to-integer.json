@@ -1,0 +1,32 @@
+{
+  "title": "CONVERT ( DATE ( 1900, 1, 1 ), INTEGER ) is 2 (the Microsoft example)",
+  "model": "scalar",
+  "query": "EVALUATE { CONVERT ( DATE ( 1900, 1, 1 ), INTEGER ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/convert-function-dax",
+    "quote": "EVALUATE { CONVERT ( DATE ( 1900, 1, 1 ), INTEGER ) } Returns [Value] 2",
+    "supports": "the page's example query and its result"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "date",
+    "table-constructor"
+  ]
+}

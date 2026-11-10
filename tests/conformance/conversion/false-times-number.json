@@ -1,0 +1,32 @@
+{
+  "title": "FALSE * 7 is 0: FALSE is 0 in arithmetic",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FALSE () * 7 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/multiplication/",
+    "quote": "Boolean values are converted into numbers (0 for FALSE and 1 for TRUE) when they are involved in a multiplication",
+    "supports": "FALSE becomes 0"
+  },
+  "confidence": "derived",
+  "derivation": "FALSE is converted to 0, and 0 * 7 = 0.",
+  "tags": [
+    "conversion",
+    "operator-multiply",
+    "boolean"
+  ],
+  "notes": "The column's type is not asserted: the sources do not say which numeric type a Boolean becomes."
+}

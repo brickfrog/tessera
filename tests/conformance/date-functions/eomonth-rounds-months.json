@@ -1,0 +1,32 @@
+{
+  "title": "EOMONTH ( DATE ( 2008, 3, 3 ), 1.5 ) is May 31, 2008: the months argument is rounded to 2",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", EOMONTH ( DATE ( 2008, 3, 3 ), 1.5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2008-05-31T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/eomonth-function-dax",
+    "quote": "The following expression returns May 31, 2008, because the months argument is rounded to 2.",
+    "supports": "the documented example = EOMONTH(\"March 3, 2008\",1.5), with the date given by DATE instead of text"
+  },
+  "confidence": "derived",
+  "derivation": "1.5 rounds to 2; two months after March 2008 is May 2008, whose last day is the 31st.",
+  "tags": [
+    "date-functions",
+    "eomonth",
+    "rounding"
+  ]
+}

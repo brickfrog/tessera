@@ -1,0 +1,40 @@
+{
+  "title": "BLANK < DATE ( 2024, 1, 1 ) is TRUE: BLANK compares as the zero date",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () < DATE ( 2024, 1, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "All comparison operators except == treat BLANK as equal to number 0, empty string \"\", DATE(1899, 12, 30), or FALSE",
+      "supports": "< treats BLANK as DATE ( 1899, 12, 30 ) next to a date"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "Integer, Real Number, Currency, Date/time and Blank are considered numeric for comparison purposes",
+      "supports": "BLANK and a date can be compared"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "BLANK is compared as 1899-12-30, which is before 2024-01-01, so < is TRUE.",
+  "tags": [
+    "blank",
+    "operator-less-than",
+    "comparison",
+    "date"
+  ]
+}

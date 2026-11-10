@@ -1,0 +1,54 @@
+{
+  "title": "A measure reference in a row context performs the context transition implicitly",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Customer[Country] ), \"Amount\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "US",
+          310.0
+        ],
+        [
+          "JP",
+          230.0
+        ],
+        [
+          "FR",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+      "quote": "when you invoke a measure from a DAX expression, this is automatically surrounded by CALCULATE",
+      "supports": "a measure reference is wrapped in an implicit CALCULATE, which performs the context transition"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/calculate-function-dax",
+      "quote": "When you use a model measure in row context, context transition is automatic.",
+      "supports": "a model measure used in row context transitions automatically"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "US customers are Ann (1) and Bob (2): Sales rows 1, 2, 3, 4, 7 = 100 + 40 + 20 + 50 + 100 = 310. JP is Cho (3): rows 5, 6 = 200 + 30 = 230. FR is Dee (4): no sales, BLANK.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "measure",
+    "context-transition"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

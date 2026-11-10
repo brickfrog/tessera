@@ -1,0 +1,30 @@
+{
+  "title": "FORMAT ( DATE ( 2019, 3, 28 ), \"yyyy-mm-dd\" ) is \"2019-03-28\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( DATE ( 2019, 3, 28 ), \"yyyy-mm-dd\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "2019-03-28"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/format/",
+    "quote": "FORMAT is a formatting function that formats a value based",
+    "supports": "the example shows \"Date (1)\", FORMAT ( DATE ( 2019, 3, 28 ), \"yyyy-mm-dd\" ) as 2019-03-28"
+  },
+  "confidence": "published",
+  "tags": [
+    "format",
+    "custom-date-format"
+  ]
+}

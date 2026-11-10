@@ -1,0 +1,60 @@
+{
+  "title": "A calculated column (DEFINE COLUMN) is evaluated in a row context for each row of its table",
+  "model": "sales",
+  "query": [
+    "DEFINE COLUMN 'Product'[Double] = 'Product'[Price] * 2",
+    "EVALUATE SELECTCOLUMNS ( 'Product', \"Product\", 'Product'[Product], \"Double\", 'Product'[Double] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Double]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          200.0
+        ],
+        [
+          "Helmet",
+          40.0
+        ],
+        [
+          "Lock",
+          20.0
+        ],
+        [
+          "Scooter",
+          100.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+      "quote": "When you write an expression in a calculated column, the expression is evaluated for each row of the table, creating a row context for each row.",
+      "supports": "a calculated column's expression is evaluated once per row, with that row as the row context"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The operator determines the type of conversion DAX performs by casting the values it requires before doing the requested operation.",
+      "supports": "the multiplication table gives CURRENCY * INTEGER as CURRENCY"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Prices 100, 20, 10, 50, each doubled: 200, 40, 20, 100.",
+  "tags": [
+    "define-column",
+    "calculated-column",
+    "selectcolumns",
+    "row-context"
+  ]
+}

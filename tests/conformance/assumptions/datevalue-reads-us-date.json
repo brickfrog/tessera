@@ -1,0 +1,31 @@
+{
+  "title": "DATEVALUE ( \"1/31/2009\" ) is 31 January 2009",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATEVALUE ( \"1/31/2009\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2009-01-31T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datevalue/",
+    "quote": "will always return the January 31st of 2009 regardless of the locale settings",
+    "supports": "the page states the result for the string 1/31/2009"
+  },
+  "confidence": "published",
+  "tags": [
+    "assumption:text-to-date",
+    "datevalue",
+    "date-functions"
+  ]
+}

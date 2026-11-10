@@ -1,0 +1,31 @@
+{
+  "title": "FLOOR ( 10.8423, 0.1 ) is 10.8",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FLOOR ( 10.8423, 0.1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          10.8
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-09,
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/floor-function-dax",
+    "quote": "rounds down to the nearest multiple of .1.",
+    "supports": "the table of expected results lists 10.8423 with the result 10.8; Return value: a decimal number"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "floor"
+  ]
+}

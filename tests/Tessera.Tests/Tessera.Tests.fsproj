@@ -77,6 +77,12 @@
     <Compile Include="RefreshTests.fs" />
     <Compile Include="XmlaRefreshTests.fs" />
     <Compile Include="RefreshCommandTests.fs" />
+    <Compile Include="QueryCompareTests.fs" />
+    <Compile Include="EmbedTests.fs" />
+    <Compile Include="Conformance.fs" />
+    <Compile Include="ConformanceTests.fs" />
+    <Compile Include="ConformanceServer.fs" />
+    <Compile Include="ConformanceServerTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

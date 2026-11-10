@@ -1,0 +1,33 @@
+{
+  "title": "BLANK = DATE ( 1899, 12, 30 ) is TRUE: the zero date equals BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () = DATE ( 1899, 12, 30 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+    "quote": "All comparison operators except == treat BLANK as equal to number 0, empty string \"\", DATE(1899, 12, 30), or FALSE",
+    "supports": "= treats BLANK as equal to DATE ( 1899, 12, 30 )"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-equals",
+    "comparison",
+    "date"
+  ],
+  "notes": "The expression is the one the operator reference names. The Microsoft DATE page says dates from March 1, 1900 are supported, and DAX Guide says a year from 100 to 9999 is used as it is; if DATE fails for 1899 on a server, the literal dt\"1899-12-30\" states the same value."
+}

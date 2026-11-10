@@ -1,0 +1,48 @@
+{
+  "title": "With three nested row contexts, EARLIER ( column ) reads the middle one",
+  "model": "scalar",
+  "query": "EVALUATE ADDCOLUMNS ( T, \"x\", SUMX ( FILTER ( T, T[n] >= 2 ), SUMX ( FILTER ( T, T[n] = 1 ), EARLIER ( T[n] ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "T[n]",
+          "type": "int64"
+        },
+        {
+          "name": "[x]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          5
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          3,
+          5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+    "quote": "The next evaluation level out is represented by 1; two levels out is represented by 2 and so on. When omitted default value is 1.",
+    "supports": "the default is one level out"
+  },
+  "confidence": "derived",
+  "derivation": "Row contexts when EARLIER is evaluated: ADDCOLUMNS (n = 1, 2 or 3), the outer SUMX (rows 2 and 3), the inner SUMX (row 1). One level out of the inner SUMX is the outer SUMX: for each of its rows the inner SUMX has one row and returns the outer SUMX value. 2 + 3 = 5 for every ADDCOLUMNS row.",
+  "tags": [
+    "earlier",
+    "addcolumns",
+    "sumx",
+    "filter",
+    "row-context",
+    "nested-row-context"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "title": "CONVERT ( -2.5, INTEGER ) is -3: a half rounds away from zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( -2.5, INTEGER ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "A value that ends in .5 is rounded away from zero. For example, CONVERT ( 2.5, INTEGER ) returns 3 and CONVERT ( -2.5, INTEGER ) returns -3",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "rounding",
+    "assumption:convert-integer-rounding"
+  ]
+}

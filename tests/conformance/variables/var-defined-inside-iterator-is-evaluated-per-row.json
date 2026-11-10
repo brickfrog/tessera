@@ -1,0 +1,41 @@
+{
+  "title": "A variable defined inside an iterator is evaluated in each row, with the context transition of the measure it holds",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( Customer, VAR S = [Sales Amount] RETURN IF ( S > 100, S ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          470.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+      "quote": "Using a variable ensures that the evaluation happens only once, and that the DAX engine does not choose an execution plan requiring multiple evaluations of Sales Amount",
+      "supports": "the CustomerSales variable defined inside SUMX ( Customer, ... ) holds the sales of the customer being iterated"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+      "quote": "Variables are evaluated in the filter context where they are defined, and their evaluation happens at most once.",
+      "supports": "a variable is evaluated where it is defined, not where it is used"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Per customer: Ann rows 1, 2, 7 = 100 + 40 + 100 = 240; Bob rows 3, 4 = 20 + 50 = 70; Cho rows 5, 6 = 200 + 30 = 230; Dee has no sales, BLANK. S > 100 holds for Ann and Cho only (BLANK > 100 is FALSE); the two-argument IF gives BLANK for the others, and SUMX skips blanks: 240 + 230 = 470.",
+  "tags": [
+    "var",
+    "sumx",
+    "if",
+    "context-transition",
+    "iterator"
+  ]
+}

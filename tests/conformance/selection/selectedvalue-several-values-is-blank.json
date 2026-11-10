@@ -1,0 +1,31 @@
+{
+  "title": "SELECTEDVALUE returns BLANK when several values are visible and no alternate is given",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SELECTEDVALUE ( Product[Color] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/selectedvalue-function-dax",
+    "quote": "When not provided, the default value is BLANK().",
+    "supports": "no alternate means BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "With no filter Product[Color] has three values (Red, Blue, Green), so the alternate is returned, and its default is BLANK.",
+  "tags": [
+    "selectedvalue",
+    "blank"
+  ]
+}

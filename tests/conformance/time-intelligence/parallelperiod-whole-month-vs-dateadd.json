@@ -1,0 +1,59 @@
+{
+  "title": "For one date, PARALLELPERIOD returns the whole previous month and DATEADD the same day of the previous month",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"Parallel\", CALCULATE ( [Sales], PARALLELPERIOD ( 'Date'[Date], -1, MONTH ) ), \"DateAdd\", CALCULATE ( [Sales], DATEADD ( 'Date'[Date], -1, MONTH ) ), \"ParallelDays\", COUNTROWS ( PARALLELPERIOD ( 'Date'[Date], -1, MONTH ) ), \"DateAddDays\", COUNTROWS ( DATEADD ( 'Date'[Date], -1, MONTH ) ) ), 'Date'[Date] = DATE ( 2024, 2, 15 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Parallel]",
+          "type": "decimal"
+        },
+        {
+          "name": "[DateAdd]",
+          "type": "decimal"
+        },
+        {
+          "name": "[ParallelDays]",
+          "type": "int64"
+        },
+        {
+          "name": "[DateAddDays]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          300.0,
+          100.0,
+          31,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "For each interval with at least one value in Date[Date] , the function returns the entire interval shifted by the number of specified intervals.",
+      "supports": "PARALLELPERIOD returns whole intervals"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "If not all the days of the month are selected, then each day is shifted by the number of intervals specified.",
+      "supports": "a partly selected month moves day by day"
+    },
+    {
+      "url": "https://dax.guide/parallelperiod/",
+      "quote": "If the interval is a partial range of month, quarter, or year then any partial months in the result are also filled out to complete the entire interval.",
+      "supports": "partial periods are completed"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The selection is 2024-02-15. PARALLELPERIOD returns all of January 2024: 31 days, sales 300. DATEADD returns 2024-01-15 only: 1 day, sales 100.",
+  "tags": [
+    "time-intelligence",
+    "parallelperiod",
+    "dateadd"
+  ]
+}

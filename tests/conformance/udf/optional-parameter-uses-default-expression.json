@@ -1,0 +1,35 @@
+{
+  "title": "An omitted argument takes the default expression of its parameter",
+  "model": "scalar",
+  "query": [
+    "DEFINE FUNCTION AddTax = ( amount : NUMERIC, taxRate : NUMERIC = 0.1 ) => amount * ( 1 + taxRate )",
+    "EVALUATE { AddTax ( 10 ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]"
+        }
+      ],
+      "rows": [
+        [
+          11.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+    "quote": "The caller can omit the argument, and the default expression is used as the argument value.",
+    "supports": "the page shows this query with the comment \"Returns 11\""
+  },
+  "confidence": "published",
+  "tags": [
+    "udf",
+    "define-function",
+    "default-parameter",
+    "type-hint"
+  ],
+  "notes": "The type is left out: it depends on the type of the literal 0.1, which the page does not state."
+}

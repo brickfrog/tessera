@@ -1,0 +1,42 @@
+{
+  "title": "CURRENCY ( 2 ) ^ 2 is the decimal number 4, not a fixed decimal",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( 2 ) ^ 2 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          4.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/power/",
+      "quote": "The exponentiation operator ^ returns the same result as the POWER function",
+      "supports": "^ is POWER, and the page gives POWER's return value as a single decimal value"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/power-function-dax",
+      "quote": "The following example returns 25",
+      "supports": "POWER(5,2) is 25; the page's return value is a decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "^ is syntax for POWER, and POWER returns a decimal number; no source makes an exception for a currency base. 2 * 2 = 4, as the double 4.0.",
+  "uncertain": true,
+  "alternative": "No source shows the type for a currency base. If the base's type carried over, the result would be the fixed decimal 4.0.",
+  "tags": [
+    "assumption:power-result-type",
+    "operator-power",
+    "currency",
+    "result-type"
+  ]
+}

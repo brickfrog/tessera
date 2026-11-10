@@ -1,0 +1,32 @@
+{
+  "title": "CLOSINGBALANCEMONTH evaluates the expression on the last date of the month",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CLOSINGBALANCEMONTH ( [Sales], 'Date'[Date] ) ), 'Date'[Date] >= DATE ( 2024, 2, 1 ) && 'Date'[Date] <= DATE ( 2024, 2, 29 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          400.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/closingbalancemonth/",
+    "quote": "CALCULATE ( <Expression>, ENDOFMONTH ( <Dates> ) [, <Filter>] )",
+    "supports": "the definition: the expression on the last date of the month"
+  },
+  "confidence": "derived",
+  "derivation": "The last date of February 2024 is the 29th; sales on that date are 400 (the month total is 700).",
+  "tags": [
+    "time-intelligence",
+    "closingbalancemonth",
+    "leap-year"
+  ]
+}

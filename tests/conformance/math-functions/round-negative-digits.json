@@ -1,0 +1,30 @@
+{
+  "title": "ROUND ( 21.5, -1 ) is 20: negative digits round to the left of the decimal point",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUND ( 21.5, -1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          20.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/round-function-dax",
+    "quote": "The following formula rounds 21.5 to one decimal place to the left of the decimal point. The expected result is 20.",
+    "supports": "the example gives 20"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "round"
+  ]
+}

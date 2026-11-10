@@ -1,0 +1,45 @@
+{
+  "title": "A filter table on the group-by column limits the groups",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], TREATAS ( { \"Red\", \"Green\" }, Product[Color] ), \"Amt\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/summarizecolumns-function-dax",
+      "quote": "A table expression which is added to the filter context of all columns specified as groupBy_columnName arguments.",
+      "supports": "the filter applies to the group-by column and to the expression"
+    },
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "If all expressions evaluate to BLANK for a row, that row is not included in the table returned.",
+      "supports": "Green has no sales"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The filter keeps Red and Green. Red sales: 100 + 40 + 20 + 200 + 100 = 460. Green has none, so its row is dropped. Blue is filtered out.",
+  "tags": [
+    "summarizecolumns",
+    "filter-table",
+    "treatas",
+    "blank"
+  ]
+}

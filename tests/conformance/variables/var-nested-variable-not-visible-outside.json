@@ -1,0 +1,21 @@
+{
+  "title": "A variable of a nested VAR block is not visible after the block",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VAR a = SUMX ( T, VAR b = T[n] RETURN b * 2 ) RETURN a + b )",
+  "expected": {
+    "error": "b is defined in the nested VAR/RETURN inside SUMX and does not exist in the outer RETURN"
+  },
+  "source": {
+    "url": "https://dax.guide/st/var/",
+    "quote": "the nested variables are not visible outside of the scope of expression",
+    "supports": "a variable defined in a nested VAR/RETURN cannot be used outside it"
+  },
+  "confidence": "derived",
+  "derivation": "b exists only inside the VAR/RETURN that is the second argument of SUMX. The outer RETURN refers to b, which is not defined there, so the query fails.",
+  "tags": [
+    "var",
+    "nested-var",
+    "variable-scope",
+    "error"
+  ]
+}

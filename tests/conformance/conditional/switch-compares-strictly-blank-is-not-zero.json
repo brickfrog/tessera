@@ -1,0 +1,70 @@
+{
+  "title": "SWITCH compares like ==: BLANK does not match 0, while = in SWITCH ( TRUE, ... ) does",
+  "model": "scalar",
+  "query": [
+    "DEFINE VAR Vals = UNION ( { 0, 1 }, { BLANK () } )",
+    "EVALUATE ADDCOLUMNS ( Vals,",
+    "  \"Value = 0\", [Value] = 0,",
+    "  \"SWITCH\", SWITCH ( [Value], 0, \"Zero\", 1, \"One\", \"Other\" ),",
+    "  \"SWITCH TRUE\", SWITCH ( TRUE, [Value] = 0, \"Zero\", [Value] = 1, \"One\", \"Other\" ) )",
+    "ORDER BY [Value]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]"
+        },
+        {
+          "name": "[Value = 0]",
+          "type": "boolean"
+        },
+        {
+          "name": "[SWITCH]",
+          "type": "string"
+        },
+        {
+          "name": "[SWITCH TRUE]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          null,
+          true,
+          "Other",
+          "Zero"
+        ],
+        [
+          0,
+          true,
+          "Zero",
+          "Zero"
+        ],
+        [
+          1,
+          false,
+          "One",
+          "One"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/switch/",
+    "quote": "SWITCH uses strict comparison: BLANK does not match 0 or an empty string.",
+    "supports": "the page shows this query with its result: the blank row is \"Other\" for SWITCH and \"Zero\" for SWITCH TRUE"
+  },
+  "confidence": "published",
+  "tags": [
+    "switch",
+    "switch-true",
+    "blank",
+    "strict-comparison",
+    "union",
+    "define",
+    "query-variable",
+    "addcolumns"
+  ],
+  "notes": "Not marked ordered: the first row depends on where BLANK sorts. The column types are not shown by the page; they follow from the expressions, except [Value], whose type is left out because it comes from a UNION with { BLANK () }."
+}

@@ -1,0 +1,31 @@
+{
+  "title": "CONVERT ( 3.7, INTEGER ) is 4: it rounds, it does not truncate",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( 3.7, INTEGER ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "INT is different, because INT rounds down: INT ( 3.7 ) returns 3, but CONVERT ( 3.7, INTEGER ) returns 4",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "rounding"
+  ]
+}

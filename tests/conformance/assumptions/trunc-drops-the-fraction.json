@@ -1,0 +1,33 @@
+{
+  "title": "TRUNC ( -4.3 ) is -4: TRUNC rounds toward zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", TRUNC ( -4.3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          -4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/trunc-function-dax",
+    "quote": "TRUNC(-4.3) returns -4, but INT(-4.3) returns -5 because -5 is the smaller number",
+    "supports": "TRUNC(-4.3) is -4"
+  },
+  "confidence": "published",
+  "tags": [
+    "assumption:convert-integer-rounding",
+    "trunc",
+    "math-functions",
+    "rounding",
+    "negative"
+  ],
+  "notes": "The column's type is not asserted: the Microsoft page says TRUNC returns a whole number, DAX Guide says a decimal value."
+}

@@ -1,0 +1,50 @@
+{
+  "title": "Without RELATEDTABLE or CALCULATE a row context on the one side does not filter the many side",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Amount\", SUMX ( Sales, Sales[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          540.0
+        ],
+        [
+          "Helmet",
+          540.0
+        ],
+        [
+          "Lock",
+          540.0
+        ],
+        [
+          "Scooter",
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/using-related-and-relatedtable-in-dax/",
+    "quote": "By default, the row context does not propagate through relationships",
+    "supports": "a row context does not propagate through relationships"
+  },
+  "confidence": "derived",
+  "derivation": "There is no context transition, so Sales is not filtered by the current Product row: every row gets the total, 100 + 40 + 20 + 50 + 200 + 30 + 100 = 540.",
+  "tags": [
+    "sumx",
+    "selectcolumns",
+    "row-context",
+    "relationship"
+  ]
+}

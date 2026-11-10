@@ -1,0 +1,38 @@
+{
+  "title": "MAXX ( { -2, BLANK() }, [Value] ) is -2: an iterator's maximum ignores BLANK, it is not taken as 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MAXX ( { -2, BLANK () }, [Value] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/max/",
+      "quote": "MAX consider the BLANK value as significative, whereas MAXX ignores it",
+      "supports": "the page gives MAXX ( { -2, BLANK() }, [Value] ) as returning -2"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/maxx-function-dax",
+      "quote": "Blank values are skipped",
+      "supports": "MAXX skips blanks"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "maxx",
+    "blank",
+    "table-constructor"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "title": "\"1,234\" + 1 is 1235: a thousands separator is accepted in text converted to a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"1,234\" + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          1235
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "the string is automatically converted into a corresponding number, as long as the string is a valid representation of a number",
+      "supports": "text in an arithmetic expression converts when it is a valid number; the page does not say which forms are valid"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "DAX implicitly converts the string to a number, and then does the addition for a numeric result",
+      "supports": "the page gives \"22\" + 22 as 44"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "+ converts text to a number when the text is a valid representation of a number. In en-US 1,234 is the usual way to write 1234, so it is taken as valid: 1234 + 1 = 1235.",
+  "uncertain": true,
+  "alternative": "No source says whether a group separator is accepted. If it is not, the conversion fails and the query returns an error.",
+  "tags": [
+    "assumption:text-to-number-separators",
+    "operator-add",
+    "implicit-conversion",
+    "thousands-separator"
+  ],
+  "notes": "The column's type is not asserted: no source says whether a number that came from text is an integer or a decimal number."
+}

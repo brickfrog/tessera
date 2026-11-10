@@ -1,0 +1,38 @@
+{
+  "title": "VALUE ( \"3\" ) is the number 3",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VALUE ( \"3\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          3.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/value-function-dax",
+      "quote": "The following formula converts the typed string, \"3\", into the numeric value 3.",
+      "supports": "the example"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/value-function-dax",
+      "quote": "The converted number in decimal data type.",
+      "supports": "the result is a decimal number"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "value",
+    "result-type"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "title": "PARALLELPERIOD of two dates in different months returns both whole months, shifted",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = PARALLELPERIOD ( 'Date'[Date], -1, MONTH ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] IN { DATE ( 2024, 2, 1 ), DATE ( 2024, 3, 10 ) } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-01T00:00:00",
+          "2024-02-29T00:00:00",
+          60,
+          1000.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "January and February of 2019 for MONTH (our input dates are within February and March 2019).",
+      "supports": "the article gets the same result from the range February 1 to March 10 and from just those two dates: the two previous whole months"
+    },
+    {
+      "url": "https://dax.guide/parallelperiod/",
+      "quote": "shifts the first date and the last date the specified number of intervals, and then returns all contiguous dates between the two shifted dates",
+      "supports": "the definition"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The two dates are in February and March 2024. The months are completed (February 1 to March 31) and moved back one month: January 1 to February 29, 31 + 29 = 60 days. Sales: Jan 300 + Feb 700 = 1000.",
+  "tags": [
+    "time-intelligence",
+    "parallelperiod",
+    "in",
+    "leap-year"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "title": "A boolean filter argument may compare a column with an aggregation, evaluated in the outer context",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( SUM ( Sales[Amount] ), Sales[OrderDate] = MAX ( Sales[OrderDate] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          100.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/calculate-function-dax",
+      "quote": "It can contain an aggregation function that returns a scalar value.",
+      "supports": "the page's example 'Total sales on the last selected date' has this shape: column = MAX ( column )"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "CALCULATE evaluates all the explicit filter arguments in the original evaluation context, each one independently from the others.",
+      "supports": "the filter argument, MAX included, is evaluated in the original context"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "MAX ( Sales[OrderDate] ) in the empty filter context is 2024-03-01 (row 7). Rows with that OrderDate: row 7 only, Amount 100.",
+  "tags": [
+    "calculate",
+    "max",
+    "evaluation-order"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases. The learn CALCULATETABLE page dates this allowance to the September 2021 release."
+}

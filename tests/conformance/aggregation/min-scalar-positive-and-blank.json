@@ -1,0 +1,41 @@
+{
+  "title": "MIN ( 2, BLANK ): the sources disagree between BLANK and 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MIN ( 2, BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/min/",
+      "quote": "-- MIN returns BLANK MIN ( 2, BLANK() )",
+      "supports": "DAX Guide gives this expression with the result BLANK"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/min-function-dax",
+      "quote": "Min(1,Blank() ) returns 0",
+      "supports": "the Microsoft page says a positive number against BLANK gives 0"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "DAX Guide expands MIN ( v1, v2 ) to SWITCH ( TRUE, v1 = v2, ..., v1 < v2, v1, v2 ). With v1 = 2 and v2 = BLANK: 2 = BLANK is false, 2 < BLANK is false (BLANK compares as 0), so v2, the BLANK, is returned.",
+  "uncertain": true,
+  "alternative": "Microsoft Learn says BLANK is treated as 0 and the result is 0: [r] would be 0 (int64).",
+  "tags": [
+    "min",
+    "blank",
+    "scalar"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

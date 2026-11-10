@@ -1,0 +1,30 @@
+{
+  "title": "Characters such as $ are literals in a custom format",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( 1234.567, \"$#,0.00\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "$1,234.57"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/format/",
+    "quote": "FORMAT is a formatting function that formats a value based",
+    "supports": "the example shows \"Currency (1)\", FORMAT ( 1234.567, \"$#,0.00\" ) as $1,234.57"
+  },
+  "confidence": "published",
+  "tags": [
+    "format",
+    "custom-numeric-format"
+  ]
+}

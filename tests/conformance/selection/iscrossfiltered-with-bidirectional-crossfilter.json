@@ -1,0 +1,58 @@
+{
+  "title": "With CROSSFILTER BOTH a filter on Sales cross-filters Product, which is still not filtered",
+  "model": "sales",
+  "query": [
+    "EVALUATE CALCULATETABLE (",
+    "  {",
+    "    ( \"ISFILTERED Product\", ISFILTERED ( Product ) ),",
+    "    ( \"ISCROSSFILTERED Product[Category]\", ISCROSSFILTERED ( Product[Category] ) ),",
+    "    ( \"ISCROSSFILTERED Product\", ISCROSSFILTERED ( Product ) )",
+    "  },",
+    "  Sales[Quantity] = 1,",
+    "  CROSSFILTER ( Sales[ProductKey], Product[ProductKey], BOTH ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value1]",
+          "type": "string"
+        },
+        {
+          "name": "[Value2]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "ISFILTERED Product",
+          false
+        ],
+        [
+          "ISCROSSFILTERED Product[Category]",
+          true
+        ],
+        [
+          "ISCROSSFILTERED Product",
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isfiltered/",
+    "quote": "A filter on a related table does not make the table filtered, -- also when the relationship uses a bidirectional cross-filter.",
+    "supports": "the page shows these results for a filter on Sales[Quantity] with CROSSFILTER BOTH"
+  },
+  "confidence": "derived",
+  "derivation": "CROSSFILTER makes the relationship filter both ways for this evaluation, so the filter on Sales[Quantity] reaches Product: its columns are cross-filtered. Product has no direct filter, so ISFILTERED ( Product ) stays FALSE.",
+  "tags": [
+    "isfiltered",
+    "iscrossfiltered",
+    "calculatetable",
+    "crossfilter",
+    "bidirectional",
+    "cross-filter",
+    "relationship"
+  ]
+}

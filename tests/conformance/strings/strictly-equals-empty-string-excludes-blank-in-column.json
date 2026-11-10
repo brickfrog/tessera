@@ -1,0 +1,34 @@
+{
+  "title": "Txt == \"\" matches the empty-string row only",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( Empty, Empty[Txt] == \"\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/strictly-equal-to/",
+    "quote": "Returns TRUE if Product[Color] is an empty string, returns FALSE if it is BLANK or any other value",
+    "supports": "Column == \"\" is TRUE only for the empty string"
+  },
+  "confidence": "derived",
+  "derivation": "Empty[Txt] holds '' (Id 1), BLANK (Id 2), x (Id 3). == is TRUE for the empty string and FALSE for BLANK, so only row 1 matches: 1 row.",
+  "tags": [
+    "operator-strict-equals",
+    "filter",
+    "countrows",
+    "empty-string",
+    "blank"
+  ]
+}

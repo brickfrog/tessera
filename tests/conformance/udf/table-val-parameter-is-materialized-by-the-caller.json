@@ -1,0 +1,40 @@
+{
+  "title": "A TABLE VAL parameter is evaluated in the filter context of the call and not again in the body",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION CountRowsNow = ( t : TABLE VAL ) => COUNTROWS ( CALCULATETABLE ( t, ALL ( 'Date' ) ) )",
+    "EVALUATE { CALCULATE ( CountRowsNow ( Sales ), 'Date'[Year] = 2023 ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+    "quote": "The 'Sales' table is already filtered by the year before entering the function, so ALL('Date') inside the function has no effect.",
+    "supports": "the page gives this function and call (with a fiscal year filter) and explains the result"
+  },
+  "confidence": "derived",
+  "derivation": "The argument Sales is evaluated by the caller under Year = 2023: rows 1, 2, 3 (January and February 2023) and 4 (2023-12-31), 4 rows. ALL ( Date ) in the body does not evaluate it again.",
+  "tags": [
+    "udf",
+    "define-function",
+    "val-parameter",
+    "table-parameter",
+    "calculate",
+    "calculatetable",
+    "all",
+    "countrows"
+  ]
+}

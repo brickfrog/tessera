@@ -1,0 +1,31 @@
+{
+  "title": "BLANK = 0 is TRUE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () = 0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+    "quote": "All comparison operators except == treat BLANK as equal to number 0, empty string \"\", DATE(1899, 12, 30), or FALSE",
+    "supports": "= treats BLANK as equal to 0"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-equals",
+    "comparison"
+  ]
+}

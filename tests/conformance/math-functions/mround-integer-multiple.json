@@ -1,0 +1,43 @@
+{
+  "title": "MROUND to a multiple of 3: 7 gives 6, 8 gives 9",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"seven\", MROUND ( 7, 3 ), \"eight\", MROUND ( 8, 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[seven]",
+          "type": "double"
+        },
+        {
+          "name": "[eight]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          6.0,
+          9.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/mround-function-dax",
+      "quote": "MROUND rounds up, away from zero, if the remainder of dividing number by the specified multiple is greater than or equal to half the value of multiple .",
+      "supports": "the rule for which multiple is chosen"
+    },
+    {
+      "url": "https://dax.guide/mround/",
+      "quote": "MROUND returns the nearer multiple",
+      "supports": "the example table shows 7 giving 6 with the multiple 3"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "7 / 3 leaves remainder 1, less than half of 3 (1.5), so MROUND rounds down to 6. 8 / 3 leaves remainder 2, more than 1.5, so it rounds up to 9. The return value is a decimal number.",
+  "tags": [
+    "math-functions",
+    "mround"
+  ]
+}

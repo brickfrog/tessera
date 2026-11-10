@@ -1,0 +1,51 @@
+{
+  "title": "DATEADD of the last days of a shorter month reaches the end of the longer month",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = DATEADD ( 'Date'[Date], 1, MONTH ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ) ), 'Date'[Date] >= DATE ( 2024, 2, 25 ) && 'Date'[Date] <= DATE ( 2024, 2, 29 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2024-03-25T00:00:00",
+          "2024-03-31T00:00:00",
+          7
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/dateadd/",
+      "quote": "DATEADD has a quite complex logic to move months and quarters",
+      "supports": "the example moves 2008-02-25..29 forward one month and shows 2008-03-25 to 2008-03-31, seven dates"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "If not all the days of the month are selected, then each day is shifted by the number of intervals specified.",
+      "supports": "a partly selected month moves day by day"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "DAX Guide shows this very shape for the leap February of 2008: the five days February 25 to 29 moved forward one month give the seven days March 25 to 31, because the selection ends on the last day of February. Applied to 2024: March 25 to 31, 7 days.",
+  "uncertain": true,
+  "alternative": "By the rule SQLBI states for a partly selected month (each day shifted on its own) the result would be March 25 to 29: [Max] 2024-03-29T00:00:00 and [Days] 5.",
+  "tags": [
+    "time-intelligence",
+    "dateadd",
+    "leap-year"
+  ]
+}

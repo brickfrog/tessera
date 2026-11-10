@@ -1,0 +1,50 @@
+{
+  "title": "A nested GROUPBY aggregates a column computed by the inner one",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "GROUPBY (",
+    "    GROUPBY ( Sales, Product[Category], Product[Product], \"Amt\", SUMX ( CURRENTGROUP (), Sales[Amount] ) ),",
+    "    Product[Category],",
+    "    \"Max Product Amt\", MAXX ( CURRENTGROUP (), [Amt] )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "[Max Product Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Vehicles",
+          400.0
+        ],
+        [
+          "Accessories",
+          80.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/nested-grouping-using-groupby-vs-summarize/",
+    "quote": "You have to use a new function, CURRENTGROUP , which enables the access to the internal group, so you have the table argument for an aggX function",
+    "supports": "the article shows this nested pattern: an inner GROUPBY computing a column and an outer MAXX over CURRENTGROUP"
+  },
+  "confidence": "derived",
+  "derivation": "Inner groups: Vehicles Bike 100 + 200 + 100 = 400; Accessories Helmet 40 + 20 = 60; Accessories Lock 50 + 30 = 80. Outer maximum per category: Vehicles 400, Accessories 80.",
+  "tags": [
+    "groupby",
+    "currentgroup",
+    "maxx",
+    "sumx",
+    "nested"
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "title": "Inside SUMMARIZE, removing the filter on the group-by column does not widen the result: the cluster filters every column",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZE (",
+    "    Sales,",
+    "    Product[Color],",
+    "    \"Sales\", SUM ( Sales[Amount] ),",
+    "    \"All Sales\", CALCULATE ( SUM ( Sales[Amount] ), REMOVEFILTERS ( Product[Color] ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        },
+        {
+          "name": "[All Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0,
+          460.0
+        ],
+        [
+          "Blue",
+          80.0,
+          80.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/all-the-secrets-of-summarize/",
+      "quote": "Therefore, despite the removal of the filter from Product[Color] by REMOVEFILTERS , both Sales and All Sales calculations produce the same result.",
+      "supports": "the article shows this query shape and says both columns are equal"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/all-the-secrets-of-summarize/",
+      "quote": "it creates a filter context using all the columns in the cluster, filtering the values that are present in the cluster",
+      "supports": "the filter is on every column of the expanded Sales table, not just the colour"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows by product colour (Bike and Helmet are Red, Lock is Blue, Scooter is Green): rows 1, 2, 3, 5, 7 are Red, rows 4, 6 are Blue, none is Green. Red cluster: 100 + 40 + 20 + 200 + 100 = 460; Blue cluster: 50 + 30 = 80. The cluster filter holds every column of the Sales rows in it (SalesKey included), so REMOVEFILTERS on Product[Color] leaves the same rows visible and All Sales equals Sales. The intuitive reading (540 in All Sales) is what the article warns against.",
+  "tags": [
+    "summarize",
+    "calculate",
+    "removefilters",
+    "clustering",
+    "expanded-table"
+  ],
+  "notes": "This is why extension columns in SUMMARIZE are discouraged."
+}

@@ -1,0 +1,58 @@
+{
+  "title": "A variable that saves the outer value gives the same result as EARLIER",
+  "model": "sales",
+  "query": [
+    "EVALUATE ADDCOLUMNS ( VALUES ( Sales[Quantity] ),",
+    "  \"RT Rows\", VAR CurrentQuantity = Sales[Quantity] RETURN COUNTROWS ( FILTER ( Sales, Sales[Quantity] <= CurrentQuantity ) ) )",
+    "ORDER BY Sales[Quantity]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Sales[Quantity]",
+          "type": "int64"
+        },
+        {
+          "name": "[RT Rows]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          3
+        ],
+        [
+          2,
+          5
+        ],
+        [
+          3,
+          6
+        ],
+        [
+          5,
+          7
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/earlier/",
+    "quote": "EARLIER is superseded by a careful usage of variables.",
+    "supports": "the page shows the same result for the VAR version of its EARLIER query"
+  },
+  "confidence": "derived",
+  "derivation": "CurrentQuantity is the quantity of the ADDCOLUMNS row, evaluated before FILTER opens its row context. Rows of Sales with a quantity up to it: 1 gives 3 (rows 1, 3, 7), 2 gives 5 (plus rows 2, 5), 3 gives 6 (plus row 6), 5 gives 7 (plus row 4).",
+  "tags": [
+    "var",
+    "addcolumns",
+    "values",
+    "countrows",
+    "filter",
+    "row-context",
+    "order-by"
+  ]
+}

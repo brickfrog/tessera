@@ -1,0 +1,28 @@
+{
+  "title": "A referenced variable is evaluated even when only an untaken IF branch uses it",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Test] = VAR Err = ERROR ( \"evaluated\" ) VAR NumCustomers = DISTINCTCOUNT ( Sales[CustomerKey] ) VAR Result = IF ( NumCustomers < 0, Err ) RETURN Result",
+    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Test\", [Test] )"
+  ],
+  "expected": {
+    "error": "Err is referenced, so ERROR ( \"evaluated\" ) is evaluated when the variable is, whatever the condition"
+  },
+  "source": {
+    "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+    "quote": "even though we never return the Err variable, DAX needs to evaluate its value",
+    "supports": "the article shows this measure (Test 1) producing an error"
+  },
+  "confidence": "derived",
+  "derivation": "The measure is Test 1 of the article, evaluated per color as in a report. The number of customers is never below 0 (Red 3, Blue 2, Green none), but Err is referenced in the code, so it is evaluated and the query fails.",
+  "tags": [
+    "var",
+    "error",
+    "if",
+    "eager-evaluation",
+    "distinctcount",
+    "define-measure",
+    "summarizecolumns"
+  ],
+  "notes": "The article notes the engine can remove the reference when the condition is known before execution (its Test 3, with COUNTROWS ( ALL ( ... ) )); DISTINCTCOUNT of a column is the form it shows failing."
+}

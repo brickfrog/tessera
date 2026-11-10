@@ -1,0 +1,32 @@
+{
+  "title": "A calculation item does nothing to an expression that has no measure reference",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( SUM ( T[Qty] ), Adjust[Adjustment] = \"Plus 2\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          60
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-the-application-of-calculation-items/",
+    "quote": "Without a measure reference, a calculation item does not apply any modification.",
+    "supports": "SUM ( T[Qty] ) is not a measure reference, so Plus 2 is not applied"
+  },
+  "confidence": "derived",
+  "derivation": "SUM ( T[Qty] ) = 60, unchanged: not 62.",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "sum"
+  ]
+}

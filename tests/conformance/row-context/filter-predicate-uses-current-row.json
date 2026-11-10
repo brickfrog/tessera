@@ -1,0 +1,46 @@
+{
+  "title": "FILTER evaluates its predicate in the row context of each row",
+  "model": "sales",
+  "query": "EVALUATE FILTER ( ALL ( 'Product'[Product], 'Product'[Price] ), 'Product'[Price] > 15 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          100.0
+        ],
+        [
+          "Helmet",
+          20.0
+        ],
+        [
+          "Scooter",
+          50.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/filter/",
+    "quote": "FILTER can filter rows from a table by using any expression valid in the row context.",
+    "supports": "FILTER keeps the rows for which the expression, evaluated in the row context, is true"
+  },
+  "confidence": "derived",
+  "derivation": "Prices: Bike 100, Helmet 20, Lock 10, Scooter 50. Only Lock (10) fails Price > 15.",
+  "tags": [
+    "filter",
+    "all",
+    "row-context",
+    "iterator"
+  ]
+}

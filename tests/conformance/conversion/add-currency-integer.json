@@ -1,0 +1,45 @@
+{
+  "title": "Currency + integer is a currency",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( 1.5 ) + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if an addition operation uses a real number in combination with currency data, DAX converts both values to REAL and returns the result as REAL",
+      "supports": "the Addition (+) table of result types: INTEGER+INTEGER is INTEGER, INTEGER+REAL is REAL, CURRENCY+INTEGER is CURRENCY, CURRENCY+REAL is REAL"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "When a decimal is involved, the result is decimal. Otherwise, when a currency is involved then the result is currency. The result is integer only when both operands are also integers.",
+      "supports": "the same rule for + and -"
+    },
+    {
+      "url": "https://dax.guide/currency/",
+      "quote": "Returns the value as a currency data type",
+      "supports": "CURRENCY ( x ) is a currency (fixed decimal) value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CURRENCY ( 1.5 ) is a currency and 1 an integer. CURRENCY + INTEGER is CURRENCY: 1.5 + 1 = 2.5.",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "result-type",
+    "currency"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "title": "CROSSJOIN returns every combination of the rows of its tables",
+  "model": "sales",
+  "query": "EVALUATE CROSSJOIN ( VALUES ( Product[Category] ), VALUES ( Customer[Country] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Vehicles",
+          "US"
+        ],
+        [
+          "Vehicles",
+          "JP"
+        ],
+        [
+          "Vehicles",
+          "FR"
+        ],
+        [
+          "Accessories",
+          "US"
+        ],
+        [
+          "Accessories",
+          "JP"
+        ],
+        [
+          "Accessories",
+          "FR"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/crossjoin-function-dax",
+    "quote": "The total number of rows returned by CROSSJOIN() is equal to the product of the number of rows from all tables in the arguments",
+    "supports": "rows multiply, columns add"
+  },
+  "confidence": "derived",
+  "derivation": "2 categories times 3 countries = 6 rows, with one column from each table.",
+  "tags": [
+    "crossjoin",
+    "values"
+  ]
+}

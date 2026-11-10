@@ -1,0 +1,54 @@
+{
+  "title": "DATESYTD with the year end \"6/30\" starts on July 1",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = DATESYTD ( 'Date'[Date], \"6/30\" ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] = DATE ( 2024, 2, 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2023-07-01T00:00:00",
+          "2024-02-10T00:00:00",
+          225,
+          750.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/datesytd-function-dax",
+      "quote": "A literal string with a date that defines the year-end date. The default is December 31.",
+      "supports": "the second argument moves the year end"
+    },
+    {
+      "url": "https://dax.guide/datesytd/",
+      "quote": "DATESBETWEEN ( <Dates>, STARTOFYEAR ( LASTDATE ( <Dates> )[, <YearEndDate>] ), LASTDATE ( <Dates> ) )",
+      "supports": "the definition: from the start of the (fiscal) year of the last date"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "With the year ending June 30, the year that contains 2024-02-10 began on 2023-07-01. July to December 2023 is 184 days, January 31, February 10: 225 days. Sales: 2023 Jul 1 70 + Dec 31 80 + 2024 Jan 300 + Feb 10 300 = 750 (the calendar YTD would be 600).",
+  "tags": [
+    "time-intelligence",
+    "datesytd",
+    "fiscal-year"
+  ]
+}

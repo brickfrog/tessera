@@ -1,0 +1,30 @@
+{
+  "title": "INT ( 1.5 ) is 1",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( 1.5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/int-function-dax",
+    "quote": "The following expression rounds the value to 1. If you use the ROUND function, the result would be 2.",
+    "supports": "the example = INT(1.5) gives 1; Return value: a whole number"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "int"
+  ]
+}

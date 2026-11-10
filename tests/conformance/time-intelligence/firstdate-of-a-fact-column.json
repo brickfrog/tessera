@@ -1,0 +1,40 @@
+{
+  "title": "FIRSTDATE of a fact column returns the first date that has rows in the filter context",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( FIRSTDATE ( Sales[Date] ), 'Date'[Year] = 2024 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Sales[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-15T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/firstdate/",
+      "quote": "The result table includes only dates that exist in the dates column.",
+      "supports": "only dates present in the column given are considered"
+    },
+    {
+      "url": "https://dax.guide/firstdate/",
+      "quote": "The result of time intelligence functions has the same data lineage as the date column or table provided as an argument.",
+      "supports": "the column is Sales[Date]"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "With Date[Year] = 2024 the visible Sales rows are those of 2024; the earliest Sales[Date] among them is 2024-01-15 (not January 1, which has no sale).",
+  "tags": [
+    "time-intelligence",
+    "firstdate",
+    "relationship",
+    "filter-propagation"
+  ]
+}

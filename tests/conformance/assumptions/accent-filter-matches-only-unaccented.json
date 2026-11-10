@@ -1,0 +1,42 @@
+{
+  "title": "Filtering Txt = \"e\" over e, é, E keeps e and E but not é",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( Accent, Accent[Txt] = \"e\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/dt/string/",
+      "quote": "By default, the comparison between strings is case-insensitive and accent-sensitive",
+      "supports": "the default comparison ignores case and respects accents; the page gives \"e\" and \"è\" as different"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The engine that stores and queries data in Power BI is case insensitive, and treats different capitalization of letters as the same value",
+      "supports": "text that differs only in case is the same value, for comparison and for storage"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Accent[Txt] holds e (Id 1), é (Id 2), E (Id 3). = ignores case, so rows 1 and 3 equal \"e\". It does not ignore accents, so row 2 does not. 2 rows. An accent-insensitive comparison would give 3.",
+  "tags": [
+    "assumption:collation-accents",
+    "filter",
+    "countrows",
+    "operator-equals",
+    "collation",
+    "case-insensitive"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "title": "COUNTROWS ( ALLNOBLANKROW ( table ) ) does not count the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( ALLNOBLANKROW ( Product ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "ALLNOBLANKROW does not return the blank row",
+      "supports": "ALLNOBLANKROW leaves the blank row out"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/allnoblankrow-function-dax",
+      "quote": "returns all rows but the blank row, or all distinct values of a column but the blank row",
+      "supports": "all rows but the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows 3 and 4 have ProductKey 9, which Product lacks, so the relationship is invalid and Product gets a blank row. ALLNOBLANKROW ( Product ) returns only the 3 stored rows.",
+  "tags": [
+    "countrows",
+    "allnoblankrow",
+    "blank-row",
+    "relationship"
+  ]
+}

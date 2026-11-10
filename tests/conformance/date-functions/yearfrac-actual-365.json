@@ -1,0 +1,39 @@
+{
+  "title": "YEARFRAC on basis 3 divides the actual days by 365",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", YEARFRAC ( DATE ( 2011, 1, 1 ), DATE ( 2011, 12, 15 ), 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          0.9534246575342465
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-09,
+  "source": [
+    {
+      "url": "https://dax.guide/yearfrac/",
+      "quote": "Different standards produce different fractions",
+      "supports": "the example shows 0.9534 for these dates on basis 3 (Actual / 365)"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/yearfrac-function-dax",
+      "quote": "3 - Actual/365",
+      "supports": "basis 3"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "January 1 to December 15, 2011 is 348 actual days; 348 / 365 = 0.95342..., which the page prints as 0.9534.",
+  "tags": [
+    "date-functions",
+    "yearfrac"
+  ]
+}

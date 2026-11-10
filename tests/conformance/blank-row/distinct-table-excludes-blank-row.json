@@ -1,0 +1,59 @@
+{
+  "title": "DISTINCT of a table does not return the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE DISTINCT ( Product )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Red"
+        ],
+        [
+          2,
+          "Lock",
+          "Blue"
+        ],
+        [
+          3,
+          "Bell",
+          "Red"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/distinct/",
+      "quote": "DISTINCT returns the distinct rows in the table",
+      "supports": "DISTINCT of a table returns its distinct rows; the page's example counts none for the blank row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "the VALUES function treats the blank row as a regular row, returning it. On the other hand, DISTINCT never returns the blank row",
+      "supports": "DISTINCT never returns the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows 3 and 4 have ProductKey 9, which Product lacks, so the relationship is invalid and Product gets a blank row. DISTINCT ( Product ) returns only the 3 stored rows, which are all different.",
+  "tags": [
+    "distinct",
+    "blank-row",
+    "relationship"
+  ]
+}

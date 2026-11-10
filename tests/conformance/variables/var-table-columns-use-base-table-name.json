@@ -1,0 +1,33 @@
+{
+  "title": "A column of a table variable is referenced with the name of its base table",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR Expensive = FILTER ( Product, Product[Price] >= 50 ) RETURN SUMX ( Expensive, Product[Price] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          150.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/variables-in-dax/",
+    "quote": "In order to reference a column inside a variable, you need to reference the column name with the base table prefix.",
+    "supports": "Product[Price] is how the Price column of the variable is referenced"
+  },
+  "confidence": "derived",
+  "derivation": "Prices: Bike 100, Helmet 20, Lock 10, Scooter 50. Expensive holds Bike and Scooter; the sum of Product[Price] over it is 100 + 50 = 150, a fixed decimal.",
+  "tags": [
+    "var",
+    "table-variable",
+    "sumx",
+    "filter"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "title": "COUNTBLANK returns BLANK, not 0, when no value is blank",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTBLANK ( V[Id] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/countblank-function-dax",
+    "quote": "If there are no rows, or if there are rows but none of them is blank, the function returns a blank. COUNTBLANK never returns 0.",
+    "supports": "no blank cells gives BLANK"
+  },
+  "confidence": "published",
+  "derivation": "V[Id] holds 1 to 7, none BLANK.",
+  "tags": [
+    "countblank",
+    "blank"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

@@ -1,0 +1,40 @@
+{
+  "title": "LOOKUPVALUE ignores a filter on the table of the result column",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( LOOKUPVALUE ( Product[Product], Product[ProductKey], 3 ), Product[Color] = \"Red\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Lock"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/lookupvalue-function-dax",
+      "quote": "LOOKUPVALUE removes filters from the table that contains result_columnName",
+      "supports": "filters on the result column's table are removed, as by ALL"
+    },
+    {
+      "url": "https://dax.guide/lookupvalue/",
+      "quote": "LOOKUPVALUE removes the filters on the table of Result_ColumnName with ALL",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "ProductKey 3 is Lock, which is Blue. The outer filter Product[Color] = Red is on the table of the result column, so LOOKUPVALUE removes it and finds Lock.",
+  "tags": [
+    "lookupvalue",
+    "calculate",
+    "filter-removal"
+  ],
+  "notes": "An engine that kept the outer filter would return BLANK."
+}

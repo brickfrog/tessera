@@ -1,0 +1,41 @@
+{
+  "title": "COUNTBLANK over a text column counts the empty string as well as BLANK",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", COUNTBLANK ( Empty[Txt] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/countblank/",
+      "quote": "Any empty string is considered as a blank for COUNTBLANK purposes, even though ISBLANK would return FALSE for an empty string",
+      "supports": "COUNTBLANK counts empty strings"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/countblank-function-dax",
+      "quote": "You can use columns containing any type of data, but only blank cells are counted",
+      "supports": "the other reading: only BLANK is counted"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Empty[Txt] holds '' (Id 1), BLANK (Id 2), x (Id 3). DAX Guide says COUNTBLANK counts empty strings as blanks: rows 1 and 2, so 2.",
+  "uncertain": true,
+  "alternative": "The Microsoft page says only blank cells are counted. Read strictly, only row 2 counts and the result is 1.",
+  "tags": [
+    "countblank",
+    "empty-string",
+    "blank"
+  ]
+}

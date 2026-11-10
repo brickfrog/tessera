@@ -1,0 +1,39 @@
+{
+  "title": "A date plus an integer is a date that many days later",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2020, 10, 15 ) + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2020-10-16T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "INTEGER CURRENCY REAL Date/time",
+      "supports": "the addition table gives Date/time for Date/time + INTEGER"
+    },
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "Thus, the following expression returns the current date plus one day (exactly 24 hours):",
+      "supports": "adding 1 adds one day"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "October 15, 2020 plus 1 day is October 16, 2020; the result type of Date/time + INTEGER is Date/time.",
+  "tags": [
+    "date-functions",
+    "operator-add",
+    "result-type"
+  ]
+}

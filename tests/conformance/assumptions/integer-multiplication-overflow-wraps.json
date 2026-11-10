@@ -1,0 +1,34 @@
+{
+  "title": "3037000500 * 3037000500 wraps around to -9223372036709301616",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 3037000500 * 3037000500 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -9223372036709301616
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/rounding-errors-with-different-data-types-in-dax/",
+    "quote": "there is an overflow condition, but there is no overflow error and the result is the least significant representable digits",
+    "supports": "integer sum, subtraction and multiplication wrap around on overflow instead of failing"
+  },
+  "confidence": "derived",
+  "derivation": "Both operands are integers, so the product is an integer. 3037000500 squared is 9223372037000250000, which is above 2^63 - 1 = 9223372036854775807. There is no overflow error; the result is the low 64 bits: 9223372037000250000 - 2^64 = -9223372036709301616.",
+  "tags": [
+    "assumption:integer-overflow",
+    "operator-multiply",
+    "int64",
+    "overflow"
+  ],
+  "notes": "If multiplication overflow were an error the query would fail; if it promoted to a decimal number the result would be the double 9.22337203700025E+18."
+}

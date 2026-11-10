@@ -1,0 +1,49 @@
+{
+  "title": "The values of a table constructor filter nothing, whatever they contain",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( { \"Red\", \"Blue\" }, \"Amt\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          540.0
+        ],
+        [
+          "Blue",
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+      "quote": "The query returns the same value in the Amt column for all the rows",
+      "supports": "the article does this with DATATABLE: strings with no lineage give the same value on every row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+      "quote": "What really matters is only the data lineage of a column, which is the original column the values have been retrieved from",
+      "supports": "the content of a column does not matter, only its lineage"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The constructor's [Value] column has no lineage. Context transition on it filters no model column: both rows get the total, 100 + 40 + 20 + 50 + 200 + 30 + 100 = 540.",
+  "tags": [
+    "addcolumns",
+    "table-constructor",
+    "lineage",
+    "context-transition"
+  ]
+}

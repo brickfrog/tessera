@@ -1,0 +1,34 @@
+{
+  "title": "ROUND ( 2.5, 0 ) is 3 as a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUND ( 2.5, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          3.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/round-function-dax",
+    "quote": "Ties are broken by rounding half away from zero (also known as commercial rounding)",
+    "supports": "ROUND rounds a half away from zero; its return value is a decimal number"
+  },
+  "confidence": "derived",
+  "derivation": "2.5 is exact in binary, so it is a true tie between 2 and 3. Half away from zero gives 3; ROUND returns a decimal number, so 3.0. Round half to even would give 2.0.",
+  "tags": [
+    "assumption:convert-integer-rounding",
+    "round",
+    "math-functions",
+    "rounding",
+    "tie"
+  ]
+}

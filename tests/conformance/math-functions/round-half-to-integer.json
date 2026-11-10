@@ -1,0 +1,44 @@
+{
+  "title": "ROUND ( 2.5, 0 ) is 3 and ROUND ( -2.5, 0 ) is -3",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"pos\", ROUND ( 2.5, 0 ), \"neg\", ROUND ( -2.5, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[pos]",
+          "type": "double"
+        },
+        {
+          "name": "[neg]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          3.0,
+          -3.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/round-function-dax",
+      "quote": "Ties are broken by rounding half away from zero (also known as commercial rounding).",
+      "supports": "ROUND breaks ties away from zero"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/round-function-dax",
+      "quote": "If num_digits is 0, the number is rounded to the nearest integer.",
+      "supports": "zero digits rounds to an integer; the return value is documented as a decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "2.5 and -2.5 are exact ties between two integers. Half away from zero gives 3 and -3 (banker's rounding would give 2 and -2). ROUND returns a decimal number, so the results are the doubles 3.0 and -3.0.",
+  "tags": [
+    "math-functions",
+    "round",
+    "rounding-half-away-from-zero"
+  ]
+}

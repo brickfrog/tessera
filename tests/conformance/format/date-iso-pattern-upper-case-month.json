@@ -1,0 +1,40 @@
+{
+  "title": "FORMAT with \"yyyy-MM-dd\" (upper-case MM) gives the month",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( DATE ( 2019, 3, 28 ), \"yyyy-MM-dd\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "2019-03-28"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Display the month as a number with a leading zero (01-12). If mm immediately follows h or hh , minute rather than the month is displayed.",
+      "supports": "mm is documented in lower case only"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "The format strings supported as an argument to the DAX FORMAT function are based on the format strings used by Visual Basic (OLE Automation), not on the format strings used by the .NET Framework.",
+      "supports": "Visual Basic format characters are not case-sensitive, unlike .NET where MM is month and mm is minute"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The pages document mm, in lower case, as the month. In Visual Basic format strings the case of m does not matter, so MM is read as mm: \"2019-03-28\".",
+  "uncertain": true,
+  "alternative": "No page says that upper-case MM is accepted. If the engine treats MM as literal text the result would be \"2019-MM-28\".",
+  "tags": [
+    "format",
+    "custom-date-format"
+  ]
+}

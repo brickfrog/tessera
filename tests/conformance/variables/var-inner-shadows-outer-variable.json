@@ -1,0 +1,36 @@
+{
+  "title": "An inner variable hides an outer variable of the same name inside its block only",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VAR x = 1 RETURN x + SUMX ( T, VAR x = T[n] * 10 RETURN x ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          61
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+    "quote": "the outer Result is not visible in the inner block because it is being hidden by a closer variable with the same name",
+    "supports": "a closer variable hides an outer variable with the same name"
+  },
+  "confidence": "derived",
+  "derivation": "Inside SUMX the inner x (10, 20, 30) hides the outer x: the sum is 60. Outside the inner block x is still 1: 1 + 60 = 61.",
+  "uncertain": true,
+  "alternative": "The article reuses a name in a nested block, but there the outer variable is still being defined; no source shows redefining a variable that is already in scope. If the engine rejects that, the query fails with an error instead of returning 61.",
+  "tags": [
+    "var",
+    "nested-var",
+    "sumx",
+    "variable-scope",
+    "shadowing"
+  ]
+}

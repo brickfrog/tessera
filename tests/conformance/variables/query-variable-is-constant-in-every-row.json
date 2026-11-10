@@ -1,0 +1,65 @@
+{
+  "title": "A DEFINE VAR variable is evaluated once, outside any row or filter of the query",
+  "model": "sales",
+  "query": [
+    "DEFINE VAR Total = [Sales Amount]",
+    "EVALUATE ADDCOLUMNS ( VALUES ( Customer[Country] ), \"Total\", Total, \"Amount\", [Sales Amount] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        },
+        {
+          "name": "[Total]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "US",
+          540.0,
+          310.0
+        ],
+        [
+          "JP",
+          540.0,
+          230.0
+        ],
+        [
+          "FR",
+          540.0,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/st/var/",
+      "quote": "If VAR is used in the DEFINE section of an EVALUATE statement, it can be used in any expression of the statement and the RETURN keyword cannot be used.",
+      "supports": "a variable of the DEFINE section can be used in the EVALUATE"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+      "quote": "Variables are evaluated in the filter context where they are defined, and their evaluation happens at most once.",
+      "supports": "a variable is evaluated where it is defined, not where it is used"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Total is defined with no filter: 540. In each row it is that value. The measure does a context transition per country: US is Ann and Bob, rows 1, 2, 7, 3, 4 = 100 + 40 + 100 + 20 + 50 = 310; JP is Cho, rows 5, 6 = 230; FR is Dee, no sales, BLANK.",
+  "tags": [
+    "var",
+    "define",
+    "query-variable",
+    "addcolumns",
+    "variable-evaluated-once",
+    "context-transition"
+  ]
+}

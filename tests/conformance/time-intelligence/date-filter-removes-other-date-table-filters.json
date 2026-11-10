@@ -1,0 +1,47 @@
+{
+  "title": "A time intelligence filter on the date key removes a filter on another column of the Date table",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"Month\", [Sales], \"YTD\", CALCULATE ( [Sales], DATESYTD ( 'Date'[Date] ) ) ), 'Date'[YearMonth] = 202403 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Month]",
+          "type": "decimal"
+        },
+        {
+          "name": "[YTD]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          500.0,
+          1500.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/time-intelligence-in-power-bi-desktop/",
+      "quote": "this ALL statement is automatically applied when you apply a filter over a column of Date type that is the primary key in a relationship",
+      "supports": "a filter on the date key removes the filters on the other columns of the Date table"
+    },
+    {
+      "url": "https://dax.guide/datesytd/",
+      "quote": "Returns a set of dates in the year up to the last date visible in the filter context.",
+      "supports": "DATESYTD returns January 1 to March 31, 2024"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The outer filter is on Date[YearMonth], not on Date[Date]. DATESYTD returns January 1 to March 31, 2024. Date[Date] is a date column and the key of the relationship from Sales, so the filter on it also removes the filter on YearMonth: Jan 300 + Feb 700 + Mar 500 = 1500. If the YearMonth filter stayed, the result would be March only, 500.",
+  "tags": [
+    "time-intelligence",
+    "datesytd",
+    "calculate",
+    "date-table-auto-all",
+    "filter-overwrite"
+  ],
+  "notes": "The model does not mark Date as a date table; the behaviour comes from Date[Date] being a dateTime column on the one side of a relationship."
+}

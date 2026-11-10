@@ -1,0 +1,38 @@
+{
+  "title": "A backslash makes the next character literal: \"\\QQ yyyy\" gives \"Q1 2019\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( DATE ( 2019, 3, 28 ), \"\\QQ yyyy\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Q1 2019"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "Use a backslash (\\) to display the next character",
+      "supports": "the example shows \"Date (Q)\", FORMAT ( DATE ( 2019, 3, 28 ), \"\\QQ yyyy\" ) as Q1 2019"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Display the quarter of the year as a number (1-4).",
+      "supports": "q is the quarter"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "escape"
+  ]
+}

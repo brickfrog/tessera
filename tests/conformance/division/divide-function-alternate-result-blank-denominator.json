@@ -1,0 +1,34 @@
+{
+  "title": "DIVIDE ( 5, BLANK, 9 ) is 9: the alternate result also replaces a BLANK denominator",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DIVIDE ( 5, BLANK (), 9 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          9
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-divide-function-operator",
+    "quote": "When an alternate result is passed in, it's returned instead of BLANK",
+    "supports": "the alternate result replaces the BLANK returned for a zero or BLANK denominator"
+  },
+  "confidence": "derived",
+  "derivation": "The denominator is BLANK, which without a third argument gives BLANK. The alternate result 9 is returned instead.",
+  "tags": [
+    "division",
+    "divide",
+    "divide-by-zero",
+    "alternate-result",
+    "blank"
+  ],
+  "notes": "The column's type is not asserted, as in divide-function-alternate-result."
+}

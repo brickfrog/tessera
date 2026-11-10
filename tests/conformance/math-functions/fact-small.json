@@ -1,0 +1,43 @@
+{
+  "title": "FACT ( 5 ) is 120 and FACT ( 0 ) is 1",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"five\", FACT ( 5 ), \"zero\", FACT ( 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[five]",
+          "type": "double"
+        },
+        {
+          "name": "[zero]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          120.0,
+          1.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/fact-function-dax",
+      "quote": "The following table shows the expected results:",
+      "supports": "the table gives 1 for 0 and 120 for 5; Return value: a decimal number"
+    },
+    {
+      "url": "https://dax.guide/fact/",
+      "quote": "The factorial of the argument in a decimal data type.",
+      "supports": "the result is a decimal number"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "fact",
+    "result-type"
+  ]
+}

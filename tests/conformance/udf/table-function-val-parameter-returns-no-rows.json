@@ -1,0 +1,46 @@
+{
+  "title": "The same table function with a VAL parameter compares one value with itself and returns no rows",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION BestCustomers = ( metricVal : VAL ) =>",
+    "  VAR AverageMetric = AVERAGEX ( Customer, metricVal )",
+    "  VAR BestCustomersResult = FILTER ( Customer, metricVal > AverageMetric )",
+    "  RETURN BestCustomersResult",
+    "EVALUATE BestCustomers ( [Sales Amount] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[CustomerKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Customer[Customer]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": []
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+    "quote": "Changing the parameter type to VAL produces an empty result.",
+    "supports": "the article gives this function and says it returns an empty table"
+  },
+  "confidence": "derived",
+  "derivation": "metricVal is evaluated once by the caller: 540. The average of 540 over the four customers is 540, and 540 > 540 is FALSE for every row, so the table is empty.",
+  "tags": [
+    "udf",
+    "define-function",
+    "val-parameter",
+    "table-function",
+    "averagex",
+    "filter",
+    "empty-table"
+  ]
+}

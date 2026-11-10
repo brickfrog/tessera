@@ -1,0 +1,65 @@
+{
+  "title": "A column reference in ADDCOLUMNS gives the value of the current row",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( ALL ( 'Product'[Product], 'Product'[Price] ), \"Double\", 'Product'[Price] * 2 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Double]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          100.0,
+          200.0
+        ],
+        [
+          "Helmet",
+          20.0,
+          40.0
+        ],
+        [
+          "Lock",
+          10.0,
+          20.0
+        ],
+        [
+          "Scooter",
+          50.0,
+          100.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/addcolumns/",
+      "quote": "New columns are computed in the row context of ADDCOLUMNS",
+      "supports": "the added column is computed in the row context of ADDCOLUMNS"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The operator determines the type of conversion DAX performs by casting the values it requires before doing the requested operation.",
+      "supports": "the multiplication table gives CURRENCY * INTEGER as CURRENCY"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "ALL over two columns returns the 4 existing combinations of Product and Price (sales has no orphans, so no blank row). Each row doubles its own Price: 100 * 2 = 200, 20 * 2 = 40, 10 * 2 = 20, 50 * 2 = 100.",
+  "tags": [
+    "addcolumns",
+    "all",
+    "row-context",
+    "iterator"
+  ]
+}

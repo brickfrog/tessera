@@ -1,0 +1,37 @@
+{
+  "title": "CONTAINSROW needs the whole row to match, not each value somewhere",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"pair\", CONTAINSROW ( { ( 2023, 12 ), ( 2024, 1 ) }, 2024, 1 ), \"mixed\", CONTAINSROW ( { ( 2023, 12 ), ( 2024, 1 ) }, 2023, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[pair]",
+          "type": "boolean"
+        },
+        {
+          "name": "[mixed]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true,
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/containsrow/",
+    "quote": "Returns TRUE if there exists at least one row where all columns have specified values.",
+    "supports": "all the columns of one row must match"
+  },
+  "confidence": "derived",
+  "derivation": "(2024, 1) is the second row: TRUE. (2023, 1) takes 2023 from the first row and 1 from the second; no single row holds both: FALSE.",
+  "tags": [
+    "containsrow",
+    "tuple",
+    "table-constructor"
+  ]
+}

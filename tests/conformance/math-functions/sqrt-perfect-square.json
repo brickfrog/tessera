@@ -1,0 +1,39 @@
+{
+  "title": "SQRT ( 25 ) is 5, a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SQRT ( 25 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          5.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/sqrt-function-dax",
+      "quote": "Returns the square root of a number.",
+      "supports": "the square root of 25 is 5; Return value: a decimal number"
+    },
+    {
+      "url": "https://dax.guide/sqrt/",
+      "quote": "SQRT computes the square root of a number",
+      "supports": "the example table lists 25 with SQRT 5.00; Return values: a single decimal value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The square root of 25 is exactly 5. SQRT returns a decimal number even for an integer argument: 5.0.",
+  "tags": [
+    "math-functions",
+    "sqrt",
+    "result-type"
+  ]
+}

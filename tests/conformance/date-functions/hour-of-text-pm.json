@@ -1,0 +1,31 @@
+{
+  "title": "HOUR of a text date and time uses the 24-hour clock",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", HOUR ( \"March 3, 2008 3:00 PM\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          15
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/hour-function-dax",
+    "quote": "The following example returns 15, meaning the hour corresponding to 3 PM in a 24-hour clock.",
+    "supports": "the example"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "hour",
+    "implicit-conversion"
+  ]
+}

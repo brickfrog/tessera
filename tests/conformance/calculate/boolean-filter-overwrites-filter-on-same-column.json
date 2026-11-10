@@ -1,0 +1,69 @@
+{
+  "title": "A boolean filter argument overwrites the existing filter on the same column",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Red Sales] = CALCULATE ( [Sales Amount], 'Product'[Color] = \"Red\" )",
+    "EVALUATE SUMMARIZECOLUMNS ( 'Product'[Color], \"Sales Amount\", [Sales Amount], \"Red Sales\", [Red Sales] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales Amount]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Red Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0,
+          460.0
+        ],
+        [
+          "Blue",
+          80.0,
+          460.0
+        ],
+        [
+          "Green",
+          null,
+          460.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "The compact syntax (boolean) is expanded in the full syntax",
+      "supports": "the page's first example runs this query on its own model: Red Sales shows the Red amount on every color row"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/calculate-function-dax",
+      "quote": "If the columns or tables are already in the filter context, the existing filters are overwritten by the new filters to evaluate the CALCULATE expression.",
+      "supports": "a filter on a column already in the filter context is overwritten"
+    },
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "If all expressions evaluate to BLANK for a row, that row is not included in the table returned.",
+      "supports": "the Green row is kept because Red Sales is not blank for it"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales Amount: Red 460 (rows 1, 2, 3, 5, 7), Blue 80 (rows 4, 6), Green BLANK. Red Sales replaces the color filter of each row with Color = Red: 460 everywhere. Green has a non-blank Red Sales, so SUMMARIZECOLUMNS returns its row.",
+  "tags": [
+    "calculate",
+    "summarizecolumns",
+    "define-measure",
+    "filter-overwrite"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

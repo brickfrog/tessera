@@ -1,0 +1,19 @@
+{
+  "title": "UNICHAR ( 0 ) is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", UNICHAR ( 0 ) )",
+  "expected": {
+    "error": "UNICHAR of zero"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/unichar-function-dax",
+    "quote": "If number is zero (0), UNICHAR returns an error.",
+    "supports": "zero is documented as an error"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "unichar",
+    "error"
+  ]
+}

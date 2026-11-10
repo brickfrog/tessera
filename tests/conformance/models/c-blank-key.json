@@ -1,0 +1,91 @@
+{
+  "description": "Orphans of two kinds and a real BLANK in a dimension column. Product: Bike Red, Lock Blue, Bell with a BLANK Color. Sales row 3 has a BLANK ProductKey and row 4 has ProductKey 9, which Product lacks: both belong to Product's blank row. Amount: total 200; Bike 100, Lock 30, Bell none, blank row 70 (50 + 20).",
+  "tables": [
+    {
+      "name": "Product",
+      "columns": [
+        {
+          "name": "ProductKey",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Product",
+          "type": "string"
+        },
+        {
+          "name": "Color",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Red"
+        ],
+        [
+          2,
+          "Lock",
+          "Blue"
+        ],
+        [
+          3,
+          "Bell",
+          null
+        ]
+      ]
+    },
+    {
+      "name": "Sales",
+      "columns": [
+        {
+          "name": "SalesKey",
+          "type": "int64"
+        },
+        {
+          "name": "ProductKey",
+          "type": "int64"
+        },
+        {
+          "name": "Amount",
+          "type": "decimal"
+        }
+      ],
+      "measures": [
+        {
+          "name": "Sales Amount",
+          "expression": "SUM ( Sales[Amount] )"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          1,
+          100.0
+        ],
+        [
+          2,
+          2,
+          30.0
+        ],
+        [
+          3,
+          null,
+          50.0
+        ],
+        [
+          4,
+          9,
+          20.0
+        ]
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Sales[ProductKey]",
+      "to": "Product[ProductKey]"
+    }
+  ]
+}

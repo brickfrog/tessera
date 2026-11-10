@@ -1,0 +1,46 @@
+{
+  "title": "FORMAT ( 12345.67, \"Percent\" ) has no thousand separator and no space before the sign",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( 12345.67, \"Percent\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1234567.00%"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "FORMAT accepts a set of predefined format strings to format numbers",
+      "supports": "the example table lists each predefined format applied to 12345.67"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Displays number multiplied by 100 with a percent sign (%) appended immediately to the right; always displays two digits to the right of the decimal separator.",
+      "supports": "the table of predefined formats: the sign is appended immediately"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "\"Percent\" displays the number as a percentage (multiplied by 100) with formatting and the percent sign at the right of the number separated by a single space.",
+      "supports": "the example on the same page, which shows 1,234,567.00 %"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "12345.67 * 100 = 1234567 with two decimals. DAX Guide shows 1234567.00% for this formula and the table of predefined formats on Microsoft Learn agrees (sign appended immediately, no mention of separators).",
+  "uncertain": true,
+  "alternative": "The example at the top of the Microsoft Learn page shows \"1,234,567.00 %\", with thousand separators and a space before the sign.",
+  "tags": [
+    "format",
+    "predefined-numeric-format",
+    "percent"
+  ]
+}

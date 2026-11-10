@@ -1,0 +1,57 @@
+{
+  "title": "IN with a tuple matches both columns of the same row",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "FILTER (",
+    "    ALL ( 'Date'[Year], 'Date'[MonthNo] ),",
+    "    ( 'Date'[Year], 'Date'[MonthNo] ) IN { ( 2023, 12 ), ( 2024, 1 ), ( 2025, 2 ) }",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Year]",
+          "type": "int64"
+        },
+        {
+          "name": "Date[MonthNo]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2023,
+          12
+        ],
+        [
+          2024,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/containsrow/",
+      "quote": "( 'Date'[Year], 'Date'[MonthNumber] ) IN { ( 2018, 12 ), ( 2019, 1 ) }",
+      "supports": "the page gives the two-column form"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-the-in-operator-in-dax/",
+      "quote": "Please note that since we are searching for two columns, we need to use the full syntax that requires us to enclose different columns of the same row in parentheses.",
+      "supports": "the tuple syntax"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Date has (year, month) pairs (2023, 1), (2023, 2), (2023, 12), (2024, 1), (2024, 2), (2024, 3). The pairs (2023, 12) and (2024, 1) are in the list. (2023, 1) and (2024, 2) are not, although their year and their month each appear in the list, and (2025, 2) is not in Date.",
+  "tags": [
+    "in",
+    "containsrow",
+    "tuple",
+    "filter",
+    "all",
+    "table-constructor"
+  ]
+}

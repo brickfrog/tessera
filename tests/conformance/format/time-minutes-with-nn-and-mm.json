@@ -1,0 +1,43 @@
+{
+  "title": "In a time format nn is the minute, and mm after hh is the minute too",
+  "model": "scalar",
+  "query": "EVALUATE VAR DT = DATE ( 2020, 1, 2 ) + TIME ( 15, 30, 0 ) RETURN ROW ( \"nn\", FORMAT ( DT, \"hh:nn:ss\" ), \"mm\", FORMAT ( DT, \"hh:mm:ss\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[nn]",
+          "type": "string"
+        },
+        {
+          "name": "[mm]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "15:30:00",
+          "15:30:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "You can use simple date formatting composing the format string",
+      "supports": "the example shows hh:nn:ss and hh:mm:ss both as 15:30:00"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "If mm immediately follows h or hh , minute rather than the month is displayed.",
+      "supports": "the rule for mm"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "time"
+  ]
+}

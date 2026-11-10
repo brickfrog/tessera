@@ -1,0 +1,26 @@
+{
+  "title": "COUNT on a Boolean column is an error",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNT ( V[Flag] ) )",
+  "expected": {
+    "error": "COUNT does not support a Boolean column; COUNTA does"
+  },
+  "source": [
+    {
+      "url": "https://dax.guide/count/",
+      "quote": "COUNT returns an error on a Boolean column",
+      "supports": "stated in the example comment"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/count-function-dax",
+      "quote": "TRUE / FALSE values are not supported.",
+      "supports": "COUNT does not take Boolean values"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "count",
+    "boolean",
+    "error"
+  ]
+}

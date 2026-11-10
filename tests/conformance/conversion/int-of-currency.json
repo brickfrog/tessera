@@ -1,0 +1,43 @@
+{
+  "title": "INT of a currency is a currency",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( CURRENCY ( 2.5 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "If <Number> is a Currency , then the result is also a Currency data type",
+      "supports": "the result type for a currency argument"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/int-function-dax",
+      "quote": "Return value A whole number",
+      "supports": "Microsoft only says a whole number: the other reading"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "INT rounds 2.5 down to 2. The argument is a currency, so the result is the currency 2.0.",
+  "uncertain": true,
+  "alternative": "INT always returns the Integer type: 2 (int64).",
+  "tags": [
+    "conversion",
+    "int",
+    "currency",
+    "result-type"
+  ],
+  "notes": "DAX Guide is specific about the currency case; the Microsoft page is general."
+}

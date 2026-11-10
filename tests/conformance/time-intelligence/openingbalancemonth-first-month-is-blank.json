@@ -1,0 +1,32 @@
+{
+  "title": "OPENINGBALANCEMONTH in the first month of the Date table is BLANK",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", OPENINGBALANCEMONTH ( [Sales], 'Date'[Date] ) ), 'Date'[Date] >= DATE ( 2023, 1, 1 ) && 'Date'[Date] <= DATE ( 2023, 1, 31 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/openingbalancemonth/",
+    "quote": "Therefore, the result is BLANK for an expression that uses the dates, for example a sum of sales.",
+    "supports": "no date before the first month"
+  },
+  "confidence": "derived",
+  "derivation": "January 2023 is the first month of the Date table: there is no previous month end, the date filter is empty and the sum of sales is BLANK.",
+  "tags": [
+    "time-intelligence",
+    "openingbalancemonth",
+    "blank"
+  ],
+  "notes": "The type of the BLANK column is not asserted."
+}

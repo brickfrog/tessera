@@ -1,0 +1,113 @@
+{
+  "title": "A year-to-date measure grouped by month accumulates through months without sales",
+  "model": "f-calendar",
+  "query": [
+    "DEFINE MEASURE Sales[YTD] = CALCULATE ( [Sales], DATESYTD ( 'Date'[Date] ) )",
+    "EVALUATE SUMMARIZECOLUMNS ( 'Date'[YearMonth], TREATAS ( { 2024 }, 'Date'[Year] ), \"Sales\", [Sales], \"YTD\", [YTD] )",
+    "ORDER BY 'Date'[YearMonth]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[YearMonth]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        },
+        {
+          "name": "[YTD]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          202401,
+          300.0,
+          300.0
+        ],
+        [
+          202402,
+          700.0,
+          1000.0
+        ],
+        [
+          202403,
+          500.0,
+          1500.0
+        ],
+        [
+          202404,
+          null,
+          1500.0
+        ],
+        [
+          202405,
+          600.0,
+          2100.0
+        ],
+        [
+          202406,
+          null,
+          2100.0
+        ],
+        [
+          202407,
+          700.0,
+          2800.0
+        ],
+        [
+          202408,
+          null,
+          2800.0
+        ],
+        [
+          202409,
+          null,
+          2800.0
+        ],
+        [
+          202410,
+          null,
+          2800.0
+        ],
+        [
+          202411,
+          null,
+          2800.0
+        ],
+        [
+          202412,
+          800.0,
+          3600.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/datesytd/",
+      "quote": "This example shows the sales in the current and both the",
+      "supports": "the example groups by month with SUMMARIZECOLUMNS and shows Sales YTD accumulating month by month"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/time-intelligence-in-power-bi-desktop/",
+      "quote": "this ALL statement is automatically applied when you apply a filter over a column of Date type that is the primary key in a relationship",
+      "supports": "a filter on the date key removes the filters on the other columns of the Date table"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales by month of 2024: Jan 300, Feb 700, Mar 500, May 600, Jul 700, Dec 800; the other months have none (BLANK). The running total within the year: 300, 1000, 1500, 1500, 2100, 2100, 2800, 2800, 2800, 2800, 2800, 3600. Months without sales still have a YTD, so SUMMARIZECOLUMNS keeps their rows. The filter DATESYTD puts on Date[Date] removes the filters on YearMonth and Year (see date-filter-removes-other-date-table-filters).",
+  "tags": [
+    "time-intelligence",
+    "datesytd",
+    "summarizecolumns",
+    "treatas",
+    "date-table-auto-all",
+    "define-measure",
+    "order-by"
+  ]
+}

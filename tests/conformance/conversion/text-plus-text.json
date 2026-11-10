@@ -1,0 +1,32 @@
+{
+  "title": "\"6\" + \"4\" is 10: + converts both text operands to numbers",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"6\" + \"4\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          10
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/addition/",
+    "quote": "Any argument passed as a string to the binary operator is automatically converted into a number",
+    "supports": "the page says 6 + 4 and \"6\" + \"4\" return the same result"
+  },
+  "confidence": "derived",
+  "derivation": "Both strings are converted to numbers, 6 and 4, and 6 + 4 = 10.",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "text-to-number"
+  ],
+  "notes": "The column's type is not asserted: no source says which numeric type the text becomes."
+}

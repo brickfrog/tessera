@@ -1,0 +1,31 @@
+{
+  "title": "COUNT counts the rows where the column is not BLANK",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNT ( V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/count-function-dax",
+    "quote": "Counts the number of rows in the specified column that contain non-blank values.",
+    "supports": "blank values are skipped; the return value is a whole number"
+  },
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. Five values are not BLANK (the zero counts).",
+  "tags": [
+    "count",
+    "blank"
+  ]
+}

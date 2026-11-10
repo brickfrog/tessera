@@ -1,0 +1,42 @@
+{
+  "title": "A table variable is not filtered again by a CALCULATE that references it",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR Colors = VALUES ( Product[Color] ) RETURN CALCULATE ( COUNTROWS ( Colors ), Product[Color] = \"Red\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+      "quote": "Variables are evaluated in the filter context where they are defined, and their evaluation happens at most once.",
+      "supports": "a variable is evaluated where it is defined, not where it is used"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/var-dax",
+      "quote": "After DAX calculates the values for a variable expression, those values don't change, even if you reference the variable in another expression.",
+      "supports": "the value of a variable does not change when it is referenced under another context"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Colors is evaluated where it is defined, with no filter: Red, Blue, Green, 3 rows. The filter Color = Red applies to expressions evaluated inside CALCULATE, not to the rows the variable already holds, so COUNTROWS is 3. With VALUES ( Product[Color] ) in place of the variable it would be 1.",
+  "tags": [
+    "var",
+    "table-variable",
+    "calculate",
+    "values",
+    "countrows",
+    "variable-evaluated-once"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "title": "MOD ( 3, 2 ) is 1",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MOD ( 3, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/mod-function-dax",
+    "quote": "The following formula returns 1, the remainder of 3 divided by 2.",
+    "supports": "the example gives 1"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "mod"
+  ],
+  "notes": "The type is not asserted: Microsoft Learn says \"a whole number\", DAX Guide says \"a single value of any type\"."
+}

@@ -1,0 +1,25 @@
+{
+  "title": "ALL () with no arguments cannot be used as a table expression",
+  "model": "sales",
+  "query": "EVALUATE ALL ()",
+  "expected": {
+    "error": "ALL () with no arguments can only be used as a CALCULATE or CALCULATETABLE modifier; it does not return a table"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/all-function-dax",
+      "quote": "ALL() can only be used to clear filters but not to return a table.",
+      "supports": "ALL () cannot return a table"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "ALL can be used as a table expression when it has at least one argument.",
+      "supports": "ALL is a table expression only when it has at least one argument"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "all",
+    "error"
+  ]
+}

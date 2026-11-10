@@ -1,0 +1,38 @@
+{
+  "title": "INT ( -4.3 ) is -5: INT rounds down, not toward zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( -4.3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/int-function-dax",
+      "quote": "TRUNC(-4.3) returns -4, but INT(-4.3) returns -5 because -5 is the lower number.",
+      "supports": "states the result; Return value: a whole number"
+    },
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "INT performs a type conversion to an integer and always returns an integer value.",
+      "supports": "the result is of the integer data type for a decimal argument"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "int",
+    "floor"
+  ]
+}

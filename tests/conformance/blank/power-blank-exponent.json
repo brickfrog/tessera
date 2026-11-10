@@ -1,0 +1,44 @@
+{
+  "title": "1 ^ BLANK is 1: a BLANK exponent is zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1 ^ BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "1 ^ BLANK () 1",
+      "supports": "the table of expressions with a blank value gives 1 for 1 ^ BLANK ()"
+    },
+    {
+      "url": "https://dax.guide/op/exponentiation/",
+      "quote": "It is syntactic sugar for the POWER function, which is used underneath",
+      "supports": "^ is POWER"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/power-function-dax",
+      "quote": "Return value A decimal number",
+      "supports": "POWER returns a decimal number (double)"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-power",
+    "assumption:power-result-type"
+  ],
+  "notes": "The value is published by SQLBI. The double type comes from ^ being POWER, which returns a decimal number."
+}

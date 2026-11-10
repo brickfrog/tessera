@@ -1,0 +1,44 @@
+{
+  "title": "SUMMARIZE over the dimension table returns each of its values, sold or not",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZE ( Product, Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/summarize-function-dax",
+      "quote": "One row is returned for each group.",
+      "supports": "one row per distinct value of the group-by column"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/from-sql-to-dax-projection/",
+      "quote": "we always suggest using SUMMARIZE as an equivalent of SELECT DISTINCT in SQL",
+      "supports": "SUMMARIZE without expressions is a distinct"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] holds Red, Red, Blue, Green: three distinct values. Sales plays no part.",
+  "tags": [
+    "summarize",
+    "distinct"
+  ]
+}

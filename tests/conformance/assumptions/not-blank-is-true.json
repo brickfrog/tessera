@@ -1,0 +1,41 @@
+{
+  "title": "NOT BLANK () is TRUE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", NOT BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/not/",
+      "quote": "Changes FALSE to TRUE, or TRUE to FALSE",
+      "supports": "NOT returns TRUE or FALSE"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "a BLANK in a logical expression is converted to a FALSE value",
+      "supports": "a logical expression returns TRUE or FALSE; BLANK counts as FALSE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "NOT returns TRUE or FALSE. A BLANK in a logical expression is converted to FALSE, and NOT FALSE is TRUE.",
+  "uncertain": true,
+  "alternative": "No source shows NOT of BLANK. If NOT passed BLANK through, the result would be BLANK.",
+  "tags": [
+    "assumption:logical-blank",
+    "not",
+    "blank"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "title": "AVERAGEX when the expression is BLANK for every row: BLANK or 0",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", AVERAGEX ( V, IF ( V[N] > 100, V[N] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/averagex/",
+      "quote": "When Table has no rows, or Expression returns BLANK for all the rows, the function returns BLANK .",
+      "supports": "DAX Guide: all BLANK gives BLANK"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/averagex-function-dax",
+      "quote": "When there are rows, but none of them meet the specified criteria, then the function returns 0.",
+      "supports": "the Microsoft page can be read as giving 0 here"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "No N is above 100, so the expression is BLANK for all 7 rows. DAX Guide says the result is then BLANK.",
+  "uncertain": true,
+  "alternative": "Reading the Microsoft sentence as covering this case, the result is 0: [r] would be 0.0 (double).",
+  "tags": [
+    "averagex",
+    "if",
+    "blank"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

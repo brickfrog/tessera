@@ -1,0 +1,48 @@
+{
+  "title": "GCD ( 24, 36 ) is 12 and LCM ( 24, 36 ) is 72",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"gcd\", GCD ( 24, 36 ), \"lcm\", LCM ( 24, 36 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[gcd]",
+          "type": "int64"
+        },
+        {
+          "name": "[lcm]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          12,
+          72
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/gcd-function-dax",
+      "quote": "Greatest common divisor of 24 and 36.",
+      "supports": "the example table gives 12"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/lcm-function-dax",
+      "quote": "Least common multiple of 24 and 36.",
+      "supports": "the example table gives 72"
+    },
+    {
+      "url": "https://dax.guide/gcd/",
+      "quote": "The greatest common divisor of two integers.",
+      "supports": "Return values: a single integer value"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "gcd",
+    "lcm"
+  ]
+}

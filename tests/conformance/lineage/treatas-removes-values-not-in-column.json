@@ -1,0 +1,47 @@
+{
+  "title": "TREATAS removes the values that the target column does not have",
+  "model": "sales",
+  "query": "EVALUATE TREATAS ( { \"Red\", \"Purple\", \"Green\" }, Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+      "quote": "If some of the values in the table contain values that do not correspond to a valid value in the column used to apply the data lineage change, then TREATAS removes the values from the input",
+      "supports": "values with no match in the column are removed"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/treatas-function-dax",
+      "quote": "If a value returned in the table expression does not exist in the column, it is ignored",
+      "supports": "same statement"
+    },
+    {
+      "url": "https://dax.guide/treatas/",
+      "quote": "filters out any values that are not present in its respective output column",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] has Red, Blue, Green. Purple is not one of them and is removed; Red and Green stay.",
+  "tags": [
+    "treatas",
+    "table-constructor",
+    "lineage"
+  ]
+}

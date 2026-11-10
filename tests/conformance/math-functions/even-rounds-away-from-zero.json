@@ -1,0 +1,52 @@
+{
+  "title": "EVEN rounds away from zero to an even integer: 1.5 gives 2, 3 gives 4, 2 stays 2, -1 gives -2",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"a\", EVEN ( 1.5 ), \"b\", EVEN ( 3 ), \"c\", EVEN ( 2 ), \"d\", EVEN ( -1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "int64"
+        },
+        {
+          "name": "[b]",
+          "type": "int64"
+        },
+        {
+          "name": "[c]",
+          "type": "int64"
+        },
+        {
+          "name": "[d]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2,
+          4,
+          2,
+          -2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/even-function-dax",
+      "quote": "Regardless of the sign of number, a value is rounded up when adjusted away from zero. If number is an even integer, no rounding occurs.",
+      "supports": "the table of examples gives 2, 4, 2 and -2 for these four formulas"
+    },
+    {
+      "url": "https://dax.guide/even/",
+      "quote": "Returns number rounded up to the nearest even integer.",
+      "supports": "Return values: a single integer value"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "even"
+  ]
+}

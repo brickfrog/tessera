@@ -1,0 +1,36 @@
+{
+  "title": "CALCULATE turns every active row context into a filter, not only the innermost",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( VALUES ( 'Date'[Year] ), SUMX ( VALUES ( 'Product'[Color] ), IF ( [Sales Amount] > 200, 1 ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+    "quote": "CALCULATE transforms all existing row contexts into an equivalent filter context before applying its filter arguments to the original filter context.",
+    "supports": "CALCULATE transforms all existing row contexts into a filter context"
+  },
+  "confidence": "derived",
+  "derivation": "Sales Amount by year and color: 2023 Red 100 + 40 + 20 = 160; 2023 Blue 50; 2024 Red 200 + 100 = 300; 2024 Blue 30; Green none. Only 2024 Red exceeds 200, so the result is 1. If only the inner row context (color) were transformed, Red would be 460 in both years and the result 2; if only the outer (year), 210 and 330 for each of 3 colors would give 6.",
+  "tags": [
+    "sumx",
+    "values",
+    "if",
+    "measure",
+    "context-transition",
+    "nested-row-context"
+  ],
+  "notes": "IF with no else branch gives BLANK, which SUMX skips. Type: the sum is taken to have the type of the summed expression, an integer."
+}

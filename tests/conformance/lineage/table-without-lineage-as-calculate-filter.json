@@ -1,0 +1,47 @@
+{
+  "title": "A table whose column has no lineage filters nothing as a CALCULATE filter",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "VAR Blue = SELECTCOLUMNS ( FILTER ( VALUES ( Product[Color] ), Product[Color] = \"Blue\" ), \"c\", Product[Color] & \"\" )",
+    "RETURN ROW ( \"r\", CALCULATE ( [Sales Amount], Blue ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+      "quote": "it returns the same value as Sales Amount without applying any filter",
+      "supports": "the article's v3 measure: a filter table column that has no lineage of a model column applies no filter"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+      "quote": "adding an empty string to Product[Category] in the previous expression does not change the column content, whereas it does break the data lineage",
+      "supports": "the expression broke the lineage"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The variable holds one row, \"Blue\", in a column computed by an expression: no lineage. Used as a filter it restricts no model column, so the measure is the total, 540. With lineage it would be 80.",
+  "uncertain": true,
+  "alternative": "If the engine rejects a filter table whose only column has no lineage, the query is an error. If it kept the lineage through the concatenation, the result would be 80.",
+  "tags": [
+    "calculate",
+    "selectcolumns",
+    "variable",
+    "lineage"
+  ],
+  "notes": "The article's example has one column with lineage beside the one without; here the table has only the column without lineage."
+}

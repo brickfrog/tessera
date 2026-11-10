@@ -1,0 +1,35 @@
+{
+  "title": "A single-direction many-to-many cardinality relationship does not filter back",
+  "model": "c-weak",
+  "query": "EVALUATE ROW ( \"Products\", CALCULATE ( COUNTROWS ( Product ), Target[Category] = \"Accessories\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+    "quote": "for many-to-many relationships, cross filter direction can be from either one of the tables, or from both tables",
+    "supports": "the direction of a many-to-many relationship can be from one table only"
+  },
+  "confidence": "derived",
+  "derivation": "The relationship filters from Product to Target only. A filter on Target[Category] does not reach Product: 3 rows.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "relationship",
+    "many-to-many-cardinality",
+    "limited-relationship",
+    "single-direction"
+  ]
+}

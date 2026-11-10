@@ -1,0 +1,39 @@
+{
+  "title": "SEARCH ignores case",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SEARCH ( \"RED\", \"Big red box\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/search-function-dax",
+      "quote": "The search function is case insensitive. Searching for \"N\" finds the first occurrence of 'N' or 'n'.",
+      "supports": "case is ignored"
+    },
+    {
+      "url": "https://dax.guide/search/",
+      "quote": "A single integer value.",
+      "supports": "the result is an integer position, counted from 1"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "\"red\" starts at character 5 of \"Big red box\" (B=1, i=2, g=3, space=4, r=5).",
+  "tags": [
+    "text-functions",
+    "search",
+    "case-insensitive"
+  ]
+}

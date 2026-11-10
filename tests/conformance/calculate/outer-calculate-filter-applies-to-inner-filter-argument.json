@@ -1,0 +1,43 @@
+{
+  "title": "With nested CALCULATE the outer filter is in place when the inner filter argument is evaluated",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( CALCULATE ( [Sales Amount], FILTER ( VALUES ( Customer[Country] ), [Sales Amount] > 250 ) ), 'Date'[Year] = 2023 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/order-of-evaluation-in-calculate-parameters/",
+      "quote": "In these functions, the first parameter is evaluated only after all the others have been evaluated.",
+      "supports": "the outer CALCULATE's first parameter, the inner CALCULATE, is evaluated only after the outer filter has been applied"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/order-of-evaluation-in-calculate-parameters/",
+      "quote": "the outer filter over Italy is executed first and it applies its effects to the FILTER function",
+      "supports": "the outer filter applies its effects to a FILTER evaluated inside the outer CALCULATE's expression"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The inner CALCULATE runs in the context Year = 2023. There FILTER finds US 100 + 40 + 20 + 50 = 210, JP BLANK (Cho's sales are in 2024), FR BLANK: none exceeds 250. The country filter is empty, so the result is BLANK.",
+  "tags": [
+    "calculate",
+    "filter",
+    "values",
+    "measure",
+    "evaluation-order",
+    "nested-calculate",
+    "blank"
+  ],
+  "notes": "The column's type is not asserted: the only value is BLANK."
+}

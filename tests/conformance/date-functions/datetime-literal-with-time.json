@@ -1,0 +1,31 @@
+{
+  "title": "A dt literal with a time part keeps the time",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", dt\"2020-10-15T22:45:30\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2020-10-15T22:45:30"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/date-function-dax",
+    "quote": "Date and datetime can also be specified as a literal in the format dt\"YYYY-MM-DD\" , dt\"YYYY-MM-DDThh:mm:ss\" , or dt\"YYYY-MM-DD hh:mm:ss\" .",
+    "supports": "the literal form"
+  },
+  "confidence": "derived",
+  "derivation": "The literal is October 15, 2020 at 22:45:30.",
+  "tags": [
+    "date-functions",
+    "datetime-literal"
+  ]
+}

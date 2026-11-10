@@ -1,0 +1,31 @@
+{
+  "title": "BLANK == 0 is FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () == 0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+    "quote": "In contrast, [Column] == 0 is true only when the value of [Column] is 0",
+    "supports": "== does not treat BLANK as 0"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-strict-equals",
+    "comparison"
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "title": "Unary minus on BLANK leaves it BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", - BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "the minus operator creates a negative value, if applied to a numeric value",
+      "supports": "unary minus negates a numeric value; it says nothing of BLANK"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "Data models support the unary operator, - (negative), but this operator doesn't change the data type of the operand",
+      "supports": "the operand keeps its type; BLANK has none to change"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "No source states the result of unary minus on BLANK. The operator is said not to change the type of its operand, and BLANK is not a numeric value to negate, so BLANK is taken to stay BLANK.",
+  "uncertain": true,
+  "alternative": "BLANK is converted to 0 as it is in an addition or subtraction (BLANK - 4 is -4), and the result is 0 (an int64).",
+  "tags": [
+    "blank",
+    "operator-unary-minus"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

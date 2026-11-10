@@ -1,0 +1,39 @@
+{
+  "title": "VALUES returning one row and one column can be used as a scalar",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( VALUES ( Product[Color] ), Product[Product] = \"Lock\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Blue"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/if/",
+      "quote": "DAX tries to convert the table to a scalar value, and it fails if there are multiple rows.",
+      "supports": "a one-row, one-column table converts to its value"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/selectedvalue-function-dax",
+      "quote": "An equivalent expression for SELECTEDVALUE(<columnName>, <alternateResult>) is IF(HASONEVALUE(<columnName>), VALUES(<columnName>), <alternateResult>) .",
+      "supports": "SELECTEDVALUE returns the value when the column has one visible value, else the alternate"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Only Lock is visible, so VALUES ( Product[Color] ) has the single row Blue, which converts to the scalar \"Blue\".",
+  "tags": [
+    "values",
+    "table-to-scalar",
+    "calculate"
+  ]
+}

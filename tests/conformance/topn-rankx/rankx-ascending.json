@@ -1,0 +1,76 @@
+{
+  "title": "RANKX with ASC gives rank 1 to the lowest value",
+  "model": "d-values",
+  "query": "EVALUATE ADDCOLUMNS ( Player, \"Rank\", RANKX ( Player, Player[Score], Player[Score], ASC ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          90,
+          6
+        ],
+        [
+          "Bob",
+          80,
+          4
+        ],
+        [
+          "Cho",
+          80,
+          4
+        ],
+        [
+          "Dee",
+          70,
+          2
+        ],
+        [
+          "Eve",
+          70,
+          2
+        ],
+        [
+          "Fay",
+          50,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "Ranks in ascending order of expression. If value is equal to the lowest number in expression then RANKX returns 1.",
+      "supports": "ascending order"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "The next rank value, after a tie, is the rank value of the tie plus the count of tied values.",
+      "supports": "Skip is the default for ties"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Player scores: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. Ascending: 50 is 1; the two 70s share 2; the next rank is 4 for the two 80s; 90 is 6.",
+  "tags": [
+    "rankx",
+    "ties",
+    "skip",
+    "order",
+    "addcolumns"
+  ]
+}

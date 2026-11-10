@@ -1,0 +1,32 @@
+{
+  "title": "INDEX ( 1, ... ) is the first row of the relation, ordered by its columns when no ORDERBY is given",
+  "model": "sales",
+  "query": "EVALUATE INDEX ( 1, ALL ( 'Product'[Product] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Bike"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/index-function-dax",
+    "quote": "EVALUATE INDEX(1, ALL(DimDate[CalendarYear]))",
+    "supports": "the page's first example is this query on a year column and returns the lowest year, 2005"
+  },
+  "confidence": "derived",
+  "derivation": "The products ascending are Bike, Helmet, Lock, Scooter: the first is Bike.",
+  "tags": [
+    "window-functions",
+    "index",
+    "all"
+  ]
+}

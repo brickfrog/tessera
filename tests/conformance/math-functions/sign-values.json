@@ -1,0 +1,47 @@
+{
+  "title": "SIGN returns -1, 0 or 1 as an integer",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"neg\", SIGN ( -2.5 ), \"zero\", SIGN ( 0 ), \"pos\", SIGN ( 0.5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[neg]",
+          "type": "int64"
+        },
+        {
+          "name": "[zero]",
+          "type": "int64"
+        },
+        {
+          "name": "[pos]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -1,
+          0,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/sign-function-dax",
+      "quote": "The function returns 1 if the number is positive, 0 (zero) if the number is zero, or -1 if the number is negative.",
+      "supports": "the three results; Return value: a whole number"
+    },
+    {
+      "url": "https://dax.guide/sign/",
+      "quote": "A single integer value.",
+      "supports": "the result is an integer"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "sign"
+  ]
+}

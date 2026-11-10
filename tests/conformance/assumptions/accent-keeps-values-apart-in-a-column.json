@@ -1,0 +1,40 @@
+{
+  "title": "A column holding e, é, E has two distinct values: case folds, the accent does not",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNT ( Accent[Txt] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/dt/string/",
+      "quote": "By default, the comparison between strings is case-insensitive and accent-sensitive",
+      "supports": "the default comparison ignores case and respects accents; the page gives \"e\" and \"è\" as different"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The engine that stores and queries data in Power BI is case insensitive, and treats different capitalization of letters as the same value",
+      "supports": "text that differs only in case is the same value, for comparison and for storage"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Accent[Txt] holds e (Id 1), é (Id 2), E (Id 3). Case is ignored, so e and E are one value. Comparison is accent-sensitive, so é is a second value. 2 distinct values. An accent-insensitive collation would give 1; a case-sensitive one would give 3.",
+  "tags": [
+    "assumption:collation-accents",
+    "distinctcount",
+    "collation",
+    "case-insensitive"
+  ]
+}

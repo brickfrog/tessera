@@ -13,3 +13,4 @@ TestResults/
 **/.pbi/localSettings.json
 **/.pbi/cache.abf
 **/*.abf
+conformance-report/

@@ -1,0 +1,44 @@
+{
+  "title": "MIN and MAX of a text column compare alphabetically",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"min\", MIN ( Product[Product] ), \"max\", MAX ( Product[Product] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[min]",
+          "type": "string"
+        },
+        {
+          "name": "[max]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          "Scooter"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/min/",
+      "quote": "Strings are compared according to alphabetical order.",
+      "supports": "MIN works on text"
+    },
+    {
+      "url": "https://dax.guide/max/",
+      "quote": "Strings are compared according to alphabetical order.",
+      "supports": "MAX works on text"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Product] holds Bike, Helmet, Lock, Scooter. Alphabetically first is Bike, last is Scooter.",
+  "tags": [
+    "min",
+    "max",
+    "text"
+  ]
+}

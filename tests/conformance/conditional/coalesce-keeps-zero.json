@@ -1,0 +1,32 @@
+{
+  "title": "Zero is not BLANK for COALESCE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COALESCE ( 0, 5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/coalesce/",
+    "quote": "An empty string and 0 are not BLANK , so COALESCE returns them.",
+    "supports": "0 is returned"
+  },
+  "confidence": "derived",
+  "derivation": "The first argument is 0, which is not BLANK, so it is returned and 5 is not. Both arguments are integers.",
+  "tags": [
+    "coalesce",
+    "blank",
+    "zero"
+  ]
+}

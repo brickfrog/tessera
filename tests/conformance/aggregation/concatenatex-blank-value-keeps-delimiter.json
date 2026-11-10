@@ -1,0 +1,32 @@
+{
+  "title": "CONCATENATEX writes a BLANK value as an empty string and keeps its delimiter",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONCATENATEX ( { 1, BLANK (), 3 }, [Value], \",\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1,,3"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/concatenatex/",
+    "quote": "A BLANK value of Expression becomes an empty string, but CONCATENATEX still adds the delimiter.",
+    "supports": "the page gives this expression and its result, 1,,3"
+  },
+  "confidence": "published",
+  "tags": [
+    "concatenatex",
+    "blank",
+    "table-constructor"
+  ],
+  "notes": "No order expression is given, as on the page. The page also says the order is then not guaranteed, so an engine that iterates the constructor in another order would differ."
+}

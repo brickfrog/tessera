@@ -1,0 +1,39 @@
+{
+  "title": "\"20\" / \"4\" is 5: / converts both text operands to numbers",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"20\" / \"4\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          5.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/op/division/",
+      "quote": "Any argument passed as a string is automatically converted into a number",
+      "supports": "the page says 20 / 4 and \"20\" / \"4\" return the same result"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency.",
+      "supports": "the result type of / and of DIVIDE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Both strings are converted to numbers, 20 and 4, and 20 / 4 = 5. No currency is involved, so the result of / is a decimal number (double).",
+  "tags": [
+    "conversion",
+    "operator-divide",
+    "text-to-number"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "title": "VALUES over apple, Apple, APPLE returns one value, in the casing loaded first",
+  "model": "a2-text",
+  "query": "EVALUATE VALUES ( CaseT[Txt] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "CaseT[Txt]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "apple"
+        ],
+        [
+          "pear"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "so it doesn't store those variations, but refers to the first variation it stored",
+      "supports": "of several casings of one value, the first one loaded is the one kept"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/string-storage-and-collation-in-tabular-models",
+      "quote": "The first instance of the string is used as the canonical representation",
+      "supports": "the first occurrence is what later equivalent strings are shown as"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Rows load in the order apple (Id 1), Apple (2), APPLE (3), pear (4). The engine stores the first variation it sees and refers the later ones to it, so the column's values are apple and pear.",
+  "uncertain": true,
+  "alternative": "The number of rows (2) is not in doubt. Which casing survives is: the collation page warns that there is no simple way to determine in advance which row is processed first. If the engine processed another row first the result would be Apple, pear or APPLE, pear.",
+  "tags": [
+    "values",
+    "case-insensitive",
+    "collation"
+  ],
+  "notes": "Rows are compared as a multiset; the casing of the first value is the fact under test."
+}

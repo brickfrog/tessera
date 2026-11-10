@@ -1,0 +1,99 @@
+{
+  "description": "A many-to-many cardinality (limited) relationship: Target[Category] -> Product[Category], single direction, Product filters Target. Product[Category] has duplicates (Clothing twice). Target has a Category (Footwear) that Product does not have. TargetQuantity: total 360; Clothing 220 (100 + 120), Accessories 110 (50 + 60), Footwear 30. Blue products are in Clothing and Accessories (330); the Green product is in Clothing (220).",
+  "tables": [
+    {
+      "name": "Product",
+      "columns": [
+        {
+          "name": "ProductID",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Product",
+          "type": "string"
+        },
+        {
+          "name": "Color",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "T-shirt",
+          "Green",
+          "Clothing"
+        ],
+        [
+          2,
+          "Jeans",
+          "Blue",
+          "Clothing"
+        ],
+        [
+          3,
+          "Hat",
+          "Blue",
+          "Accessories"
+        ]
+      ]
+    },
+    {
+      "name": "Target",
+      "columns": [
+        {
+          "name": "Category",
+          "type": "string"
+        },
+        {
+          "name": "TargetYear",
+          "type": "int64"
+        },
+        {
+          "name": "TargetQuantity",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Clothing",
+          2019,
+          100
+        ],
+        [
+          "Accessories",
+          2019,
+          50
+        ],
+        [
+          "Clothing",
+          2020,
+          120
+        ],
+        [
+          "Accessories",
+          2020,
+          60
+        ],
+        [
+          "Footwear",
+          2020,
+          30
+        ]
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Target[Category]",
+      "to": "Product[Category]",
+      "cardinality": "many-to-many",
+      "crossFilter": "single"
+    }
+  ]
+}

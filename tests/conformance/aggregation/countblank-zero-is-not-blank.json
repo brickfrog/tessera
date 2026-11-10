@@ -1,0 +1,31 @@
+{
+  "title": "COUNTBLANK does not count zeros",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTBLANK ( V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/countblank-function-dax",
+    "quote": "Cells that have the value zero (0) are not counted, as zero is considered a numeric value and not a blank.",
+    "supports": "only blank cells are counted"
+  },
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. Two BLANKs; the zero in row 3 is not one.",
+  "tags": [
+    "countblank",
+    "blank"
+  ]
+}

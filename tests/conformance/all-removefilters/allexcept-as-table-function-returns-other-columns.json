@@ -1,0 +1,37 @@
+{
+  "title": "ALLEXCEPT as a table expression returns the distinct combinations of the columns not listed",
+  "model": "sales",
+  "query": "EVALUATE ALLEXCEPT ( 'Product', 'Product'[ProductKey], 'Product'[Product], 'Product'[Price], 'Product'[Category] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/allexcept/",
+    "quote": "ALLEXCEPT materializes all the unique combinations of the columns in the table specified in the first argument that are not listed in the following arguments",
+    "supports": "as a table function ALLEXCEPT returns the unique combinations of the table's columns that are not listed"
+  },
+  "confidence": "derived",
+  "derivation": "Product has columns ProductKey, Product, Color, Category, Price. All but Color are listed, so the result is the unique values of Color: Red (twice in the table, once in the result), Blue, Green.",
+  "tags": [
+    "allexcept",
+    "table-function"
+  ]
+}

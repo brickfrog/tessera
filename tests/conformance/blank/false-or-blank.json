@@ -1,0 +1,31 @@
+{
+  "title": "FALSE || BLANK is FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FALSE () || BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "FALSE OR BLANK FALSE",
+    "supports": "the table of BLANK in operations gives FALSE for FALSE OR BLANK"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-or",
+    "logical"
+  ]
+}

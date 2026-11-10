@@ -1,0 +1,19 @@
+{
+  "title": "SQRT ( -1 ) is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SQRT ( -1 ) )",
+  "expected": {
+    "error": "SQRT of a negative number"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/sqrt-function-dax",
+    "quote": "If the number is negative, the SQRT function returns an error.",
+    "supports": "a negative argument is documented as an error"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "sqrt",
+    "error"
+  ]
+}

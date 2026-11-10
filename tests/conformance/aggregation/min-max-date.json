@@ -1,0 +1,45 @@
+{
+  "title": "MIN and MAX of a date column, ignoring BLANK",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"min\", MIN ( V[Dt] ), \"max\", MAX ( V[Dt] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[max]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2023-02-10T00:00:00",
+          "2024-03-01T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/min-function-dax",
+      "quote": "This formula therefore returns the date that is earliest.",
+      "supports": "MIN of a date column is the earliest date"
+    },
+    {
+      "url": "https://dax.guide/min/",
+      "quote": "The result is blank in case there are no rows in the table with a non-blank value.",
+      "supports": "blank only when no row has a value: blanks are otherwise ignored"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[Dt] holds 2024-03-01, BLANK, 2023-12-31, 2024-01-05, 2024-03-01, 2023-02-10, BLANK. Earliest 2023-02-10, latest 2024-03-01.",
+  "tags": [
+    "min",
+    "max",
+    "date",
+    "blank"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "title": "BLANK () && TRUE is FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () && TRUE )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "BLANK () && TRUE",
+      "supports": "the table of expressions containing BLANK gives False for BLANK () && TRUE"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "TRUE AND BLANK",
+      "supports": "Microsoft's table gives FALSE for TRUE AND BLANK"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "assumption:logical-blank",
+    "operator-and",
+    "blank"
+  ]
+}

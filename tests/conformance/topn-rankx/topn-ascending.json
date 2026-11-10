@@ -1,0 +1,43 @@
+{
+  "title": "TOPN with ASC returns the lowest rows",
+  "model": "d-values",
+  "query": "EVALUATE TOPN ( 1, Player, Player[Score], ASC )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Fay",
+          50
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/topn-function-dax",
+      "quote": "Ranks in ascending order of OrderBy .",
+      "supports": "order 1 / TRUE / ASC sorts ascending"
+    },
+    {
+      "url": "https://dax.guide/topn/",
+      "quote": "0/FALSE/DESC – descending; 1/TRUE/ASC – ascending.",
+      "supports": "the ASC keyword"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Player scores: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. The lowest score is Fay 50, with no tie.",
+  "tags": [
+    "topn",
+    "order"
+  ]
+}

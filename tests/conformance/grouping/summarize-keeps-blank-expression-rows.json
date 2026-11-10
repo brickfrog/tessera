@@ -1,0 +1,54 @@
+{
+  "title": "SUMMARIZE keeps a group whose added expression is BLANK",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZE ( Product, Product[Color], \"Amt\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ],
+        [
+          "Blue",
+          80.0
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/summarize-function-dax",
+      "quote": "One row is returned for each group.",
+      "supports": "a row per group, with no rule that removes blank results"
+    },
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "Only rows for which at least one of the supplied expressions return a non-blank value are included in the table returned.",
+      "supports": "removing blank rows is documented for SUMMARIZECOLUMNS, not for SUMMARIZE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Groups of Product by Color: Red, Blue, Green. Sales Amount: Red 460 (rows 1, 2, 3, 5, 7: 100 + 40 + 20 + 200 + 100), Blue 80 (rows 4, 6: 50 + 30), Green BLANK (no sales). SUMMARIZE returns one row per group, so Green stays with a BLANK.",
+  "tags": [
+    "summarize",
+    "blank",
+    "measure",
+    "column-names"
+  ],
+  "notes": "No source says in so many words that SUMMARIZE keeps the row; it follows from one row per group and from the blank-row removal being a SUMMARIZECOLUMNS feature. Compare aggregation/sum-by-color, where SUMMARIZECOLUMNS drops Green."
+}

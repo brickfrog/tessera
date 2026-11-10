@@ -1,0 +1,38 @@
+{
+  "title": "ABS ( -2.5 ) is 2.5",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ABS ( -2.5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/abs-function-dax",
+      "quote": "The absolute value of a number is a decimal number, whole or decimal, without its sign.",
+      "supports": "the value without its sign; Return value: a decimal number"
+    },
+    {
+      "url": "https://dax.guide/abs/",
+      "quote": "The absolute value of a number with the same data type and without its sign.",
+      "supports": "the type follows the argument, a decimal number here"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "-2.5 without its sign is 2.5; both pages give a decimal number for a decimal argument.",
+  "tags": [
+    "math-functions",
+    "abs"
+  ]
+}

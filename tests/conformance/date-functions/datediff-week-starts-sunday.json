@@ -1,0 +1,44 @@
+{
+  "title": "DATEDIFF by WEEK counts Sundays crossed: Saturday to Sunday is 1, Sunday to Saturday is 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"sat to sun\", DATEDIFF ( DATE ( 2005, 1, 1 ), DATE ( 2005, 1, 2 ), WEEK ), \"sun to sat\", DATEDIFF ( DATE ( 2005, 1, 2 ), DATE ( 2005, 1, 8 ), WEEK ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[sat to sun]",
+          "type": "int64"
+        },
+        {
+          "name": "[sun to sat]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/datediff/",
+      "quote": "With WEEK, a week starts on Sunday. For example, from a Saturday to the next Sunday the result is 1, and from a Sunday to the next Saturday the result is 0.",
+      "supports": "the rule, with these two situations as its examples"
+    },
+    {
+      "url": "https://dax.guide/weekday/",
+      "quote": "WEEKDAY returns the day of the week using different standards",
+      "supports": "its example table shows 2005-01-01 is a Saturday, 2005-01-02 a Sunday and 2005-01-08 a Saturday"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "January 1, 2005 is a Saturday and January 2 a Sunday: one week boundary is crossed, so 1. January 2 (Sunday) to January 8 (Saturday) stays inside one week: 0.",
+  "tags": [
+    "date-functions",
+    "datediff",
+    "week"
+  ]
+}

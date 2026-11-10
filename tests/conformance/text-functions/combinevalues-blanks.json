@@ -1,0 +1,31 @@
+{
+  "title": "COMBINEVALUES of two BLANKs is the delimiter alone, not BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COMBINEVALUES ( \",\", BLANK (), BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          ","
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/combinevalues/",
+    "quote": "A BLANK value becomes an empty string, so the result is never BLANK .",
+    "supports": "the page gives COMBINEVALUES ( \",\", BLANK (), BLANK () ) returning \",\""
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "combinevalues",
+    "blank"
+  ]
+}

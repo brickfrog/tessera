@@ -1,0 +1,60 @@
+{
+  "title": "OFFSET ( -1, ... ) is the previous row of the relation; the first row has none",
+  "model": "sales",
+  "query": [
+    "DEFINE",
+    "    VAR vRelation = SUMMARIZECOLUMNS ( 'Date'[Year], \"Amount\", [Sales Amount] )",
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    vRelation,",
+    "    \"Previous\", SELECTCOLUMNS ( OFFSET ( -1, vRelation, ORDERBY ( 'Date'[Year] ) ), [Amount] )",
+    ")",
+    "ORDER BY 'Date'[Year]"
+  ],
+  "ordered": true,
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Year]",
+          "type": "int64"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Previous]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2023,
+          210.0,
+          null
+        ],
+        [
+          2024,
+          330.0,
+          210.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/offset-function-dax",
+    "quote": "Returns a table that summarizes the total sales for each product category and calendar year, as well as the total sales for that category in the previous year.",
+    "supports": "the page's first example has this shape: a DEFINE VAR relation from SUMMARIZECOLUMNS, ADDCOLUMNS over it, and SELECTCOLUMNS over OFFSET ( -1, ... ) for the previous year's value"
+  },
+  "confidence": "derived",
+  "derivation": "Amount by year of OrderDate: 2023 = 100 + 40 + 20 + 50 = 210, 2024 = 200 + 30 + 100 = 330. The row before 2024 is 2023: 210. 2023 has no previous row, so OFFSET returns no row and the value is BLANK.",
+  "tags": [
+    "window-functions",
+    "offset",
+    "orderby",
+    "summarizecolumns",
+    "addcolumns",
+    "define-var"
+  ]
+}

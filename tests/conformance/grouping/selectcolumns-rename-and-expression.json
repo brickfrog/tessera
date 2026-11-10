@@ -1,0 +1,57 @@
+{
+  "title": "SELECTCOLUMNS returns only the columns listed, renamed or computed in the row context",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"Name\", Product[Product], \"Twice\", Product[Price] * 2 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Name]",
+          "type": "string"
+        },
+        {
+          "name": "[Twice]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          200.0
+        ],
+        [
+          "Helmet",
+          40.0
+        ],
+        [
+          "Lock",
+          20.0
+        ],
+        [
+          "Scooter",
+          100.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/selectcolumns-function-dax",
+      "quote": "instead of starting with the Table specified, SELECTCOLUMNS starts with an empty table before adding columns",
+      "supports": "only the listed columns are returned"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "it returns a currency when a currency and a non-currency type are involved",
+      "supports": "currency * integer is currency"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Prices 100, 20, 10, 50 doubled: 200, 40, 20, 100. Price is a fixed decimal and 2 an integer, so the product is a fixed decimal.",
+  "tags": [
+    "selectcolumns",
+    "row-context",
+    "column-names",
+    "result-type"
+  ]
+}

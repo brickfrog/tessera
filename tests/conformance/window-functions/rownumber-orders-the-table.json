@@ -1,0 +1,88 @@
+{
+  "title": "ROWNUMBER numbers the rows of the relation in the ORDERBY order",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    'Product',",
+    "    \"N\", ROWNUMBER ( 'Product', ORDERBY ( 'Product'[Price], DESC ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        },
+        {
+          "name": "[N]"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Red",
+          "Vehicles",
+          100.0,
+          1
+        ],
+        [
+          2,
+          "Helmet",
+          "Red",
+          "Accessories",
+          20.0,
+          3
+        ],
+        [
+          3,
+          "Lock",
+          "Blue",
+          "Accessories",
+          10.0,
+          4
+        ],
+        [
+          4,
+          "Scooter",
+          "Green",
+          "Vehicles",
+          50.0,
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rownumber-function-dax",
+    "quote": "Returns the unique ranking for the current context within the specified partition, sorted by the specified order.",
+    "supports": "the page's first example has this shape: ADDCOLUMNS over a table with ROWNUMBER over the same table and an ORDERBY"
+  },
+  "confidence": "derived",
+  "derivation": "Prices descending: Bike 100, Scooter 50, Helmet 20, Lock 10, so Bike 1, Scooter 2, Helmet 3, Lock 4.",
+  "notes": "The type of the number is not asserted: the pages say a ranking is returned but not its data type.",
+  "tags": [
+    "window-functions",
+    "rownumber",
+    "orderby",
+    "addcolumns"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "title": "\"e\" = \"è\" is FALSE: accents count in text comparison",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"e\" = \"è\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/dt/string/",
+    "quote": "By default, the comparison between strings is case-insensitive and accent-sensitive",
+    "supports": "the sentence goes on to say that \"e\" and \"è\" are considered different"
+  },
+  "confidence": "published",
+  "tags": [
+    "assumption:collation-accents",
+    "operator-equals",
+    "comparison",
+    "collation"
+  ]
+}

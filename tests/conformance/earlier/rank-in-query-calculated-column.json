@@ -1,0 +1,65 @@
+{
+  "title": "EARLIER in a calculated column: rank by counting the rows with a larger value, plus 1",
+  "model": "sales",
+  "query": [
+    "DEFINE COLUMN Product[Price Rank] = COUNTROWS ( FILTER ( Product, EARLIER ( Product[Price] ) < Product[Price] ) ) + 1",
+    "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Rank\", Product[Price Rank] ) ORDER BY [Product]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          1
+        ],
+        [
+          "Helmet",
+          3
+        ],
+        [
+          "Lock",
+          4
+        ],
+        [
+          "Scooter",
+          2
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+      "quote": "The COUNTROWS function counts the rows of the filtered table and assigns that value to the new calculated column in the current row plus 1.",
+      "supports": "the page gives this formula for a rank column and explains EARLIER as the value of the current row of the outer loop"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+      "quote": "Adding 1 is needed to prevent the top ranked value from become a Blank.",
+      "supports": "the top row has no larger value: BLANK + 1 = 1"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Prices: Bike 100, Helmet 20, Lock 10, Scooter 50. Rows with a larger price: Bike none (COUNTROWS of an empty table is BLANK, BLANK + 1 = 1), Scooter 1 (Bike) + 1 = 2, Helmet 2 (Bike, Scooter) + 1 = 3, Lock 3 + 1 = 4.",
+  "tags": [
+    "earlier",
+    "define-column",
+    "countrows",
+    "filter",
+    "row-context",
+    "rank",
+    "selectcolumns",
+    "order-by"
+  ]
+}

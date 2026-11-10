@@ -1,0 +1,31 @@
+{
+  "title": "CONTAINSSTRING of a BLANK text is FALSE even for an empty search text",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONTAINSSTRING ( BLANK (), \"\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/containsstring/",
+    "quote": "If WithinText is BLANK or an empty string, CONTAINSSTRING always returns FALSE, even when FindText is empty or “*”.",
+    "supports": "states the result"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "containsstring",
+    "blank"
+  ]
+}

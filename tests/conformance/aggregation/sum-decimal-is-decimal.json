@@ -1,0 +1,40 @@
+{
+  "title": "The sum of a fixed decimal column is a fixed decimal",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", SUM ( V[Amt] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          22.75
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/sum/",
+      "quote": "corresponds to the following SUMX call",
+      "supports": "SUM ( t[c] ) is SUMX ( t, t[c] ): a chain of additions"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "Otherwise, when a currency is involved then the result is currency.",
+      "supports": "currency + currency is currency"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[Amt] holds 10.5, BLANK, 0, -2.25, 10.5, 4, BLANK. 10.5 + 0 - 2.25 + 10.5 + 4 = 22.75. Currency + currency stays currency.",
+  "tags": [
+    "sum",
+    "blank",
+    "result-type",
+    "decimal"
+  ]
+}

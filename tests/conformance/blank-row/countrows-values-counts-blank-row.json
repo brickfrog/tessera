@@ -1,0 +1,40 @@
+{
+  "title": "COUNTROWS ( VALUES ( table ) ) counts the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( VALUES ( Product ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "the VALUES function treats the blank row as a regular row, returning it. On the other hand, DISTINCT never returns the blank row",
+      "supports": "VALUES returns the blank row as a regular row"
+    },
+    {
+      "url": "https://dax.guide/values/",
+      "quote": "returns a table with the same columns and all the rows of the table (including duplicates) with the additional blank row caused by an invalid relationship if present",
+      "supports": "VALUES of a table adds the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows 3 and 4 have ProductKey 9, which Product lacks, so the relationship is invalid and Product gets a blank row. 3 stored rows + the blank row = 4.",
+  "tags": [
+    "countrows",
+    "values",
+    "blank-row",
+    "relationship"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "title": "IF returning BLANK where the other branch is Boolean returns FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IF ( 1 = 1, BLANK (), TRUE ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "IF ( 1 = 1, BLANK(), TRUE ) FALSE",
+      "supports": "the table of Boolean IF expressions shows this expression and its result"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "When <expression> is of Boolean data type, IF is of Boolean data type and an implicit cast is applied to BLANK which converts to FALSE",
+      "supports": "why: BLANK is cast to the Boolean type of the other branch"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "if",
+    "boolean"
+  ]
+}

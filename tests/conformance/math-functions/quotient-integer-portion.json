@@ -1,0 +1,37 @@
+{
+  "title": "QUOTIENT ( 5, 2 ) is 2",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", QUOTIENT ( 5, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/quotient-function-dax",
+      "quote": "The following formulas return the same result, 2.",
+      "supports": "the example = QUOTIENT(5,2); Return value: a whole number"
+    },
+    {
+      "url": "https://dax.guide/quotient/",
+      "quote": "QUOTIENT ( 5, 2 ) -- returns 2",
+      "supports": "the example; Return values: a single integer value"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "quotient"
+  ]
+}

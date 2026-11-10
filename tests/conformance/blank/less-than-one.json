@@ -1,0 +1,39 @@
+{
+  "title": "BLANK < 1 is TRUE: BLANK compares as zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () < 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "Blank evaluates to zero when performing a comparison",
+      "supports": "in a comparison with a number BLANK counts as 0"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "All comparison operators except == treat BLANK as equal to number 0",
+      "supports": "< treats BLANK as 0"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "BLANK is compared as 0, and 0 < 1 is TRUE.",
+  "tags": [
+    "blank",
+    "operator-less-than",
+    "comparison"
+  ]
+}

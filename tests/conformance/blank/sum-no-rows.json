@@ -1,0 +1,33 @@
+{
+  "title": "SUM over no rows is BLANK, not 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( SUM ( T[n] ), T[n] > 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/sum/",
+    "quote": "The result is blank in case there are no rows in the table with a non-blank value",
+    "supports": "SUM with nothing to add is BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "T[n] holds 1, 2, 3. No row has n > 10, so SUM has no rows and returns BLANK.",
+  "tags": [
+    "blank",
+    "sum",
+    "calculate",
+    "empty-table"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

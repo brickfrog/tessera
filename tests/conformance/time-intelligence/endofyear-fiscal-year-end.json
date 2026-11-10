@@ -1,0 +1,32 @@
+{
+  "title": "ENDOFYEAR with the year end \"6/30\" returns June 30",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ENDOFYEAR ( 'Date'[Date], \"6/30\" ), 'Date'[Date] = DATE ( 2024, 2, 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-06-30T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/endofyear-function-dax",
+    "quote": "A literal string with a date that defines the year-end date. The default is December 31.",
+    "supports": "the second argument moves the year end"
+  },
+  "confidence": "derived",
+  "derivation": "With the year ending June 30, the year that contains 2024-02-10 ends on 2024-06-30.",
+  "tags": [
+    "time-intelligence",
+    "endofyear",
+    "fiscal-year"
+  ]
+}

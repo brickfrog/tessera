@@ -1,0 +1,43 @@
+{
+  "title": "A date with no time concatenated to text reads 1/31/2024",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2024, 1, 31 ) & \"\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1/31/2024"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/concatenate/",
+      "quote": "CONCATENATE converts numbers, dates, and Boolean values to text with the default format",
+      "supports": "a date joined to text takes the default format; the page says & gives the same result as CONCATENATE"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/table-constructor",
+      "quote": "Returns the following table of a single column of String data type",
+      "supports": "the example { 1, DATE(2017, 1, 1), TRUE, \"A\" } is shown returning 1, 1/1/2017, TRUE, A as strings"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Concatenation converts a date to text with the default format. The table constructor example shows that conversion for a date at midnight in en-US: 1/1/2017, month/day/year without leading zeros and without a time. For 31 January 2024 that is 1/31/2024.",
+  "uncertain": true,
+  "alternative": "The published example is a table constructor, not &. If & kept the time part the result would be 1/31/2024 12:00:00 AM.",
+  "tags": [
+    "assumption:date-to-text",
+    "operator-concatenate",
+    "date",
+    "implicit-conversion",
+    "date-functions"
+  ]
+}

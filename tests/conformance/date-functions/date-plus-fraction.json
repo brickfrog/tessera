@@ -1,0 +1,39 @@
+{
+  "title": "A date plus 0.5 is noon of that day",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2020, 10, 15 ) + 0.5 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2020-10-15T12:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/time-function-dax",
+      "quote": "Therefore, the datetime value 12:00 PM is equivalent to 0.5, because it is half of a day.",
+      "supports": "half a day is 12 hours"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "INTEGER CURRENCY REAL Date/time",
+      "supports": "the addition table gives Date/time for Date/time + REAL"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "0.5 of a day is 12 hours: October 15, 2020 at 12:00:00.",
+  "tags": [
+    "date-functions",
+    "operator-add",
+    "result-type"
+  ]
+}

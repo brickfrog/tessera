@@ -1,0 +1,32 @@
+{
+  "title": "Several filter arguments are combined with AND",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], 'Product'[Color] = \"Red\", 'Date'[Year] = 2024 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          300.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/calculatetable-function-dax",
+    "quote": "When there are multiple filters, they're evaluated by using the AND logical operator",
+    "supports": "multiple filters must all be true at the same time"
+  },
+  "confidence": "derived",
+  "derivation": "Red sales rows are 1, 2, 3, 5, 7; of those in 2024: rows 5 and 7 = 200 + 100 = 300. An OR would give 460 + 330 - 300 = 490.",
+  "tags": [
+    "calculate",
+    "filter-intersection"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

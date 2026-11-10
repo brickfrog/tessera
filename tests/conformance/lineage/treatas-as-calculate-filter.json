@@ -1,0 +1,46 @@
+{
+  "title": "A TREATAS table used as a CALCULATE filter filters the column it names",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Treated\", CALCULATE ( [Sales Amount], TREATAS ( { \"Blue\", \"Purple\" }, Product[Color] ) ), \"In\", CALCULATE ( [Sales Amount], Product[Color] IN { \"Blue\", \"Purple\" } ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Treated]",
+          "type": "decimal"
+        },
+        {
+          "name": "[In]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          80.0,
+          80.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/treatas/",
+      "quote": "TREATAS assigns the data lineage of the columns returned by the expression using the columns in the following arguments",
+      "supports": "the page's example pairs TREATAS with the equivalent IN filter and shows equal results"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/treatas-function-dax",
+      "quote": "If a value returned in the table expression does not exist in the column, it is ignored",
+      "supports": "a value the column lacks is ignored"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Purple is not a color of Product. Blue is product 3: Sales rows 4 and 6 = 50 + 30 = 80, with both spellings.",
+  "tags": [
+    "calculate",
+    "treatas",
+    "table-constructor",
+    "lineage",
+    "in"
+  ]
+}

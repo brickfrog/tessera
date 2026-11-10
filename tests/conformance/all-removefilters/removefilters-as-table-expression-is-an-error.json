@@ -1,0 +1,25 @@
+{
+  "title": "REMOVEFILTERS cannot be used as a table expression",
+  "model": "sales",
+  "query": "EVALUATE REMOVEFILTERS ( 'Product' )",
+  "expected": {
+    "error": "REMOVEFILTERS can only be used to clear filters as a CALCULATE modifier; it does not return a table"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/removefilters-function-dax",
+      "quote": "REMOVEFILTERS can only be used to clear filters but not to return a table.",
+      "supports": "REMOVEFILTERS cannot return a table"
+    },
+    {
+      "url": "https://dax.guide/removefilters/",
+      "quote": "it can be used only as a CALCULATE modifier and not as a table expression like ALL",
+      "supports": "it is not a table expression like ALL"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "removefilters",
+    "error"
+  ]
+}

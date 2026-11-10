@@ -1,0 +1,31 @@
+{
+  "title": "CONVERT ( BLANK, BOOLEAN ) is FALSE, the one conversion of BLANK that is not BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( BLANK (), BOOLEAN ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "The only exception is BOOLEAN: CONVERT ( BLANK (), BOOLEAN ) returns FALSE",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "convert",
+    "boolean"
+  ]
+}

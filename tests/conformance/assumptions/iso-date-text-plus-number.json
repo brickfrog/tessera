@@ -1,0 +1,42 @@
+{
+  "title": "\"2024-01-31\" + 1 is 45323: the text converts to the date's day number and the sum is a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"2024-01-31\" + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          45323
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/value/",
+      "quote": "VALUE is not common because DAX implicitly converts text to numbers as necessary",
+      "supports": "the implicit conversion is the one VALUE does, and VALUE ( \"2020-10-23\" ) is shown as 44127"
+    },
+    {
+      "url": "https://dax.guide/op/addition/",
+      "quote": "Any argument passed as a string to the binary operator is automatically converted into a number",
+      "supports": "+ converts a string operand to a number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "+ converts a string to a number as VALUE does. VALUE of an ISO date is its day number: 2020-10-23 is 44127. 2024-01-31 is 1195 days later (69 to the end of 2020, 365 + 365 + 365 for 2021 to 2023, 31 in January 2024), so 45322. Plus 1 is 45323.",
+  "uncertain": true,
+  "alternative": "If the text is cast to a date rather than a number, the addition table gives Date/time for Date/time + INTEGER and the result is the date 2024-02-01. If text in date form is not accepted by +, the query fails.",
+  "tags": [
+    "assumption:text-to-date",
+    "operator-add",
+    "implicit-conversion",
+    "iso-date"
+  ],
+  "notes": "The column's type is not asserted: no source says whether a number that came from text is an integer or a decimal number."
+}

@@ -1,0 +1,42 @@
+{
+  "title": "In nested CALCULATE an inner KEEPFILTERS intersects with the outer filter on the same column",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( CALCULATE ( [Sales Amount], KEEPFILTERS ( Customer[Country] IN { \"US\", \"JP\" } ) ), Customer[Country] IN { \"JP\", \"FR\" } ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          230.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/keepfilters-function-dax",
+      "quote": "Because the intersection of filters is used",
+      "supports": "the page's '$$ in WA !!' expression: with KEEPFILTERS the inner and outer filters on the column are intersected"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/keepfilters-function-dax",
+      "quote": "whereas CALCULATE filters replace the current context, KEEPFILTERS adds filters to the current context",
+      "supports": "KEEPFILTERS adds to the current context instead of replacing it"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Outer: { JP, FR }. Inner with KEEPFILTERS: { US, JP }. Intersection: JP = rows 5, 6 = 200 + 30 = 230. Without KEEPFILTERS the inner filter would replace the outer: US + JP = 540.",
+  "tags": [
+    "calculate",
+    "keepfilters",
+    "in",
+    "nested-calculate",
+    "filter-intersection"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

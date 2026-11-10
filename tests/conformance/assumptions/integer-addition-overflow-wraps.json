@@ -1,0 +1,41 @@
+{
+  "title": "CONVERT ( 5E18, INTEGER ) + CONVERT ( 5E18, INTEGER ) is -8446744073709551616: no error, the sum wraps",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( 5E18, INTEGER ) + CONVERT ( 5E18, INTEGER ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -8446744073709551616
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/rounding-errors-with-different-data-types-in-dax/",
+      "quote": "there is an overflow condition, but there is no overflow error and the result is the least significant representable digits",
+      "supports": "integer sum, subtraction and multiplication wrap around on overflow instead of failing"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/rounding-errors-with-different-data-types-in-dax/",
+      "quote": "the outcome of the expression is a negative number",
+      "supports": "the page gives this expression's result as -8,446,744,073,709,551,616"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "assumption:integer-overflow",
+    "operator-add",
+    "convert",
+    "int64",
+    "overflow"
+  ],
+  "notes": "10^19 - 2^64 = -8446744073709551616."
+}

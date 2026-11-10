@@ -1,0 +1,40 @@
+{
+  "title": "FILTER over the fact table, as a CALCULATE filter, filters the related dimensions too",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Products\", CALCULATE ( COUNTROWS ( Product ), FILTER ( Sales, Sales[Quantity] >= 3 ) ), \"Customers\", CALCULATE ( COUNTROWS ( Customer ), FILTER ( Sales, Sales[Quantity] >= 3 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "int64"
+        },
+        {
+          "name": "[Customers]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/context-transition-and-expanded-tables/",
+    "quote": "when you place a filter on Sales, it results in applying the filter not only on the Sales table, but also on the Product table",
+    "supports": "a filter on Sales is also a filter on Product, and on every table Sales expands to"
+  },
+  "confidence": "derived",
+  "derivation": "Sales rows with Quantity >= 3: row 4 (5) and row 6 (3). Both are product 3 (Lock): 1 product. Their customers are 2 and 3: 2 customers.",
+  "tags": [
+    "calculate",
+    "filter",
+    "countrows",
+    "expanded-table",
+    "table-filter",
+    "relationship"
+  ]
+}

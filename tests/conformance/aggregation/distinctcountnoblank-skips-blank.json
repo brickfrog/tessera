@@ -1,0 +1,39 @@
+{
+  "title": "DISTINCTCOUNTNOBLANK leaves BLANK out of the distinct values",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNTNOBLANK ( V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/distinctcount/",
+      "quote": "DISTINCTCOUNTNOBLANK does not count any blank value",
+      "supports": "BLANK is not counted"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/distinctcount-function-dax",
+      "quote": "To skip the BLANK value, use the DISTINCTCOUNTNOBLANK function.",
+      "supports": "same"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. Distinct non-blank values: 5, 0, -3, 2.",
+  "tags": [
+    "distinctcountnoblank",
+    "blank",
+    "duplicates"
+  ]
+}

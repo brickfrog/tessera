@@ -1,0 +1,31 @@
+{
+  "title": "LOG ( 25, 5 ) is 2",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", LOG ( 25, 5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.0
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-09,
+  "source": {
+    "url": "https://dax.guide/log/",
+    "quote": "Logarithm of number to the base specified.",
+    "supports": "the example table lists 25 with LOG 5 = 2.00"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "log"
+  ]
+}

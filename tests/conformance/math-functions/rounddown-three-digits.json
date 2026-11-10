@@ -1,0 +1,30 @@
+{
+  "title": "ROUNDDOWN ( 3.14159, 3 ) is 3.141",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUNDDOWN ( 3.14159, 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          3.141
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rounddown-function-dax",
+    "quote": "The following example rounds 3.14159 down to three decimal places. The expected result is 3.141.",
+    "supports": "the example gives 3.141; Return value: a decimal number"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "rounddown"
+  ]
+}

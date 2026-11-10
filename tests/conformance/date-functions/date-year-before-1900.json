@@ -1,0 +1,46 @@
+{
+  "title": "DATE ( 1850, 1, 2 ) returns January 2, 1850",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 1850, 1, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1850-01-02T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/date-function-dax",
+      "quote": "If year is between 100 and 9999 (inclusive), that value is used as the year.",
+      "supports": "years from 100 are used as they are"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/date-function-dax",
+      "quote": "Dates beginning with March 1, 1900 are supported.",
+      "supports": "earlier dates are outside the supported range"
+    },
+    {
+      "url": "https://dax.guide/date/",
+      "quote": "If Year is between 100 and 9999 (inclusive), DATE uses the value as the year.",
+      "supports": "the same rule"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "1850 is between 100 and 9999, so it is used as the year: January 2, 1850. The pages say dates before March 1, 1900 are not officially supported but do not say DATE fails for them; DAX Guide gives DATE ( -50, 1, 2 ) returning January 2, 1850.",
+  "uncertain": true,
+  "alternative": "If the engine refuses dates before March 1, 1900, the query fails.",
+  "tags": [
+    "date-functions",
+    "date",
+    "before-1900"
+  ]
+}

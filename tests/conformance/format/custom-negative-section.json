@@ -1,0 +1,38 @@
+{
+  "title": "A second section of a custom format applies to negative numbers",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( -1980.1, \"#,0.00;(#,0.00)\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "(1,980.10)"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "Two sections : first for positive and zero, second for negative",
+      "supports": "the example shows FORMAT ( -1980.1, \"#,0.00;(#,0.00)\" ) as (1,980.10)"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "The first section applies to positive values and zeros, the second to negative values.",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "custom-numeric-format",
+    "sections"
+  ]
+}

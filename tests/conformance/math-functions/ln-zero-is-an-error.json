@@ -1,0 +1,19 @@
+{
+  "title": "LN ( 0 ) is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", LN ( 0 ) )",
+  "expected": {
+    "error": "LN of zero"
+  },
+  "source": {
+    "url": "https://dax.guide/ln/",
+    "quote": "If the number is less than or equal to zero, the function generates an error.",
+    "supports": "zero is documented as an error"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "ln",
+    "error"
+  ]
+}

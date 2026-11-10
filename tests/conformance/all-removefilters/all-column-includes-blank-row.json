@@ -1,0 +1,46 @@
+{
+  "title": "ALL ( column ) as a table includes the blank row added for orphans",
+  "model": "sales-orphans",
+  "query": "EVALUATE ALL ( 'Product'[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "In every case, ALL includes in the result the additional blank row generated for invalid relationships",
+      "supports": "ALL includes the blank row generated for an invalid relationship"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "ALL considers the blank row as valid.",
+      "supports": "ALL treats the blank row as a valid row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] holds Red, Blue, Red. Sales rows 3 and 4 have ProductKey 9, which Product lacks, so Product has the blank row and ALL returns its BLANK color too.",
+  "tags": [
+    "all",
+    "blank-row",
+    "table-function",
+    "relationship"
+  ]
+}

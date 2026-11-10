@@ -1,0 +1,44 @@
+{
+  "title": "A DEFINE FUNCTION with the name of a model function replaces it for the query",
+  "model": {
+    "base": "sales",
+    "functions": [
+      {
+        "name": "Twice",
+        "expression": "( x : NUMERIC ) => x * 2"
+      }
+    ]
+  },
+  "query": [
+    "DEFINE FUNCTION Twice = ( x : NUMERIC ) => x * 3",
+    "EVALUATE { Twice ( 2 ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          6
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/st/function/",
+    "quote": "A query function overrides a model function with the same name.",
+    "supports": "the query definition is the one used"
+  },
+  "confidence": "derived",
+  "derivation": "The model Twice multiplies by 2 and would give 4. The query redefines Twice to multiply by 3: 2 * 3 = 6.",
+  "tags": [
+    "udf",
+    "define-function",
+    "model-function",
+    "function-override"
+  ]
+}

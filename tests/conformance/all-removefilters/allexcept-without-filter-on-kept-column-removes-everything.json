@@ -1,0 +1,57 @@
+{
+  "title": "ALLEXCEPT only keeps an existing filter: grouped by another column it gives the grand total",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Using AllExcept] = CALCULATE ( [Sales Amount], ALLEXCEPT ( 'Product', 'Product'[Category] ) )",
+    "EVALUATE ADDCOLUMNS ( VALUES ( 'Product'[Product] ), \"x\", [Using AllExcept] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[x]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          540.0
+        ],
+        [
+          "Helmet",
+          540.0
+        ],
+        [
+          "Lock",
+          540.0
+        ],
+        [
+          "Scooter",
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/using-allexcept-versus-all-and-values/",
+    "quote": "If there are no filters on Customer[Continent] when ALLEXCEPT is invoked, there will be no filters after ALLEXCEPT has done its job.",
+    "supports": "ALLEXCEPT does not add a filter: with no filter on the kept column, nothing is left after it"
+  },
+  "confidence": "derived",
+  "derivation": "Each row filters Product[Product] only. There is no filter on Product[Category] to keep, so ALLEXCEPT removes the product filter and leaves an empty filter context: 540 on every row, not the category total.",
+  "tags": [
+    "calculate",
+    "allexcept",
+    "addcolumns",
+    "values",
+    "define-measure",
+    "filter-removal",
+    "context-transition"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

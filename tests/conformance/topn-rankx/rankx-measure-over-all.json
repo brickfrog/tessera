@@ -1,0 +1,69 @@
+{
+  "title": "Ranking a measure needs a table that ignores the current filter: ALL",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS (",
+    "    Product[Product],",
+    "    \"Amt\", [Sales Amount],",
+    "    \"Rank\", IF ( NOT ISBLANK ( [Sales Amount] ), RANKX ( ALL ( Product[Product] ), [Sales Amount] ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          400.0,
+          1
+        ],
+        [
+          "Lock",
+          80.0,
+          2
+        ],
+        [
+          "Helmet",
+          60.0,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-rankx-in-dax/",
+      "quote": "RANKX starts iterating the table with all the brands, and for each row it computes the Sales Amount measure.",
+      "supports": "the measure is evaluated for every row of the table by context transition"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-rankx-in-dax/",
+      "quote": "We could have used ALL instead of ALLSELECTED .",
+      "supports": "ALL gives the full list whatever the current filter"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales Amount by product: Bike 100 + 200 + 100 = 400, Lock 50 + 30 = 80, Helmet 40 + 20 = 60, Scooter BLANK. For each group the list is built over all four products (400, 80, 60 and the BLANK of Scooter) and the amount of the group is looked up: Bike 1, Lock 2, Helmet 3. Scooter has a BLANK amount, the IF leaves its rank BLANK too, and SUMMARIZECOLUMNS drops the row.",
+  "tags": [
+    "rankx",
+    "all",
+    "measure",
+    "context-transition",
+    "summarizecolumns",
+    "if"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "title": "FORMAT with d, dd, m and mm: with and without a leading zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"d\", FORMAT ( DATE ( 2020, 1, 9 ), \"d\" ), \"dd\", FORMAT ( DATE ( 2020, 1, 9 ), \"dd\" ), \"m\", FORMAT ( DATE ( 2020, 1, 2 ), \"m\" ), \"mm\", FORMAT ( DATE ( 2020, 1, 2 ), \"mm\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[d]",
+          "type": "string"
+        },
+        {
+          "name": "[dd]",
+          "type": "string"
+        },
+        {
+          "name": "[m]",
+          "type": "string"
+        },
+        {
+          "name": "[mm]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "9",
+          "09",
+          "1",
+          "01"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "The \"d\" format string offers many options, depending on the",
+      "supports": "the example shows d = 9 and dd = 09 for DATE ( 2020, 1, 9 )"
+    },
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "The \"m\" format string offers many options, depending on the",
+      "supports": "the example shows m = 1 and mm = 01 for DATE ( 2020, 1, 2 )"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "custom-date-format"
+  ]
+}

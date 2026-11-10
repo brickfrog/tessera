@@ -1,0 +1,69 @@
+{
+  "title": "EARLIER reads the outer row inside FILTER: running count of rows up to the current value",
+  "model": "sales",
+  "query": [
+    "EVALUATE ADDCOLUMNS ( VALUES ( Sales[Quantity] ),",
+    "  \"Rows\", CALCULATE ( COUNTROWS ( Sales ) ),",
+    "  \"RT Rows\", COUNTROWS ( FILTER ( Sales, Sales[Quantity] <= EARLIER ( Sales[Quantity] ) ) ) )",
+    "ORDER BY Sales[Quantity]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Sales[Quantity]",
+          "type": "int64"
+        },
+        {
+          "name": "[Rows]",
+          "type": "int64"
+        },
+        {
+          "name": "[RT Rows]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          3,
+          3
+        ],
+        [
+          2,
+          2,
+          5
+        ],
+        [
+          3,
+          1,
+          6
+        ],
+        [
+          5,
+          1,
+          7
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/earlier/",
+    "quote": "EARLIER evaluates a column in the outer row context, in case there -- are multiple row contexts open in the same expression",
+    "supports": "the page shows this query shape (customers by yearly income) with its running total"
+  },
+  "confidence": "derived",
+  "derivation": "Sales[Quantity] by row: 1, 2, 1, 5, 2, 3, 1. Distinct values 1, 2, 3, 5 with 3, 2, 1, 1 rows (CALCULATE turns the row into a filter). FILTER ( Sales, ... ) has no filter on Sales, so it scans all 7 rows and keeps those with a quantity up to the outer value: 3, 3 + 2 = 5, 5 + 1 = 6, 7.",
+  "tags": [
+    "earlier",
+    "addcolumns",
+    "values",
+    "countrows",
+    "filter",
+    "calculate",
+    "row-context",
+    "context-transition",
+    "order-by"
+  ]
+}

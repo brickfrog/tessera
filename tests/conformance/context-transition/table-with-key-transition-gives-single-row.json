@@ -1,0 +1,86 @@
+{
+  "title": "Context transition on a table with a unique key filters exactly the current row",
+  "model": "b-duplicates",
+  "query": "EVALUATE ADDCOLUMNS ( Keyed, \"T\", CALCULATE ( SUM ( Keyed[Value] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Keyed[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Keyed[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Keyed[Value]",
+          "type": "int64"
+        },
+        {
+          "name": "[T]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "A",
+          10,
+          10
+        ],
+        [
+          2,
+          "A",
+          10,
+          10
+        ],
+        [
+          3,
+          "B",
+          5,
+          5
+        ],
+        [
+          4,
+          "C",
+          1,
+          1
+        ],
+        [
+          5,
+          "C",
+          1,
+          1
+        ],
+        [
+          6,
+          "C",
+          1,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+      "quote": "This, of course, holds true if the table has a primary key that guarantees the absence of duplication.",
+      "supports": "with a primary key there are no duplicated rows, so the transition filters a single row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+      "quote": "The row context, which contains a single row, is transformed into a filter context that contains the same row.",
+      "supports": "the row context becomes a filter context that contains the same row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Keyed has the same Name and Value pairs as Dup plus a unique Id (1 to 6). The transition also filters Id, so each row sees only itself: T equals Value.",
+  "tags": [
+    "addcolumns",
+    "calculate",
+    "sum",
+    "context-transition",
+    "key"
+  ]
+}

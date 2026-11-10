@@ -1,0 +1,32 @@
+{
+  "title": "DATEVALUE ( \"1/8/2009\" ) is January 8, 2009 in en-US: month first",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATEVALUE ( \"1/8/2009\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2009-01-08T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/datevalue-function-dax",
+    "quote": "If the model date/time settings represent dates in the format of Month/Day/Year, then the string, \"1/8/2009\", is converted to a datetime value equivalent to January 8th of 2009.",
+    "supports": "the rule for a month/day/year culture"
+  },
+  "confidence": "derived",
+  "derivation": "The model culture is en-US, whose dates are month/day/year, so \"1/8/2009\" is January 8, 2009.",
+  "tags": [
+    "date-functions",
+    "datevalue",
+    "culture"
+  ]
+}

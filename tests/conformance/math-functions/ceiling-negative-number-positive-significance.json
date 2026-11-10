@@ -1,0 +1,37 @@
+{
+  "title": "CEILING ( -10.2, 1 ) is -10: toward positive infinity",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CEILING ( -10.2, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -10
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/ceiling/",
+      "quote": "= CEILING ( -10.2, 1 ) -- Returns -10 (Integer)",
+      "supports": "the example states the value and the type"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/ceiling-function-dax",
+      "quote": "When using a positive multiple of significance, both CEILING and ISO.CEILING round negative numbers upward (toward positive infinity).",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "ceiling"
+  ]
+}

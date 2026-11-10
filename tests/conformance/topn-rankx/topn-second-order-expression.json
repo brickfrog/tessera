@@ -1,0 +1,48 @@
+{
+  "title": "A second order expression in TOPN breaks the tie",
+  "model": "d-values",
+  "query": "EVALUATE TOPN ( 2, Player, Player[Score], DESC, Player[Name], ASC )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          90
+        ],
+        [
+          "Bob",
+          80
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/topn/",
+      "quote": "-- Multiple sorting criteria can be provided in further parameters.",
+      "supports": "the page shows the tied result shrinking to N rows once a second sort expression is added"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/topn-function-dax",
+      "quote": "If there is a tie, in Order_By values, at the N-th row of the table, then all tied rows are returned.",
+      "supports": "ties at the N-th row are all returned"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Player scores: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. By score descending, then name ascending: Ann 90, Bob 80, Cho 80, ... The first two rows are Ann and Bob, and Bob no longer ties with Cho because the names differ.",
+  "tags": [
+    "topn",
+    "ties",
+    "order"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "title": "An empty string is not BLANK for COALESCE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COALESCE ( \"\", \"x\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          ""
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/coalesce/",
+    "quote": "An empty string and 0 are not BLANK , so COALESCE returns them.",
+    "supports": "the empty string is returned"
+  },
+  "confidence": "derived",
+  "derivation": "The first argument is the empty string, which is not BLANK, so it is returned and \"x\" is not.",
+  "tags": [
+    "coalesce",
+    "blank",
+    "empty-string"
+  ]
+}

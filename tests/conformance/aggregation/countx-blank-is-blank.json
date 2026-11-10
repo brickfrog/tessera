@@ -1,0 +1,31 @@
+{
+  "title": "COUNTX of an expression that is always BLANK is BLANK, not 0",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTX ( V, BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/countx/",
+    "quote": "When the function finds no rows producing a non-blank value, it returns a blank.",
+    "supports": "the page says COUNTX ( Customer, BLANK () ) returns BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "The expression is BLANK for every row, so nothing is counted and the result is BLANK.",
+  "tags": [
+    "countx",
+    "blank"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

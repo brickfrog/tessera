@@ -1,0 +1,38 @@
+{
+  "title": "BLANK / BLANK is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () / BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "BLANK/BLANK BLANK",
+      "supports": "the table of BLANK in operations gives BLANK for BLANK/BLANK"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "BLANK () / BLANK () Blank value",
+      "supports": "the same"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "division",
+    "blank",
+    "operator-divide"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

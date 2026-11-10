@@ -1,0 +1,32 @@
+{
+  "title": "IF with a decimal and an integer branch returns a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IF ( 1 = 2, 1.0, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          0.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+    "quote": "the formula IF(<condition>, 1.0, 0) returns only decimal values even though value_if_false is of the whole number data type",
+    "supports": "stated outright"
+  },
+  "confidence": "derived",
+  "derivation": "1 = 2 is FALSE, so the result is the else value 0, converted to the decimal type the two branches share: 0.0.",
+  "tags": [
+    "conversion",
+    "if",
+    "result-type"
+  ]
+}

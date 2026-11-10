@@ -1,0 +1,67 @@
+{
+  "title": "EVALUATE of a table name returns its rows and all its columns, named Table[Column], in model order",
+  "model": "sales",
+  "query": "EVALUATE Customer ORDER BY Customer[CustomerKey]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[CustomerKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Customer[Customer]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Ann",
+          "US"
+        ],
+        [
+          2,
+          "Bob",
+          "US"
+        ],
+        [
+          3,
+          "Cho",
+          "JP"
+        ],
+        [
+          4,
+          "Dee",
+          "FR"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/evaluate-statement-dax",
+      "quote": "Returns all rows and columns from the Internet Sales table, as a table.",
+      "supports": "a table name returns the whole table"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "Tables in the model when referenced by name work with EVALUATE to output a result table showing the data in the table.",
+      "supports": "a table name is a table expression"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Customer has three columns and four rows, returned as they are and sorted by the key.",
+  "tags": [
+    "evaluate",
+    "table-reference",
+    "column-names",
+    "order-by"
+  ],
+  "notes": "The pages do not state the order of the columns; the order of the model definition is assumed."
+}

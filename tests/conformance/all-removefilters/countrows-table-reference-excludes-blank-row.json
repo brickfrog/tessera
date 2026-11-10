@@ -1,0 +1,32 @@
+{
+  "title": "A plain table reference does not include the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( 'Product' ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+    "quote": "the blank row is never returned, as if it were not part of the table",
+    "supports": "a table reference never returns the blank row"
+  },
+  "confidence": "derived",
+  "derivation": "Product has 3 real rows; the blank row for the orphans is not part of a table reference.",
+  "tags": [
+    "countrows",
+    "blank-row",
+    "relationship"
+  ]
+}

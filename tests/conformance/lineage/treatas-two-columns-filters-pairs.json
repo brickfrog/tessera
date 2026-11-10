@@ -1,0 +1,47 @@
+{
+  "title": "TREATAS over two columns filters the pairs, not each column on its own",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Pairs\", CALCULATE ( [Sales Amount], TREATAS ( { ( \"Red\", \"Vehicles\" ), ( \"Blue\", \"Accessories\" ) }, Product[Color], Product[Category] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Pairs]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          480.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/treatas/",
+      "quote": "TREATAS can be used with tables with multiple columns",
+      "supports": "TREATAS takes one target column per column of the table"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/propagate-filters-using-treatas-in-dax/",
+      "quote": "You can also use TREATAS with two or more columns",
+      "supports": "same statement"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/treatas-function-dax",
+      "quote": "The number of columns specified must match the number of columns in the table expression and be in the same order",
+      "supports": "the columns are matched in order"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "(Red, Vehicles) is Bike: Sales rows 1, 5, 7 = 400. (Blue, Accessories) is Lock: rows 4, 6 = 80. 400 + 80 = 480. Helmet is Red and Accessories, but (Red, Accessories) is not one of the pairs.",
+  "tags": [
+    "calculate",
+    "treatas",
+    "table-constructor",
+    "lineage",
+    "multi-column-filter"
+  ],
+  "notes": "Two independent filters, Color in {Red, Blue} and Category in {Vehicles, Accessories}, would include Helmet and give 540."
+}

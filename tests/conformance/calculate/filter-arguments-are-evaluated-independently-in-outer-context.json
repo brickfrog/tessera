@@ -1,0 +1,42 @@
+{
+  "title": "Each filter argument is evaluated in the outer context, not under its sibling arguments",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], FILTER ( VALUES ( Customer[Country] ), [Sales Amount] > 250 ), 'Date'[Year] = 2023 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          210.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "CALCULATE evaluates all the explicit filter arguments in the original evaluation context, each one independently from the others.",
+      "supports": "filter arguments are evaluated in the original evaluation context, each one independently from the others"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/order-of-evaluation-in-calculate-parameters/",
+      "quote": "all the filter parameters of a CALCULATE are executed independently from each other",
+      "supports": "the filter parameters of one CALCULATE do not affect each other's evaluation"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "FILTER is evaluated with no filter on Year: US 310, JP 230, FR BLANK; only US exceeds 250. Then Country = US and Year = 2023 apply together: rows 1, 2, 3, 4 = 100 + 40 + 20 + 50 = 210. If FILTER saw Year = 2023, US would be 210, no country would pass and the result would be BLANK.",
+  "tags": [
+    "calculate",
+    "filter",
+    "values",
+    "measure",
+    "evaluation-order"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

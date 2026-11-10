@@ -1,0 +1,41 @@
+{
+  "title": "IFERROR returns its second argument when a text cannot be converted to a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IFERROR ( VALUE ( \"abc\" ), -1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          -1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/iferror-function-dax",
+      "quote": "Evaluates an expression and returns a specified value if the expression returns an error; otherwise returns the value of the expression itself.",
+      "supports": "an error in the first argument gives the second"
+    },
+    {
+      "url": "https://dax.guide/value/",
+      "quote": "VALUE raises an error if the conversion is not possible.",
+      "supports": "VALUE ( \"abc\" ) is an error"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "\"abc\" is not a number, so VALUE raises an error; IFERROR catches it and returns -1.",
+  "tags": [
+    "iferror",
+    "value",
+    "error",
+    "implicit-conversion",
+    "text-functions"
+  ],
+  "notes": "The type is left out: VALUE returns a decimal number and -1 is an integer. DAX Guide warns that IFERROR does not catch every runtime error, depending on the execution plan; a constant expression like this one is the simplest case."
+}

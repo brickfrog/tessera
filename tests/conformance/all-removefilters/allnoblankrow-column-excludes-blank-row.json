@@ -1,0 +1,43 @@
+{
+  "title": "ALLNOBLANKROW ( column ) leaves out the blank row added for orphans",
+  "model": "sales-orphans",
+  "query": "EVALUATE ALLNOBLANKROW ( 'Product'[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/allnoblankrow/",
+      "quote": "The only blank row that is ignored is the one added to a table in case of an invalid relationship.",
+      "supports": "ALLNOBLANKROW ignores the blank row added for an invalid relationship"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "ALLNOBLANKROW does not return the blank row",
+      "supports": "contrary to ALL, ALLNOBLANKROW does not return the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] holds Red, Blue, Red: unique values Red and Blue. The blank row for the orphan Sales rows (ProductKey 9) is not returned.",
+  "tags": [
+    "allnoblankrow",
+    "blank-row",
+    "table-function",
+    "relationship"
+  ]
+}

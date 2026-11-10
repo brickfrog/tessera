@@ -1,0 +1,54 @@
+{
+  "title": "DATEADD moves a whole month to the whole month before, whatever its length",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = DATEADD ( 'Date'[Date], -1, MONTH ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] >= DATE ( 2024, 2, 1 ) && 'Date'[Date] <= DATE ( 2024, 2, 29 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-01T00:00:00",
+          "2024-01-31T00:00:00",
+          31,
+          300.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/dateadd/",
+      "quote": "If the <Dates> argument includes all the days in April (30 rows), the result for the previous month includes all the days in March (31 days).",
+      "supports": "a whole month becomes the whole target month"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "If all the days of the month are selected, then the entire month is shifted by the number of intervals specified.",
+      "supports": "a fully selected month moves as a whole month"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "All 29 days of February 2024 are selected, so the result is all of January 2024: 31 days from 29. Sales in January 2024: 300.",
+  "tags": [
+    "time-intelligence",
+    "dateadd",
+    "leap-year"
+  ]
+}

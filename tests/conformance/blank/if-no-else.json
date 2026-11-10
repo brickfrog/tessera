@@ -1,0 +1,31 @@
+{
+  "title": "IF without an else branch returns BLANK when the condition is false",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IF ( 1 = 2, 5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+    "quote": "If omitted, BLANK is returned",
+    "supports": "a missing value_if_false is BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "1 = 2 is FALSE and there is no third argument, so the result is BLANK.",
+  "tags": [
+    "blank",
+    "if"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

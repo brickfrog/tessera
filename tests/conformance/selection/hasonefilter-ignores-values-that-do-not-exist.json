@@ -1,0 +1,42 @@
+{
+  "title": "HASONEFILTER counts only the filtered values that exist in the column",
+  "model": "sales",
+  "query": [
+    "EVALUATE ROW (",
+    "  \"Red and Purple\", CALCULATE ( HASONEFILTER ( Product[Color] ), Product[Color] IN { \"Red\", \"Purple\" } ),",
+    "  \"Red and Blue\", CALCULATE ( HASONEFILTER ( Product[Color] ), Product[Color] IN { \"Red\", \"Blue\" } ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Red and Purple]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Red and Blue]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true,
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/hasonefilter/",
+    "quote": "Filters on non-existing values are not considered",
+    "supports": "the page shows a filter on one existing and one non-existing value returning true, and on two existing values false"
+  },
+  "confidence": "derived",
+  "derivation": "Purple is not a color of Product, so the first filter leaves one filtered value, Red: TRUE. Red and Blue both exist: two filtered values, FALSE.",
+  "tags": [
+    "hasonefilter",
+    "calculate",
+    "in",
+    "direct-filter"
+  ]
+}

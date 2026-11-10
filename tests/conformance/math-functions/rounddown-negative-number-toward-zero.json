@@ -1,0 +1,31 @@
+{
+  "title": "ROUNDDOWN ( -1.9, 0 ) is -1: down means toward zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUNDDOWN ( -1.9, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -1.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rounddown-function-dax",
+    "quote": "Rounds a number down, toward zero.",
+    "supports": "ROUNDDOWN rounds toward zero, so a negative number moves up"
+  },
+  "confidence": "derived",
+  "derivation": "-1.9 rounded toward zero to 0 digits is -1 (INT ( -1.9 ) would be -2). ROUNDDOWN returns a decimal number: -1.0.",
+  "tags": [
+    "math-functions",
+    "rounddown"
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "title": "ISERROR is TRUE for the infinities and NaN of a division by zero, FALSE for the BLANK of DIVIDE",
+  "model": "scalar",
+  "query": [
+    "DEFINE VAR PositiveInfinity = 1 / 0 VAR NegativeInfinity = -1 / 0 VAR NotANumber = 0 / 0",
+    "EVALUATE {",
+    "  ( \"1 / 0\", ISERROR ( PositiveInfinity ) ),",
+    "  ( \"-1 / 0\", ISERROR ( NegativeInfinity ) ),",
+    "  ( \"0 / 0\", ISERROR ( NotANumber ) ),",
+    "  ( \"DIVIDE ( 1, 0 )\", ISERROR ( DIVIDE ( 1, 0 ) ) ),",
+    "  ( \"DIVIDE ( 0, 0 )\", ISERROR ( DIVIDE ( 0, 0 ) ) ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value1]",
+          "type": "string"
+        },
+        {
+          "name": "[Value2]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "1 / 0",
+          true
+        ],
+        [
+          "-1 / 0",
+          true
+        ],
+        [
+          "0 / 0",
+          true
+        ],
+        [
+          "DIVIDE ( 1, 0 )",
+          false
+        ],
+        [
+          "DIVIDE ( 0, 0 )",
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/iserror/",
+    "quote": "ISERROR returns TRUE for the infinite values and for NaN -- (not a number) that a division by zero can return.",
+    "supports": "the page shows this query with its result"
+  },
+  "confidence": "published",
+  "tags": [
+    "iserror",
+    "division-by-zero",
+    "infinity",
+    "nan",
+    "divide",
+    "define",
+    "query-variable"
+  ]
+}

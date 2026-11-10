@@ -1,0 +1,50 @@
+{
+  "title": "TREATAS gives a table constructor the lineage of a model column",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( TREATAS ( { \"Red\", \"Blue\" }, Product[Color] ), \"Amt\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ],
+        [
+          "Blue",
+          80.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+      "quote": "TREATAS returns the same input table, with each column tagged with the data lineage of the column references specified as arguments",
+      "supports": "TREATAS tags the column with the lineage of Product[Color]"
+    },
+    {
+      "url": "https://dax.guide/treatas/",
+      "quote": "TREATAS assigns the data lineage of the columns returned by the expression using the columns in the following arguments",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "After TREATAS the column is Product[Color], and context transition filters it. Red is products 1 and 2: Sales rows 1, 2, 3, 5, 7 = 100 + 40 + 20 + 200 + 100 = 460. Blue is product 3: rows 4, 6 = 50 + 30 = 80.",
+  "tags": [
+    "addcolumns",
+    "treatas",
+    "table-constructor",
+    "lineage",
+    "context-transition"
+  ]
+}

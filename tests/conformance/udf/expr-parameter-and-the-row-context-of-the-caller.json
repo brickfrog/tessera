@@ -1,0 +1,35 @@
+{
+  "title": "An EXPR argument that reads a column of the caller row",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION Twice = ( x : EXPR ) => x * 2",
+    "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Twice\", Twice ( Product[Price] ) )"
+  ],
+  "expected": {
+    "error": "the EXPR argument is evaluated in the function body, which does not inherit the row context of the caller, so Product[Price] has no current row"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "An expr parameter is evaluated lazily within the function body, so it inherits only the filter context.",
+      "supports": "an EXPR argument does not get the row context of the caller"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "Expression parameters are passed as formulas, and they are evaluated every time the function uses them.",
+      "supports": "the SQLBI article describes an EXPR argument as a formula placed in the body"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The Microsoft page says an EXPR parameter inherits only the filter context. Product[Price] needs a row context, and the body has none of its own, so the column cannot be evaluated and the query fails.",
+  "uncertain": true,
+  "alternative": "The SQLBI article describes an EXPR argument as the formula itself, evaluated where the body uses it. If the row context of the SELECTCOLUMNS that contains the call is still available there, the result is the same as with VAL: Bike 200, Helmet 40, Lock 20, Scooter 100.",
+  "tags": [
+    "udf",
+    "define-function",
+    "expr-parameter",
+    "row-context",
+    "selectcolumns",
+    "error"
+  ]
+}

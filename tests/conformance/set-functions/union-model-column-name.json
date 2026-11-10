@@ -1,0 +1,50 @@
+{
+  "title": "UNION of a model column and a table constructor keeps the name of the first table",
+  "model": "sales",
+  "query": "EVALUATE UNION ( VALUES ( Product[Color] ), { \"Red\" } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Green"
+        ],
+        [
+          "Red"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/union/",
+      "quote": "The column names in the return table will match the column names in the first Table.",
+      "supports": "the result column is Product[Color]"
+    },
+    {
+      "url": "https://dax.guide/union/",
+      "quote": "Duplicate rows are retained.",
+      "supports": "Red appears twice"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "VALUES ( Product[Color] ) gives Red, Blue, Green; the constructor adds another Red. Four rows under the name of the first table.",
+  "tags": [
+    "union",
+    "values",
+    "duplicates",
+    "column-names",
+    "table-constructor"
+  ]
+}

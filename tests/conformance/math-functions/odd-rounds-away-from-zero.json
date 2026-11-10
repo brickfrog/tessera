@@ -1,0 +1,52 @@
+{
+  "title": "ODD rounds away from zero to an odd integer: 1.5 gives 3, 2 gives 3, -1 stays -1, -2 gives -3",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"a\", ODD ( 1.5 ), \"b\", ODD ( 2 ), \"c\", ODD ( -1 ), \"d\", ODD ( -2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "int64"
+        },
+        {
+          "name": "[b]",
+          "type": "int64"
+        },
+        {
+          "name": "[c]",
+          "type": "int64"
+        },
+        {
+          "name": "[d]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3,
+          3,
+          -1,
+          -3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/odd-function-dax",
+      "quote": "Rounds -2 up (away from 0) to the nearest odd integer.",
+      "supports": "the table of examples gives 3, 3, -1 and -3 for these four formulas"
+    },
+    {
+      "url": "https://dax.guide/odd/",
+      "quote": "Returns number rounded up to the nearest odd integer.",
+      "supports": "Return values: a single integer value"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "odd"
+  ]
+}

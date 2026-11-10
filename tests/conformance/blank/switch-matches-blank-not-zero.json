@@ -1,0 +1,30 @@
+{
+  "title": "SWITCH on BLANK skips 0 and matches BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SWITCH ( BLANK(), 0, \"zero\", BLANK(), \"blank\", True, \"true\", False, \"false\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "blank"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "SWITCH ( BLANK(), 0, \"zero\", BLANK(), \"blank\", True, \"true\", False, \"false\" ) blank",
+    "supports": "the article's table shows this expression and its result"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "switch"
+  ]
+}

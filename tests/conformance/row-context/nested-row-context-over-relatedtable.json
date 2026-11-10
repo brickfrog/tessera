@@ -1,0 +1,47 @@
+{
+  "title": "An inner iterator over RELATEDTABLE reads columns of the outer and the inner row",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( 'Product', SUMX ( RELATEDTABLE ( Sales ), Sales[Quantity] + 'Product'[Price] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          375.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+      "quote": "You can safely do this because there are two row contexts: the first one introduced by AVERAGEX over Customer and the second one introduced by SUMX over Sales.",
+      "supports": "the article's AVERAGEX over Customer with SUMX over RELATEDTABLE ( Sales ) reads one column from each row context"
+    },
+    {
+      "url": "https://dax.guide/relatedtable/",
+      "quote": "The RELATEDTABLE function performs a context transition from row context(s) to a filter context",
+      "supports": "RELATEDTABLE ( Sales ) returns the Sales rows of the product in the outer row context"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The operator determines the type of conversion DAX performs by casting the values it requires before doing the requested operation.",
+      "supports": "the addition table gives INTEGER + CURRENCY as CURRENCY"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Bike (price 100): Sales rows 1, 5, 7 with Quantity 1, 2, 1: 101 + 102 + 101 = 304. Helmet (20): rows 2, 3 with Quantity 2, 1: 22 + 21 = 43. Lock (10): rows 4, 6 with Quantity 5, 3: 15 + 13 = 28. Scooter: no rows, BLANK. Total 304 + 43 + 28 = 375.",
+  "tags": [
+    "sumx",
+    "relatedtable",
+    "row-context",
+    "nested-row-context",
+    "context-transition"
+  ],
+  "notes": "Type: the summed expression is a currency; the sum is taken to keep that type."
+}

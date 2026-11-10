@@ -1,0 +1,44 @@
+{
+  "title": "MIN and MAX of a column with negatives, zeros and BLANKs",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"min\", MIN ( V[N] ), \"max\", MAX ( V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[min]",
+          "type": "int64"
+        },
+        {
+          "name": "[max]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -3,
+          5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/min-function-dax",
+      "quote": "Returns the smallest value in a column, or between two scalar expressions.",
+      "supports": "MIN of a column"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/max-function-dax",
+      "quote": "Returns the largest value in a column, or between two scalar expressions.",
+      "supports": "MAX of a column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. Smallest -3, largest 5.",
+  "tags": [
+    "min",
+    "max",
+    "blank"
+  ]
+}

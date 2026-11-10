@@ -1,0 +1,48 @@
+{
+  "title": "LOG ( 100, 10 ), LOG ( 100 ) and LOG10 ( 100 ) are all 2",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"a\", LOG ( 100, 10 ), \"b\", LOG ( 100 ), \"c\", LOG10 ( 100 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "double"
+        },
+        {
+          "name": "[b]",
+          "type": "double"
+        },
+        {
+          "name": "[c]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.0,
+          2.0,
+          2.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/log-function-dax",
+      "quote": "The following formulas return the same result, 2.",
+      "supports": "the three formulas are listed with the result 2; Return value: a decimal number"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/log-function-dax",
+      "quote": "If omitted, the base is 10.",
+      "supports": "the default base"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "log",
+    "log10"
+  ]
+}

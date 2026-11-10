@@ -1,0 +1,31 @@
+{
+  "title": "CONVERT ( \"12/25/1966\", DATETIME ) is 25 December 1966",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( \"12/25/1966\", DATETIME ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1966-12-25T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "CONVERT converts any expression in the requested datatype",
+    "supports": "the example lists CONVERT ( \"12/25/1966\", DATETIME ) with the result 1966-12-25 00:00:00"
+  },
+  "confidence": "published",
+  "tags": [
+    "assumption:text-to-date",
+    "convert",
+    "date"
+  ]
+}

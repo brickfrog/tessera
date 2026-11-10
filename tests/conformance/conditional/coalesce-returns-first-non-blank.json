@@ -1,0 +1,32 @@
+{
+  "title": "COALESCE returns the first argument that is not BLANK",
+  "model": "scalar",
+  "query": "EVALUATE { COALESCE ( BLANK (), 10, DATE ( 2008, 3, 3 ) ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]"
+        }
+      ],
+      "rows": [
+        [
+          10
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/coalesce-function-dax",
+    "quote": "Returns 10 , which is the first expression that does not evaluate to BLANK.",
+    "supports": "the page shows this query and its result"
+  },
+  "confidence": "published",
+  "tags": [
+    "coalesce",
+    "blank",
+    "date",
+    "date-functions"
+  ],
+  "notes": "The type is left out: the arguments are an integer and a date, and DAX Guide says the data type of the result can differ from that of the returned argument. The value is the number 10."
+}

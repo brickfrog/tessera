@@ -1,0 +1,32 @@
+{
+  "title": "SUBSTITUTE only replaces text whose case matches",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SUBSTITUTE ( \"Red red RED\", \"red\", \"blue\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red blue RED"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/substitute-function-dax",
+    "quote": "The SUBSTITUTE function is case-sensitive. If case does not match between text and old_text , SUBSTITUTE will not replace the text.",
+    "supports": "only the lower-case occurrence matches"
+  },
+  "confidence": "derived",
+  "derivation": "Of \"Red\", \"red\" and \"RED\" only the second equals \"red\" exactly, so only it becomes \"blue\".",
+  "tags": [
+    "text-functions",
+    "substitute",
+    "case-sensitive"
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "title": "TRIM removes leading and trailing spaces and repeated spaces between words",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", TRIM ( \"  DAX   is  awesome  \" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "DAX is awesome"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/trim-function-dax",
+      "quote": "Removes all spaces from text except for single spaces between words.",
+      "supports": "the rule"
+    },
+    {
+      "url": "https://dax.guide/trim/",
+      "quote": "TRIM removes trailing and starting spaces from a string",
+      "supports": "the example comment: also multiple spaces within the string"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The two leading and two trailing spaces go; the runs of 3 and 2 spaces between the words become single spaces: \"DAX is awesome\".",
+  "tags": [
+    "text-functions",
+    "trim"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "title": "An ANYREF parameter receives a column reference that the body can use as a column",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION CountDistinct = ( c : ANYREF ) => COUNTROWS ( DISTINCT ( c ) )",
+    "EVALUATE { CountDistinct ( Product[Color] ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "AnyRef : Accepts any reference.",
+      "supports": "ANYREF accepts a column reference"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "The expression types ( AnyRef , ColumnRef , etc) type must be expr as its references (columns, tables, measures, etc.) need to be evaluated in the function's context.",
+      "supports": "the reference is used in the body as the column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "c stands for Product[Color] in the body: DISTINCT ( Product[Color] ) is Red, Blue, Green, 3 rows.",
+  "uncertain": true,
+  "alternative": "The page has no example of a column reference passed on to DISTINCT (its MODEX example passes a reference to TABLEOF and ADDCOLUMNS). If a reference parameter cannot be used where a column name is required, the query fails with an error.",
+  "tags": [
+    "udf",
+    "define-function",
+    "anyref",
+    "expr-parameter",
+    "type-hint",
+    "distinct",
+    "countrows"
+  ]
+}

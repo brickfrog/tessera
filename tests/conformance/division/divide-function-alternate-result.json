@@ -1,0 +1,32 @@
+{
+  "title": "DIVIDE ( 5, 0, 1 ) is 1: the alternate result",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DIVIDE ( 5, 0, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/divide-function-dax",
+    "quote": "The following example returns 1. = DIVIDE(5,0,1)",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "division",
+    "divide",
+    "divide-by-zero",
+    "alternate-result"
+  ],
+  "notes": "The column's type is not asserted: the alternate result is an integer and DIVIDE is documented as returning a decimal number, and no source says which wins."
+}

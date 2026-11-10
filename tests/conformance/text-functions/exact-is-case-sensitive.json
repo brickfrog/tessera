@@ -1,0 +1,31 @@
+{
+  "title": "EXACT compares case-sensitively",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", EXACT ( \"sqlbi\", \"SQLBI\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/exact/",
+    "quote": "EXACT performs string comparison in a case-sensitive way",
+    "supports": "the example shows EXACT ( A, B ) false for \"sqlbi\" and \"SQLBI\""
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "exact",
+    "case-sensitive"
+  ]
+}

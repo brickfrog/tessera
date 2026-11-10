@@ -1,0 +1,39 @@
+{
+  "title": "FIND matches case: FIND ( \"red\", \"Red red\" ) is 5",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FIND ( \"red\", \"Red red\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/find-function-dax",
+      "quote": "Returns the starting position of one text string within another text string. FIND is case-sensitive.",
+      "supports": "case must match"
+    },
+    {
+      "url": "https://dax.guide/find/",
+      "quote": "A single integer value.",
+      "supports": "the result is an integer position"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "\"Red\" at position 1 has a capital R and does not match; \"red\" starts at position 5 (R1 e2 d3 space4 r5). SEARCH would return 1.",
+  "tags": [
+    "text-functions",
+    "find",
+    "case-sensitive"
+  ]
+}

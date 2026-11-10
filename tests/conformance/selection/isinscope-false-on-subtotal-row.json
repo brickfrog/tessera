@@ -1,0 +1,71 @@
+{
+  "title": "ISINSCOPE is FALSE on the total row that ROLLUPADDISSUBTOTAL adds",
+  "model": "sales",
+  "query": [
+    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"Is Total\" ),",
+    "  \"In Scope\", ISINSCOPE ( Product[Color] ) )",
+    "ORDER BY [Is Total] ASC, Product[Color] ASC"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Is Total]",
+          "type": "boolean"
+        },
+        {
+          "name": "[In Scope]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "Blue",
+          false,
+          true
+        ],
+        [
+          "Green",
+          false,
+          true
+        ],
+        [
+          "Red",
+          false,
+          true
+        ],
+        [
+          null,
+          true,
+          false
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/distinguishing-hasonevalue-from-isinscope/",
+      "quote": "This is why at the grand total Brand neither has one value, nor is it in scope.",
+      "supports": "the grouped column is not in scope at the total computed by ROLLUPADDISSUBTOTAL"
+    },
+    {
+      "url": "https://dax.guide/rollupaddissubtotal/",
+      "quote": "adds a new column to the result indicating -- whether the current row is a subtotal or not",
+      "supports": "the named column is TRUE on the total row, whose group column is blank"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Three detail rows, one per color, with [Is Total] FALSE and the color in scope. One total row with a blank color and [Is Total] TRUE, where no grouping is active and ISINSCOPE is FALSE. FALSE sorts before TRUE, so the total is last whatever the position of BLANK.",
+  "tags": [
+    "isinscope",
+    "summarizecolumns",
+    "rollupaddissubtotal",
+    "subtotal",
+    "order-by"
+  ]
+}

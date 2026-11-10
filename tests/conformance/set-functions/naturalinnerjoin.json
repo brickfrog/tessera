@@ -1,0 +1,84 @@
+{
+  "title": "NATURALINNERJOIN returns only the rows with a match on the common column",
+  "model": "scalar",
+  "query": [
+    "DEFINE",
+    "    VAR LeftTable =",
+    "        DATATABLE (",
+    "            \"Key\", STRING,",
+    "            \"Left Value\", STRING,",
+    "            { { \"A\", \"L1\" }, { \"A\", \"L2\" }, { \"B\", \"L3\" }, { \"C\", \"L4\" } }",
+    "        )",
+    "    VAR RightTable =",
+    "        DATATABLE (",
+    "            \"Key\", STRING,",
+    "            \"Right Value\", STRING,",
+    "            { { \"A\", \"R1\" }, { \"B\", \"R2\" }, { \"B\", \"R3\" }, { \"D\", \"R4\" } }",
+    "        )",
+    "EVALUATE",
+    "NATURALINNERJOIN ( LeftTable, RightTable )",
+    "ORDER BY [Key], [Left Value], [Right Value]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Key]",
+          "type": "string"
+        },
+        {
+          "name": "[Left Value]",
+          "type": "string"
+        },
+        {
+          "name": "[Right Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "A",
+          "L1",
+          "R1"
+        ],
+        [
+          "A",
+          "L2",
+          "R1"
+        ],
+        [
+          "B",
+          "L3",
+          "R2"
+        ],
+        [
+          "B",
+          "L3",
+          "R3"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/naturalinnerjoin/",
+      "quote": "A table which includes only rows for which the values in the common columns specified are present in both tables. The table returned will have the common columns from the left table and other columns from both the tables.",
+      "supports": "only matching keys, with the key column once"
+    },
+    {
+      "url": "https://dax.guide/naturalleftouterjoin/",
+      "quote": "When a row of the left table matches more than one row of the right table, the result has one row for each match.",
+      "supports": "the left outer join of the same tables is shown on this page; the inner join is that result without the unmatched row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Keys on the left: A, A, B, C. On the right: A, B, B, D. A: L1 and L2 each with R1. B: L3 with R2 and with R3. C and D have no partner and are left out.",
+  "tags": [
+    "naturalinnerjoin",
+    "datatable",
+    "join",
+    "var",
+    "order-by"
+  ]
+}

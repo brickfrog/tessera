@@ -1,0 +1,33 @@
+{
+  "title": "CONVERT ( 3.5, INTEGER ) is 4",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( 3.5, INTEGER ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "A value that ends in .5 is rounded away from zero",
+    "supports": "the page gives CONVERT ( 2.5, INTEGER ) as 3 and CONVERT ( -2.5, INTEGER ) as -3"
+  },
+  "confidence": "derived",
+  "derivation": "A value ending in .5 is rounded away from zero: 3.5 becomes 4. Round half to even gives 4 as well; truncation would give 3. With CONVERT ( 2.5, INTEGER ) this separates the three readings.",
+  "tags": [
+    "assumption:convert-integer-rounding",
+    "convert",
+    "rounding",
+    "tie"
+  ]
+}

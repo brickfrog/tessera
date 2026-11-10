@@ -1,0 +1,60 @@
+{
+  "title": "SWITCH with a string result and a number result",
+  "model": "scalar",
+  "query": "EVALUATE ADDCOLUMNS ( T, \"x\", SWITCH ( T[n], 1, \"one\", 2, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "T[n]",
+          "type": "int64"
+        },
+        {
+          "name": "[x]",
+          "type": "variant"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "one"
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/switch/",
+      "quote": "By using TRUE as a first argument, SWITCH can replace a list of cascading IF statements.",
+      "supports": "SWITCH is the same as nested IF functions"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+      "quote": "The IF function can return a variant data type if value_if_true and value_if_false are of different data types",
+      "supports": "IF with branches of different types returns a variant"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/switch-function-dax",
+      "quote": "The following statement returns an error because the data types in the result arguments are different.",
+      "supports": "the SWITCH page says results of different types are an error"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Read as nested IF functions, which return a variant when the branches differ: n = 1 gives \"one\", n = 2 gives the integer 2, n = 3 matches nothing and is BLANK.",
+  "uncertain": true,
+  "alternative": "The Microsoft SWITCH page says that results of different data types are an error (its example is SWITCH ( [Class], \"L\", \"Large\", \"H\", 0.1 ) in a calculated column). If that holds for a query too, this query fails with an error.",
+  "tags": [
+    "switch",
+    "result-type",
+    "variant",
+    "addcolumns"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "title": "A one-to-one relationship adds a blank row to the table that lacks a matching row",
+  "model": "c-onetoone",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( ProductCategory[Category], \"Products\", COUNTROWS ( Product ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "ProductCategory[Category]",
+          "type": "string"
+        },
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Clothing",
+          1
+        ],
+        [
+          "Accessories",
+          1
+        ],
+        [
+          null,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "This join type ensures that blank virtual rows are added on either side, when necessary",
+      "supports": "blank rows are added on either side of a one-to-one relationship"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-one-to-one",
+      "quote": "Notice that the Category value for product SKU CL-02 is BLANK",
+      "supports": "the unmatched product shows under a BLANK category"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Clothing filters Product to CL-01: 1. Accessories to AC-01: 1. Jeans (CL-02) has no ProductCategory row, so ProductCategory gets a blank row, and filtering it leaves the unmatched Product row: 1.",
+  "uncertain": true,
+  "alternative": "If the engine adds no blank row to ProductCategory, the result has only the rows (Clothing, 1) and (Accessories, 1).",
+  "tags": [
+    "summarizecolumns",
+    "countrows",
+    "relationship",
+    "one-to-one",
+    "blank-row"
+  ],
+  "notes": "The sources state the blank row and show the BLANK category in a visual, but none shows a query result for a measure on that blank row."
+}

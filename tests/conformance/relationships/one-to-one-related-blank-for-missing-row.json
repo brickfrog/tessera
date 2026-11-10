@@ -1,0 +1,54 @@
+{
+  "title": "RELATED across a one-to-one relationship is BLANK for a row with no match",
+  "model": "c-onetoone",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"SKU\", Product[SKU], \"Category\", RELATED ( ProductCategory[Category] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[SKU]",
+          "type": "string"
+        },
+        {
+          "name": "[Category]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "CL-01",
+          "Clothing"
+        ],
+        [
+          "CL-02",
+          null
+        ],
+        [
+          "AC-01",
+          "Accessories"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-one-to-one",
+      "quote": "Notice that the Category value for product SKU CL-02 is BLANK",
+      "supports": "the page shows these rows in a visual: the Category of CL-02 is BLANK"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/expanded-tables-in-dax/",
+      "quote": "An expanded table contains all the columns of the base table and all the columns of the tables that are linked to the base table through one or more cascading many-to-one or one-to-one relationships",
+      "supports": "table expansion follows one-to-one relationships, so RELATED can read the other table's columns"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CL-01 matches Clothing, AC-01 matches Accessories. CL-02 (Jeans) has no ProductCategory row: BLANK.",
+  "tags": [
+    "related",
+    "selectcolumns",
+    "relationship",
+    "one-to-one",
+    "blank-row"
+  ]
+}

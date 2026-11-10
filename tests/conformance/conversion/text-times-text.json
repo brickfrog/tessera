@@ -1,0 +1,32 @@
+{
+  "title": "\"5\" * \"4\" is 20: * converts both text operands to numbers",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"5\" * \"4\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          20
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/multiplication/",
+    "quote": "Any argument passed as a string is automatically converted into a number",
+    "supports": "the page says 5 * 4 and \"5\" * \"4\" return the same result"
+  },
+  "confidence": "derived",
+  "derivation": "Both strings are converted to numbers, 5 and 4, and 5 * 4 = 20.",
+  "tags": [
+    "conversion",
+    "operator-multiply",
+    "text-to-number"
+  ],
+  "notes": "The column's type is not asserted: no source says which numeric type the text becomes."
+}

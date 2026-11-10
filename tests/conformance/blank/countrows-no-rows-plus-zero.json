@@ -1,0 +1,34 @@
+{
+  "title": "COUNTROWS of an empty table, plus 0, is 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( T, FALSE ) ) + 0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "COUNTROWS ( FILTER ( Table, False ) ) + 0 0",
+    "supports": "the article's example, on a table named Table"
+  },
+  "confidence": "derived",
+  "derivation": "FILTER ( T, FALSE ) keeps none of T's three rows, so COUNTROWS returns BLANK, and BLANK + 0 is 0. COUNTROWS is a whole number and so is 0.",
+  "tags": [
+    "blank",
+    "countrows",
+    "filter",
+    "empty-table",
+    "operator-add"
+  ]
+}

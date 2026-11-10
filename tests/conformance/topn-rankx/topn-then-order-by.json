@@ -1,0 +1,60 @@
+{
+  "title": "TOPN picks the rows with its own sort; ORDER BY then sorts the result",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "TOPN ( 2, ADDCOLUMNS ( VALUES ( Product[Product] ), \"@Amt\", [Sales Amount] ), [@Amt], DESC )",
+    "ORDER BY [@Amt] ASC"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[@Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Lock",
+          80.0
+        ],
+        [
+          "Bike",
+          400.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "TOPN does not choose the specified number of rows to return based on the sort order specified in ORDER BY.",
+      "supports": "TOPN uses its own order expression"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "ORDER BY only sorts the result table returned by TOPN.",
+      "supports": "ORDER BY sorts what TOPN returned"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/topn-function-dax",
+      "quote": "TOPN does not guarantee any sort order for the results.",
+      "supports": "hence the ORDER BY"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales Amount by product: Bike 100 + 200 + 100 = 400, Helmet 40 + 20 = 60, Lock 50 + 30 = 80, Scooter BLANK. The top 2 descending are Bike and Lock. ORDER BY ascending then lists Lock 80 before Bike 400. If ORDER BY chose the rows, the two lowest would come back instead.",
+  "tags": [
+    "topn",
+    "order-by",
+    "addcolumns",
+    "measure",
+    "context-transition"
+  ]
+}

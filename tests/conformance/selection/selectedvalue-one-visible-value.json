@@ -1,0 +1,32 @@
+{
+  "title": "SELECTEDVALUE returns the only visible value of the column, also when the filter is on another column",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( SELECTEDVALUE ( Product[Color] ), Product[Product] = \"Lock\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Blue"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/selectedvalue-function-dax",
+    "quote": "An equivalent expression for SELECTEDVALUE(<columnName>, <alternateResult>) is IF(HASONEVALUE(<columnName>), VALUES(<columnName>), <alternateResult>) .",
+    "supports": "SELECTEDVALUE returns the value when the column has one visible value, else the alternate"
+  },
+  "confidence": "derived",
+  "derivation": "The filter leaves one Product row, Lock, whose color is Blue. Product[Color] has one visible value, which is returned.",
+  "tags": [
+    "selectedvalue",
+    "calculate",
+    "cross-filter"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "title": "COUNTROWS ( ALL ( Sales ) ) counts every row whatever the filter context",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( COUNTROWS ( ALL ( Sales ) ), 'Product'[Color] = \"Blue\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/all-function-dax",
+    "quote": "In effect, ALL(Table) returns all of the values in the table, removing any filters from the context that otherwise might have been applied.",
+    "supports": "ALL ( Sales ) as a table expression returns all rows of Sales although Product is filtered"
+  },
+  "confidence": "derived",
+  "derivation": "Under Color = Blue, Sales has 2 visible rows (4, 6). ALL ( Sales ) returns all 7.",
+  "tags": [
+    "all",
+    "calculate",
+    "countrows",
+    "table-function"
+  ]
+}

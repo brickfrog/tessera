@@ -1,0 +1,40 @@
+{
+  "title": "VALUES in the same place does see the filter: the contrast to ALLSELECTED",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "CALCULATETABLE (",
+    "    ROW ( \"Products\", CONCATENATEX ( VALUES ( 'Product'[Product] ), 'Product'[Product], \", \", 'Product'[Product], ASC ) ),",
+    "    'Product'[Color] = \"Red\"",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Bike, Helmet"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/the-definitive-guide-to-allselected/",
+    "quote": "VALUES and DISTINCT always take into account the filter context, whereas ALLSELECTED does not",
+    "supports": "VALUES returns only the products visible under the filter on Color"
+  },
+  "confidence": "derived",
+  "derivation": "The red products are Bike (1) and Helmet (2).",
+  "tags": [
+    "allselected",
+    "values",
+    "concatenatex",
+    "calculatetable",
+    "cross-filter"
+  ]
+}

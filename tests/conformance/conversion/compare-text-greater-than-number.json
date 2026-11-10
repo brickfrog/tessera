@@ -1,0 +1,33 @@
+{
+  "title": "\"12\" > 12 is an error: text is not compared with a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IF ( \"12\" > 12, \"Expression is true\", \"Expression is false\" ) )",
+  "expected": {
+    "error": "comparison operations do not support comparing values of type Text with values of type Integer"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "Other mixed data-type comparisons will return an error. For example, a formula such as =\"1\" > 0 returns an error stating that DAX comparison operations do not support comparing values of type Text with values of type Integer",
+      "supports": "only Numeric with Numeric, Boolean with Boolean and String with String can be compared; anything else is an error"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "=IF(\"12\">12,\"Expression is true\", \"Expression is false\") returns \"Expression is true\"",
+      "supports": "the other reading"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The left operand is text and the right an integer. That pair is not among the supported comparisons, so the query fails.",
+  "uncertain": true,
+  "alternative": "The Power BI data types page says this very formula returns \"Expression is true\" (text ranks above numbers): one row, [r] = \"Expression is true\" (string).",
+  "tags": [
+    "conversion",
+    "comparison",
+    "operator-greater-than",
+    "if",
+    "mixed-types",
+    "error"
+  ],
+  "notes": "The Microsoft pages disagree. The operator reference says a comparison of text (or a Boolean) with a number is an error. The Power BI data types page gives a result, ranking Boolean above text and text above numbers."
+}

@@ -1,0 +1,40 @@
+{
+  "title": "VALUE of an ISO date text is the date's serial number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VALUE ( \"2020-10-23\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          44127.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/value/",
+      "quote": "( \"Date (1)\", DATE ( 2020, 10, 23 ), VALUE ( \"2020-10-23\" ) )",
+      "supports": "the example shows 44127 for this expression"
+    },
+    {
+      "url": "https://dax.guide/value/",
+      "quote": "The converted number in decimal data type",
+      "supports": "the result is a decimal number (double)"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "value",
+    "text-to-date",
+    "date",
+    "assumption:text-to-date"
+  ]
+}

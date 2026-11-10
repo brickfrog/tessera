@@ -1,0 +1,57 @@
+{
+  "title": "GENERATEALL keeps the rows of the first table for which the second is empty, with BLANKs",
+  "model": "scalar",
+  "query": [
+    "EVALUATE",
+    "GENERATEALL (",
+    "    SELECTCOLUMNS ( { 1, 2, 3 }, \"a\", [Value] ),",
+    "    FILTER ( SELECTCOLUMNS ( { 1, 2 }, \"b\", [Value] ), [b] < [a] )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "int64"
+        },
+        {
+          "name": "[b]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          null
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/generateall/",
+    "quote": "then the current row from table1 will be included in the results and columns corresponding to table2 will have null values for that row",
+    "supports": "a row with no match is kept with blanks"
+  },
+  "confidence": "derived",
+  "derivation": "As generate-skips-empty, plus the row a = 1 with b BLANK.",
+  "tags": [
+    "generateall",
+    "row-context",
+    "blank",
+    "table-constructor",
+    "selectcolumns"
+  ]
+}

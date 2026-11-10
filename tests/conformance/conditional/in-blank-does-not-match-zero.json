@@ -1,0 +1,32 @@
+{
+  "title": "BLANK () IN { 0 } is FALSE: IN compares strictly",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () IN { 0 } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/containsrow-function-dax",
+    "quote": "Unlike the = operator, the IN operator and the CONTAINSROW function perform strict comparison. For example, the BLANK value doesn't match 0.",
+    "supports": "BLANK does not match 0 with IN"
+  },
+  "confidence": "published",
+  "tags": [
+    "in",
+    "containsrow",
+    "blank",
+    "strict-comparison"
+  ]
+}

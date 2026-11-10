@@ -1,0 +1,38 @@
+{
+  "title": "LOOKUPVALUE returns the alternate result when only some of the search pairs match",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", LOOKUPVALUE ( Product[Product], Product[Color], \"Green\", Product[Category], \"Accessories\", \"none\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "none"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/lookupvalue-function-dax",
+      "quote": "If no match satisfies all the search values, the function returns BLANK or alternateResult (if specified)",
+      "supports": "no value when only some criteria match; the alternate result is returned if given"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-lookupvalue/",
+      "quote": "In case LOOKUPVALUE does not find a suitable matching row, it returns the default value",
+      "supports": "the last unpaired argument is the default"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The only Green product is Scooter, category Vehicles. No row is both Green and Accessories, so the alternate result \"none\" is returned.",
+  "tags": [
+    "lookupvalue",
+    "alternate-result"
+  ]
+}

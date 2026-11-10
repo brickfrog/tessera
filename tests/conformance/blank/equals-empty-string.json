@@ -1,0 +1,39 @@
+{
+  "title": "BLANK = \"\" is TRUE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () = \"\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/blank/",
+      "quote": "BLANK is equal to 0 and to an empty string in DAX",
+      "supports": "the example evaluates BLANK () = \"\" and shows true"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "BLANK () = \"\" True",
+      "supports": "the table of expressions with a blank value"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-equals",
+    "comparison",
+    "empty-string"
+  ]
+}

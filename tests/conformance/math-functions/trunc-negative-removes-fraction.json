@@ -1,0 +1,30 @@
+{
+  "title": "TRUNC ( -4.3 ) is -4: TRUNC removes the fractional part",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", TRUNC ( -4.3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          -4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/trunc-function-dax",
+    "quote": "TRUNC(-4.3) returns -4, but INT(-4.3) returns -5 because -5 is the smaller number.",
+    "supports": "states the result"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "trunc"
+  ],
+  "notes": "The type is not asserted: Microsoft Learn says TRUNC returns a whole number, DAX Guide says a decimal value (\"Other rounding functions (such as TRUNC) return a Decimal data type\")."
+}

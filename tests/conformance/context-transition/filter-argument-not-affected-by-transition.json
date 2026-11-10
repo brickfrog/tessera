@@ -1,0 +1,60 @@
+{
+  "title": "A filter argument of an inline CALCULATE is evaluated before the context transition",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( 'Product'[Product] ), \"x\", CALCULATE ( [Sales Amount], ALL ( 'Product' ), VALUES ( 'Product'[Color] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[x]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          540.0
+        ],
+        [
+          "Helmet",
+          540.0
+        ],
+        [
+          "Lock",
+          540.0
+        ],
+        [
+          "Scooter",
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/context-transition-and-filters-in-calculate/",
+      "quote": "The filter arguments of CALCULATE and CALCULATETABLE do not receive the effect of a context transition.",
+      "supports": "the filter argument VALUES ( Product[Color] ) does not see the filter made by the context transition"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "CALCULATE evaluates all the explicit filter arguments in the original evaluation context, each one independently from the others.",
+      "supports": "filter arguments are evaluated in the original evaluation context"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The original filter context is empty, so VALUES ( Product[Color] ) is Red, Blue, Green on every row. The transition filters Product[Product]; ALL ( Product ) removes that filter; the color filter allows every color. Each row is the grand total 540.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "calculate",
+    "all",
+    "context-transition",
+    "evaluation-order"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

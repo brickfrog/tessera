@@ -1,0 +1,39 @@
+{
+  "title": "YEARFRAC defaults to the US 30/360 basis",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", YEARFRAC ( DATE ( 2011, 1, 1 ), DATE ( 2011, 12, 15 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          0.9555555555555556
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-09,
+  "source": [
+    {
+      "url": "https://dax.guide/yearfrac/",
+      "quote": "Different standards produce different fractions",
+      "supports": "the example shows 0.9556 for these dates on basis 0 (US 30/360)"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/yearfrac-function-dax",
+      "quote": "0 - US (NASD) 30/360 (Default value)",
+      "supports": "basis 0 is the default; Return value: a decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "On a 30/360 basis January 1 to December 15 is 11 months of 30 days plus 14 days = 344 days; 344 / 360 = 0.95555..., which the page prints as 0.9556.",
+  "tags": [
+    "date-functions",
+    "yearfrac"
+  ]
+}

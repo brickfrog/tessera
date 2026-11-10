@@ -1,0 +1,20 @@
+{
+  "title": "MOD ( 5, 0 ) is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MOD ( 5, 0 ) )",
+  "expected": {
+    "error": "MOD by zero"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/mod-function-dax",
+    "quote": "If the divisor is 0 (zero), MOD returns an error. You cannot divide by 0.",
+    "supports": "a zero divisor is documented as an error"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "mod",
+    "error",
+    "division-by-zero"
+  ]
+}

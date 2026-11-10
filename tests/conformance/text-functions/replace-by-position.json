@@ -1,0 +1,30 @@
+{
+  "title": "REPLACE swaps a run of characters at a position for new text",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", REPLACE ( \"DAX is so cool !\", 11, 4, \"fantastic\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "DAX is so fantastic !"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/replace/",
+    "quote": "REPLACE lets you replace part of a string with a new string",
+    "supports": "the example replaces 4 characters at position 11 of \"DAX is so cool !\" and shows \"DAX is so fantastic !\""
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "replace"
+  ]
+}

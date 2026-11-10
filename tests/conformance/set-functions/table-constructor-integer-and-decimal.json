@@ -1,0 +1,44 @@
+{
+  "title": "A table constructor mixing an integer and a decimal number converts the column to one numeric type",
+  "model": "scalar",
+  "query": "EVALUATE { 1, 2.5 }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1.0
+        ],
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/table-constructor",
+      "quote": "When the data types of the values for a column are different in different rows, all values are converted to a common data type.",
+      "supports": "one type for the column"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "When a decimal is involved, the result is decimal.",
+      "supports": "between an integer and a decimal number the wider type is the decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The values are an integer and a decimal number (double). The common type that holds both is double, so the column is double: 1.0 and 2.5.",
+  "uncertain": true,
+  "alternative": "The page does not name the common type for numbers. If the engine does not unify them the column would be variant, holding the int64 1 and the double 2.5.",
+  "tags": [
+    "table-constructor",
+    "type-coercion",
+    "result-type"
+  ]
+}

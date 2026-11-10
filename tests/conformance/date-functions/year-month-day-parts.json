@@ -1,0 +1,49 @@
+{
+  "title": "YEAR, MONTH and DAY of November 20, 2008",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"y\", YEAR ( DATE ( 2008, 11, 20 ) ), \"m\", MONTH ( DATE ( 2008, 11, 20 ) ), \"d\", DAY ( DATE ( 2008, 11, 20 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[y]",
+          "type": "int64"
+        },
+        {
+          "name": "[m]",
+          "type": "int64"
+        },
+        {
+          "name": "[d]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2008,
+          11,
+          20
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/year/",
+      "quote": "Extract date parts from a date",
+      "supports": "the example table lists 2008-11-20 with Year 2008, Month 11, Day 20; Return values: a single integer value"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/year-function-dax",
+      "quote": "Returns the year of a date as a four digit integer in the range 1900-9999.",
+      "supports": "YEAR returns an integer"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "year",
+    "month",
+    "day"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "title": "CONVERT ( \"12/25/1966\", DATETIME ) reads the text as month/day/year",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( \"12/25/1966\", DATETIME ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1966-12-25T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "( \"Date1\", CONVERT ( \"12/25/1966\", DATETIME ) )",
+    "supports": "the example shows 1966-12-25 00:00:00 for Date1"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "date",
+    "text-to-date",
+    "assumption:text-to-date"
+  ],
+  "notes": "The model culture is en-US. 25 cannot be a month, so the reading does not depend on the day/month order."
+}

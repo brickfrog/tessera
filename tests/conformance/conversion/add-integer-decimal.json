@@ -1,0 +1,44 @@
+{
+  "title": "Integer + decimal is a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1 + 2.5 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          3.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if an addition operation uses a real number in combination with currency data, DAX converts both values to REAL and returns the result as REAL",
+      "supports": "the Addition (+) table of result types: INTEGER+INTEGER is INTEGER, INTEGER+REAL is REAL, CURRENCY+INTEGER is CURRENCY, CURRENCY+REAL is REAL"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "When a decimal is involved, the result is decimal. Otherwise, when a currency is involved then the result is currency. The result is integer only when both operands are also integers.",
+      "supports": "the same rule for + and -"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "VAR Quantity = 100000 -- Integer VAR Discount = 0.10 -- Decimal VAR UnitPrice = CURRENCY ( 12.3456 ) -- Currency",
+      "supports": "a literal without a decimal point is an Integer, one with a decimal point a Decimal (double), CURRENCY ( ) gives a Currency"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "1 is an integer and 2.5 a decimal number. INTEGER + REAL is REAL: 1 + 2.5 = 3.5.",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "result-type"
+  ]
+}

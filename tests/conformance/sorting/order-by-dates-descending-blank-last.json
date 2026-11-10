@@ -1,0 +1,57 @@
+{
+  "title": "ORDER BY DESC on dates puts BLANK after every date",
+  "model": "a2-sort",
+  "query": "EVALUATE Dates ORDER BY Dates[D] DESC",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Dates[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Dates[D]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "2024-03-01T00:00:00"
+        ],
+        [
+          4,
+          "2024-01-05T13:00:00"
+        ],
+        [
+          3,
+          "2023-12-31T00:00:00"
+        ],
+        [
+          2,
+          null
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "the integer corresponds to the number of days since December 30, 1899, and the decimal part identifies the fraction of the day",
+      "supports": "dates order as their numbers do: later dates and later times are larger"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "treat BLANK as equal to number 0, empty string \"\", DATE(1899, 12, 30), or FALSE",
+      "supports": "next to a date, BLANK compares as 1899-12-30, earlier than every date in the column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Dates[D] by Id: 2024-03-01 (1), BLANK (2), 2023-12-31 (3), 2024-01-05 13:00 (4). Descending: 2024-03-01, 2024-01-05 13:00, 2023-12-31. BLANK is below all of them whether it sorts as the lowest value or as 1899-12-30, so it is last under either reading: Ids 1, 4, 3, 2.",
+  "tags": [
+    "order-by",
+    "datetime",
+    "blank"
+  ]
+}

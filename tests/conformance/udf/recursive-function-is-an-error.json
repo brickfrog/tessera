@@ -1,0 +1,24 @@
+{
+  "title": "A function that calls itself is an error",
+  "model": "scalar",
+  "query": [
+    "DEFINE FUNCTION CountDown = ( n ) => IF ( n <= 0, 0, CountDown ( n - 1 ) )",
+    "EVALUATE { CountDown ( 2 ) }"
+  ],
+  "expected": {
+    "error": "CountDown calls itself, and recursion is not supported"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+    "quote": "Recursion or mutual recursion is not supported.",
+    "supports": "a recursive function is not allowed"
+  },
+  "confidence": "derived",
+  "derivation": "The body of CountDown calls CountDown, which the page lists as not supported, so the query fails.",
+  "tags": [
+    "udf",
+    "define-function",
+    "recursion",
+    "error"
+  ]
+}

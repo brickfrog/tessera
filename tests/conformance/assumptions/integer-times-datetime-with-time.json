@@ -1,0 +1,45 @@
+{
+  "title": "2 * ( DATE ( 2020, 10, 23 ) + TIME ( 12, 0, 0 ) ) is the integer 88255: the half day takes part in the product",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 2 * ( DATE ( 2020, 10, 23 ) + TIME ( 12, 0, 0 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          88255
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a multiplication operation combines an integer with a real number, DAX converts both numbers to real numbers, and the return value is also REAL",
+      "supports": "the multiplication table above this sentence has a Date/time column: INTEGER gives INTEGER, REAL gives REAL. It has no Date/time row"
+    },
+    {
+      "url": "https://dax.guide/value/",
+      "quote": "VALUE converts a text string that represents a number to a number",
+      "supports": "the example shows DATE ( 2020, 10, 23 ) as the number 44127"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The multiplication table gives INTEGER for an INTEGER multiplied by a Date/time, as in assumptions/integer-times-date. 2020-10-23 12:00 is day 44127.5. The product 2 * 44127.5 = 88255 is a whole number, so as an integer it is 88255.",
+  "uncertain": true,
+  "alternative": "If the date multiplies as a decimal number the result is the double 88255.0 (and assumptions/integer-times-date is the double 88254.0). If the date were made an integer before multiplying, the half day would be rounded away and the result would be 88254 or 88256.",
+  "tags": [
+    "assumption:date-multiplication",
+    "operator-multiply",
+    "date",
+    "time",
+    "implicit-conversion",
+    "date-functions"
+  ],
+  "notes": "The value separates the readings as well as the type: only a product computed on 44127.5 gives 88255."
+}

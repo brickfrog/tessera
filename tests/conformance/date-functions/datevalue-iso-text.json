@@ -1,0 +1,30 @@
+{
+  "title": "DATEVALUE ( \"2020-02-06\" ) is February 6, 2020",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATEVALUE ( \"2020-02-06\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2020-02-06T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datevalue/",
+    "quote": "If month and day are exchanged, the conversion still works",
+    "supports": "the example shows DATEVALUE ( \"2020-02-06\" ) as 2020-02-06"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "datevalue"
+  ]
+}

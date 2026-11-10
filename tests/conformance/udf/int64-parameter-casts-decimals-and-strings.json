@@ -1,0 +1,40 @@
+{
+  "title": "INT64 parameters convert each argument to an integer before the body runs",
+  "model": "scalar",
+  "query": [
+    "DEFINE FUNCTION SumTwoNumbers = ( a : INT64 VAL, b : INT64 VAL ) => a + b",
+    "EVALUATE { SumTwoNumbers ( 3.4, 2.4 ), SumTwoNumbers ( \"3.4\", \"2.4\" ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ],
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+    "quote": "Even though the sum of the decimal numbers should be 5.8 (which, rounded to an integer, would be six), because each parameter is separately cast to an integer, the result of 3+2 is five.",
+    "supports": "the article shows this query returning 5 and 5"
+  },
+  "confidence": "published",
+  "tags": [
+    "udf",
+    "define-function",
+    "type-hint",
+    "implicit-conversion",
+    "val-parameter"
+  ],
+  "notes": "The article shows the values; the type follows from the INT64 parameters."
+}

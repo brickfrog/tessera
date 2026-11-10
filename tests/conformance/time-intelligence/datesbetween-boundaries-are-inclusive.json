@@ -1,0 +1,46 @@
+{
+  "title": "DATESBETWEEN includes both boundaries",
+  "model": "f-calendar",
+  "query": "EVALUATE VAR R = DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 1, 31 ), DATE ( 2024, 2, 10 ) ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-31T00:00:00",
+          "2024-02-10T00:00:00",
+          11,
+          500.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datesbetween/",
+    "quote": "The dates used as StartDate and EndDate are inclusive.",
+    "supports": "both ends are in the result"
+  },
+  "confidence": "derived",
+  "derivation": "January 31 to February 10, 2024, both included: 1 + 10 = 11 days. Sales: Jan 31 200 + Feb 10 300 = 500.",
+  "tags": [
+    "time-intelligence",
+    "datesbetween"
+  ]
+}

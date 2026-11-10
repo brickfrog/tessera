@@ -1,0 +1,31 @@
+{
+  "title": "COALESCE of BLANKs only is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COALESCE ( BLANK (), BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/coalesce/",
+    "quote": "If all the arguments are BLANK , COALESCE returns BLANK",
+    "supports": "the rule"
+  },
+  "confidence": "derived",
+  "derivation": "Both arguments are BLANK, so the result is BLANK.",
+  "tags": [
+    "blank",
+    "coalesce"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

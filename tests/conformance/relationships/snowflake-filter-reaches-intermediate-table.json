@@ -1,0 +1,41 @@
+{
+  "title": "A filter on Category filters Product two relationships away",
+  "model": "c-snowflake",
+  "query": "EVALUATE ROW ( \"Products\", CALCULATE ( COUNTROWS ( Product ), Category[Category] = \"Bikes\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "The filter on the Category table propagates to the Product table",
+      "supports": "the Category filter propagates to Product"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "Filters will propagate so long as there's a relationship path to follow, which can involve propagation to multiple tables",
+      "supports": "propagation can involve several tables"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Bikes (CategoryKey 1) has subcategories 10 and 11. Products with SubcategoryKey 10 or 11: 100, 101, 102. 3 rows.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "relationship",
+    "filter-propagation",
+    "snowflake"
+  ]
+}

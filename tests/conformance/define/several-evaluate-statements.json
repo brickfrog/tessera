@@ -1,0 +1,60 @@
+{
+  "title": "A query with several EVALUATE statements returns one result for each, in order",
+  "model": "scalar",
+  "query": [
+    "EVALUATE ROW ( \"a\", 1 )",
+    "EVALUATE ROW ( \"b\", \"x\", \"c\", TRUE () )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "[b]",
+          "type": "string"
+        },
+        {
+          "name": "[c]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "x",
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/evaluate-statement-dax",
+      "quote": "A DAX query can contain multiple EVALUATE statements.",
+      "supports": "several EVALUATE statements are allowed"
+    },
+    {
+      "url": "https://dax.guide/st/evaluate/",
+      "quote": "There might be multiple query expressions, each introduced by EVALUATE and each with its own set of result modifiers.",
+      "supports": "each EVALUATE is its own query expression"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Two EVALUATE statements, two results: the first has the column [a] with 1, the second the columns [b] and [c] with \"x\" and TRUE.",
+  "tags": [
+    "evaluate",
+    "multiple-evaluate",
+    "row"
+  ]
+}

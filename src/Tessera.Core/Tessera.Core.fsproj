@@ -52,6 +52,7 @@
     <Compile Include="Fixture.fs" />
     <Compile Include="FixtureInit.fs" />
     <Compile Include="Refresh.fs" />
+    <Compile Include="FixtureEmbed.fs" />
   </ItemGroup>
 
   <ItemGroup>

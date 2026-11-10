@@ -1,0 +1,34 @@
+{
+  "title": "ISERROR ( 1 / 0 ) is TRUE: ISERROR counts infinity as an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ISERROR ( 1 / 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/iserror/",
+    "quote": "ISERROR also returns TRUE when the value is positive infinity, negative infinity or NaN (not a number). For example, 1 / 0, -1 / 0 and 0 / 0 return these values",
+    "supports": "stated outright, and the page's example shows TRUE for ISERROR of 1 / 0"
+  },
+  "confidence": "published",
+  "tags": [
+    "division",
+    "operator-divide",
+    "divide-by-zero",
+    "iserror",
+    "infinity"
+  ],
+  "notes": "DAX Guide also says ISERROR cannot catch every runtime error, depending on the execution plan. The page's example shows TRUE, TRUE, TRUE, FALSE, FALSE for 1 / 0, -1 / 0, 0 / 0, DIVIDE ( 1, 0 ), DIVIDE ( 0, 0 )."
+}

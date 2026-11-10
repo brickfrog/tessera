@@ -1,0 +1,33 @@
+{
+  "title": "MAXX over numbers and text returns the largest number unless told otherwise",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MAXX ( T, IF ( T[n] = 2, \"x\", T[n] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/maxx-function-dax",
+    "quote": "If the expression has variant or mixed value types such as text and number, then by default MAXX considers only numbers",
+    "supports": "without the third argument only the numbers are compared; with it, the maximum over all values"
+  },
+  "confidence": "derived",
+  "derivation": "T[n] holds 1, 2, 3. The expression gives 1, \"x\", 3. By default MAXX considers only the numbers 1 and 3: the result is 3.",
+  "tags": [
+    "maxx",
+    "variant",
+    "if",
+    "mixed-types"
+  ],
+  "notes": "The column's type is not asserted: no source says whether the result of a variant expression is reported as an integer or as a variant."
+}

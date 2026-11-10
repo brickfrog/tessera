@@ -1,0 +1,32 @@
+{
+  "title": "COUNTBLANK counts empty strings as well as BLANKs",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTBLANK ( V[T] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/countblank/",
+    "quote": "Any empty string is considered as a blank for COUNTBLANK purposes",
+    "supports": "an empty string counts as blank here"
+  },
+  "confidence": "derived",
+  "derivation": "V[T] has one BLANK (row 2) and one empty string (row 3): 2.",
+  "tags": [
+    "countblank",
+    "blank",
+    "empty-string"
+  ]
+}

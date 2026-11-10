@@ -1,0 +1,53 @@
+{
+  "title": "Grouping by a one-side column shows a BLANK group with the orphans' amount",
+  "model": "sales-orphans",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Amount\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          100.0
+        ],
+        [
+          "Blue",
+          30.0
+        ],
+        [
+          null,
+          70.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "The values obtained for the group-by columns include the blank values of invalid relationships",
+      "supports": "the group-by values include the blank row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "all the different values of Sales[ProductKey] with no corresponding row in Product are linked to the single blank row",
+      "supports": "all orphaned rows are linked to the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Red is Bike (1) and Bell (3): Sales row 1 = 100 (Bell has no sales). Blue is Lock (2): row 2 = 30. Rows 3 and 4 (ProductKey 9) belong to the blank row: 50 + 20 = 70. 100 + 30 + 70 = 200, the total.",
+  "tags": [
+    "summarizecolumns",
+    "blank-row",
+    "relationship",
+    "filter-propagation"
+  ]
+}

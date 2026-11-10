@@ -1,0 +1,31 @@
+{
+  "title": "GCD ( 24.9, 36.9 ) is 12: arguments are truncated",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", GCD ( 24.9, 36.9 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          12
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/gcd-function-dax",
+    "quote": "If a value is not an integer, it is truncated.",
+    "supports": "the arguments are truncated before the divisor is computed"
+  },
+  "confidence": "derived",
+  "derivation": "24.9 truncates to 24 and 36.9 to 36 (rounding would give 25 and 37, whose divisor is 1). GCD ( 24, 36 ) is 12.",
+  "tags": [
+    "math-functions",
+    "gcd"
+  ]
+}

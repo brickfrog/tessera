@@ -1,0 +1,48 @@
+{
+  "title": "SUMMARIZECOLUMNS returns only the existing combinations of columns of the same table",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Product[Category] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          "Vehicles"
+        ],
+        [
+          "Red",
+          "Accessories"
+        ],
+        [
+          "Blue",
+          "Accessories"
+        ],
+        [
+          "Green",
+          "Vehicles"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/summarizecolumns-function-dax",
+    "quote": "Each groupBy_columnName column is cross-joined (different tables) or auto-existed (same table) with the subsequent specified columns.",
+    "supports": "columns of one table are auto-existed: only combinations present in the table"
+  },
+  "confidence": "derived",
+  "derivation": "Product rows: Bike Red Vehicles, Helmet Red Accessories, Lock Blue Accessories, Scooter Green Vehicles. Four combinations exist; a cross join would give 3 * 2 = 6 (adding Blue Vehicles and Green Accessories).",
+  "tags": [
+    "summarizecolumns",
+    "auto-exist"
+  ]
+}

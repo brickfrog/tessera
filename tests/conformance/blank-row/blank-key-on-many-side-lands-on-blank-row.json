@@ -1,0 +1,53 @@
+{
+  "title": "A BLANK key on the many side belongs to the blank row, together with keys that have no match",
+  "model": "c-blank-key",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Product], \"Amount\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          100.0
+        ],
+        [
+          "Lock",
+          30.0
+        ],
+        [
+          null,
+          70.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/allnoblankrow-function-dax",
+      "quote": "or null values, meaning no value for date at all",
+      "supports": "rows with a null key are added to the blank group, like rows with a non-matching key"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "all the different values of Sales[ProductKey] with no corresponding row in Product are linked to the single blank row",
+      "supports": "every unmatched key is linked to the one blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Bike (1): Sales row 1 = 100. Lock (2): row 2 = 30. Bell (3) has no sales: BLANK, row removed. Row 3 has a BLANK ProductKey and row 4 has ProductKey 9, which Product lacks: both belong to the single blank row: 50 + 20 = 70.",
+  "tags": [
+    "summarizecolumns",
+    "blank-row",
+    "relationship",
+    "blank"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "title": "DIVIDE ( 5, 2 ) is 2.5",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DIVIDE ( 5, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/divide-function-dax",
+      "quote": "The following example returns 2.5. = DIVIDE(5,2)",
+      "supports": "stated outright"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/divide-function-dax",
+      "quote": "Return value A decimal number",
+      "supports": "the result type"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "division",
+    "divide"
+  ]
+}

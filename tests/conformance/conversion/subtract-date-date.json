@@ -1,0 +1,41 @@
+{
+  "title": "Date - date is a date, not a number of days",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2024, 1, 2 ) - DATE ( 2024, 1, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1899-12-31T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a subtraction operation uses a date with any other data type, DAX converts both values to dates, and the return value is also a date",
+      "supports": "the Subtraction (-) table: the Date/time row is Date/time in every column, including Date/time"
+    },
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "the integer corresponds to the number of days since December 30, 1899",
+      "supports": "a date as a number is the count of days since 1899-12-30"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Date/time - Date/time is Date/time. The two dates are 1 day apart, and the number 1 as a date is 1 day after 1899-12-30: 1899-12-31.",
+  "tags": [
+    "conversion",
+    "operator-subtract",
+    "result-type",
+    "date"
+  ],
+  "notes": "The table is the only source. An engine that returns the number 1 (int64 or double) here contradicts it."
+}

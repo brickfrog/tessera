@@ -1,0 +1,54 @@
+{
+  "title": "An EXPR parameter that is not a measure gets no context transition from the rows iterated in the body",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION BestCustomers = ( metricExpr : EXPR ) =>",
+    "  VAR AverageMetric = AVERAGEX ( Customer, metricExpr )",
+    "  VAR BestCustomersResult = FILTER ( Customer, metricExpr > AverageMetric )",
+    "  RETURN BestCustomersResult",
+    "EVALUATE BestCustomers ( SUM ( Sales[Amount] ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[CustomerKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Customer[Customer]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": []
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "Parameters are not like measures: there is no automatic context transition happening.",
+      "supports": "the article passes an aggregation in place of the measure and says the query returns an empty table"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "Quite surprisingly, this query returns an empty table.",
+      "supports": "the stated result"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "SUM ( Sales[Amount] ) has no CALCULATE around it, so the row contexts of AVERAGEX and FILTER do not filter it: 540 in every row. The average is 540 and 540 > 540 is FALSE, so the table is empty.",
+  "tags": [
+    "udf",
+    "define-function",
+    "expr-parameter",
+    "table-function",
+    "no-context-transition",
+    "averagex",
+    "filter",
+    "empty-table"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "title": "FLOOR ( -2.5, -2 ) is -2: FLOOR rounds toward zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FLOOR ( -2.5, -2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -2.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/floor-function-dax",
+      "quote": "Rounds a number down, toward zero, to the nearest multiple of significance.",
+      "supports": "FLOOR goes toward zero"
+    },
+    {
+      "url": "https://dax.guide/floor/",
+      "quote": "The functions always returns a decimal data type, regardless of the arguments.",
+      "supports": "the result is a decimal number even with an integer significance"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The multiples of -2 around -2.5 are -2 and -4. Toward zero is -2. FLOOR always returns a decimal number: -2.0.",
+  "tags": [
+    "math-functions",
+    "floor",
+    "result-type"
+  ]
+}

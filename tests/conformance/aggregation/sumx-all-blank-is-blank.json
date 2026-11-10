@@ -1,0 +1,32 @@
+{
+  "title": "SUMX over rows whose values are all BLANK is BLANK, not 0",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( FILTER ( V, V[Id] = 2 ), V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/sum/",
+    "quote": "The result is blank in case there are no rows in the table with a non-blank value.",
+    "supports": "SUM is SUMX; with no non-blank value the result is BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "Row 2 has N = BLANK. The only value iterated is BLANK, so the sum is BLANK.",
+  "tags": [
+    "sumx",
+    "filter",
+    "blank"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

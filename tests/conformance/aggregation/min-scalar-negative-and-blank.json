@@ -1,0 +1,31 @@
+{
+  "title": "MIN ( -1, BLANK ) is -1",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MIN ( -1, BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/min-function-dax",
+    "quote": "Min( -1, Blank() ) returns -1",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "min",
+    "blank",
+    "scalar"
+  ]
+}

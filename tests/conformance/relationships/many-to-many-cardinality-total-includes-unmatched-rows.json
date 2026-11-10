@@ -1,0 +1,33 @@
+{
+  "title": "With no filter, the total over a limited relationship includes the rows that match nothing",
+  "model": "c-weak",
+  "query": "EVALUATE ROW ( \"Total\", SUM ( Target[TargetQuantity] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Total]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          360
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/strong-and-weak-relationships-in-power-bi/",
+    "quote": "the total shown for Weak Amount is different than the sum of individual brands",
+    "supports": "the total is not the sum of the groups: unmatched rows are in the total and in no group"
+  },
+  "confidence": "derived",
+  "derivation": "No filter is on Product, so nothing is propagated and all of Target is summed: 100 + 50 + 120 + 60 + 30 = 360. That is 30 (Footwear) more than the two groups of many-to-many-cardinality-filter-propagation, 220 + 110 = 330.",
+  "tags": [
+    "sum",
+    "relationship",
+    "many-to-many-cardinality",
+    "limited-relationship"
+  ]
+}

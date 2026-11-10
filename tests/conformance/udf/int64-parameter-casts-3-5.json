@@ -1,0 +1,47 @@
+{
+  "title": "A SCALAR INT64 VAL parameter rounds 3.5 to 4",
+  "model": "scalar",
+  "query": [
+    "DEFINE FUNCTION CastToInt = ( x : SCALAR INT64 VAL ) => x",
+    "EVALUATE { CastToInt ( 3.5 ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "This uses a Scalar type, Int64 subtype, and val parameterMode for predictable rounding and text-to-number coercion",
+      "supports": "the page shows CastToInt ( 3.4 ), CastToInt ( 3.5 ), CastToInt ( \"5\" ) returning 3, 4, 5"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "SumTwoNumbers( 3.4, 2.4 ), -- evaluates INT ( 3.4 ) + INT ( 2.4 )",
+      "supports": "the SQLBI article describes the cast as INT, which rounds down"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The Microsoft page gives 3, 4, 5 for the arguments 3.4, 3.5 and \"5\" in one query; this is the second of them alone. 4 means the cast rounds to the nearest integer.",
+  "uncertain": true,
+  "alternative": "The SQLBI article describes the same cast as INT ( ... ), which rounds down. In that reading CastToInt ( 3.5 ) is 3.",
+  "tags": [
+    "udf",
+    "define-function",
+    "type-hint",
+    "implicit-conversion",
+    "rounding",
+    "val-parameter"
+  ]
+}

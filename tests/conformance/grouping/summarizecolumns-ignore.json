@@ -1,0 +1,50 @@
+{
+  "title": "IGNORE takes an expression out of the test that drops blank rows",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS (",
+    "    Customer[Country],",
+    "    \"Qty\", IGNORE ( [Total Quantity] ),",
+    "    \"Big\", IF ( [Total Quantity] > 8, 1 )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        },
+        {
+          "name": "[Qty]",
+          "type": "int64"
+        },
+        {
+          "name": "[Big]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "US",
+          10,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/summarizecolumns-function-dax",
+    "quote": "Rows for which all expressions not using IGNORE return BLANK/NULL will be excluded independent of whether the expressions which do use IGNORE evaluate to BLANK/NULL or not.",
+    "supports": "the page has the same pattern: a total under IGNORE and an IF that is blank for some groups"
+  },
+  "confidence": "derived",
+  "derivation": "Quantity by country: US (Ann, Bob) rows 1, 2, 3, 4, 7 = 1 + 2 + 1 + 5 + 1 = 10; JP (Cho) rows 5, 6 = 2 + 3 = 5; FR none. Big is 1 only for US. JP has Qty 5 but its only expression outside IGNORE is BLANK, so the row is dropped; without IGNORE it would be returned as JP, 5, BLANK.",
+  "tags": [
+    "summarizecolumns",
+    "ignore",
+    "blank",
+    "if"
+  ]
+}

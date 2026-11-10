@@ -1,0 +1,40 @@
+{
+  "title": "Integer ^ integer is a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 2 ^ 3 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          8.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/op/exponentiation/",
+      "quote": "It is syntactic sugar for the POWER function, which is used underneath",
+      "supports": "^ is POWER"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/power-function-dax",
+      "quote": "Return value A decimal number",
+      "supports": "POWER returns a decimal number (double)"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "2 ^ 3 is POWER ( 2, 3 ) = 8. POWER returns a decimal number, so the result is 8.0, not the integer 8.",
+  "tags": [
+    "conversion",
+    "operator-power",
+    "result-type",
+    "assumption:power-result-type"
+  ]
+}

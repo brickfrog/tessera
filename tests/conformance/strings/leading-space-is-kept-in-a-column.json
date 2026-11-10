@@ -1,0 +1,34 @@
+{
+  "title": "Filtering Txt = \"ab\" matches \"ab\" and \"ab \" but not \" ab\"",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( Spaces, Spaces[Txt] = \"ab\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "The Power BI engine automatically trims any trailing spaces that follow text data, but doesn't remove leading spaces that precede the data",
+    "supports": "trailing spaces are dropped from stored text, leading spaces are kept"
+  },
+  "confidence": "derived",
+  "derivation": "Row 1 is 'ab'. Row 2, 'ab ', is stored without its trailing space, so it is 'ab' too. Row 3, ' ab', keeps its leading space and is not equal to 'ab'. 2 rows.",
+  "tags": [
+    "filter",
+    "countrows",
+    "operator-equals",
+    "trailing-space",
+    "leading-space"
+  ]
+}

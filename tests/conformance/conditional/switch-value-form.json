@@ -1,0 +1,45 @@
+{
+  "title": "SWITCH returns the result paired with the first value equal to the expression, or the else value",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Product[Color] ), \"Code\", SWITCH ( Product[Color], \"Red\", 1, \"Blue\", 2, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Code]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          1
+        ],
+        [
+          "Blue",
+          2
+        ],
+        [
+          "Green",
+          0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/switch-function-dax",
+    "quote": "If there’s a match with a value , a scalar value from the corresponding result is returned. If there isn’t a match with a value , a value from else is returned.",
+    "supports": "match gives the paired result, no match gives else"
+  },
+  "confidence": "derived",
+  "derivation": "Red matches the first value: 1. Blue matches the second: 2. Green matches neither: the else value 0.",
+  "tags": [
+    "switch",
+    "addcolumns",
+    "values"
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "title": "BLANK ^ 1 is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () ^ 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "BLANK () ^ 1 Blank value",
+    "supports": "the table of expressions with a blank value gives a blank for BLANK () ^ 1"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-power"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

@@ -1,0 +1,74 @@
+{
+  "title": "Inside an iteration over ALL of a column, ALLSELECTED restores the iterated values, not the outer filter",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "CALCULATETABLE (",
+    "    ADDCOLUMNS (",
+    "        ALL ( 'Product'[Color] ),",
+    "        \"Amount\", [Sales Amount],",
+    "        \"Sel\", CALCULATE ( [Sales Amount], ALLSELECTED ( 'Product'[Color] ) )",
+    "    ),",
+    "    'Product'[Color] IN { \"Red\", \"Green\" }",
+    ")",
+    "ORDER BY 'Product'[Color]"
+  ],
+  "ordered": true,
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Sel]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Blue",
+          80.0,
+          540.0
+        ],
+        [
+          "Green",
+          null,
+          540.0
+        ],
+        [
+          "Red",
+          460.0,
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/allselected/",
+      "quote": "Be aware that using ALLSELECTED in an iterator could produce unintuitive results.",
+      "supports": "the page's example has exactly this shape (ADDCOLUMNS over ALL of a column inside CALCULATETABLE with an IN filter) and shows every row of the column with the same total in the ALLSELECTED column"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/the-definitive-guide-to-allselected/",
+      "quote": "it does so by accessing and using the last shadow filter context left by an iterator on the stack of filter contexts",
+      "supports": "ALLSELECTED restores the shadow filter context of the iteration, which here is over ALL colors"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "ADDCOLUMNS iterates ALL ( Product[Color] ): Blue, Green, Red. [Amount] is a measure, so context transition replaces the outer filter on Color with the current color: Blue 50 + 30 = 80, Green no sales = BLANK, Red 100 + 40 + 20 + 200 + 100 = 460. For [Sel], ALLSELECTED restores the shadow filter context left by the iteration, which holds all three colors, so every row is the total over all colors: 540. The outer filter (Red, Green) is not what comes back: that reading would give 460.",
+  "tags": [
+    "allselected",
+    "addcolumns",
+    "all",
+    "calculatetable",
+    "context-transition",
+    "shadow-filter-context"
+  ]
+}

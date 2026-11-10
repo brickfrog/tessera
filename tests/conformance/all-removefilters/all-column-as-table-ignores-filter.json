@@ -1,0 +1,45 @@
+{
+  "title": "ALL ( column ) as a table expression returns every value of the column, ignoring the filter on it",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ALL ( 'Product'[Color] ), 'Product'[Color] = \"Red\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "ignoring the filter on product color",
+      "supports": "the page's example runs the same query on its model and lists every color despite the filter on Red"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "Using a single column argument, ALL returns all the unique values of the column.",
+      "supports": "with one column ALL returns all its unique values"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] holds Red, Red, Blue, Green: the unique values are Red, Blue, Green. The filter Color = Red is ignored. The sales model has no orphans, so there is no blank row.",
+  "tags": [
+    "all",
+    "calculatetable",
+    "table-function"
+  ]
+}

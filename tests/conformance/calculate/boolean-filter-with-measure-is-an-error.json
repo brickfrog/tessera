@@ -1,0 +1,26 @@
+{
+  "title": "A boolean filter argument that references a measure is an error",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], Customer[Country] = \"US\" && [Sales Amount] > 100 ) )",
+  "expected": {
+    "error": "A measure reference (an implicit CALCULATE) has been used in a True/False expression that is used as a table filter expression. This is not allowed."
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/calculate-function-dax",
+      "quote": "It can't reference measures.",
+      "supports": "the rules for Boolean filter expressions"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "It cannot reference a measure, and it cannot use CALCULATE.",
+      "supports": "the limits of a True/False filter argument"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "calculate",
+    "measure",
+    "error"
+  ]
+}

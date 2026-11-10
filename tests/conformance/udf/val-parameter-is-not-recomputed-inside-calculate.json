@@ -1,0 +1,43 @@
+{
+  "title": "A parameter with the default VAL mode is evaluated before the call, so CALCULATE in the body does not change it",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION ComputeForRed = ( amount ) => CALCULATE ( amount, Product[Color] = \"Red\" )",
+    "EVALUATE { ComputeForRed ( [Sales Amount] ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "Despite the function body evaluating the parameter in a filter context that filters only red products, the result is the Sales Amount for all the visible product colors.",
+      "supports": "the article gives this function and says the result is the amount of all colors"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "A value parameter is like a variable definition: the formula used by the caller produces a value; this value is assigned to a variable, and then the function is executed.",
+      "supports": "a VAL parameter is evaluated once by the caller, like a variable"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "amount has no mode, so it is VAL: [Sales Amount] is evaluated by the caller with no filter, 540. Inside CALCULATE the parameter is that value: 540, not the Red amount 460.",
+  "tags": [
+    "udf",
+    "define-function",
+    "val-parameter",
+    "calculate"
+  ]
+}

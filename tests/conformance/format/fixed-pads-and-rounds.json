@@ -1,0 +1,36 @@
+{
+  "title": "FORMAT with \"Fixed\" pads to two decimals and keeps a leading zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"pad\", FORMAT ( 5, \"Fixed\" ), \"lead\", FORMAT ( 0.5, \"Fixed\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[pad]",
+          "type": "string"
+        },
+        {
+          "name": "[lead]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "5.00",
+          "0.50"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+    "quote": "Displays at least one digit to the left and two digits to the right of the decimal separator.",
+    "supports": "the definition of \"Fixed\""
+  },
+  "confidence": "derived",
+  "derivation": "5 gets two decimals: \"5.00\". 0.5 keeps one digit to the left: \"0.50\".",
+  "tags": [
+    "format",
+    "predefined-numeric-format"
+  ]
+}

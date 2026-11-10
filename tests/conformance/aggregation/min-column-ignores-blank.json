@@ -1,0 +1,40 @@
+{
+  "title": "MIN of a column ignores BLANK",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( MIN ( V[N] ), V[Grp] = \"A\", V[Id] <> 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/min/",
+      "quote": "corresponds to the following MINX call",
+      "supports": "MIN ( t[c] ) is MINX ( t, t[c] )"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/minx-function-dax",
+      "quote": "Blank values are skipped.",
+      "supports": "MINX skips blanks rather than reading them as 0"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Group A without row 3 leaves rows 1 and 2, where N is 5 and BLANK. BLANK is skipped, so the minimum is 5 (reading BLANK as 0 would give 0 or BLANK).",
+  "tags": [
+    "min",
+    "minx",
+    "blank",
+    "calculate"
+  ]
+}

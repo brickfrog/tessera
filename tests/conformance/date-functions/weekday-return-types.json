@@ -1,0 +1,52 @@
+{
+  "title": "WEEKDAY of a Sunday: 1 by default, 7 with type 2, 6 with type 3",
+  "model": "scalar",
+  "query": "EVALUATE VAR s = DATE ( 2005, 1, 2 ) RETURN ROW ( \"default\", WEEKDAY ( s ), \"t1\", WEEKDAY ( s, 1 ), \"t2\", WEEKDAY ( s, 2 ), \"t3\", WEEKDAY ( s, 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[default]",
+          "type": "int64"
+        },
+        {
+          "name": "[t1]",
+          "type": "int64"
+        },
+        {
+          "name": "[t2]",
+          "type": "int64"
+        },
+        {
+          "name": "[t3]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          1,
+          7,
+          6
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/weekday/",
+      "quote": "WEEKDAY returns the day of the week using different standards",
+      "supports": "the example table lists 2005-01-02, Sunday, with Weekday 1, Weekday 1 = 1, Weekday 2 = 7, Weekday 3 = 6"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/weekday-function-dax",
+      "quote": "Return type: 3 , week begins on Monday (0) and ends on Sunday (6).numbered 0 through 6.",
+      "supports": "type 3 is zero-based"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "weekday"
+  ]
+}

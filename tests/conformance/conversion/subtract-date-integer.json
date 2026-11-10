@@ -1,0 +1,33 @@
+{
+  "title": "Date - integer is a date: subtracting 1 goes back a day",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2024, 3, 1 ) - 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-02-29T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "if a subtraction operation uses a date with any other data type, DAX converts both values to dates, and the return value is also a date",
+    "supports": "the Subtraction (-) table: Date/time minus anything is Date/time"
+  },
+  "confidence": "derived",
+  "derivation": "Date/time - INTEGER is Date/time. 2024 is a leap year, so the day before 2024-03-01 is 2024-02-29.",
+  "tags": [
+    "conversion",
+    "operator-subtract",
+    "result-type",
+    "date"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "title": "ORDER BY on a boolean column puts FALSE before TRUE",
+  "model": "a2-sort",
+  "query": "EVALUATE FILTER ( Flags, NOT ISBLANK ( Flags[F] ) ) ORDER BY Flags[F], Flags[Id]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Flags[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Flags[F]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          2,
+          false
+        ],
+        [
+          1,
+          true
+        ],
+        [
+          4,
+          true
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/dt/boolean/",
+    "quote": "This sometimes proves useful for sorting purposes because TRUE > FALSE",
+    "supports": "FALSE sorts before TRUE"
+  },
+  "confidence": "derived",
+  "derivation": "Flags[F] by Id: TRUE (1), FALSE (2), BLANK (3), TRUE (4). The filter drops the BLANK row. TRUE is greater than FALSE, so FALSE (Id 2) comes first, then the two TRUE rows in Id order: 2, 1, 4.",
+  "tags": [
+    "order-by",
+    "boolean",
+    "filter"
+  ]
+}

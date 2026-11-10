@@ -1,0 +1,41 @@
+{
+  "title": "DISTINCT on a table expression removes duplicate rows",
+  "model": "scalar",
+  "query": "EVALUATE DISTINCT ( { ( 1, \"A\" ), ( 2, \"B\" ), ( 1, \"A\" ) } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value1]",
+          "type": "int64"
+        },
+        {
+          "name": "[Value2]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "A"
+        ],
+        [
+          2,
+          "B"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/distinct-table-function-dax",
+    "quote": "EVALUATE DISTINCT( { (1, \"A\"), (2, \"B\"), (1, \"A\") } )",
+    "supports": "the page shows this query and its two rows"
+  },
+  "confidence": "published",
+  "tags": [
+    "distinct",
+    "table-constructor",
+    "duplicates",
+    "column-names"
+  ]
+}

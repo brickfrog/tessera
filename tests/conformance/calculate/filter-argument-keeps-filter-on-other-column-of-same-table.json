@@ -1,0 +1,49 @@
+{
+  "title": "A filter argument on one column keeps the filter on another column of the same table",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( 'Product'[Category], \"Red\", CALCULATE ( [Sales Amount], 'Product'[Color] = \"Red\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "[Red]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Vehicles",
+          400.0
+        ],
+        [
+          "Accessories",
+          60.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/keepfilters-function-dax",
+      "quote": "Filters on columns other than those mentioned in the arguments of CALCULATE or other related functions remain in effect and unaltered.",
+      "supports": "only filters on the columns named in the filter argument are replaced; the Category filter is unaltered"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "the predicate shown in the first expression is internally converted in the second expression",
+      "supports": "the predicate becomes a filter over the Color column only"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Vehicles and Red: Bike, rows 1, 5, 7 = 100 + 200 + 100 = 400. Accessories and Red: Helmet, rows 2, 3 = 40 + 20 = 60.",
+  "tags": [
+    "calculate",
+    "summarizecolumns",
+    "filter-intersection"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

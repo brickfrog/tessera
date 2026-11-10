@@ -1,0 +1,90 @@
+{
+  "title": "OFFSET past the last row returns no row",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    'Product',",
+    "    \"Next\", MAXX ( OFFSET ( 1, 'Product', ORDERBY ( 'Product'[ProductKey], ASC ) ), 'Product'[Product] )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Next]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Red",
+          "Vehicles",
+          100.0,
+          "Helmet"
+        ],
+        [
+          2,
+          "Helmet",
+          "Red",
+          "Accessories",
+          20.0,
+          "Lock"
+        ],
+        [
+          3,
+          "Lock",
+          "Blue",
+          "Accessories",
+          10.0,
+          "Scooter"
+        ],
+        [
+          4,
+          "Scooter",
+          "Green",
+          "Vehicles",
+          50.0,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/offset/",
+    "quote": "The number of rows before (negative value) or after (positive value) the current row from which to obtain the data.",
+    "supports": "a delta of 1 is the row after the current one"
+  },
+  "confidence": "derived",
+  "derivation": "Ordered by ProductKey: Bike, Helmet, Lock, Scooter. The row after Bike is Helmet, after Helmet Lock, after Lock Scooter. Scooter is last: OFFSET returns an empty table and MAXX over no rows is BLANK.",
+  "tags": [
+    "window-functions",
+    "offset",
+    "orderby",
+    "maxx",
+    "addcolumns",
+    "empty-table"
+  ]
+}

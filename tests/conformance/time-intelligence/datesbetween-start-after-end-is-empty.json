@@ -1,0 +1,27 @@
+{
+  "title": "DATESBETWEEN with the start after the end is an empty table",
+  "model": "f-calendar",
+  "query": "EVALUATE DATESBETWEEN ( 'Date'[Date], DATE ( 2024, 2, 10 ), DATE ( 2024, 1, 31 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": []
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datesbetween/",
+    "quote": "If StartDate is later than EndDate, the result is an empty table.",
+    "supports": "states the result"
+  },
+  "confidence": "published",
+  "tags": [
+    "time-intelligence",
+    "datesbetween",
+    "empty-table"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "title": "With four nested row contexts, EARLIEST reads the outermost one",
+  "model": "scalar",
+  "query": "EVALUATE ADDCOLUMNS ( T, \"x\", SUMX ( FILTER ( T, T[n] >= 2 ), SUMX ( FILTER ( T, T[n] = 1 ), SUMX ( FILTER ( T, T[n] = 1 ), EARLIEST ( T[n] ) ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "T[n]",
+          "type": "int64"
+        },
+        {
+          "name": "[x]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          6
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/earliest/",
+      "quote": "EARLIEST retrieves the value from the outermost row context.",
+      "supports": "EARLIEST is the outermost row context, however many are open"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/earliest-function-dax",
+      "quote": "The EARLIEST function is similar to EARLIER, but lets you specify one additional level of recursion.",
+      "supports": "the Microsoft page describes it differently"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Row contexts: ADDCOLUMNS (n), SUMX over rows 2 and 3, SUMX over row 1, SUMX over row 1. The outermost is ADDCOLUMNS. Its value is added once per row of the second level (2 rows), the other levels having one row each: 1 gives 2, 2 gives 4, 3 gives 6.",
+  "uncertain": true,
+  "alternative": "The Microsoft page says EARLIEST gives one additional level of recursion compared with EARLIER, which can be read as two levels out, like EARLIER ( column, 2 ). Two levels out of the innermost SUMX is the SUMX over rows 2 and 3, which would give 2 + 3 = 5 in every row.",
+  "tags": [
+    "earliest",
+    "addcolumns",
+    "sumx",
+    "filter",
+    "row-context",
+    "nested-row-context"
+  ]
+}

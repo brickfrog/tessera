@@ -1,0 +1,54 @@
+{
+  "title": "DATESYTD for one date is January 1 to that date",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = DATESYTD ( 'Date'[Date] ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] = DATE ( 2024, 3, 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-01T00:00:00",
+          "2024-03-10T00:00:00",
+          70,
+          1500.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/datesytd/",
+      "quote": "Returns a set of dates in the year up to the last date visible in the filter context.",
+      "supports": "DATESYTD goes from January 1 to the last visible date"
+    },
+    {
+      "url": "https://dax.guide/datesytd/",
+      "quote": "DATESYTD returns the dates from the first of January of the currently selected date",
+      "supports": "the example for 2007-05-12 returns 2007-01-01 to 2007-05-12"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The only visible date is 2024-03-10, so the result is 2024-01-01 to 2024-03-10: 31 + 29 (leap February) + 10 = 70 days. Sales in that range: Jan 300 + Feb 700 + Mar 10 500 = 1500.",
+  "tags": [
+    "time-intelligence",
+    "datesytd",
+    "leap-year"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "title": "ROUNDUP ( -1.1, 0 ) is -2: up means away from zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUNDUP ( -1.1, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -2.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/roundup-function-dax",
+    "quote": "Rounds a number up, away from 0 (zero).",
+    "supports": "ROUNDUP rounds away from zero, so a negative number moves down"
+  },
+  "confidence": "derived",
+  "derivation": "-1.1 rounded away from zero to 0 digits is -2 (toward positive infinity it would be -1). ROUNDUP returns a decimal number: -2.0.",
+  "tags": [
+    "math-functions",
+    "roundup"
+  ]
+}

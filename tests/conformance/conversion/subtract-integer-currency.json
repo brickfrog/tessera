@@ -1,0 +1,45 @@
+{
+  "title": "Integer - currency is a currency",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 5 - CURRENCY ( 1.5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          3.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "In the following table, the row header is the minuend (left side) and the column header is the subtrahend (right side).",
+      "supports": "the Subtraction (-) table of result types: INTEGER - CURRENCY is CURRENCY"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "When a decimal is involved, the result is decimal. Otherwise, when a currency is involved then the result is currency. The result is integer only when both operands are also integers.",
+      "supports": "the same rule for + and -"
+    },
+    {
+      "url": "https://dax.guide/currency/",
+      "quote": "Returns the value as a currency data type",
+      "supports": "CURRENCY ( x ) is a currency (fixed decimal) value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "5 is an integer and CURRENCY ( 1.5 ) a currency. INTEGER - CURRENCY is CURRENCY: 5 - 1.5 = 3.5.",
+  "tags": [
+    "conversion",
+    "operator-subtract",
+    "result-type",
+    "currency"
+  ]
+}

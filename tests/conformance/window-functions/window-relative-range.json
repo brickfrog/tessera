@@ -1,0 +1,89 @@
+{
+  "title": "WINDOW ( -1, REL, 0, REL ) is the previous row and the current one",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    'Product',",
+    "    \"Pair\", SUMX ( WINDOW ( -1, REL, 0, REL, 'Product', ORDERBY ( 'Product'[ProductKey], ASC ) ), 'Product'[Price] )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Pair]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Red",
+          "Vehicles",
+          100.0,
+          100.0
+        ],
+        [
+          2,
+          "Helmet",
+          "Red",
+          "Accessories",
+          20.0,
+          120.0
+        ],
+        [
+          3,
+          "Lock",
+          "Blue",
+          "Accessories",
+          10.0,
+          30.0
+        ],
+        [
+          4,
+          "Scooter",
+          "Green",
+          "Vehicles",
+          50.0,
+          60.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/window/",
+    "quote": "If FromType is REL, the number of rows to go back (negative value) or forward (positive value) from the current row to get the first row in the window.",
+    "supports": "-1, REL starts one row back; 0, REL ends at the current row"
+  },
+  "confidence": "derived",
+  "derivation": "Ordered by ProductKey the prices are 100, 20, 10, 50. Bike has no previous row: 100. Helmet: 100 + 20 = 120. Lock: 20 + 10 = 30. Scooter: 10 + 50 = 60.",
+  "tags": [
+    "window-functions",
+    "window",
+    "orderby",
+    "sumx",
+    "addcolumns"
+  ]
+}

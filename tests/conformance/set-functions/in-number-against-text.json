@@ -1,0 +1,24 @@
+{
+  "title": "IN with a number against a table of text",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1 IN { \"1\" } )",
+  "expected": {
+    "error": "the number 1 cannot be compared with the text column of the table"
+  },
+  "source": {
+    "url": "https://dax.guide/containsrow/",
+    "quote": "If a Value has a data type that cannot be compared with the corresponding column, CONTAINSROW returns an error.",
+    "supports": "the page continues: for example, the number 1 does not match the text \"1\""
+  },
+  "confidence": "derived",
+  "derivation": "The value is an integer and the only column of the table is text. The page says CONTAINSROW returns an error when the types cannot be compared, and gives exactly this pair as the example.",
+  "uncertain": true,
+  "alternative": "The example sentence says only that 1 \"does not match\" the text \"1\": read that way the query succeeds and [r] is FALSE (boolean).",
+  "tags": [
+    "in",
+    "containsrow",
+    "type-mismatch",
+    "error",
+    "table-constructor"
+  ]
+}

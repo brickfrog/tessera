@@ -1,0 +1,30 @@
+{
+  "title": "REPT ( \"85\", 3 ) is \"858585\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", REPT ( \"85\", 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "858585"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rept-function-dax",
+    "quote": "The following example returns the string, 85, repeated three times.",
+    "supports": "the example table shows 858585"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "rept"
+  ]
+}

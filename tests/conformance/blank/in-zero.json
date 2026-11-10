@@ -1,0 +1,31 @@
+{
+  "title": "BLANK IN { 0 } is FALSE: IN compares strictly",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () IN { 0 } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "BLANK () IN { 0 } False",
+    "supports": "the table of expressions with a blank value"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "in",
+    "table-constructor"
+  ]
+}

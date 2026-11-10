@@ -1,0 +1,30 @@
+{
+  "title": "MID ( \"abcde\", 2, 3 ) is \"bcd\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MID ( \"abcde\", 2, 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "bcd"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/mid-function-dax",
+    "quote": "Returns \"bcd\" .",
+    "supports": "the example MID(\"abcde\",2,3) returns \"bcd\"; positions start at 1"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "mid"
+  ]
+}

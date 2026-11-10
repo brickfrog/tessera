@@ -1,0 +1,97 @@
+{
+  "title": "WINDOW from the first row (1, ABS) to the current row (0, REL) is a running total",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    'Product',",
+    "    \"Running\", SUMX ( WINDOW ( 1, ABS, 0, REL, 'Product', ORDERBY ( 'Product'[ProductKey], ASC ) ), 'Product'[Price] )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Running]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Red",
+          "Vehicles",
+          100.0,
+          100.0
+        ],
+        [
+          2,
+          "Helmet",
+          "Red",
+          "Accessories",
+          20.0,
+          120.0
+        ],
+        [
+          3,
+          "Lock",
+          "Blue",
+          "Accessories",
+          10.0,
+          130.0
+        ],
+        [
+          4,
+          "Scooter",
+          "Green",
+          "Vehicles",
+          50.0,
+          180.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/window-function-dax",
+      "quote": "Returns the running sum for Total Sales by Month Number Of Year, restarting for every Fiscal Year",
+      "supports": "the page's second example uses WINDOW ( 1, ABS, 0, REL, ... ) inside SUMX for a running sum"
+    },
+    {
+      "url": "https://dax.guide/window/",
+      "quote": "For example, 1 means window starts from the beginning of the partition.",
+      "supports": "1, ABS is the first row; 0, REL is the current row, which is included"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Ordered by ProductKey the prices are 100, 20, 10, 50. Running sums: 100, 120, 130, 180. SUMX over a fixed decimal column is taken to be a fixed decimal.",
+  "tags": [
+    "window-functions",
+    "window",
+    "orderby",
+    "sumx",
+    "addcolumns",
+    "running-total"
+  ]
+}

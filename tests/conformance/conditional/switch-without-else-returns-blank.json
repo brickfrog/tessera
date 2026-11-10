@@ -1,0 +1,46 @@
+{
+  "title": "SWITCH with no match and no else returns BLANK",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Product[Color] ), \"Code\", SWITCH ( Product[Color], \"Red\", 1, \"Blue\", 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Code]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          1
+        ],
+        [
+          "Blue",
+          2
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/switch-function-dax",
+    "quote": "If none of the values match and else isn’t specified, BLANK is returned.",
+    "supports": "no match and no else is BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "Green matches neither \"Red\" nor \"Blue\" and there is no else argument, so its code is BLANK.",
+  "tags": [
+    "switch",
+    "blank",
+    "addcolumns",
+    "values"
+  ]
+}

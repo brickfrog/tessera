@@ -1,0 +1,32 @@
+{
+  "title": "Every measure reference inside the CALCULATE gets the calculation item",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total] + [Count], Adjust[Adjustment] = \"Plus 2\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          67
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-the-application-of-calculation-items/",
+    "quote": "If the expression inside CALCULATE contains multiple measure references, all of them are replaced with the calculation item definition.",
+    "supports": "both [Total] and [Count] become measure + 2"
+  },
+  "confidence": "derived",
+  "derivation": "( 60 + 2 ) + ( 3 + 2 ) = 67. Applying the item once to the sum would give 65.",
+  "tags": [
+    "calculation-groups",
+    "selectedmeasure",
+    "calculate"
+  ]
+}

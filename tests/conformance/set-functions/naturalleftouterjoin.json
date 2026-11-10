@@ -1,0 +1,83 @@
+{
+  "title": "NATURALLEFTOUTERJOIN: a row per match, and unmatched left rows once with BLANKs",
+  "model": "scalar",
+  "query": [
+    "DEFINE",
+    "    VAR LeftTable =",
+    "        DATATABLE (",
+    "            \"Key\", STRING,",
+    "            \"Left Value\", STRING,",
+    "            { { \"A\", \"L1\" }, { \"A\", \"L2\" }, { \"B\", \"L3\" }, { \"C\", \"L4\" } }",
+    "        )",
+    "    VAR RightTable =",
+    "        DATATABLE (",
+    "            \"Key\", STRING,",
+    "            \"Right Value\", STRING,",
+    "            { { \"A\", \"R1\" }, { \"B\", \"R2\" }, { \"B\", \"R3\" }, { \"D\", \"R4\" } }",
+    "        )",
+    "EVALUATE",
+    "NATURALLEFTOUTERJOIN ( LeftTable, RightTable )",
+    "ORDER BY [Key], [Left Value], [Right Value]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Key]",
+          "type": "string"
+        },
+        {
+          "name": "[Left Value]",
+          "type": "string"
+        },
+        {
+          "name": "[Right Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "A",
+          "L1",
+          "R1"
+        ],
+        [
+          "A",
+          "L2",
+          "R1"
+        ],
+        [
+          "B",
+          "L3",
+          "R2"
+        ],
+        [
+          "B",
+          "L3",
+          "R3"
+        ],
+        [
+          "C",
+          "L4",
+          null
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/naturalleftouterjoin/",
+    "quote": "A row of the left table without a match is returned once, with blank values in the columns of the right table. Rows of the right table without a match are not returned.",
+    "supports": "the page shows this query and its five rows"
+  },
+  "confidence": "published",
+  "derivation": "A matches R1 for both left rows; B matches R2 and R3; C has no match and comes back with a BLANK; D is only on the right and is not returned.",
+  "tags": [
+    "naturalleftouterjoin",
+    "datatable",
+    "join",
+    "blank",
+    "var",
+    "order-by"
+  ]
+}

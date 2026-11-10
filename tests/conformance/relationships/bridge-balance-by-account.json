@@ -1,0 +1,42 @@
+{
+  "title": "Grouping by the account side of a bridge model needs no both-direction filter",
+  "model": "c-bridge",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Account[Account], \"Balance\", SUM ( Transactions[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Account[Account]",
+          "type": "string"
+        },
+        {
+          "name": "[Balance]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Account-01",
+          75
+        ],
+        [
+          "Account-02",
+          200
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-many-to-many",
+    "quote": "Account-01 balance amount is 75",
+    "supports": "the page states the balance by account on these rows: 75 and 200"
+  },
+  "confidence": "published",
+  "derivation": "Account 1: 100 - 25 = 75. Account 2: 200.",
+  "tags": [
+    "summarizecolumns",
+    "sum",
+    "relationship",
+    "bridge"
+  ]
+}

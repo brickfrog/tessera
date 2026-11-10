@@ -1,0 +1,46 @@
+{
+  "title": "ALLSELECTED of a column, with no iteration active, returns every value: a filter on another column doesn't narrow it",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "CALCULATETABLE (",
+    "    ROW ( \"Products\", CONCATENATEX ( ALLSELECTED ( 'Product'[Product] ), 'Product'[Product], \", \", 'Product'[Product], ASC ) ),",
+    "    'Product'[Color] = \"Red\"",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Bike, Helmet, Lock, Scooter"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/the-definitive-guide-to-allselected/",
+      "quote": "As a result, all the product names are returned because neither Color nor Brand filter the Product[Product] column",
+      "supports": "the article runs this query shape (CALCULATETABLE over ROW with CONCATENATEX over ALLSELECTED of a column, filtered on other columns) and shows that every product comes back"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/the-definitive-guide-to-allselected/",
+      "quote": "ALLSELECTED does not take into account the filter context",
+      "supports": "the rule behind it"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "There is no iterator around ALLSELECTED, so no shadow filter context exists. The filter Color = Red is on another column, so it only cross-filters Product[Product], which ALLSELECTED ignores. All four products are returned: Bike, Helmet, Lock, Scooter, concatenated in ascending order.",
+  "tags": [
+    "allselected",
+    "concatenatex",
+    "calculatetable",
+    "cross-filter"
+  ]
+}

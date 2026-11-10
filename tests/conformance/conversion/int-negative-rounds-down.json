@@ -1,0 +1,38 @@
+{
+  "title": "INT ( -4.3 ) is -5: INT rounds towards negative infinity",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( -4.3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/int-function-dax",
+      "quote": "TRUNC(-4.3) returns -4, but INT(-4.3) returns -5 because -5 is the lower number",
+      "supports": "stated outright"
+    },
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "If <Number> is an Integer or a Decimal data type data type, then the result is an Integer data type",
+      "supports": "the result type"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "int",
+    "rounding"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "title": "RANKX treats a BLANK as 0: above a negative value",
+  "model": "d-values",
+  "query": [
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    FILTER ( Mixed, Mixed[Id] <> 4 ),",
+    "    \"Rank\", RANKX ( FILTER ( Mixed, Mixed[Id] <> 4 ), Mixed[v] )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Mixed[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Mixed[v]",
+          "type": "int64"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          10,
+          1
+        ],
+        [
+          2,
+          null,
+          2
+        ],
+        [
+          3,
+          -5,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+    "quote": "If expression or value evaluates to BLANK it is treated as a 0 (zero) for all expressions that result in a number, or as an empty text for all text expressions.",
+    "supports": "a BLANK is ranked as 0"
+  },
+  "confidence": "derived",
+  "derivation": "Without row 4 the values are 10, BLANK, -5. With BLANK read as 0 the descending order is 10, 0, -5: ranks 1, 2, 3. If BLANK sorted below every number it would be last, after -5.",
+  "tags": [
+    "rankx",
+    "blank",
+    "filter",
+    "addcolumns"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "title": "0 / 0 is NaN",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 0 / 0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          "NaN"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/division/",
+    "quote": "If the error is not intercepted, the division returns positive or negative infinity depending on the sign of the numerator, or NaN in case of 0 / 0",
+    "supports": "what / gives for a zero denominator"
+  },
+  "confidence": "published",
+  "tags": [
+    "division",
+    "operator-divide",
+    "divide-by-zero",
+    "nan"
+  ]
+}

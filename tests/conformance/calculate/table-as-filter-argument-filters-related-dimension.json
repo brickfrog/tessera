@@ -1,0 +1,33 @@
+{
+  "title": "A fact table used as a filter argument filters the dimensions it is related to",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( COUNTROWS ( 'Product' ), Sales ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+    "quote": "the filter context contains all the columns of the expanded version of Sales",
+    "supports": "the article's NumOfProductsSold = CALCULATE ( [NumOfProducts], Sales ) counts only products with sales, because the filter is the expanded Sales table"
+  },
+  "confidence": "derived",
+  "derivation": "Sales as a filter is its expanded table, which includes the Product columns. The products appearing in Sales are 1 (Bike), 2 (Helmet), 3 (Lock). Scooter has no sales, so 3 of the 4 products remain.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "table-filter",
+    "expanded-table"
+  ]
+}

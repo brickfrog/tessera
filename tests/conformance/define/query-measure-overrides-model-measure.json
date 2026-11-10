@@ -1,0 +1,42 @@
+{
+  "title": "A DEFINE MEASURE with the name of a model measure replaces it for the query",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Sales Amount] = SUM ( Sales[Quantity] )",
+    "EVALUATE ROW ( \"r\", [Sales Amount] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          15
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/measure-statement-dax",
+      "quote": "Measure definitions for a query override model measures of the same name for the duration of the query.",
+      "supports": "the query definition is the one used"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "When the measure already exists in the model, the DAX query will use the measure DAX formula defined in the query.",
+      "supports": "the query definition is the one used"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The model measure is SUM ( Sales[Amount] ) = 540. The query redefines it as SUM ( Sales[Quantity] ) = 1 + 2 + 1 + 5 + 2 + 3 + 1 = 15, an integer, and that is what the reference returns.",
+  "tags": [
+    "define-measure",
+    "measure-override",
+    "sum"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "title": "DATE ( 2008, 1, 0 ) is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2008, 1, 0 ) )",
+  "expected": {
+    "error": "DATE with day 0"
+  },
+  "source": [
+    {
+      "url": "https://dax.guide/date/",
+      "quote": "If Day is 0, DATE returns an error.",
+      "supports": "DAX Guide documents day 0 as an error"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/date-function-dax",
+      "quote": "Negative integers are not supported. Valid values are 1-31.",
+      "supports": "Microsoft Learn calls only 1 to 31 valid"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "DAX Guide states that day 0 is an error, while a negative day goes back from the first day of the month.",
+  "uncertain": true,
+  "alternative": "In Excel, day 0 is the last day of the previous month: the result would be 2007-12-31T00:00:00.",
+  "tags": [
+    "date-functions",
+    "date",
+    "error"
+  ]
+}

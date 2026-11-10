@@ -1,0 +1,41 @@
+{
+  "title": "REPT with a count of zero returns an empty string",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", REPT ( \"ab\", 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          ""
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/rept/",
+      "quote": "If NumberOfTimes is 0 (zero), REPT returns an empty string.",
+      "supports": "DAX Guide: an empty string"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rept-function-dax",
+      "quote": "If num_times is 0 (zero), REPT returns a blank.",
+      "supports": "Microsoft Learn: a blank"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Zero repetitions of \"ab\". DAX Guide says the result is an empty string; the example table on Microsoft Learn shows an empty cell for a count of 0.",
+  "uncertain": true,
+  "alternative": "Microsoft Learn says \"returns a blank\": if that means BLANK rather than an empty string, the value is BLANK (null).",
+  "tags": [
+    "text-functions",
+    "rept",
+    "blank"
+  ]
+}

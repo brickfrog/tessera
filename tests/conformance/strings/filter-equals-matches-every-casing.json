@@ -1,0 +1,40 @@
+{
+  "title": "A filter Txt = \"APPLE\" keeps the rows loaded as apple, Apple and APPLE",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( CaseT, CaseT[Txt] = \"APPLE\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The engine that stores and queries data in Power BI is case insensitive, and treats different capitalization of letters as the same value",
+      "supports": "text that differs only in case is the same value, for comparison and for storage"
+    },
+    {
+      "url": "https://dax.guide/dt/string/",
+      "quote": "By default, the comparison between strings is case-insensitive and accent-sensitive",
+      "supports": "the default comparison ignores case and respects accents; the page gives \"e\" and \"è\" as different"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CaseT[Txt] holds apple, Apple, APPLE, pear. = ignores case, so the first three rows equal \"APPLE\" and pear does not: 3 rows. COUNTROWS returns an integer.",
+  "tags": [
+    "filter",
+    "countrows",
+    "operator-equals",
+    "case-insensitive"
+  ]
+}

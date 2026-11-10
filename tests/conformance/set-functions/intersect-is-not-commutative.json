@@ -1,0 +1,44 @@
+{
+  "title": "INTERSECT with the tables swapped keeps the duplicates of the other table",
+  "model": "scalar",
+  "query": "EVALUATE INTERSECT ( { \"B\", \"C\", \"D\", \"D\", \"D\", \"E\" }, { \"A\", \"A\", \"B\", \"B\", \"B\", \"C\", \"D\", \"D\" } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "B"
+        ],
+        [
+          "C"
+        ],
+        [
+          "D"
+        ],
+        [
+          "D"
+        ],
+        [
+          "D"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/intersect-function-dax",
+    "quote": "Intersect is not commutative. In general, Intersect(T1, T2) will have a different result set than Intersect(T2, T1).",
+    "supports": "the page shows these two tables and this result for Intersect(States2, States1)"
+  },
+  "confidence": "published",
+  "derivation": "Left is now B, C, D, D, D, E. B, C and D are in the other table; E is not. So B, C, D, D, D.",
+  "tags": [
+    "intersect",
+    "duplicates",
+    "table-constructor"
+  ]
+}

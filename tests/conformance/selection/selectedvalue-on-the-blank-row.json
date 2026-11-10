@@ -1,0 +1,56 @@
+{
+  "title": "On the blank row SELECTEDVALUE returns BLANK as the one value, not the alternate result",
+  "model": "sales-orphans",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Product[Color] ), \"Product\", CALCULATE ( SELECTEDVALUE ( Product[Product], \"several\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          "several"
+        ],
+        [
+          "Blue",
+          "Lock"
+        ],
+        [
+          null,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/selectedvalue-function-dax",
+      "quote": "An equivalent expression for SELECTEDVALUE(<columnName>, <alternateResult>) is IF(HASONEVALUE(<columnName>), VALUES(<columnName>), <alternateResult>) .",
+      "supports": "SELECTEDVALUE returns the value when the column has one visible value, else the alternate"
+    },
+    {
+      "url": "https://dax.guide/values/",
+      "quote": "VALUES includes the blank row caused by an invalid relationship, if present",
+      "supports": "VALUES, and so HASONEVALUE, count the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows 3 and 4 have ProductKey 9, missing from Product, so Product has a blank row and VALUES ( Product[Color] ) is Red, Blue and BLANK. Red has two products (Bike, Bell): the alternate. Blue has Lock. For the blank color the only visible row is the blank row, where Product[Product] has one value, BLANK: HASONEVALUE is TRUE and that BLANK is returned, not \"several\".",
+  "tags": [
+    "selectedvalue",
+    "blank-row",
+    "values",
+    "addcolumns",
+    "calculate",
+    "context-transition",
+    "relationship"
+  ]
+}

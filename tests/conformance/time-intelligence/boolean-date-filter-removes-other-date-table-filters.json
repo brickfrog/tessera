@@ -1,0 +1,42 @@
+{
+  "title": "A plain filter on the date key also removes filters on the other columns of the Date table",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CALCULATE ( [Sales], 'Date'[Date] = DATE ( 2023, 1, 31 ) ) ), 'Date'[Year] = 2024 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          20.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/time-intelligence-in-power-bi-desktop/",
+      "quote": "this ALL statement is automatically applied when you apply a filter over a column of Date type that is the primary key in a relationship",
+      "supports": "a filter on the date key removes the filters on the other columns of the Date table"
+    },
+    {
+      "url": "https://dax.guide/dateadd/",
+      "quote": "With the date column of a table marked as a date table, CALCULATE removes all the filters on the date table.",
+      "supports": "the same rule as DAX Guide states it"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The outer filter keeps Date[Year] = 2024. The inner filter is on Date[Date], the date key of the relationship, so CALCULATE also removes the filter on Year: the only visible date is 2023-01-31, with sales 20. If the Year filter stayed, no date would satisfy both and the result would be BLANK.",
+  "uncertain": true,
+  "alternative": "If the automatic ALL needs the table to be explicitly marked as a date table (the model format has no such switch), the Year filter stays and the result is BLANK.",
+  "tags": [
+    "time-intelligence",
+    "calculate",
+    "date-table-auto-all",
+    "filter-overwrite"
+  ]
+}

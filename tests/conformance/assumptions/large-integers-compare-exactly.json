@@ -1,0 +1,35 @@
+{
+  "title": "9007199254740993 = 9007199254740992 is FALSE: two integers are compared as integers",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 9007199254740993 = 9007199254740992 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "DAX does implicit conversions for numeric or date/time types as the following table describes",
+    "supports": "the comparison table that follows gives REAL for INTEGER compared with REAL, and INTEGER for INTEGER with INTEGER"
+  },
+  "confidence": "derived",
+  "derivation": "The comparison table gives INTEGER for INTEGER compared with INTEGER: no conversion to floating point. 2^53 + 1 and 2^53 are different 64-bit integers.",
+  "tags": [
+    "assumption:exact-number-comparison",
+    "operator-equals",
+    "comparison",
+    "int64",
+    "precision"
+  ],
+  "notes": "The control for assumptions/large-integer-equals-decimal-number: same digits, no decimal point."
+}

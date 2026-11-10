@@ -1,0 +1,44 @@
+{
+  "title": "A query measure defined on one table is used unqualified and can aggregate another table",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Product[Rows] = COUNTROWS ( Sales )",
+    "EVALUATE SUMMARIZECOLUMNS ( Customer[Country], \"Rows\", [Rows] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        },
+        {
+          "name": "[Rows]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "US",
+          5
+        ],
+        [
+          "JP",
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/measure-statement-dax",
+    "quote": "The measure expression can be used with any other expression in the same query.",
+    "supports": "the DAX queries page defines measures on a table of its own and uses them unqualified in SUMMARIZECOLUMNS"
+  },
+  "confidence": "derived",
+  "derivation": "The measure is on Product but counts Sales rows in the filter of each country: US is Ann (rows 1, 2, 7) and Bob (rows 3, 4), 5 rows; JP is Cho (rows 5, 6), 2 rows; FR (Dee) has none, BLANK, and its row is dropped.",
+  "tags": [
+    "define-measure",
+    "summarizecolumns",
+    "countrows"
+  ]
+}

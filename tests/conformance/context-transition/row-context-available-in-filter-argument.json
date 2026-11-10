@@ -1,0 +1,53 @@
+{
+  "title": "The outer row context is still available inside a CALCULATE filter argument",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( 'Date'[Year] ), \"Previous\", CALCULATE ( [Sales Amount], TREATAS ( { 'Date'[Year] - 1 }, 'Date'[Year] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Year]",
+          "type": "int64"
+        },
+        {
+          "name": "[Previous]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2023,
+          null
+        ],
+        [
+          2024,
+          210.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/context-transition-and-filters-in-calculate/",
+      "quote": "Any row context available outside of CALCULATE and CALCULATETABLE is available to filter arguments.",
+      "supports": "the column reference Date[Year] inside the filter argument reads the row context of ADDCOLUMNS, as in the article's YOY-3 measure"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+      "quote": "context transition happens before further filters in CALCULATE",
+      "supports": "the explicit filter on Date[Year] replaces the filter the transition put on the same column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "For 2023 the filter argument is Date[Year] = 2022: no dates, BLANK. For 2024 it is Date[Year] = 2023, which overwrites the transition's filter Date[Year] = 2024: Sales rows 1, 2, 3, 4 = 100 + 40 + 20 + 50 = 210.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "calculate",
+    "treatas",
+    "context-transition",
+    "evaluation-order",
+    "filter-overwrite"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

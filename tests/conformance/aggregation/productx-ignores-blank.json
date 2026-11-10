@@ -1,0 +1,40 @@
+{
+  "title": "PRODUCTX multiplies the non-blank values and returns a double",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", PRODUCTX ( { 2, BLANK (), 3, -4 }, [Value] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -24.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/productx/",
+      "quote": "PRODUCTX ignores blank expressions, the multiplication operator does not.",
+      "supports": "a BLANK does not turn the product into BLANK"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/productx-function-dax",
+      "quote": "Only the numbers in the column are counted. Blanks, logical values, and text are ignored.",
+      "supports": "same; the return value is a decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "2 * 3 * -4 = -24, skipping the BLANK. Both pages give the return type as a decimal number (double), also for integer input.",
+  "tags": [
+    "productx",
+    "blank",
+    "table-constructor",
+    "result-type"
+  ]
+}

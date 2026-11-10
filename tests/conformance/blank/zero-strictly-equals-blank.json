@@ -1,0 +1,32 @@
+{
+  "title": "0 == BLANK is FALSE: zero is not BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 0 == BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/strictly-equal-to/",
+    "quote": "Returns TRUE if Sales[Quantity] is BLANK, returns FALSE if it is 0 or any other value",
+    "supports": "== BLANK () is FALSE for 0"
+  },
+  "confidence": "derived",
+  "derivation": "The left side is 0, not BLANK, so == BLANK () is FALSE. The operand order is the page's: <value> == BLANK ().",
+  "tags": [
+    "blank",
+    "operator-strict-equals",
+    "comparison"
+  ]
+}

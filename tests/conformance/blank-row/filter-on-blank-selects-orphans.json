@@ -1,0 +1,45 @@
+{
+  "title": "A filter for BLANK on a one-side column selects the fact rows with no matching dimension row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], ISBLANK ( Product[Color] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          70.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "all the different values of Sales[ProductKey] with no corresponding row in Product are linked to the single blank row",
+      "supports": "orphaned rows are linked to the blank row"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "ALL includes in the result the additional blank row generated for invalid relationships",
+      "supports": "the values of the column that the predicate filters include the blank row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "If a relationship is invalid, the VertiPaq engine automatically adds a row containing BLANK in every column of the table on the one-side of the relationship",
+      "supports": "the blank row has BLANK in every column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The predicate filters the values of Product[Color], which are Red, Blue and the blank row's BLANK. Only the blank row is BLANK. The Sales rows linked to it are rows 3 and 4: 50 + 20 = 70.",
+  "tags": [
+    "calculate",
+    "isblank",
+    "blank-row",
+    "relationship"
+  ]
+}

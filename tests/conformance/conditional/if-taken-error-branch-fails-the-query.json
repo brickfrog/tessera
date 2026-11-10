@@ -1,0 +1,25 @@
+{
+  "title": "ERROR in the branch that is taken fails the whole query",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Product[Checked Color] = IF ( SELECTEDVALUE ( Product[Color] ) = \"Red\", ERROR ( \"red color encountered\" ), SELECTEDVALUE ( Product[Color] ) )",
+    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Measure\", [Checked Color] ) ORDER BY Product[Color]"
+  ],
+  "expected": {
+    "error": "the measure raises \"red color encountered\" for the Red row"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/error-function-dax",
+    "quote": "Fails and raises and error message containing \"red color encountered\".",
+    "supports": "the page shows this query failing when one of the colors is the tested one"
+  },
+  "confidence": "derived",
+  "derivation": "Red is one of the colors, so for that row the condition is TRUE and ERROR is evaluated. One error fails the query.",
+  "tags": [
+    "if",
+    "error",
+    "selectedvalue",
+    "summarizecolumns",
+    "define-measure"
+  ]
+}

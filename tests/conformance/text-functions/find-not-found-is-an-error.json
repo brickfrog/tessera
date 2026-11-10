@@ -1,0 +1,20 @@
+{
+  "title": "FIND with no 4th argument fails when the text is not found",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FIND ( \"Bike\", \"bike shop\" ) )",
+  "expected": {
+    "error": "FIND did not find the text and no NotFoundValue was given"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/find-function-dax",
+    "quote": "If you don't specify it, the function returns an error.",
+    "supports": "not found without a NotFoundValue is an error"
+  },
+  "confidence": "derived",
+  "derivation": "\"bike shop\" has no \"Bike\" with a capital B and no NotFoundValue is given.",
+  "tags": [
+    "text-functions",
+    "find",
+    "error"
+  ]
+}

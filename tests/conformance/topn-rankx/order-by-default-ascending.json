@@ -1,0 +1,74 @@
+{
+  "title": "ORDER BY sorts ascending when no direction is given, and DESC reverses it",
+  "model": "d-values",
+  "query": [
+    "EVALUATE VALUES ( Player[Score] ) ORDER BY Player[Score]",
+    "EVALUATE VALUES ( Player[Score] ) ORDER BY Player[Score] DESC"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          50
+        ],
+        [
+          70
+        ],
+        [
+          80
+        ],
+        [
+          90
+        ]
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          90
+        ],
+        [
+          80
+        ],
+        [
+          70
+        ],
+        [
+          50
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "ASC (default) Ascending sort order.",
+      "supports": "ascending is the default"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "DESC Descending sort order.",
+      "supports": "the DESC keyword"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The distinct scores are 90, 80, 70, 50. Ascending: 50, 70, 80, 90. Descending: 90, 80, 70, 50.",
+  "tags": [
+    "order-by",
+    "values",
+    "distinct"
+  ]
+}

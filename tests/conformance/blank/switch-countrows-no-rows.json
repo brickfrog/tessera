@@ -1,0 +1,33 @@
+{
+  "title": "SWITCH on the COUNTROWS of an empty table does not match 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SWITCH ( COUNTROWS ( FILTER ( T, FALSE ) ), 0, \"zero\", 1, \"one\", \"other\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "other"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "SWITCH ( COUNTROWS ( FILTER ( Query1, False ) ), 0, \"zero\", 1, \"one\", \"other\" ) other",
+    "supports": "the article's example, on a table named Query1"
+  },
+  "confidence": "derived",
+  "derivation": "FILTER ( T, FALSE ) is empty, so COUNTROWS is BLANK. SWITCH does not match BLANK with 0 or 1, so the else value \"other\" is returned.",
+  "tags": [
+    "blank",
+    "switch",
+    "countrows",
+    "empty-table"
+  ]
+}

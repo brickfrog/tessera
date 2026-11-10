@@ -1,0 +1,62 @@
+{
+  "title": "A query column holding a plain aggregate has the grand total in every row",
+  "model": "sales",
+  "query": [
+    "DEFINE COLUMN Product[All Sales] = SUM ( Sales[Amount] )",
+    "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"All Sales\", Product[All Sales] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[All Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          540.0
+        ],
+        [
+          "Helmet",
+          540.0
+        ],
+        [
+          "Lock",
+          540.0
+        ],
+        [
+          "Scooter",
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/st/column/",
+      "quote": "The syntax after COLUMN defines a query column, which has a data lineage and it is populated in an empty filter context before the query is executed.",
+      "supports": "the column is computed row by row in an empty filter context"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "By using the SUMX expression, the context transition does not happen because the implicit CALCULATE around the measure reference is missing.",
+      "supports": "an aggregation written out, unlike a measure reference, has no context transition"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The column expression has a row context and an empty filter context. SUM ( Sales[Amount] ) has no CALCULATE, so the row does not filter Sales: 540 for every product.",
+  "tags": [
+    "define-column",
+    "query-column",
+    "sum",
+    "row-context",
+    "no-context-transition",
+    "selectcolumns"
+  ]
+}

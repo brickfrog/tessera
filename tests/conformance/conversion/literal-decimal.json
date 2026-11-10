@@ -1,0 +1,38 @@
+{
+  "title": "A literal with a decimal point is a decimal number, even when whole",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1.0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "VAR Quantity = 100000 -- Integer VAR Discount = 0.10 -- Decimal VAR UnitPrice = CURRENCY ( 12.3456 ) -- Currency",
+      "supports": "a literal without a decimal point is an Integer, one with a decimal point a Decimal (double), CURRENCY ( ) gives a Currency"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "VAR AmountDecimal = 10000000.0",
+      "supports": "a whole value written with .0 is used as the Decimal amount"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "1.0 has a decimal point, so it is a Decimal (double), as 0.10 and 10000000.0 are in the article.",
+  "tags": [
+    "conversion",
+    "literal"
+  ]
+}
