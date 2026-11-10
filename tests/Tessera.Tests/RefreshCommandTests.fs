@@ -224,10 +224,12 @@ let tests =
             let server = salesServer ()
             server.TraceEvents <- trace
             server.ExecuteMessages <- [ { IsError = false; Text = "a warning" } ]
+            // (The harness gives stdout with LF; the script itself has the platform's newlines.)
+            let lf (s: string) = s.Replace("\r\n", "\n")
             let shown = (run server [ "refresh"; remote; "Sales"; "--tmsl" ]).Out.TrimEnd()
             let r = run server [ "refresh"; remote; "Sales"; "--execute" ]
             Expect.equal r.Code 0 r.Err
-            Expect.equal server.Executed [ shown ] ""
+            Expect.equal (server.Executed |> List.map lf) [ shown ] ""
             Expect.equal server.Traced 1 ""
             Expect.stringContains r.Out "Refresh (automatic) 'Sales'" ""
             Expect.isFalse (r.Out.Contains "TMSL:") "the script is for the dry run"

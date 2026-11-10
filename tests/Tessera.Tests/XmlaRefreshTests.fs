@@ -226,6 +226,47 @@ let tests =
             Expect.equal seen.Count before ""
             Expect.equal ran.Progress.Length before ""
 
+        testCase "the names matched are the client library's names for the events"
+        <| fun () ->
+            // The live connector reports an event's class and subclass by their enum names.
+            let ended = string Microsoft.AnalysisServices.TraceEventClass.ProgressReportEnd
+
+            for c in
+                [
+                    Microsoft.AnalysisServices.TraceEventClass.ProgressReportBegin
+                    Microsoft.AnalysisServices.TraceEventClass.ProgressReportCurrent
+                    Microsoft.AnalysisServices.TraceEventClass.ProgressReportEnd
+                    Microsoft.AnalysisServices.TraceEventClass.ProgressReportError
+                ] do
+                Expect.isTrue (Progress.isProgress (event (string c) "" "" "")) (string c)
+
+            Expect.isTrue
+                (Progress.isError (
+                    event (string Microsoft.AnalysisServices.TraceEventClass.ProgressReportError) "" "" ""
+                ))
+                ""
+
+            Expect.isFalse
+                (Progress.isProgress (event (string Microsoft.AnalysisServices.TraceEventClass.CommandEnd) "" "" ""))
+                ""
+
+            for s in
+                [
+                    Microsoft.AnalysisServices.TraceEventSubclass.ExecuteSql
+                    Microsoft.AnalysisServices.TraceEventSubclass.ReadData
+                    Microsoft.AnalysisServices.TraceEventSubclass.Process
+                    Microsoft.AnalysisServices.TraceEventSubclass.TabularRefresh
+                    Microsoft.AnalysisServices.TraceEventSubclass.Commit
+                    Microsoft.AnalysisServices.TraceEventSubclass.TabularCommit
+                ] do
+                Expect.isTrue (Progress.wanted Detail.Objects (event ended (string s) "" "")) (string s)
+
+            Expect.isFalse
+                (Progress.wanted
+                    Detail.Objects
+                    (event ended (string Microsoft.AnalysisServices.TraceEventSubclass.CompressSegment) "" ""))
+                "a per-column step"
+
         testCase "detail names"
         <| fun () ->
             Expect.equal (Detail.all |> List.map Detail.token) [ "none"; "objects"; "all" ] ""

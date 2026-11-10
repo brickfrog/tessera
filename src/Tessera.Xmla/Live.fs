@@ -138,7 +138,11 @@ module private Live =
 
         {
             EventClass = name (fun () -> string e.EventClass)
-            EventSubclass = name (fun () -> string e.EventSubclass)
+            EventSubclass =
+                // The client library's name for "this event has no subclass".
+                match name (fun () -> string e.EventSubclass) with
+                | "NotAvailable" -> ""
+                | subclass -> subclass
             ObjectName = column Microsoft.AnalysisServices.TraceColumn.ObjectName
             ObjectPath = column Microsoft.AnalysisServices.TraceColumn.ObjectPath
             Text = column Microsoft.AnalysisServices.TraceColumn.TextData
