@@ -1,0 +1,31 @@
+{
+  "title": "COMBINEVALUES joins its values with the delimiter",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COMBINEVALUES ( \"|\", \"a\", \"b\", \"c\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "a|b|c"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/combinevalues-function-dax",
+    "quote": "Joins two or more text strings into one text string.",
+    "supports": "the values are joined, separated by the delimiter"
+  },
+  "confidence": "derived",
+  "derivation": "\"a\", \"b\" and \"c\" with \"|\" between them.",
+  "tags": [
+    "text-functions",
+    "combinevalues"
+  ]
+}

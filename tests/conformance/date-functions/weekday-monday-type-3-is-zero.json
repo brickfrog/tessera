@@ -1,0 +1,30 @@
+{
+  "title": "WEEKDAY of a Monday with type 3 is 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", WEEKDAY ( DATE ( 2005, 1, 3 ), 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/weekday/",
+    "quote": "Numbers 0 (Monday) through 6 (Sunday).",
+    "supports": "the example table lists 2005-01-03, Monday, with Weekday 3 = 0"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "weekday"
+  ]
+}

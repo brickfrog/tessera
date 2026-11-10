@@ -1,0 +1,47 @@
+{
+  "title": "A column renamed with SELECTCOLUMNS keeps its lineage",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( SELECTCOLUMNS ( VALUES ( Product[Color] ), \"New name\", Product[Color] ), \"Amt\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[New name]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ],
+        [
+          "Blue",
+          80.0
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+    "quote": "If a column is renamed, the data lineage is still maintained",
+    "supports": "the article's query: a renamed column still slices the measure"
+  },
+  "confidence": "derived",
+  "derivation": "[New name] is a plain reference to Product[Color], so it keeps that lineage and context transition filters Product[Color]. Red is products 1 and 2: Sales rows 1, 2, 3, 5, 7 = 100 + 40 + 20 + 200 + 100 = 460. Blue is product 3: rows 4, 6 = 50 + 30 = 80. Green: BLANK.",
+  "tags": [
+    "addcolumns",
+    "selectcolumns",
+    "values",
+    "lineage",
+    "context-transition"
+  ]
+}

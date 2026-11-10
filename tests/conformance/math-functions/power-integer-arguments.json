@@ -1,0 +1,31 @@
+{
+  "title": "POWER ( 5, 2 ) is 25, a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", POWER ( 5, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          25.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/power-function-dax",
+    "quote": "The following example returns 25.",
+    "supports": "the example = POWER(5,2); Return value: a decimal number"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "power",
+    "result-type"
+  ]
+}

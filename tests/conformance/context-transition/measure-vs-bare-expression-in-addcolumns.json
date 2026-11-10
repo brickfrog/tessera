@@ -1,0 +1,60 @@
+{
+  "title": "In ADDCOLUMNS a measure is filtered by the current row, the measure's bare expression is not",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Qty] = SUM ( Sales[Quantity] )",
+    "EVALUATE ADDCOLUMNS ( VALUES ( 'Product'[Category] ), \"Measure\", [Qty], \"Bare\", SUM ( Sales[Quantity] ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "[Measure]",
+          "type": "int64"
+        },
+        {
+          "name": "[Bare]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Vehicles",
+          4,
+          15
+        ],
+        [
+          "Accessories",
+          11,
+          15
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition-in-dax/",
+      "quote": "The result of Sales 2 is the amount of sales to all customers, whereas the result of Sales 1 is the amount of sales to the current customer only.",
+      "supports": "a measure reference and the measure's own expression differ in a row context: only the reference has the hidden CALCULATE"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+      "quote": "when you invoke a measure from a DAX expression, this is automatically surrounded by CALCULATE",
+      "supports": "the measure reference is surrounded by CALCULATE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Vehicles (Bike, Scooter): Sales rows 1, 5, 7 with Quantity 1 + 2 + 1 = 4. Accessories (Helmet, Lock): rows 2, 3, 4, 6: 2 + 1 + 5 + 3 = 11. The bare SUM has no context transition: 15 on both rows.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "measure",
+    "define-measure",
+    "context-transition",
+    "no-context-transition"
+  ]
+}

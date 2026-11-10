@@ -1,0 +1,20 @@
+{
+  "title": "CONVERT ( 1E20, INTEGER ) is an error: the value does not fit an integer",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( 1E20, INTEGER ) )",
+  "expected": {
+    "error": "1E20 is too large for a 64-bit integer"
+  },
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "CONVERT ( 1E20, INTEGER ) also returns an error, because the value is too large for an integer",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "error",
+    "integer-overflow"
+  ]
+}

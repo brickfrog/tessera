@@ -1,0 +1,47 @@
+{
+  "title": "MAXX with the variant argument TRUE returns the text: strings rank above numbers",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MAXX ( T, IF ( T[n] = 2, \"x\", T[n] ), TRUE ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          "x"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/maxx-function-dax",
+      "quote": "If the expression has variant or mixed value types such as text and number, then by default MAXX considers only numbers",
+      "supports": "without the third argument only the numbers are compared; with it, the maximum over all values"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "DAX considers Boolean values greater than string values, and string values greater than numeric or date/time values",
+      "supports": "the rank of types in comparisons: numbers and dates lowest, then strings, then booleans"
+    },
+    {
+      "url": "https://dax.guide/maxx/",
+      "quote": "If true, maximum value in col will be same as order by variant desc column",
+      "supports": "with the third argument TRUE the maximum is the first value of a descending sort of all values"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "T[n] holds 1, 2, 3. The expression gives 1, \"x\", 3. With the variant argument TRUE all values compete. String values rank above numeric values, so the maximum is \"x\".",
+  "uncertain": true,
+  "alternative": "The ranking of strings above numbers is documented for comparison operators. If the variant order put numbers above text, the result would be 3.",
+  "tags": [
+    "maxx",
+    "variant",
+    "if",
+    "mixed-types"
+  ],
+  "notes": "The column's type is not asserted (string or variant)."
+}

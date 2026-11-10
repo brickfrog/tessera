@@ -1,0 +1,42 @@
+{
+  "title": "\"1,234\" + 1 is 1235: text with a thousands separator is read as a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"1,234\" + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          1235
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "the string is automatically converted into a corresponding number, as long as the string is a valid representation of a number",
+      "supports": "the conversion needs a valid representation of a number; the page does not say whether \"1,234\" is one"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/value-function-dax",
+      "quote": "The value passed as the text parameter can be in any of the constant, number, date, or time formats recognized by the application or services you are using",
+      "supports": "number formats are accepted broadly when text becomes a number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "No source settles this. Reading \"1,234\" as a number in the en-US number format gives 1234, and 1234 + 1 = 1235.",
+  "uncertain": true,
+  "alternative": "\"1,234\" is not accepted as a number (only digits, a sign, a decimal point and an exponent are), and the query fails with a conversion error.",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "text-to-number",
+    "assumption:text-to-number-separators"
+  ],
+  "notes": "The sources are silent on thousands separators. The column's type is not asserted."
+}

@@ -1,0 +1,38 @@
+{
+  "title": "INT ( 3.7 ) is 3, an integer",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( 3.7 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/convert/",
+      "quote": "INT is different, because INT rounds down: INT ( 3.7 ) returns 3, but CONVERT ( 3.7, INTEGER ) returns 4",
+      "supports": "stated outright"
+    },
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "If <Number> is an Integer or a Decimal data type data type, then the result is an Integer data type",
+      "supports": "the result type"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "int",
+    "rounding"
+  ]
+}

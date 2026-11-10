@@ -1,0 +1,31 @@
+{
+  "title": "DATEVALUE ( \"10/15/2020\" ) is October 15, 2020 in en-US",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATEVALUE ( \"10/15/2020\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2020-10-15T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datevalue/",
+    "quote": "DATEVALUE/TIMEVALUE convert strings into dates and times",
+    "supports": "the example shows DATEVALUE ( \"10/15/2020\" ) as 2020-10-15 00:00:00"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "datevalue",
+    "culture"
+  ]
+}

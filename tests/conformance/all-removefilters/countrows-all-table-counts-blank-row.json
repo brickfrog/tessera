@@ -1,0 +1,41 @@
+{
+  "title": "COUNTROWS ( ALL ( Product ) ) counts the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( ALL ( 'Product' ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "ALL considers the blank row as valid.",
+      "supports": "the article's COUNTROWS ( ALL ( Product ) ) is one more than the rows of the table, because of the blank row"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/allnoblankrow-function-dax",
+      "quote": "The results show a difference of 1 row in the table rows count.",
+      "supports": "COUNTROWS(ALL(table)) is one more than COUNTROWS(ALLNOBLANKROW(table)) when the table has the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product has 3 rows (Bike, Lock, Bell) plus the blank row for the orphan Sales rows: 4.",
+  "tags": [
+    "all",
+    "countrows",
+    "blank-row",
+    "table-function",
+    "relationship"
+  ]
+}

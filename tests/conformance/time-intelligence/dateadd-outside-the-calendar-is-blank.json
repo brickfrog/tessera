@@ -1,0 +1,45 @@
+{
+  "title": "DATEADD to dates the Date table does not have gives an empty table, and the measure is BLANK",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = DATEADD ( 'Date'[Date], -1, MONTH ) RETURN ROW ( \"Rows\", COUNTROWS ( R ) + 0, \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] >= DATE ( 2023, 1, 1 ) && 'Date'[Date] <= DATE ( 2023, 1, 31 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Rows]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]"
+        }
+      ],
+      "rows": [
+        [
+          0,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/dateadd/",
+      "quote": "The result table includes only dates that exist in the dates column.",
+      "supports": "dates outside the Date table are not returned"
+    },
+    {
+      "url": "https://dax.guide/dateadd/",
+      "quote": "This example shows the sales in the current and previous month.",
+      "supports": "in the example table the first month of the Date table shows (Blank) for \"Same period last month\""
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "January 2023 is the first month of the Date table. Moved back a month it would be December 2022, which the table does not have, so the result has no rows (COUNTROWS is BLANK, + 0 makes it 0). A filter with no rows leaves no Sales rows: [Sales] is BLANK.",
+  "tags": [
+    "time-intelligence",
+    "dateadd",
+    "blank",
+    "empty-table"
+  ],
+  "notes": "The type of the BLANK [Sales] column is not asserted."
+}

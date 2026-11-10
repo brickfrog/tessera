@@ -1,0 +1,38 @@
+{
+  "title": "DATE ( 2008, 1, 2.5 ) is January 3, 2008: a decimal day is rounded",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2008, 1, 2.5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2008-01-03T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/date/",
+      "quote": "DATE rounds decimal arguments to the nearest integer.",
+      "supports": "DAX Guide gives DATE ( 2008, 1, 2.5 ) returning January 3, 2008"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/date-function-dax",
+      "quote": "If day contains a decimal portion, it is rounded to the nearest integer value.",
+      "supports": "the same rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "date",
+    "rounding"
+  ]
+}

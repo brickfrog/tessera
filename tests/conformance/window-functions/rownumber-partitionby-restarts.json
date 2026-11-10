@@ -1,0 +1,89 @@
+{
+  "title": "PARTITIONBY restarts ROWNUMBER in each partition",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    'Product',",
+    "    \"N\", ROWNUMBER ( 'Product', ORDERBY ( 'Product'[Price], DESC ), PARTITIONBY ( 'Product'[Category] ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        },
+        {
+          "name": "[N]"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Red",
+          "Vehicles",
+          100.0,
+          1
+        ],
+        [
+          2,
+          "Helmet",
+          "Red",
+          "Accessories",
+          20.0,
+          1
+        ],
+        [
+          3,
+          "Lock",
+          "Blue",
+          "Accessories",
+          10.0,
+          2
+        ],
+        [
+          4,
+          "Scooter",
+          "Green",
+          "Vehicles",
+          50.0,
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rownumber-function-dax",
+    "quote": "Returns a table that uniquely ranks each geography with the same EnglishCountryRegionName, by their StateProvinceName and City.",
+    "supports": "the example partitions by one column and numbers the rows within each value of it"
+  },
+  "confidence": "derived",
+  "derivation": "Vehicles: Bike 100 is 1, Scooter 50 is 2. Accessories: Helmet 20 is 1, Lock 10 is 2.",
+  "notes": "The type of the number is not asserted: the pages say a ranking is returned but not its data type.",
+  "tags": [
+    "window-functions",
+    "rownumber",
+    "orderby",
+    "partitionby",
+    "addcolumns"
+  ]
+}

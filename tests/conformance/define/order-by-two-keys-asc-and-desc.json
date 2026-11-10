@@ -1,0 +1,57 @@
+{
+  "title": "ORDER BY sorts by each key in turn, each ascending or descending",
+  "model": "sales",
+  "query": "EVALUATE ALL ( Product[Category], Product[Color] ) ORDER BY Product[Category] ASC, Product[Color] DESC",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Accessories",
+          "Red"
+        ],
+        [
+          "Accessories",
+          "Blue"
+        ],
+        [
+          "Vehicles",
+          "Red"
+        ],
+        [
+          "Vehicles",
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/st/order-by/",
+      "quote": "Every column can be sorted in an ascending (ASC) or descending (DESC) way. The default is ASC.",
+      "supports": "the page shows this query shape: ALL of two columns ordered ASC then DESC"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "Using two or more columns arguments, ALL returns all the unique combinations of values in multiple columns.",
+      "supports": "ALL of two columns returns the combinations that exist"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Combinations in Product: (Vehicles, Red) Bike, (Accessories, Red) Helmet, (Accessories, Blue) Lock, (Vehicles, Green) Scooter. Category ascending: Accessories then Vehicles. Within each, color descending: Red before Blue, Red before Green.",
+  "tags": [
+    "order-by",
+    "all",
+    "evaluate"
+  ]
+}

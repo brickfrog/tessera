@@ -1,0 +1,49 @@
+{
+  "title": "A fact table as filter argument reduces SUMMARIZECOLUMNS to the combinations it contains",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], Sales )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          "US"
+        ],
+        [
+          "Blue",
+          "US"
+        ],
+        [
+          "Red",
+          "JP"
+        ],
+        [
+          "Blue",
+          "JP"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-summarizecolumns/",
+    "quote": "You must specify the optional filter table argument after the columns you aggregate, and before any additional calculated column",
+    "supports": "the article gives SUMMARIZECOLUMNS ( year, color, Sales ) as the equivalent of SUMMARIZE ( Sales, year, color )"
+  },
+  "confidence": "derived",
+  "derivation": "Sales rows as (colour, country): 1 Red US, 2 Red US, 3 Red US, 4 Blue US, 5 Red JP, 6 Blue JP, 7 Red US. Distinct: Red US, Blue US, Red JP, Blue JP, the same as SUMMARIZE ( Sales, Product[Color], Customer[Country] ). Without the Sales argument there would be 9 rows.",
+  "tags": [
+    "summarizecolumns",
+    "filter-table",
+    "expanded-table"
+  ]
+}

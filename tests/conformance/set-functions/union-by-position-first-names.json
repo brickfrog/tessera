@@ -1,0 +1,48 @@
+{
+  "title": "UNION combines columns by position and names them after the first table",
+  "model": "scalar",
+  "query": "EVALUATE UNION ( ROW ( \"a\", 1, \"b\", \"x\" ), ROW ( \"b\", 2, \"a\", \"y\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "int64"
+        },
+        {
+          "name": "[b]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "x"
+        ],
+        [
+          2,
+          "y"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/union-function-dax",
+      "quote": "Columns are combined by position in their respective tables.",
+      "supports": "position decides, not the name"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/union-function-dax",
+      "quote": "The column names in the return table will match the column names in tableExpression1.",
+      "supports": "names come from the first table"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The second ROW has its columns named b, a, but its first column (2) goes under the first column of the result, [a], and its second (\"y\") under [b]. Matching by name would have put a string and a number in the same column.",
+  "tags": [
+    "union",
+    "row",
+    "column-names"
+  ]
+}

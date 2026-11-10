@@ -1,0 +1,39 @@
+{
+  "title": "A filter on a one-side column filters the many-side table",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"US\", CALCULATE ( [Sales Amount], Customer[Country] = \"US\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[US]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          310.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/relationships-in-power-bi-and-tabular-models/",
+      "quote": "In a one-to-many relationship, the direction is always from the one-side of the relationship to the many-side",
+      "supports": "a single-direction one-to-many relationship propagates the filter from the one side (Customer) to the many side (Sales)"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "For one-to-many relationships, the cross filter direction is always from the \"one\" side, and optionally from the \"many\" side (bi-directional)",
+      "supports": "filters always propagate from the one side"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "US customers are Ann (1) and Bob (2). Sales rows with CustomerKey 1: rows 1, 2, 7 = 100 + 40 + 100 = 240. CustomerKey 2: rows 3, 4 = 20 + 50 = 70. 240 + 70 = 310. SUM of a fixed decimal column is a fixed decimal.",
+  "tags": [
+    "calculate",
+    "relationship",
+    "filter-propagation"
+  ]
+}

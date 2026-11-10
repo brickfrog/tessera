@@ -1,0 +1,33 @@
+{
+  "title": "COUNTROWS of a fact table filtered to nothing is BLANK, not 0",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( COUNTROWS ( Sales ), 'Product'[Color] = \"Green\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/countrows/",
+    "quote": "If the table has no rows, COUNTROWS returns BLANK",
+    "supports": "COUNTROWS of a table with no rows is BLANK, not 0"
+  },
+  "confidence": "derived",
+  "derivation": "Green is Scooter (4), which exists in Product but has no Sales rows. Sales filtered by it is empty: BLANK.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "blank",
+    "empty-filter"
+  ],
+  "notes": "The column's type is not asserted: the only value is BLANK."
+}

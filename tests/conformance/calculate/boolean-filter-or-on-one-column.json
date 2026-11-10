@@ -1,0 +1,32 @@
+{
+  "title": "A boolean filter argument may reference the same column several times",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], Customer[Country] = \"JP\" || Customer[Country] = \"FR\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          230.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/filter-arguments-in-calculate/",
+    "quote": "The syntax above is internally transformed in the following one",
+    "supports": "the article's Red or Blue predicate on one column is turned into one FILTER over ALL of that column"
+  },
+  "confidence": "derived",
+  "derivation": "JP is Cho (3): rows 5, 6 = 200 + 30 = 230. FR is Dee (4): no sales. Total 230.",
+  "tags": [
+    "calculate",
+    "operator-or"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

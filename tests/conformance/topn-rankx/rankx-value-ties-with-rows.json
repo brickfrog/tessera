@@ -1,0 +1,39 @@
+{
+  "title": "RANKX gives a value equal to tied rows their shared rank",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", RANKX ( Player, Player[Score], 80 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-rankx-in-dax/",
+      "quote": "The third argument is an optional expression that is used during step (2).",
+      "supports": "the value to look up"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "The next rank value, after a tie, is the rank value of the tie plus the count of tied values.",
+      "supports": "Skip is the default for ties"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "RANKX builds the list of scores 90, 80, 80, 70, 70, 50 and looks up the third argument in it. Only 90 is above 80, so 80 has rank 2, the rank Bob and Cho share.",
+  "tags": [
+    "rankx",
+    "value-argument",
+    "ties"
+  ]
+}

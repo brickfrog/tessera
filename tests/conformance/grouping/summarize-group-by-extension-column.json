@@ -1,0 +1,56 @@
+{
+  "title": "SUMMARIZE can group by a column added in the query",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZE (",
+    "    ADDCOLUMNS ( Sales, \"SalesType\", IF ( Sales[Quantity] > 1, \"Large\", \"Small\" ) ),",
+    "    [SalesType],",
+    "    \"Amt\", [Sales Amount]",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[SalesType]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Large",
+          320.0
+        ],
+        [
+          "Small",
+          220.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/summarize/",
+      "quote": "-- SUMMARIZE has the option of grouping by columns computed -- in the query.",
+      "supports": "the page shows this query shape with one row per SalesType and its amount"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/all-the-secrets-of-summarize/",
+      "quote": "SUMMARIZE uses the filter on all the columns in the cluster that produced a given value",
+      "supports": "the amount of a group is computed over the Sales rows in its cluster"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Quantity per Sales row: 1, 2, 1, 5, 2, 3, 1. Large (quantity above 1): rows 2, 4, 5, 6 = 40 + 50 + 200 + 30 = 320. Small: rows 1, 3, 7 = 100 + 20 + 100 = 220. Total 540.",
+  "tags": [
+    "summarize",
+    "addcolumns",
+    "clustering",
+    "column-names"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "title": "A bare SUM in a calculated column gives the grand total on every row",
+  "model": "sales",
+  "query": [
+    "DEFINE COLUMN 'Product'[All qty] = SUM ( Sales[Quantity] )",
+    "EVALUATE SELECTCOLUMNS ( 'Product', \"Product\", 'Product'[Product], \"All qty\", 'Product'[All qty] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[All qty]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          15
+        ],
+        [
+          "Helmet",
+          15
+        ],
+        [
+          "Lock",
+          15
+        ],
+        [
+          "Scooter",
+          15
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+    "quote": "The first calculated column returns the grand total of Sales[Quantity], because no filter context is active",
+    "supports": "a calculated column in Product defined as SUM ( Sales[Quantity] ) returns the grand total, as there is only a row context"
+  },
+  "confidence": "derived",
+  "derivation": "A calculated column has a row context and no filter context, and there is no CALCULATE. SUM ( Sales[Quantity] ) is 1 + 2 + 1 + 5 + 2 + 3 + 1 = 15 on each of the 4 product rows.",
+  "tags": [
+    "define-column",
+    "calculated-column",
+    "sum",
+    "row-context",
+    "no-context-transition"
+  ]
+}

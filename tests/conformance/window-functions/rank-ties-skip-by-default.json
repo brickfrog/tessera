@@ -1,0 +1,89 @@
+{
+  "title": "RANK gives tied rows the same rank and, by default (SKIP), skips the ranks they take up",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    'Product',",
+    "    \"R\", RANK ( SKIP, 'Product', ORDERBY ( 'Product'[Color], DESC ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        },
+        {
+          "name": "[R]"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Red",
+          "Vehicles",
+          100.0,
+          1
+        ],
+        [
+          2,
+          "Helmet",
+          "Red",
+          "Accessories",
+          20.0,
+          1
+        ],
+        [
+          3,
+          "Lock",
+          "Blue",
+          "Accessories",
+          10.0,
+          4
+        ],
+        [
+          4,
+          "Scooter",
+          "Green",
+          "Vehicles",
+          50.0,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rank-function-dax",
+    "quote": "If specified, the supported value is either DENSE, or SKIP. If omitted: - Defaults to SKIP",
+    "supports": "the ties argument; SKIP leaves a gap after tied rows"
+  },
+  "confidence": "derived",
+  "derivation": "Colors descending: Red (Bike, Helmet), Green (Scooter), Blue (Lock). The two Red rows tie at 1; with SKIP the next rank is 3 for Green and 4 for Blue.",
+  "notes": "The type of the number is not asserted: the pages say a ranking is returned but not its data type.",
+  "tags": [
+    "window-functions",
+    "rank",
+    "orderby",
+    "ties",
+    "addcolumns"
+  ]
+}

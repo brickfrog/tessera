@@ -1,0 +1,31 @@
+{
+  "title": "LEFT with more characters than the text has returns the whole text",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", LEFT ( \"abc\", 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "abc"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/left-function-dax",
+    "quote": "If the num_chars argument is larger than the number of characters available, the function returns the maximum characters available and doesn't raise an error.",
+    "supports": "asking for too many characters is not an error"
+  },
+  "confidence": "derived",
+  "derivation": "\"abc\" has 3 characters; 10 are asked for, so all 3 are returned.",
+  "tags": [
+    "text-functions",
+    "left"
+  ]
+}

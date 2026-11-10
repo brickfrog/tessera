@@ -1,0 +1,33 @@
+{
+  "title": "ISSELECTEDMEASURE is FALSE for another measure: the same item leaves [Count] alone",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Count], Adjust[Adjustment] = \"Only Total x10\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isselectedmeasure/",
+    "quote": "True whether the measure that is currently in context is one of those specified in the list of parameters.",
+    "supports": "the measure in context is [Count], which the item does not name"
+  },
+  "confidence": "derived",
+  "derivation": "For [Count] the IF takes its else branch, SELECTEDMEASURE (): COUNTROWS ( T ) = 3.",
+  "tags": [
+    "calculation-groups",
+    "isselectedmeasure",
+    "selectedmeasure",
+    "calculate"
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "title": "INDEX ( 0, ... ) returns an empty table",
+  "model": "sales",
+  "query": "EVALUATE INDEX ( 0, ALL ( 'Product'[Product] ), ORDERBY ( 'Product'[Product], ASC ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": []
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/index/",
+    "quote": "When Position is out of the boundary, or zero, or BLANK (), INDEX will return an empty table.",
+    "supports": "position zero"
+  },
+  "confidence": "published",
+  "tags": [
+    "window-functions",
+    "index",
+    "all",
+    "orderby",
+    "empty-table"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "title": "START AT with one value skips the rows that sort before it",
+  "model": "d-values",
+  "query": "EVALUATE VALUES ( Player[Score] ) ORDER BY Player[Score] START AT 80",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          80
+        ],
+        [
+          90
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+    "quote": "It defines the value at which the query results begin.",
+    "supports": "the result begins at the value"
+  },
+  "confidence": "derived",
+  "derivation": "Distinct scores ascending: 50, 70, 80, 90. Starting at 80 leaves 80 and 90.",
+  "tags": [
+    "start-at",
+    "order-by",
+    "values"
+  ]
+}

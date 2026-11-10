@@ -1,0 +1,26 @@
+{
+  "title": "UNION of tables with different numbers of columns is an error",
+  "model": "scalar",
+  "query": "EVALUATE UNION ( { 1, 2 }, { ( 1, 2 ) } )",
+  "expected": {
+    "error": "the tables have one and two columns; UNION needs the same number"
+  },
+  "source": [
+    {
+      "url": "https://dax.guide/union/",
+      "quote": "The arguments of UNION must have the same number of columns.",
+      "supports": "the page shows such a query and says it throws an error"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/union-function-dax",
+      "quote": "The two tables must have the same number of columns.",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "union",
+    "table-constructor",
+    "error"
+  ]
+}

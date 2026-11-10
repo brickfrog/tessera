@@ -1,0 +1,32 @@
+{
+  "title": "In CONCATENATE a BLANK argument is an empty string",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONCATENATE ( \"a\", BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "a"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/concatenate/",
+    "quote": "A BLANK argument is an empty string.",
+    "supports": "BLANK contributes nothing"
+  },
+  "confidence": "derived",
+  "derivation": "\"a\" followed by an empty string is \"a\".",
+  "tags": [
+    "text-functions",
+    "concatenate",
+    "blank"
+  ]
+}

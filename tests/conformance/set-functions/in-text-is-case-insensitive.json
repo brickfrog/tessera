@@ -1,0 +1,40 @@
+{
+  "title": "IN compares text without regard to case",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"RED\" IN { \"Red\", \"Blue\" } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/containsrow/",
+      "quote": "The comparison of text is not case-sensitive:",
+      "supports": "the page says \"RED\" matches \"Red\""
+    },
+    {
+      "url": "https://dax.guide/op/in/",
+      "quote": "It is syntactic sugar for the CONTAINSROW function, which is used underneath.",
+      "supports": "IN follows the CONTAINSROW rules"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "in",
+    "containsrow",
+    "text",
+    "case-insensitive",
+    "table-constructor"
+  ]
+}

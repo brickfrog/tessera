@@ -1,0 +1,35 @@
+{
+  "title": "A query function with two untyped parameters",
+  "model": "scalar",
+  "query": [
+    "DEFINE FUNCTION SumTwoNumbers = ( A, B ) => A + B",
+    "EVALUATE { SumTwoNumbers ( 10, 20 ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          30
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+    "quote": "The function definition includes the signature (the name and the parameters: A , B ) and the function body ( A + B ), separated by the => symbol.",
+    "supports": "the article shows this query returning 30"
+  },
+  "confidence": "published",
+  "tags": [
+    "udf",
+    "define-function",
+    "table-constructor"
+  ],
+  "notes": "The article shows the value; the type follows from integer + integer."
+}

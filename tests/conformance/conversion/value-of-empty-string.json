@@ -1,0 +1,29 @@
+{
+  "title": "VALUE ( \"\" ) is an error: an empty string is not a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VALUE ( \"\" ) )",
+  "expected": {
+    "error": "an empty string cannot be converted to a number by VALUE"
+  },
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "the measures containing an empty string generates an error during evaluation, because it cannot be converted to a valid value by the VALUE function",
+      "supports": "stated for a measure returning an empty string"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/value-function-dax",
+      "quote": "If text is not in one of these formats, an error is returned",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The argument is the empty string, which VALUE cannot convert, so the query fails.",
+  "tags": [
+    "conversion",
+    "value",
+    "text-to-number",
+    "empty-string",
+    "error"
+  ]
+}

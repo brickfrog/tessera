@@ -1,0 +1,32 @@
+{
+  "title": "COUNT counts an empty string but not a BLANK",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNT ( V[T] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          6
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/count/",
+    "quote": "An empty string is a value, therefore COUNT counts it.",
+    "supports": "the empty string is counted, BLANK is not"
+  },
+  "confidence": "derived",
+  "derivation": "V[T] holds \"pear\", BLANK, \"\", \"Apple\", \"fig\", \"Banana\", \"cherry\": 7 rows, one BLANK, so 6. The empty string in row 3 counts.",
+  "tags": [
+    "count",
+    "blank",
+    "empty-string"
+  ]
+}

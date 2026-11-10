@@ -1,0 +1,65 @@
+{
+  "title": "ALLSELECTED with no arguments, as a CALCULATE modifier, also gives the total of what the query selects",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS (",
+    "    'Product'[Product],",
+    "    TREATAS ( { \"Bike\", \"Lock\" }, 'Product'[Product] ),",
+    "    \"Amount\", [Sales Amount],",
+    "    \"Visual Total\", CALCULATE ( [Sales Amount], ALLSELECTED () )",
+    ")",
+    "ORDER BY 'Product'[Product]"
+  ],
+  "ordered": true,
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Visual Total]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          400.0,
+          480.0
+        ],
+        [
+          "Lock",
+          80.0,
+          480.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/allselected/",
+      "quote": "ALLSELECTED without arguments can be used only as a CALCULATE or CALCULATETABLE modifier.",
+      "supports": "the form used here is allowed"
+    },
+    {
+      "url": "https://dax.guide/allselected/",
+      "quote": "ignoring any filters that might have been applied inside the query, but keeping filters that come from outside",
+      "supports": "the group's own filter is removed, the selection of Bike and Lock stays"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Bike 400, Lock 80 (see the sales model). With the filter of the current group removed and the selection kept, both rows show 400 + 80 = 480.",
+  "tags": [
+    "allselected",
+    "summarizecolumns",
+    "treatas",
+    "visual-total"
+  ]
+}

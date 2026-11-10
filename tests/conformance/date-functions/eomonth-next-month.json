@@ -1,0 +1,30 @@
+{
+  "title": "EOMONTH ( DATE ( 2005, 1, 1 ), 1 ) is February 28, 2005",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", EOMONTH ( DATE ( 2005, 1, 1 ), 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2005-02-28T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/eomonth/",
+    "quote": "EOMONTH does the same, and it also goes at the end of the month",
+    "supports": "the example table lists 2005-01-01 with EOMONTH, +1 = 2005-02-28"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "eomonth"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "title": "\" 12 \" + 1 is 13: spaces around the digits are ignored in text converted to a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \" 12 \" + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          13
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "the string is automatically converted into a corresponding number, as long as the string is a valid representation of a number",
+      "supports": "text in an arithmetic expression converts when it is a valid number; the page does not say which forms are valid"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "DAX implicitly converts the string to a number, and then does the addition for a numeric result",
+      "supports": "the page gives \"22\" + 22 as 44"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "+ converts text to a number when the text is a valid representation of a number. Spaces before and after the digits are taken as insignificant: 12 + 1 = 13.",
+  "uncertain": true,
+  "alternative": "No source says whether surrounding spaces are accepted. If they are not, the conversion fails and the query returns an error.",
+  "tags": [
+    "assumption:text-to-number-separators",
+    "operator-add",
+    "implicit-conversion",
+    "leading-space",
+    "trailing-space"
+  ],
+  "notes": "The column's type is not asserted."
+}

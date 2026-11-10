@@ -1,0 +1,45 @@
+{
+  "title": "TOPN ( 1, ..., ASC ) over -5, BLANK, 3, -1, 10 returns the BLANK row",
+  "model": "a2-sort",
+  "query": "EVALUATE TOPN ( 1, Nums, Nums[N], ASC )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Nums[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Nums[N]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/topn-function-dax",
+      "quote": "TOPN does not guarantee any sort order for the results",
+      "supports": "TOPN sorts by the expression; the page does not say where BLANK goes"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "If expression or value evaluates to BLANK it is treated as a 0 (zero) for all expressions that result in a number",
+      "supports": "the other reading, documented for RANKX only: BLANK ranks as 0"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Nums[N] by Id: -5 (1), BLANK (2), 3 (3), -1 (4), 10 (5). Taking BLANK as the lowest value of an ascending sort (as in assumptions/order-by-asc-blank-before-negative), the first row is Id 2.",
+  "uncertain": true,
+  "alternative": "No source states where BLANK sorts in TOPN. If TOPN ranks BLANK as 0, as RANKX is documented to, the lowest value is -5 and the result is the row Id 1, N -5.",
+  "tags": [
+    "topn",
+    "blank"
+  ]
+}

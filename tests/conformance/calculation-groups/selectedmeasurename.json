@@ -1,0 +1,32 @@
+{
+  "title": "SELECTEDMEASURENAME () in a calculation item is the name of the measure being evaluated",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Info[Info] = \"Name\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Total"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/selectedmeasurename/",
+    "quote": "Returns the name of the measure evaluated.",
+    "supports": "the item is SELECTEDMEASURENAME () and the measure is [Total]"
+  },
+  "confidence": "derived",
+  "derivation": "The measure reference [Total] is replaced by SELECTEDMEASURENAME (), which is the text Total.",
+  "tags": [
+    "calculation-groups",
+    "selectedmeasurename",
+    "calculate"
+  ]
+}

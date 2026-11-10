@@ -1,0 +1,43 @@
+{
+  "title": "FORMAT of BLANK is an empty string, not BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"named\", FORMAT ( BLANK (), \"Currency\" ), \"custom\", FORMAT ( BLANK (), \"#,0.00\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[named]",
+          "type": "string"
+        },
+        {
+          "name": "[custom]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "",
+          ""
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "If value is BLANK, the function returns an empty string.",
+      "supports": "states the result"
+    },
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "The result is always a string, even when the value is blank.",
+      "supports": "the examples show an empty result for FORMAT ( BLANK (), \"Currency\" ) and FORMAT ( BLANK (), \"#,0.00\" )"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "blank",
+    "result-type"
+  ]
+}

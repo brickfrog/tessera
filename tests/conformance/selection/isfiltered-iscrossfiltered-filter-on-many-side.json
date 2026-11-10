@@ -1,0 +1,76 @@
+{
+  "title": "A filter on a Sales column does not cross-filter Product over a single-direction relationship",
+  "model": "sales",
+  "query": [
+    "EVALUATE CALCULATETABLE (",
+    "  {",
+    "    ( \"ISFILTERED Sales[Quantity]\", ISFILTERED ( Sales[Quantity] ) ),",
+    "    ( \"ISFILTERED Product[Color]\", ISFILTERED ( Product[Color] ) ),",
+    "    ( \"ISFILTERED Sales\", ISFILTERED ( Sales ) ),",
+    "    ( \"ISFILTERED Product\", ISFILTERED ( Product ) ),",
+    "    ( \"ISCROSSFILTERED Sales\", ISCROSSFILTERED ( Sales ) ),",
+    "    ( \"ISCROSSFILTERED Product[Category]\", ISCROSSFILTERED ( Product[Category] ) ),",
+    "    ( \"ISCROSSFILTERED Product\", ISCROSSFILTERED ( Product ) )",
+    "  },",
+    "  Sales[Quantity] = 1 )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value1]",
+          "type": "string"
+        },
+        {
+          "name": "[Value2]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "ISFILTERED Sales[Quantity]",
+          true
+        ],
+        [
+          "ISFILTERED Product[Color]",
+          false
+        ],
+        [
+          "ISFILTERED Sales",
+          true
+        ],
+        [
+          "ISFILTERED Product",
+          false
+        ],
+        [
+          "ISCROSSFILTERED Sales",
+          true
+        ],
+        [
+          "ISCROSSFILTERED Product[Category]",
+          false
+        ],
+        [
+          "ISCROSSFILTERED Product",
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isfiltered/",
+    "quote": "In this example we place the filter on the many side of a 1:* relationship",
+    "supports": "the page shows this query, with the same tables and relationship direction, and these seven results"
+  },
+  "confidence": "derived",
+  "derivation": "The only filter is on Sales[Quantity]: that column and Sales are filtered. The relationship filters from Product to Sales only, so nothing reaches Product: it is neither filtered nor cross-filtered.",
+  "tags": [
+    "isfiltered",
+    "iscrossfiltered",
+    "calculatetable",
+    "direct-filter",
+    "cross-filter",
+    "relationship"
+  ]
+}

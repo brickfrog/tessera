@@ -1,0 +1,42 @@
+{
+  "title": "CONVERT ( 1.2345, CURRENCY ) / CONVERT ( 2, INTEGER ) is the fixed decimal 0.6173",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( 1.2345, CURRENCY ) / CONVERT ( 2, INTEGER ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          0.6173
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/rounding-errors-with-different-data-types-in-dax/",
+      "quote": "When the currency is at the numerator of a division, the result might be rounded to the closest value that can be represented in a currency data type",
+      "supports": "the examples that follow give 1.2345 / 2 as 0.6173 for a currency over an integer and 0.61725 when the denominator is a currency"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency",
+      "supports": "an integer divided by a currency is a decimal number; a currency divided by an integer is a currency"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "assumption:integer-divided-by-currency",
+    "operator-divide",
+    "currency",
+    "convert",
+    "result-type",
+    "rounding"
+  ],
+  "notes": "The contrast to INTEGER / CURRENCY. 1.2345 / 2 = 0.61725, which as a currency is rounded to 0.6173 (truncation would give 0.6172)."
+}

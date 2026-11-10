@@ -1,0 +1,19 @@
+{
+  "title": "MROUND ( 5, -2 ) is an error: the number and the multiple have different signs",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MROUND ( 5, -2 ) )",
+  "expected": {
+    "error": "MROUND needs the number and the multiple to have the same sign"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/mround-function-dax",
+    "quote": "The following expression returns an error, because the numbers have different signs.",
+    "supports": "the example = MROUND(5,-2) is documented as an error"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "mround",
+    "error"
+  ]
+}

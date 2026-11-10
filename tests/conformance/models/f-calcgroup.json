@@ -1,0 +1,83 @@
+{
+ "description": "For calculation groups. T has three rows: Qty A 10, B 20, C 30. Measures: [Total] = SUM ( T[Qty] ) = 60, [Count] = COUNTROWS ( T ) = 3, [Ten] = 10. Calculation groups: Adjust[Adjustment] (precedence 100) with Current = SELECTEDMEASURE (), Plus 2 = SELECTEDMEASURE () + 2 and Only Total x10 (multiplies by 10 when the measure is [Total], otherwise leaves it); Scale[Scaling] (precedence 200) with Times 2 = SELECTEDMEASURE () * 2; Info[Info] (precedence 50) with Name = SELECTEDMEASURENAME ().",
+ "tables": [
+  {
+   "name": "T",
+   "columns": [
+    { "name": "Item", "type": "string" },
+    { "name": "Qty", "type": "int64" }
+   ],
+   "measures": [
+    {
+     "name": "Total",
+     "expression": "SUM ( T[Qty] )"
+    },
+    {
+     "name": "Count",
+     "expression": "COUNTROWS ( T )"
+    },
+    {
+     "name": "Ten",
+     "expression": "10"
+    }
+   ],
+   "rows": [
+    [
+     "A",
+     10
+    ],
+    [
+     "B",
+     20
+    ],
+    [
+     "C",
+     30
+    ]
+   ]
+  }
+ ],
+ "calculationGroups": [
+  {
+   "name": "Adjust",
+   "column": "Adjustment",
+   "precedence": 100,
+   "items": [
+    {
+     "name": "Current",
+     "expression": "SELECTEDMEASURE ()"
+    },
+    {
+     "name": "Plus 2",
+     "expression": "SELECTEDMEASURE () + 2"
+    },
+    {
+     "name": "Only Total x10",
+     "expression": "IF ( ISSELECTEDMEASURE ( [Total] ), SELECTEDMEASURE () * 10, SELECTEDMEASURE () )"
+    }
+   ]
+  },
+  {
+   "name": "Scale",
+   "column": "Scaling",
+   "precedence": 200,
+   "items": [
+    {
+     "name": "Times 2",
+     "expression": "SELECTEDMEASURE () * 2"
+    }
+   ]
+  },
+  {
+   "name": "Info",
+   "column": "Info",
+   "precedence": 50,
+   "items": [
+    {
+     "name": "Name",
+     "expression": "SELECTEDMEASURENAME ()"
+    }
+   ]
+  }
+ ]
+}

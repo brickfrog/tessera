@@ -1,0 +1,39 @@
+{
+  "title": "MIN of a column ignores BLANK: over BLANK, 3 and 10 it is 3",
+  "model": "a2-sort",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( MIN ( Nums[N] ), Nums[Id] IN { 2, 3, 5 } ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/min/",
+      "quote": "The result is blank in case there are no rows in the table with a non-blank value",
+      "supports": "MIN ( table[column] ) is MINX over the table, and only non-blank values take part"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/minx-function-dax",
+      "quote": "Blank values are skipped",
+      "supports": "MINX skips blanks"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Nums[N] by Id: -5 (1), BLANK (2), 3 (3), -1 (4), 10 (5). The filter keeps Ids 2, 3, 5: BLANK, 3, 10. MIN of a column is MINX over its rows and skips BLANK: the minimum of 3 and 10 is 3. If BLANK counted as 0 the result would be 0 or BLANK.",
+  "tags": [
+    "min",
+    "calculate",
+    "blank"
+  ]
+}

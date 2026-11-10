@@ -1,0 +1,76 @@
+{
+  "title": "RANKX ranks descending by default and skips ranks after a tie",
+  "model": "d-values",
+  "query": "EVALUATE ADDCOLUMNS ( Player, \"Rank\", RANKX ( Player, Player[Score] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          90,
+          1
+        ],
+        [
+          "Bob",
+          80,
+          2
+        ],
+        [
+          "Cho",
+          80,
+          2
+        ],
+        [
+          "Dee",
+          70,
+          4
+        ],
+        [
+          "Eve",
+          70,
+          4
+        ],
+        [
+          "Fay",
+          50,
+          6
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/rankx/",
+      "quote": "The default value for the Order argument is DESC. The default value for the Ties argument is SKIP.",
+      "supports": "defaults"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "The next rank value, after a tie, is the rank value of the tie plus the count of tied values.",
+      "supports": "Skip is the default for ties"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Player scores: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. The value ranked is the score of the current row. 90 is first. The two 80s share rank 2, so the next rank is 2 + 2 = 4, shared by the two 70s. 50 gets 4 + 2 = 6.",
+  "tags": [
+    "rankx",
+    "ties",
+    "skip",
+    "addcolumns",
+    "row-context"
+  ]
+}

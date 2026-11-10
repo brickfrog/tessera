@@ -1,0 +1,43 @@
+{
+  "title": "BLANK && BLANK is FALSE: a logical operator returns TRUE or FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () && BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "Otherwise, a BLANK in a logical expression is converted to a FALSE value",
+      "supports": "recent engines return only TRUE or FALSE from a logical expression"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "BLANK AND BLANK BLANK",
+      "supports": "the table of BLANK in operations says the result is BLANK: the other reading"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Each BLANK operand is converted to FALSE, and FALSE && FALSE is FALSE.",
+  "uncertain": true,
+  "alternative": "The Microsoft table of BLANK in operations says BLANK AND BLANK is BLANK: the result would be BLANK (null).",
+  "tags": [
+    "blank",
+    "operator-and",
+    "logical",
+    "assumption:logical-blank"
+  ],
+  "notes": "SQLBI's statement is made about logical expressions such as IF after a 2016 engine change. The Microsoft table states BLANK outright. The two disagree."
+}

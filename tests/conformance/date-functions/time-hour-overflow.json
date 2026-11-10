@@ -1,0 +1,38 @@
+{
+  "title": "TIME ( 27, 0, 0 ) is 3:00 AM: hours wrap at 24",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", TIME ( 27, 0, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1899-12-30T03:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/time-function-dax",
+      "quote": "TIME(27,0,0) = TIME(3,0,0) = 3:00:00 AM",
+      "supports": "hours above 23 are taken modulo 24"
+    },
+    {
+      "url": "https://dax.guide/time/",
+      "quote": "TIME adds the excess values, but it does never exceed the day",
+      "supports": "the time stays on the zero date, 1899-12-30"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "time",
+    "overflow"
+  ]
+}

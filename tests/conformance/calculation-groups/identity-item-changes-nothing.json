@@ -1,0 +1,32 @@
+{
+  "title": "An item that is just SELECTEDMEASURE () returns the measure unchanged",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Adjust[Adjustment] = \"Current\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          60
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-the-application-of-calculation-items/",
+    "quote": "the calculation item rewrites the measure reference by applying the expression defined in the calculation item itself",
+    "supports": "the item's expression is SELECTEDMEASURE (), so the rewrite is the measure itself"
+  },
+  "confidence": "derived",
+  "derivation": "Current is SELECTEDMEASURE (): [Total] = 60.",
+  "tags": [
+    "calculation-groups",
+    "selectedmeasure",
+    "calculate"
+  ]
+}

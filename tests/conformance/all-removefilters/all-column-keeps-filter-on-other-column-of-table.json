@@ -1,0 +1,34 @@
+{
+  "title": "ALL ( column ) removes only that column's filter; another column of the same table stays filtered",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CALCULATE ( [Sales Amount], ALL ( 'Product'[Color] ) ) ), 'Product'[Color] = \"Red\", 'Product'[Category] = \"Accessories\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          140.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/all-function-dax",
+    "quote": "Removes all filters from the specified columns in the table; all other filters on other columns in the table still apply.",
+    "supports": "ALL ( Column ) removes the filter from that column; other filters on the table still apply"
+  },
+  "confidence": "derived",
+  "derivation": "Outer filters: Color = Red and Category = Accessories (Helmet, 60). ALL ( Product[Color] ) removes the color filter; Category = Accessories remains: Helmet 60 + Lock 80 = 140.",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "all",
+    "filter-removal"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

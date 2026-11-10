@@ -1,0 +1,46 @@
+{
+  "title": "Currency / integer is a currency",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( 10 ) / 4 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "In the following table, the row header is the numerator and the column header is the denominator.",
+      "supports": "the Division (/) table of result types: INTEGER/INTEGER is REAL, INTEGER/CURRENCY is CURRENCY, CURRENCY/INTEGER is CURRENCY, CURRENCY/CURRENCY is REAL, CURRENCY/REAL is CURRENCY"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency.",
+      "supports": "the result type of / and of DIVIDE"
+    },
+    {
+      "url": "https://dax.guide/currency/",
+      "quote": "Returns the value as a currency data type",
+      "supports": "CURRENCY ( x ) is a currency (fixed decimal) value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CURRENCY / INTEGER is CURRENCY in the Microsoft table and in SQLBI's: 10 / 4 = 2.5.",
+  "tags": [
+    "conversion",
+    "operator-divide",
+    "result-type",
+    "currency"
+  ],
+  "notes": "The sentence under the Microsoft table (\"if a division operation combines an integer with a currency value, DAX converts both values to real numbers\") reads the other way, but both tables agree on currency."
+}

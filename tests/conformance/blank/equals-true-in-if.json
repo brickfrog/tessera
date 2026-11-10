@@ -1,0 +1,34 @@
+{
+  "title": "IF ( BLANK = TRUE ) takes the false branch",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IF ( BLANK () = TRUE, \"true\", \"false\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "false"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "IF ( BLANK () = True, \"true\", \"false\" ) false",
+    "supports": "the table of comparisons shows this expression and its result"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "if",
+    "operator-equals",
+    "comparison",
+    "boolean"
+  ],
+  "notes": "Tested through IF because dax.guide says a Boolean expression compared with the constant TRUE is returned as it is, so BLANK () = TRUE alone may be BLANK rather than FALSE."
+}

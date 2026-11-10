@@ -1,0 +1,38 @@
+{
+  "title": "SELECTEDVALUE needs no filter when the column has a single value",
+  "model": "e-params",
+  "query": "EVALUATE ROW ( \"r\", SELECTEDVALUE ( Param[Value] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1000
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/selectedvalue-function-dax",
+      "quote": "An equivalent expression for SELECTEDVALUE(<columnName>, <alternateResult>) is IF(HASONEVALUE(<columnName>), VALUES(<columnName>), <alternateResult>) .",
+      "supports": "SELECTEDVALUE returns the value when the column has one visible value, else the alternate"
+    },
+    {
+      "url": "https://dax.guide/hasonevalue/",
+      "quote": "HASONEVALUE corresponds to the following code: COUNTROWS ( VALUES ( <ColumnName> ) ) = 1",
+      "supports": "HASONEVALUE counts the visible values"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Param has one row, so Param[Value] has one visible value without any filter: HASONEVALUE is TRUE and the value 1000 is returned.",
+  "tags": [
+    "selectedvalue",
+    "no-filter"
+  ]
+}

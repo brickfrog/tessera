@@ -1,0 +1,31 @@
+{
+  "title": "12 & 34 is \"1234\": & converts numbers to text",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 12 & 34 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1234"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "The expression = 12 & 34 returns \"1234\"",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "operator-concatenate",
+    "number-to-text"
+  ]
+}

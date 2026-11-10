@@ -1,0 +1,49 @@
+{
+  "title": "Integer * date is an integer",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 2 * DATE ( 1900, 1, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "Multiplication (*) INTEGER CURRENCY REAL Date/time INTEGER INTEGER CURRENCY REAL INTEGER",
+      "supports": "the Multiplication (*) table: the INTEGER row gives INTEGER under Date/time"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/convert-function-dax",
+      "quote": "EVALUATE { CONVERT ( DATE ( 1900, 1, 1 ), INTEGER ) } Returns [Value] 2",
+      "supports": "1900-01-01 is the number 2"
+    },
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "This format uses a floating-point number internally",
+      "supports": "a date is stored as a floating-point number: the other reading"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "1900-01-01 as a number is 2. INTEGER * Date/time is INTEGER in the table: 2 * 2 = 4.",
+  "uncertain": true,
+  "alternative": "A date is a floating-point number, so the product is a decimal number: 4.0 (double).",
+  "tags": [
+    "conversion",
+    "operator-multiply",
+    "result-type",
+    "date",
+    "assumption:date-multiplication"
+  ],
+  "notes": "The Microsoft table is the only source that speaks of multiplying by a date, and it has no row for a date on the left side."
+}

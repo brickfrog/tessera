@@ -1,0 +1,38 @@
+{
+  "title": "FORMAT ( 0.742, \"Percent\" ) is \"74.20%\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( 0.742, \"Percent\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "74.20%"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "FORMAT is a formatting function that formats a value based",
+      "supports": "the example shows \"Percent\", FORMAT ( 0.742, \"Percent\" ) as 74.20%"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Displays number multiplied by 100 with a percent sign (%) appended immediately to the right; always displays two digits to the right of the decimal separator.",
+      "supports": "the definition: no space before the sign"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "predefined-numeric-format",
+    "percent"
+  ]
+}

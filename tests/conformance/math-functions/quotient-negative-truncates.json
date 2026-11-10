@@ -1,0 +1,33 @@
+{
+  "title": "QUOTIENT ( -5, 2 ) is -2: the integer portion of -2.5",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", QUOTIENT ( -5, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/quotient-function-dax",
+    "quote": "Performs division and returns only the integer portion of the division result.",
+    "supports": "the integer portion of the result is returned"
+  },
+  "confidence": "derived",
+  "derivation": "-5 / 2 = -2.5. Its integer portion (the remainder discarded) is -2.",
+  "uncertain": true,
+  "alternative": "If QUOTIENT rounds down like INT, the result is -3. The pages give no example with a negative argument.",
+  "tags": [
+    "math-functions",
+    "quotient"
+  ]
+}

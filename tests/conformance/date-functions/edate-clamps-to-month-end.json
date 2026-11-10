@@ -1,0 +1,31 @@
+{
+  "title": "EDATE ( \"2009-01-31\", 1 ) is February 28, 2009: a day past the month end becomes the last day",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", EDATE ( \"2009-01-31\", 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2009-02-28T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/edate-function-dax",
+    "quote": "If the requested date is past the last day of the corresponding month, then the last day of the month is returned.",
+    "supports": "the page lists EDATE(\"2009-01-31\", 1) returning February 28th of 2009"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "edate",
+    "implicit-conversion"
+  ]
+}

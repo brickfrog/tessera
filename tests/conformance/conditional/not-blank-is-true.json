@@ -1,0 +1,42 @@
+{
+  "title": "NOT BLANK () is TRUE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", NOT BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/not-function-dax",
+      "quote": "Changes FALSE to TRUE , or TRUE to FALSE .",
+      "supports": "NOT negates a boolean"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "BLANK or a blank value is converted to 0 , \"\" , or False , depending on the data type of the other compared value.",
+      "supports": "as a boolean BLANK is FALSE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "NOT needs a boolean; BLANK converts to FALSE, and NOT FALSE is TRUE.",
+  "uncertain": true,
+  "alternative": "The data types page lists BLANK OR BLANK and BLANK AND BLANK as BLANK, so logical operators can keep a BLANK. If NOT keeps it too, the result is BLANK.",
+  "tags": [
+    "not",
+    "blank",
+    "implicit-conversion",
+    "boolean"
+  ]
+}

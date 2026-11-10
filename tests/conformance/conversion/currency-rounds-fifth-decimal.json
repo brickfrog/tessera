@@ -1,0 +1,31 @@
+{
+  "title": "CURRENCY ( 3.6666666666666 ) is 3.6667",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( 3.6666666666666 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          3.6667
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/currency-function-dax",
+    "quote": "if value is 3.6666666666666 then converting to currency returns \\$3.6667",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "currency",
+    "rounding"
+  ]
+}

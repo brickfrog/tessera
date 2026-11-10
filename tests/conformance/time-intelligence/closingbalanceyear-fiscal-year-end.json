@@ -1,0 +1,39 @@
+{
+  "title": "CLOSINGBALANCEYEAR with the year end \"6/30\" as its third argument evaluates on June 30",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CLOSINGBALANCEYEAR ( [Sales], 'Date'[Date], \"6/30\" ) ), 'Date'[Date] = DATE ( 2023, 2, 15 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          60.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/closingbalanceyear/",
+      "quote": "If you do not use Filter, you can write YearEndDate as the third argument.",
+      "supports": "the year end as third argument"
+    },
+    {
+      "url": "https://dax.guide/closingbalanceyear/",
+      "quote": "YearEndDate is a text literal with a date, for example “06-30”.",
+      "supports": "the form of the argument"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "With the year ending June 30, the year that contains 2023-02-15 ends on 2023-06-30; sales on that date are 60 (December 31, 2023 has 80).",
+  "tags": [
+    "time-intelligence",
+    "closingbalanceyear",
+    "fiscal-year"
+  ]
+}

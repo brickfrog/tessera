@@ -1,0 +1,35 @@
+{
+  "title": "\"a \" = \"a\" is TRUE: a trailing space does not make a different string",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"a \" = \"a\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "The Power BI engine automatically trims any trailing spaces that follow text data, but doesn't remove leading spaces that precede the data",
+    "supports": "trailing spaces are dropped from stored text, leading spaces are kept"
+  },
+  "confidence": "derived",
+  "derivation": "The engine treats text that differs only by trailing spaces as the same value: it trims them from the data it stores and groups 'Dylan Williams' with 'Dylan Williams '. Taking = to follow the same equivalence, \"a \" equals \"a\".",
+  "uncertain": true,
+  "alternative": "The documented trimming is of stored text data. A literal in an expression is not stored data, and no source says that = ignores trailing spaces. If it does not, the two strings differ by one character and the result is FALSE.",
+  "tags": [
+    "operator-equals",
+    "comparison",
+    "trailing-space"
+  ],
+  "notes": "No source covers scalar comparison of strings with trailing spaces; this is the least supported case in the folder. The column case is strings/trailing-space-is-trimmed-in-a-column."
+}

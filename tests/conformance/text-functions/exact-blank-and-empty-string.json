@@ -1,0 +1,31 @@
+{
+  "title": "EXACT treats BLANK and the empty string as the same",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", EXACT ( BLANK (), \"\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/exact/",
+    "quote": "An empty string and BLANK are considered the same value.",
+    "supports": "states the result"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "exact",
+    "blank"
+  ]
+}

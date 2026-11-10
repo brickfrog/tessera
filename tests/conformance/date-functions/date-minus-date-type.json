@@ -1,0 +1,41 @@
+{
+  "title": "A date minus a date is typed as a date/time",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2012, 12, 15 ) - DATE ( 2011, 1, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1901-12-14T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a subtraction operation uses a date with any other data type, DAX converts both values to dates, and the return value is also a date.",
+      "supports": "the subtraction table gives Date/time for Date/time minus Date/time"
+    },
+    {
+      "url": "https://dax.guide/datediff/",
+      "quote": "DATEDIFF computes the delta between two dates, using different units of measure",
+      "supports": "the example shows INT ( EndDate - StartDate ) = 714 for these two dates"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The two dates are 714 days apart. As a date/time, 714 days after the zero date December 30, 1899 is December 14, 1901.",
+  "uncertain": true,
+  "alternative": "If the engine returns the difference as a decimal number, the value is 714.0 (type double).",
+  "tags": [
+    "date-functions",
+    "operator-subtract",
+    "result-type"
+  ]
+}

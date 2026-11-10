@@ -1,0 +1,27 @@
+{
+  "title": "A variable cannot have the name of a table of the model",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR Sales = 1 RETURN Sales + 1 )",
+  "expected": {
+    "error": "Sales is the name of a table, so it cannot be a variable name"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/var-dax",
+      "quote": "Names of existing tables aren't allowed.",
+      "supports": "a variable name cannot be a table name"
+    },
+    {
+      "url": "https://dax.guide/st/var/",
+      "quote": "The variable name cannot be a table name or a reserved keyword in DAX or MDX.",
+      "supports": "a variable name cannot be a table name"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The model has a table named Sales, so VAR Sales is not allowed and the query fails.",
+  "tags": [
+    "var",
+    "variable-name",
+    "error"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "title": "CONVERT ( DATE ( 2024, 1, 31 ), STRING ) reads 1/31/2024",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( DATE ( 2024, 1, 31 ), STRING ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1/31/2024"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/table-constructor",
+      "quote": "Returns the following table of a single column of String data type",
+      "supports": "the example { 1, DATE(2017, 1, 1), TRUE, \"A\" } is shown returning 1, 1/1/2017, TRUE, A as strings"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/convert-function-dax",
+      "quote": "Returns the value of Expression, translated to Datatype",
+      "supports": "CONVERT to STRING turns the date into text; the page does not show the text"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CONVERT to STRING is taken to use the same conversion as the implicit one. The table constructor example shows that conversion for a date at midnight in en-US as 1/1/2017, so 31 January 2024 reads 1/31/2024.",
+  "uncertain": true,
+  "alternative": "No source shows CONVERT of a date to STRING. If it kept the time, or used an ISO form, the result would be 1/31/2024 12:00:00 AM or 2024-01-31 00:00:00.",
+  "tags": [
+    "assumption:date-to-text",
+    "convert",
+    "date",
+    "date-functions"
+  ]
+}

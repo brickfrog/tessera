@@ -1,0 +1,32 @@
+{
+  "title": "OR does not evaluate its second argument when the first is TRUE",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", OR ( [Order Count] > 0, ERROR ( \"second argument\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/or-function-dax",
+    "quote": "The function evaluates the arguments until the first TRUE argument, then returns TRUE .",
+    "supports": "evaluation stops at the first TRUE"
+  },
+  "confidence": "derived",
+  "derivation": "[Order Count] is 7, so the first argument is TRUE. OR stops there and ERROR is never evaluated.",
+  "tags": [
+    "or",
+    "error",
+    "short-circuit"
+  ]
+}

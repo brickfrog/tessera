@@ -1,0 +1,39 @@
+{
+  "title": "INT of a dateTime is the number of days since December 30, 1899",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( dt\"2020-10-15T22:45:30\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          44119
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "the integer corresponds to the number of days since December 30, 1899, and the decimal part identifies the fraction of the day",
+      "supports": "the internal representation"
+    },
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "If one only needs to take the date part of a DateTime , they should use INT or TRUNC to get rid of the decimal part.",
+      "supports": "INT drops the time"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "From December 30, 1899 to October 15, 2020 is 44119 days (DAX Guide shows VALUE ( \"2020-10-23\" ) as 44127, eight days later). INT drops the time 22:45:30 and returns an integer.",
+  "tags": [
+    "date-functions",
+    "int",
+    "datetime-serial"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "title": "LEN counts trailing spaces",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", LEN ( \"ab  \" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/len-function-dax",
+      "quote": "Spaces count as characters.",
+      "supports": "spaces are counted"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/len-function-dax",
+      "quote": "A whole number indicating the number of characters in the text string.",
+      "supports": "the result is a whole number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "\"ab\" followed by two spaces is 4 characters.",
+  "tags": [
+    "text-functions",
+    "len",
+    "trailing-spaces"
+  ]
+}

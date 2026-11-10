@@ -1,0 +1,42 @@
+{
+  "title": "DATEVALUE ( \"Jan 31 2024\" ) is 31 January 2024",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATEVALUE ( \"Jan 31 2024\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-31T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "If you type a date as a string, DAX parses the string and tries to cast it as one of the Windows date and time formats",
+      "supports": "text is read as a date when it matches a Windows date format"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "[Sales Date] < \"Jan 1 2009\"",
+      "supports": "the operator reference compares a date with text of this form"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "DAX casts a date typed as a string using the Windows date formats, which in en-US accept an abbreviated month name, a day and a year. Jan 31 2024 reads as 31 January 2024.",
+  "uncertain": true,
+  "alternative": "No source lists the accepted formats or shows this one converted. If only numeric forms are accepted the query fails with a conversion error.",
+  "tags": [
+    "assumption:text-to-date",
+    "datevalue",
+    "date-functions",
+    "month-name"
+  ]
+}

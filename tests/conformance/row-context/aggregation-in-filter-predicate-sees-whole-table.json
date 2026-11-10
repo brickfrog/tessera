@@ -1,0 +1,41 @@
+{
+  "title": "An aggregation in a FILTER predicate is not restricted to the current row",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( 'Product', 'Product'[Price] > AVERAGE ( 'Product'[Price] ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+      "quote": "because SUM computes the sum of all unit prices visible in the current filter context, the result is, for each product, the sum unit prices from the entire table",
+      "supports": "an aggregation in a row context uses the filter context, so it covers the entire table"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition-in-dax/",
+      "quote": "Remember: the row context iterates, it does not filter.",
+      "supports": "the row context of FILTER does not filter Product"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "AVERAGE ( Product[Price] ) is evaluated in the empty filter context on every row: (100 + 20 + 10 + 50) / 4 = 45. Product[Price] is the current row's price. Prices above 45: Bike (100) and Scooter (50), so 2 rows. If the average were of the current row only, no price would exceed itself and the count would be BLANK.",
+  "tags": [
+    "filter",
+    "countrows",
+    "average",
+    "row-context",
+    "no-context-transition"
+  ]
+}

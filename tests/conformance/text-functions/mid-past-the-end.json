@@ -1,0 +1,40 @@
+{
+  "title": "MID that runs past the end returns the characters there are",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MID ( \"abcde\", 4, 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "de"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/mid-function-dax",
+      "quote": "The position of the first character you want to extract. Positions start at 1.",
+      "supports": "position 4 of \"abcde\" is \"d\""
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/left-function-dax",
+      "quote": "If the num_chars argument is larger than the number of characters available, the function returns the maximum characters available and doesn't raise an error.",
+      "supports": "the rule documented for LEFT, applied to MID by analogy"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Starting at position 4 (\"d\") only 2 characters remain: \"de\". The MID page does not say what happens when fewer characters remain than are asked for; LEFT documents that it returns what is available.",
+  "uncertain": true,
+  "alternative": "If MID raised an error when the count runs past the end, the query would fail. Neither page documents that.",
+  "tags": [
+    "text-functions",
+    "mid"
+  ]
+}

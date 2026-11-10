@@ -1,0 +1,33 @@
+{
+  "title": "ISSELECTEDMEASURE is TRUE for the measure it names: the item multiplies [Total] by 10",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Adjust[Adjustment] = \"Only Total x10\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          600
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isselectedmeasure/",
+    "quote": "True whether the measure that is currently in context is one of those specified in the list of parameters.",
+    "supports": "the measure in context is [Total], which the item names"
+  },
+  "confidence": "derived",
+  "derivation": "The item is IF ( ISSELECTEDMEASURE ( [Total] ), SELECTEDMEASURE () * 10, SELECTEDMEASURE () ). For [Total]: 60 * 10 = 600.",
+  "tags": [
+    "calculation-groups",
+    "isselectedmeasure",
+    "selectedmeasure",
+    "calculate"
+  ]
+}

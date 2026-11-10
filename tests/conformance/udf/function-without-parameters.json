@@ -1,0 +1,42 @@
+{
+  "title": "A function can have no parameters and is called with empty parentheses",
+  "model": "scalar",
+  "query": [
+    "DEFINE FUNCTION Answer = () => 6 * 7",
+    "EVALUATE { Answer () }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          42
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "DAX UDFs support between 0 and 256 parameters.",
+      "supports": "zero parameters are allowed"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "FUNCTION RandomInt = () => RANDBETWEEN ( 10, 100 )",
+      "supports": "the page defines and calls a function with no parameters"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The body is 6 * 7 = 42, an integer.",
+  "tags": [
+    "udf",
+    "define-function",
+    "no-parameters"
+  ]
+}

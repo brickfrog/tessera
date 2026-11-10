@@ -1,0 +1,48 @@
+{
+  "title": "WEEKNUM of Sunday January 2, 2005: 2 by default, 1 with Monday weeks, 53 in the ISO system",
+  "model": "scalar",
+  "query": "EVALUATE VAR s = DATE ( 2005, 1, 2 ) RETURN ROW ( \"default\", WEEKNUM ( s ), \"t2\", WEEKNUM ( s, 2 ), \"iso\", WEEKNUM ( s, 21 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[default]",
+          "type": "int64"
+        },
+        {
+          "name": "[t2]",
+          "type": "int64"
+        },
+        {
+          "name": "[iso]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2,
+          1,
+          53
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/weeknum/",
+      "quote": "WEEKNUM returns the week number following different standards",
+      "supports": "the example table lists 2005-01-02, Sunday, with WEEKNUM 2, WEEKNUM 2 = 1, WEEKNUM 21 = 53"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/weeknum-function-dax",
+      "quote": "The week containing January 1 is the first week of the year and is numbered week 1.",
+      "supports": "system 1; with Sunday weeks January 2, 2005 starts week 2"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "weeknum",
+    "iso-week"
+  ]
+}

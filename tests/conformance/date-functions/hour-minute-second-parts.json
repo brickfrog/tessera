@@ -1,0 +1,61 @@
+{
+  "title": "HOUR, MINUTE and SECOND of a dateTime with a time part",
+  "model": "scalar",
+  "query": "EVALUATE VAR t = dt\"2020-10-15T22:45:30\" RETURN ROW ( \"h\", HOUR ( t ), \"m\", MINUTE ( t ), \"s\", SECOND ( t ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[h]",
+          "type": "int64"
+        },
+        {
+          "name": "[m]",
+          "type": "int64"
+        },
+        {
+          "name": "[s]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          22,
+          45,
+          30
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/hour-function-dax",
+      "quote": "Returns the hour as a number from 0 (12:00 A.M.) to 23 (11:00 P.M.).",
+      "supports": "HOUR on a 24-hour clock; an integer"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/minute-function-dax",
+      "quote": "Returns the minute as a number from 0 to 59, given a date and time value.",
+      "supports": "MINUTE; an integer"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/second-function-dax",
+      "quote": "Returns the seconds of a time value, as a number from 0 to 59.",
+      "supports": "SECOND; an integer"
+    },
+    {
+      "url": "https://dax.guide/date/",
+      "quote": "A DateTime value can be specified as a literal by using the prefix dt before a string with one of the following formats:",
+      "supports": "the dt\"YYYY-MM-DDThh:mm:ss\" literal"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "22:45:30 has hour 22, minute 45, second 30.",
+  "tags": [
+    "date-functions",
+    "hour",
+    "minute",
+    "second",
+    "datetime-literal"
+  ]
+}

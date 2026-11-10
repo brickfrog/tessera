@@ -1,0 +1,35 @@
+{
+  "title": "BLANK () IN { BLANK () } is TRUE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () IN { 1, BLANK () } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/containsrow/",
+    "quote": "Unlike the = operator, the IN operator and the CONTAINSROW function perform strict comparison.",
+    "supports": "strict comparison: BLANK equals only BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "Strict comparison stops BLANK from matching 0 or \"\", but a BLANK is still equal to a BLANK, and the table holds one, so a row matches.",
+  "uncertain": true,
+  "alternative": "The sources state what BLANK does not match under strict comparison, not that BLANK matches BLANK. If BLANK matched nothing at all, the result would be FALSE.",
+  "tags": [
+    "in",
+    "containsrow",
+    "blank",
+    "strict-comparison"
+  ]
+}

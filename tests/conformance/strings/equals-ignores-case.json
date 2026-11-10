@@ -1,0 +1,32 @@
+{
+  "title": "= between two strings ignores case",
+  "model": "scalar",
+  "query": "DEFINE VAR A = \"sqlbi\" VAR B = \"SQLBI\" EVALUATE ROW ( \"r\", A = B )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/exact/",
+    "quote": "By default, DAX is not case sensitive in comparison",
+    "supports": "the page's example defines A = \"sqlbi\" and B = \"SQLBI\" and shows A = B as true"
+  },
+  "confidence": "published",
+  "tags": [
+    "operator-equals",
+    "comparison",
+    "case-insensitive",
+    "var"
+  ]
+}

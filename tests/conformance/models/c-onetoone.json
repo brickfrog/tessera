@@ -1,0 +1,72 @@
+{
+  "description": "The Product / Product Category rows of learn.microsoft.com/power-bi/guidance/relationships-one-to-one: a one-to-one relationship on SKU, filtering both ways. Product has 3 rows; ProductCategory has 2 (CL-01 Clothing, AC-01 Accessories): Jeans (CL-02) has no ProductCategory row.",
+  "tables": [
+    {
+      "name": "Product",
+      "columns": [
+        {
+          "name": "SKU",
+          "type": "string",
+          "key": true
+        },
+        {
+          "name": "Product",
+          "type": "string"
+        },
+        {
+          "name": "Color",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "CL-01",
+          "T-shirt",
+          "Green"
+        ],
+        [
+          "CL-02",
+          "Jeans",
+          "Blue"
+        ],
+        [
+          "AC-01",
+          "Hat",
+          "Blue"
+        ]
+      ]
+    },
+    {
+      "name": "ProductCategory",
+      "columns": [
+        {
+          "name": "SKU",
+          "type": "string",
+          "key": true
+        },
+        {
+          "name": "Category",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "CL-01",
+          "Clothing"
+        ],
+        [
+          "AC-01",
+          "Accessories"
+        ]
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Product[SKU]",
+      "to": "ProductCategory[SKU]",
+      "cardinality": "one-to-one",
+      "crossFilter": "both"
+    }
+  ]
+}

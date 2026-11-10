@@ -1,0 +1,33 @@
+{
+  "title": "A filter argument that selects no rows makes SUM return BLANK",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], 'Product'[Color] = \"Purple\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/sum/",
+    "quote": "The result is blank in case there are no rows in the table with a non-blank value.",
+    "supports": "SUM is blank when no rows are visible"
+  },
+  "confidence": "derived",
+  "derivation": "No product is Purple, so no Sales row is visible and SUM ( Sales[Amount] ) is BLANK, not 0. ROW still returns its one row.",
+  "tags": [
+    "calculate",
+    "sum",
+    "blank",
+    "empty-filter"
+  ],
+  "notes": "The column's type is not asserted: the only value is BLANK."
+}

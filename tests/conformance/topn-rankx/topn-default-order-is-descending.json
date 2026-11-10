@@ -1,0 +1,36 @@
+{
+  "title": "TOPN sorts descending when no order is given",
+  "model": "d-values",
+  "query": "EVALUATE TOPN ( 1, Player, Player[Score] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          90
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/topn-function-dax",
+    "quote": "Sorts in descending order of values of Order . Default when Order parameter is omitted.",
+    "supports": "descending is the default"
+  },
+  "confidence": "derived",
+  "derivation": "Player scores: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. The highest score is Ann 90.",
+  "tags": [
+    "topn",
+    "order"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "title": "FILTER ( Sales, ... ) as a filter argument is evaluated in the outer context and overwrites the row's own filter",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Product[Color] ), \"Amount\", CALCULATE ( [Sales Amount], FILTER ( Sales, Sales[Quantity] > 1 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          320.0
+        ],
+        [
+          "Blue",
+          320.0
+        ],
+        [
+          "Green",
+          320.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/context-transition-and-expanded-tables/",
+      "quote": "the formula returns the same value for all the rows",
+      "supports": "the article's query: every row gets the same value"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/context-transition-and-expanded-tables/",
+      "quote": "the filter parameters of CALCULATE are evaluated in the original filter context, not in the one that CALCULATE is about to produce",
+      "supports": "the FILTER runs before context transition, over all of Sales"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/context-transition-and-expanded-tables/",
+      "quote": "when you place a filter on Sales, it results in applying the filter not only on the Sales table, but also on the Product table",
+      "supports": "its result carries Product[Color], which overwrites the color of the current row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "FILTER ( Sales, Quantity > 1 ) is evaluated with no color filter: rows 2 (40), 4 (50), 5 (200), 6 (30). As an expanded table it includes Product[Color], so it replaces the filter that context transition put on the color. Every row: 40 + 50 + 200 + 30 = 320.",
+  "tags": [
+    "addcolumns",
+    "calculate",
+    "filter",
+    "context-transition",
+    "expanded-table",
+    "table-filter",
+    "filter-overwrite"
+  ]
+}

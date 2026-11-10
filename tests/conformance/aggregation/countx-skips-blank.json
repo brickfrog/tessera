@@ -1,0 +1,31 @@
+{
+  "title": "COUNTX counts the rows where the expression is not BLANK",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTX ( V, V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/countx-function-dax",
+    "quote": "Counts the number of rows that contain a non-blank value or an expression that evaluates to a non-blank value, when evaluating an expression over a table.",
+    "supports": "only non-blank results are counted"
+  },
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. Five are not BLANK.",
+  "tags": [
+    "countx",
+    "blank"
+  ]
+}

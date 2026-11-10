@@ -1,0 +1,61 @@
+{
+  "title": "ORDER BY sorts by the first key, then by the second, each in its own direction",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SELECTCOLUMNS ( Product, \"Category\", Product[Category], \"Product\", Product[Product], \"Price\", Product[Price] )",
+    "ORDER BY [Category] ASC, [Price] DESC"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Category]",
+          "type": "string"
+        },
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Price]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Accessories",
+          "Helmet",
+          20.0
+        ],
+        [
+          "Accessories",
+          "Lock",
+          10.0
+        ],
+        [
+          "Vehicles",
+          "Bike",
+          100.0
+        ],
+        [
+          "Vehicles",
+          "Scooter",
+          50.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/st/order-by/",
+    "quote": "Every column can be sorted in an ascending (ASC) or descending (DESC) way. The default is ASC.",
+    "supports": "a direction per key"
+  },
+  "confidence": "derived",
+  "derivation": "Accessories before Vehicles. Within Accessories by price descending: Helmet 20, Lock 10. Within Vehicles: Bike 100, Scooter 50.",
+  "tags": [
+    "order-by",
+    "selectcolumns"
+  ]
+}

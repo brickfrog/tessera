@@ -1,0 +1,39 @@
+{
+  "title": "A LOOKUPVALUE search column can be a column of a related one-side table",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", LOOKUPVALUE ( Sales[Amount], Product[Product], \"Lock\", Sales[Quantity], 5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          50.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-lookupvalue/",
+      "quote": "When providing the column to search into, you can use any column of the expanded table",
+      "supports": "any column of the expanded table can be searched"
+    },
+    {
+      "url": "https://dax.guide/lookupvalue/",
+      "quote": "The Search_ColumnName can be any column of the expanded table referenced by Result_ColumnName",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Product] is a column of the expanded Sales table. Lock is ProductKey 3: Sales rows 4 and 6. Of those, Quantity 5 is row 4: Amount 50.",
+  "tags": [
+    "lookupvalue",
+    "expanded-table",
+    "relationship"
+  ]
+}

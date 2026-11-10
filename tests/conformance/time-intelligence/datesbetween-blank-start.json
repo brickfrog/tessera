@@ -1,0 +1,47 @@
+{
+  "title": "DATESBETWEEN with a BLANK start begins at the first date of the column",
+  "model": "f-calendar",
+  "query": "EVALUATE VAR R = DATESBETWEEN ( 'Date'[Date], BLANK (), DATE ( 2023, 1, 31 ) ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2023-01-01T00:00:00",
+          "2023-01-31T00:00:00",
+          31,
+          30.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datesbetween/",
+    "quote": "If StartDate is BLANK , DATESBETWEEN starts from the first date in the Dates column.",
+    "supports": "a BLANK start"
+  },
+  "confidence": "derived",
+  "derivation": "The Date table starts on 2023-01-01, so the result is January 2023: 31 days. Sales in January 2023: 30.",
+  "tags": [
+    "time-intelligence",
+    "datesbetween",
+    "blank"
+  ]
+}

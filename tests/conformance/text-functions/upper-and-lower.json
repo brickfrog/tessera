@@ -1,0 +1,36 @@
+{
+  "title": "UPPER and LOWER change the case of letters only",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"u\", UPPER ( \"DAX is so cool!\" ), \"l\", LOWER ( \"DAX is so cool!\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[u]",
+          "type": "string"
+        },
+        {
+          "name": "[l]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "DAX IS SO COOL!",
+          "dax is so cool!"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/upper/",
+    "quote": "UPPER and LOWER convert their only argument in uppercase or lowercase, respectively",
+    "supports": "the example shows UPPER = DAX IS SO COOL! and LOWER = dax is so cool!"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "upper",
+    "lower"
+  ]
+}

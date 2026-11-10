@@ -1,0 +1,50 @@
+{
+  "title": "VALUES on the filtering side of a limited relationship has no blank row for unmatched values",
+  "model": "c-weak",
+  "query": "EVALUATE VALUES ( Product[Category] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Clothing"
+        ],
+        [
+          "Accessories"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/relationships-in-power-bi-and-tabular-models/",
+      "quote": "The additional blank row is never added to tables involved in a limited relationship",
+      "supports": "no blank row on tables in a limited relationship"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "blank virtual rows aren't added to compensate for referential integrity violations",
+      "supports": "same statement"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/relationships-in-power-bi-and-tabular-models/",
+      "quote": "an MMR relationship is always limited",
+      "supports": "a many-to-many cardinality relationship is always limited"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Category] holds Clothing, Clothing, Accessories: 2 distinct values. Target has Footwear, which Product lacks, but the relationship is limited, so Product gets no blank row.",
+  "tags": [
+    "values",
+    "relationship",
+    "many-to-many-cardinality",
+    "limited-relationship",
+    "blank-row"
+  ],
+  "notes": "With a regular relationship there would be a third row, BLANK."
+}

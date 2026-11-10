@@ -1,0 +1,48 @@
+{
+  "title": "Grouping by the calculation group's column applies each item to the measure",
+  "model": "f-calcgroup",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Adjust[Adjustment], \"v\", [Total] ) ORDER BY Adjust[Adjustment]",
+  "ordered": true,
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Adjust[Adjustment]",
+          "type": "string"
+        },
+        {
+          "name": "[v]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Current",
+          60
+        ],
+        [
+          "Only Total x10",
+          600
+        ],
+        [
+          "Plus 2",
+          62
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+    "quote": "The calculation item is applied when you select the calculation item in a filter or slicer, or use it to group the values in a visual.",
+    "supports": "each group of the column has one item in the filter context, which is applied to [Total]"
+  },
+  "confidence": "derived",
+  "derivation": "Current: 60. Only Total x10: 60 * 10 = 600. Plus 2: 62. ORDER BY sorts the names as text: Current, Only Total x10, Plus 2.",
+  "notes": "ORDER BY here is on the column's values as text. A model may sort a calculation group column by ordinal; the corpus model sets none.",
+  "tags": [
+    "calculation-groups",
+    "summarizecolumns",
+    "selectedmeasure",
+    "order-by"
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "title": "ADDCOLUMNS keeps every row and gives the expression a row context only: an aggregate needs CALCULATE to see the row",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "ADDCOLUMNS (",
+    "    VALUES ( Product[Color] ),",
+    "    \"Qty Wrong\", SUM ( Sales[Quantity] ),",
+    "    \"Qty Right\", CALCULATE ( SUM ( Sales[Quantity] ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Qty Wrong]",
+          "type": "int64"
+        },
+        {
+          "name": "[Qty Right]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          15,
+          7
+        ],
+        [
+          "Blue",
+          15,
+          8
+        ],
+        [
+          "Green",
+          15,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/addcolumns/",
+      "quote": "-- New columns are computed in the row context of ADDCOLUMNS, -- you need to invoke context transition to generate a filter -- context, if needed.",
+      "supports": "the page shows the same pair of columns: the bare SUM repeats the grand total"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/addcolumns-function-dax",
+      "quote": "A table with all its original columns and the added ones.",
+      "supports": "no row is removed"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Total quantity is 15, and a bare SUM ignores the row context, so 15 on every row. With CALCULATE the colour of the row becomes a filter: Red rows 1, 2, 3, 5, 7 = 1 + 2 + 1 + 2 + 1 = 7; Blue rows 4, 6 = 5 + 3 = 8; Green none, BLANK. Green stays in the result.",
+  "tags": [
+    "addcolumns",
+    "row-context",
+    "context-transition",
+    "calculate",
+    "blank"
+  ]
+}

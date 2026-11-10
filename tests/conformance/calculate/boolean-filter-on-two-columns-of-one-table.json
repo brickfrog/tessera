@@ -1,0 +1,51 @@
+{
+  "title": "A boolean filter argument may reference two columns of the same table",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], 'Product'[Color] = \"Blue\" || 'Product'[Category] = \"Vehicles\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          480.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/specifying-multiple-filter-conditions-in-calculate/",
+      "quote": "DAX now supports expressions where multiple columns belonging to the same table are part of the predicate expression in a CALCULATE filter argument.",
+      "supports": "since March 2021 a predicate may use several columns of one table; it is run as FILTER over ALL of those columns"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "It can reference only columns of one table, but it can use more than one column of that table.",
+      "supports": "DAX Guide: one table, more than one column allowed"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/calculatetable-function-dax",
+      "quote": "They can reference only a single column.",
+      "supports": "the CALCULATETABLE reference page still states the older single-column rule"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/filter-arguments-in-calculate/",
+      "quote": "However, you cannot write a single filter argument referencing two different columns",
+      "supports": "this older SQLBI article says such a predicate cannot be written"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Blue or Vehicles: Lock (Blue), Bike and Scooter (Vehicles). 80 + 400 + BLANK = 480.",
+  "uncertain": true,
+  "alternative": "Under the older rule (a boolean filter argument can reference only a single column) the query is an error: the expression contains columns from multiple columns of a table filter expression, which is not allowed.",
+  "tags": [
+    "calculate",
+    "multi-column-predicate"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

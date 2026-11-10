@@ -1,0 +1,60 @@
+{
+  "title": "ORDER BY on a boolean column puts BLANK before FALSE",
+  "model": "a2-sort",
+  "query": "EVALUATE Flags ORDER BY Flags[F], Flags[Id]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Flags[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Flags[F]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          3,
+          null
+        ],
+        [
+          2,
+          false
+        ],
+        [
+          1,
+          true
+        ],
+        [
+          4,
+          true
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/orderby-statement-dax",
+      "quote": "Ascending sort order",
+      "supports": "ASC is the default and sorts ascending; the page does not say where BLANK goes"
+    },
+    {
+      "url": "https://dax.guide/dt/boolean/",
+      "quote": "This sometimes proves useful for sorting purposes because TRUE > FALSE",
+      "supports": "FALSE sorts before TRUE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Flags[F] by Id: TRUE (1), FALSE (2), BLANK (3), TRUE (4). FALSE sorts before TRUE. BLANK is taken as the lowest value, before FALSE: Ids 3, 2, 1, 4.",
+  "uncertain": true,
+  "alternative": "No source states where BLANK sorts among booleans. If ORDER BY treats BLANK as equal to FALSE (as = does), the tie falls to Flags[Id] and the order is Ids 2, 3, 1, 4.",
+  "tags": [
+    "order-by",
+    "boolean",
+    "blank"
+  ],
+  "notes": "FALSE has the lower Id on purpose, so the two readings give different orders."
+}

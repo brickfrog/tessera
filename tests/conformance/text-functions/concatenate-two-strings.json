@@ -1,0 +1,31 @@
+{
+  "title": "CONCATENATE joins two strings",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONCATENATE ( \"Hello \", \"World\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Hello World"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/concatenate-function-dax",
+    "quote": "The sample formula creates a new string value by combining two string values that you provide as arguments.",
+    "supports": "the example = CONCATENATE(\"Hello \", \"World\")"
+  },
+  "confidence": "derived",
+  "derivation": "\"Hello \" followed by \"World\" is \"Hello World\".",
+  "tags": [
+    "text-functions",
+    "concatenate"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "title": "CONVERT ( 12345, DATETIME ) is 1933-10-18",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( 12345, DATETIME ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1933-10-18T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "( \"Date3\", CONVERT ( 12345, DATETIME ) )",
+    "supports": "the example shows 1933-10-18 00:00:00 for Date3"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "date"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "title": "DATESBETWEEN only returns dates the Date table has",
+  "model": "f-calendar",
+  "query": "EVALUATE DATESBETWEEN ( 'Date'[Date], DATE ( 2022, 6, 1 ), DATE ( 2023, 1, 3 ) ) ORDER BY 'Date'[Date]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2023-01-01T00:00:00"
+        ],
+        [
+          "2023-01-02T00:00:00"
+        ],
+        [
+          "2023-01-03T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/datesbetween/",
+      "quote": "A date lower than the minimum makes DATESBETWEEN start",
+      "supports": "the example starts before the first date of the table and returns dates from the first date on"
+    },
+    {
+      "url": "https://dax.guide/datesbetween/",
+      "quote": "The result includes only dates that exist in the Dates column.",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The start, 2022-06-01, is before the first date of the table (2023-01-01), so the result is January 1 to 3, 2023.",
+  "tags": [
+    "time-intelligence",
+    "datesbetween",
+    "order-by"
+  ]
+}

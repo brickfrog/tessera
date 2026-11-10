@@ -1,0 +1,47 @@
+{
+  "title": "CROSSFILTER ONEWAY turns a both-direction relationship into a single-direction one for the calculation",
+  "model": "c-bidirectional",
+  "query": "EVALUATE ROW ( \"Model\", CALCULATE ( COUNTROWS ( Product ), Customer[Country] = \"Australia\" ), \"OneWay\", CALCULATE ( COUNTROWS ( Product ), Customer[Country] = \"Australia\", CROSSFILTER ( Sales[SKU], Product[SKU], ONEWAY ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Model]",
+          "type": "int64"
+        },
+        {
+          "name": "[OneWay]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/crossfilter-function-dax",
+      "quote": "CROSSFILTER will override any existing cross-filtering setting",
+      "supports": "the model's setting is overridden by CROSSFILTER"
+    },
+    {
+      "url": "https://dax.guide/crossfilter/",
+      "quote": "the cross-filter direction, which can be BOTH, ONEWAY, NONE",
+      "supports": "ONEWAY is one of the three directions"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Model setting (both): Australia -> Sales row 3 -> Product CL-01: 1 row. With ONEWAY the relationship only filters from Product to Sales, so the Customer filter stops at Sales and Product keeps its 3 rows.",
+  "tags": [
+    "calculate",
+    "crossfilter",
+    "countrows",
+    "relationship",
+    "bidirectional",
+    "filter-propagation"
+  ]
+}

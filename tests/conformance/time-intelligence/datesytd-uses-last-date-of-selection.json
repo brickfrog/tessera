@@ -1,0 +1,53 @@
+{
+  "title": "DATESYTD over a range of dates starts at January 1 and ends at the last selected date",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = DATESYTD ( 'Date'[Date] ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] >= DATE ( 2024, 2, 5 ) && 'Date'[Date] <= DATE ( 2024, 5, 20 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-01T00:00:00",
+          "2024-05-20T00:00:00",
+          141,
+          2100.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/datesytd/",
+      "quote": "If the selection contains larger periods, it returns the YTD using",
+      "supports": "the example for 2007-02-05 to 2007-05-12 returns 2007-01-01 to 2007-05-12"
+    },
+    {
+      "url": "https://dax.guide/datesytd/",
+      "quote": "Returns a set of dates in the year up to the last date visible in the filter context.",
+      "supports": "DATESYTD goes from January 1 to the last visible date"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The last selected date is 2024-05-20; the start of the selection (February 5) does not matter. January 1 to May 20, 2024 is 31 + 29 + 31 + 30 + 20 = 141 days. Sales: Jan 300 + Feb 700 + Mar 500 + May 20 600 = 2100.",
+  "tags": [
+    "time-intelligence",
+    "datesytd"
+  ]
+}

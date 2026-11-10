@@ -1,0 +1,23 @@
+{
+  "title": "IN between a number and a table of text is an error, not FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1 IN { \"1\" } )",
+  "expected": {
+    "error": "the number 1 cannot be compared with the text column of the table"
+  },
+  "source": {
+    "url": "https://dax.guide/containsrow/",
+    "quote": "If a Value has a data type that cannot be compared with the corresponding column, CONTAINSROW returns an error. For example, the number 1 does not match the text “1”.",
+    "supports": "a number against a text column is an error"
+  },
+  "confidence": "derived",
+  "derivation": "The table constructor has one text column and the value tested is a number. The page says such a comparison makes CONTAINSROW, which IN runs, return an error.",
+  "uncertain": true,
+  "alternative": "The example sentence says the number 1 \"does not match\" the text \"1\", which can also be read as a FALSE result. In that reading the query returns one row with FALSE.",
+  "tags": [
+    "in",
+    "containsrow",
+    "error",
+    "type-mismatch"
+  ]
+}

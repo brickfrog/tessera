@@ -1,0 +1,42 @@
+{
+  "title": "A filter on a single fact column does not filter the dimension",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Products\", CALCULATE ( COUNTROWS ( Product ), Sales[Quantity] >= 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/context-transition-and-expanded-tables/",
+      "quote": "it will not spread its effects to the whole Product table, as a filter on Sales did",
+      "supports": "a filter on the Sales[Quantity] column alone does not spread to Product"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/bidirectional-relationships-and-ambiguity-in-dax/",
+      "quote": "a filter on Customer automatically filters Sales, whereas a filter on Sales propagates neither to Product nor to Customer or Date",
+      "supports": "a filter on Sales does not propagate to Product through a single-direction relationship"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The predicate filters only the column Sales[Quantity]. It is not a filter on the expanded Sales table, and the relationship is single direction, so Product keeps its 4 rows.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "expanded-table",
+    "column-filter",
+    "relationship"
+  ],
+  "notes": "Compare filter-over-fact-table-reaches-dimensions, where the same condition through FILTER ( Sales, ... ) gives 1."
+}

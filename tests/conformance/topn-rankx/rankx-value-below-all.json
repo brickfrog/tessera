@@ -1,0 +1,31 @@
+{
+  "title": "RANKX ranks a value below every row one past the row count",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", RANKX ( Player, Player[Score], 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+    "quote": "If value is not among all possible values of expression then RANKX temporarily adds value to the values from expression and re-evaluates RANKX to determine the proper rank of value .",
+    "supports": "a value not in the list is ranked as if it were added"
+  },
+  "confidence": "derived",
+  "derivation": "RANKX builds the list of scores 90, 80, 80, 70, 70, 50 and looks up the third argument in it. All six scores are above 10, so 10 would be seventh: rank 7.",
+  "tags": [
+    "rankx",
+    "value-argument"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "title": "DATEDIFF from July 1, 2019 to December 31, 2021 in each interval",
+  "model": "scalar",
+  "query": "EVALUATE VAR StartDate = DATE ( 2019, 07, 01 ) VAR EndDate = DATE ( 2021, 12, 31 ) RETURN ROW ( \"Year\", DATEDIFF ( StartDate, EndDate, YEAR ), \"Quarter\", DATEDIFF ( StartDate, EndDate, QUARTER ), \"Month\", DATEDIFF ( StartDate, EndDate, MONTH ), \"Week\", DATEDIFF ( StartDate, EndDate, WEEK ), \"Day\", DATEDIFF ( StartDate, EndDate, DAY ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Year]",
+          "type": "int64"
+        },
+        {
+          "name": "[Quarter]",
+          "type": "int64"
+        },
+        {
+          "name": "[Month]",
+          "type": "int64"
+        },
+        {
+          "name": "[Week]",
+          "type": "int64"
+        },
+        {
+          "name": "[Day]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2,
+          9,
+          29,
+          130,
+          914
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/datediff-function-dax",
+      "quote": "Returns the number of interval boundaries between two dates.",
+      "supports": "the documented query from July 1, 2019 to December 31, 2021 returns Year 2, Quarter 9, Month 29, Week 130, Day 914"
+    },
+    {
+      "url": "https://dax.guide/datediff/",
+      "quote": "The count of interval boundaries crossed between two dates.",
+      "supports": "Return values: a single integer value"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "datediff"
+  ]
+}

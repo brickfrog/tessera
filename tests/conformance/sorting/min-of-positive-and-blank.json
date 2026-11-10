@@ -1,0 +1,41 @@
+{
+  "title": "MIN ( 2, BLANK() ) with two scalar arguments is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MIN ( 2, BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/min/",
+      "quote": "MIN consider the BLANK value as significative, whereas MINX ignores it",
+      "supports": "the page gives the two-argument form as a SWITCH and says MIN ( 2, BLANK() ) returns BLANK"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/min-function-dax",
+      "quote": "blank is treated as 0 when comparing",
+      "supports": "the other reading: Min(1,Blank() ) returns 0"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "DAX Guide's expansion: v1 = 2, v2 = BLANK. v1 = v2 is FALSE. v1 < v2 is FALSE (2 is not less than BLANK, which compares as 0). So the result is v2, which is BLANK.",
+  "uncertain": true,
+  "alternative": "The Microsoft page says Min(1, Blank()) returns 0. Under that reading the result is the integer 0, not BLANK.",
+  "tags": [
+    "min",
+    "blank",
+    "comparison"
+  ],
+  "notes": "The two readings differ only in ISBLANK of the result. The column's type is not asserted."
+}

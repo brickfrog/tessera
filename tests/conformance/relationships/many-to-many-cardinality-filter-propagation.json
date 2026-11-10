@@ -1,0 +1,57 @@
+{
+  "title": "A many-to-many cardinality relationship propagates a filter on the shared column; unmatched rows get no blank row",
+  "model": "c-weak",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Category], \"Target\", SUM ( Target[TargetQuantity] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "[Target]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Clothing",
+          220
+        ],
+        [
+          "Accessories",
+          110
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "blank virtual rows aren't added to compensate for referential integrity violations",
+      "supports": "a limited relationship adds no blank row for values missing on the filtering side"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/strong-and-weak-relationships-in-power-bi/",
+      "quote": "The additional blank row is not added to the target of a limited relationship",
+      "supports": "same statement"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/strong-and-weak-relationships-in-power-bi/",
+      "quote": "a relationship is limited if it has a many-to-many cardinality or if it is a cross-island relationship",
+      "supports": "a many-to-many cardinality relationship is limited"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Clothing: Target rows 100 (2019) + 120 (2020) = 220. Accessories: 50 + 60 = 110. Target's Footwear row (30) has no Product: with a regular relationship it would appear on a blank row, but a limited relationship adds none, so the result has two rows.",
+  "tags": [
+    "summarizecolumns",
+    "sum",
+    "relationship",
+    "many-to-many-cardinality",
+    "limited-relationship",
+    "blank-row"
+  ],
+  "notes": "An engine that adds a blank row here would return a third row (BLANK, 30)."
+}

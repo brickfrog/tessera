@@ -1,0 +1,55 @@
+{
+  "title": "EARLIER ( column, 2 ) reads the row context two levels out",
+  "model": "scalar",
+  "query": "EVALUATE ADDCOLUMNS ( T, \"x\", SUMX ( FILTER ( T, T[n] >= 2 ), SUMX ( FILTER ( T, T[n] = 1 ), EARLIER ( T[n], 2 ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "T[n]",
+          "type": "int64"
+        },
+        {
+          "name": "[x]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          4
+        ],
+        [
+          3,
+          6
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+      "quote": "If you need to get a value from the loop before that, set the second argument to 2.",
+      "supports": "the second argument selects the loop before the previous one"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+      "quote": "The next evaluation level out is represented by 1; two levels out is represented by 2 and so on. When omitted default value is 1.",
+      "supports": "2 is two levels out"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Two levels out of the inner SUMX is ADDCOLUMNS. The outer SUMX has 2 rows (n = 2, 3) and the inner SUMX 1 row, so the ADDCOLUMNS value is added twice: 1 gives 2, 2 gives 4, 3 gives 6.",
+  "tags": [
+    "earlier",
+    "addcolumns",
+    "sumx",
+    "filter",
+    "row-context",
+    "nested-row-context"
+  ]
+}

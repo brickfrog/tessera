@@ -1,0 +1,45 @@
+{
+  "title": "COUNTROWS of an empty table is BLANK, not 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( T, FALSE ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "COUNTROWS ( FILTER ( Table, False ) ) Blank value",
+      "supports": "the article's example, on a table named Table"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/countrows-function-dax",
+      "quote": "When the table argument contains no rows, the function returns BLANK",
+      "supports": "the rule"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/countrows-function-dax",
+      "quote": "Return value A whole number",
+      "supports": "the type of COUNTROWS"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "FILTER ( T, FALSE ) keeps none of T's three rows, so COUNTROWS has an empty table and returns BLANK.",
+  "tags": [
+    "blank",
+    "countrows",
+    "filter",
+    "empty-table"
+  ]
+}

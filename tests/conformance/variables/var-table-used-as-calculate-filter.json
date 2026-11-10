@@ -1,0 +1,41 @@
+{
+  "title": "A variable can hold a table and be used as a CALCULATE filter",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR RedProducts = FILTER ( Product, Product[Color] = \"Red\" ) RETURN CALCULATE ( [Sales Amount], RedProducts ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          460.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/variables-in-dax/",
+      "quote": "One important detail about variables, though not clear at first sight, is that variables can contain tables too.",
+      "supports": "a variable can hold a table"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/variables-in-dax/",
+      "quote": "a variable containing a table inherits the relationships of the base tables of the columns it contains",
+      "supports": "the rows of Product in the variable filter Sales through the relationship"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "RedProducts holds Bike (1) and Helmet (2). As a filter it restricts Product to those rows, and Sales through ProductKey to rows 1, 2, 3, 5, 7: 100 + 40 + 20 + 200 + 100 = 460.",
+  "tags": [
+    "var",
+    "table-variable",
+    "calculate",
+    "filter",
+    "relationship"
+  ]
+}

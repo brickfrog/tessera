@@ -1,0 +1,52 @@
+{
+  "title": "GROUPBY and a group whose aggregate is BLANK",
+  "model": "sales",
+  "query": "EVALUATE GROUPBY ( Sales, Product[Color], \"Big\", MAXX ( CURRENTGROUP (), IF ( Sales[Amount] > 150, Sales[Amount] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Big]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          200.0
+        ],
+        [
+          "Blue",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/nested-grouping-using-groupby-vs-summarize/",
+      "quote": "The behavior of GROUPBY in Power BI and Azure Analysis Services (2022) is now different and the rows included in the result also have the blank result",
+      "supports": "current engines keep the group with a BLANK aggregate"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/nested-grouping-using-groupby-vs-summarize/",
+      "quote": "The result of GROUPBY automatically removes rows that have a blank result in the column that contains CURRENTGROUP in the expression evaluated.",
+      "supports": "older engines removed it"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Red amounts: 100, 40, 20, 200, 100: only 200 is above 150, so the maximum is 200. Blue amounts: 50, 30: none above 150, so every value is BLANK and the maximum is BLANK. Per the 2022 update the Blue row is returned with a BLANK.",
+  "uncertain": true,
+  "alternative": "The older behaviour removes groups with a BLANK aggregate: only the row Red, 200 would be returned.",
+  "tags": [
+    "groupby",
+    "currentgroup",
+    "maxx",
+    "blank",
+    "if"
+  ]
+}

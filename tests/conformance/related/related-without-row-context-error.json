@@ -1,0 +1,32 @@
+{
+  "title": "RELATED with no row context is an error",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", RELATED ( Product[Color] ) )",
+  "expected": {
+    "error": "RELATED needs a row context on a table related to Product; ROW provides none"
+  },
+  "source": [
+    {
+      "url": "https://dax.guide/related/",
+      "quote": "The RELATED function needs a row context",
+      "supports": "RELATED needs a row context"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/expanded-tables-in-dax/",
+      "quote": "RELATED requires a row context to be active",
+      "supports": "same statement"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/related-function-dax",
+      "quote": "The RELATED function needs a row context",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "ROW evaluates its expression with no row context, and RELATED needs one on a table related to Product: an error.",
+  "tags": [
+    "related",
+    "row-context",
+    "error"
+  ]
+}

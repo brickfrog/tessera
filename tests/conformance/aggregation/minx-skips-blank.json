@@ -1,0 +1,31 @@
+{
+  "title": "MINX skips a BLANK: MINX over { 2, BLANK } is 2",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MINX ( { 2, BLANK () }, [Value] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/min/",
+    "quote": "-- MINX returns 2 MINX ( { 2, BLANK() }, [Value] )",
+    "supports": "the page gives this expression and its result"
+  },
+  "confidence": "published",
+  "tags": [
+    "minx",
+    "blank",
+    "table-constructor"
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "title": "A filter on another column of the table gives one visible value but no direct filter",
+  "model": "sales",
+  "query": [
+    "EVALUATE CALCULATETABLE (",
+    "  ROW ( \"Has One Filter\", HASONEFILTER ( Product[Category] ), \"Has One Value\", HASONEVALUE ( Product[Category] ) ),",
+    "  Product[Product] = \"Lock\" )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Has One Filter]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Has One Value]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false,
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/hasonefilter/",
+    "quote": "HASONEFILTER is not HASONEVALUE. -- A column can have only one value visible because of -- cross-filtering.",
+    "supports": "the page shows this pair of measures returning false and true for a filter on the product name"
+  },
+  "confidence": "derived",
+  "derivation": "The filter is on Product[Product]. Only Lock is visible, so Product[Category] shows one value, Accessories: HASONEVALUE is TRUE. Product[Category] has no direct filter, so FILTERS returns both categories and HASONEFILTER is FALSE.",
+  "tags": [
+    "hasonefilter",
+    "hasonevalue",
+    "calculatetable",
+    "cross-filter",
+    "direct-filter"
+  ]
+}

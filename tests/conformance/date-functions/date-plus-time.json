@@ -1,0 +1,32 @@
+{
+  "title": "A date plus a time is the date with that time",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2020, 10, 15 ) + TIME ( 22, 45, 30 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2020-10-15T22:45:30"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/date/",
+    "quote": "A DateTime is a number. Therefore, it is possible to",
+    "supports": "the example shows DATE ( 2020, 10, 15 ) + TIME ( 22, 45, 30 ) as 2020-10-15 22:45:30"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "date",
+    "time",
+    "operator-add"
+  ]
+}

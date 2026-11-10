@@ -1,0 +1,46 @@
+{
+  "title": "CROSSFILTER NONE stops a relationship from propagating filters",
+  "model": "c-bidirectional",
+  "query": "EVALUATE ROW ( \"Blue\", CALCULATE ( SUM ( Sales[Quantity] ), Product[Color] = \"Blue\" ), \"BlueNone\", CALCULATE ( SUM ( Sales[Quantity] ), Product[Color] = \"Blue\", CROSSFILTER ( Sales[SKU], Product[SKU], NONE ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Blue]",
+          "type": "int64"
+        },
+        {
+          "name": "[BlueNone]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          20,
+          60
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "Modifies the relationship cross filter direction (to one or both), or it disables filter propagation (none)",
+      "supports": "CROSSFILTER with none disables filter propagation"
+    },
+    {
+      "url": "https://dax.guide/crossfilter/",
+      "quote": "the cross-filter direction, which can be BOTH, ONEWAY, NONE",
+      "supports": "NONE is one of the three directions"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Blue products are Jeans (CL-02) and Hat (AC-01). With the relationship: Sales row 2 = 20. With CROSSFILTER NONE the Product filter does not reach Sales: all rows = 10 + 20 + 30 = 60. SUM of a whole number column is a whole number.",
+  "tags": [
+    "calculate",
+    "crossfilter",
+    "sum",
+    "relationship",
+    "filter-propagation"
+  ]
+}

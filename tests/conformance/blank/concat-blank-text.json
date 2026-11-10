@@ -1,0 +1,30 @@
+{
+  "title": "BLANK & \"A\" is \"A\": BLANK is an empty string in a concatenation",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () & \"A\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "A"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "BLANK () & \"A\" A",
+    "supports": "the table of expressions with a blank value"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-concatenate"
+  ]
+}

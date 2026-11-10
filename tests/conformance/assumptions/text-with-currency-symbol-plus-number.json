@@ -1,0 +1,42 @@
+{
+  "title": "\"$5\" + 1 is 6: a currency symbol is accepted in text converted to a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"$5\" + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          6
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "the string is automatically converted into a corresponding number, as long as the string is a valid representation of a number",
+      "supports": "text in an arithmetic expression converts when it is a valid number; the page does not say which forms are valid"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/value-function-dax",
+      "quote": "The value passed as the text parameter can be in any of the constant, number, date, or time formats recognized by the application or services you are using",
+      "supports": "VALUE accepts the number formats the engine recognizes; the page does not list them"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "+ converts text to a number when the text is a valid representation of a number. The model culture is en-US, whose currency format is $5, so the text is taken as one of the recognized number formats: 5 + 1 = 6.",
+  "uncertain": true,
+  "alternative": "No source says whether a currency symbol is accepted. If it is not, the conversion fails and the query returns an error. This is the least supported of the separator cases.",
+  "tags": [
+    "assumption:text-to-number-separators",
+    "operator-add",
+    "implicit-conversion",
+    "currency-symbol"
+  ],
+  "notes": "The column's type is not asserted. If the symbol is accepted the result might also be a fixed decimal."
+}

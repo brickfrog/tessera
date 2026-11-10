@@ -1,0 +1,27 @@
+{
+  "title": "A variable cannot use a variable defined after it",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VAR a = b + 1 VAR b = 2 RETURN a )",
+  "expected": {
+    "error": "b is not defined yet when a is defined"
+  },
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/variables-in-dax/",
+      "quote": "the definition of a variable can reference other variables provided that the other variables have been defined beforehand",
+      "supports": "only variables defined beforehand can be referenced"
+    },
+    {
+      "url": "https://dax.guide/st/var/",
+      "quote": "A variable nameN is visible in all the expressionN+1 of following variables defined within the same VAR/RETURN statement.",
+      "supports": "a variable is visible to the definitions that follow it, not to the ones before"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "a is defined before b, so b is not visible in the definition of a and the query fails.",
+  "tags": [
+    "var",
+    "variable-scope",
+    "error"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "title": "UNICODE ( \"━\" ) is 9473 and UNICHAR ( 9473 ) is \"━\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"code\", UNICODE ( \"━\" ), \"char\", UNICHAR ( 9473 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[code]",
+          "type": "int64"
+        },
+        {
+          "name": "[char]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          9473,
+          "━"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/unichar/",
+    "quote": "UNICHAR returns a character given the Unicode value",
+    "supports": "the example shows UNICODE ( \"━\" ) = 9473 and UNICHAR ( 9473 ) = ━"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "unicode",
+    "unichar"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "title": "A model measure that references an overridden measure keeps using the model definition",
+  "model": {
+    "base": "sales",
+    "measures": [
+      {
+        "table": "Sales",
+        "name": "Double Amount",
+        "expression": "[Sales Amount] * 2"
+      }
+    ]
+  },
+  "query": [
+    "DEFINE MEASURE Sales[Sales Amount] = SUM ( Sales[Quantity] )",
+    "EVALUATE ROW ( \"r\", [Double Amount] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1080.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/st/measure/",
+      "quote": "However, its definition is only used in other query measures; other model measures continue to use the model measure definition.",
+      "supports": "a model measure does not see the query definition"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/define-statement-dax",
+      "quote": "Measure definitions for a query override model measures of the same name.",
+      "supports": "the Microsoft page states the override without that limit"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "[Double Amount] is a model measure, so by the DAX Guide statement its [Sales Amount] is the model one: 540 * 2 = 1080. A fixed decimal times an integer is a fixed decimal.",
+  "uncertain": true,
+  "alternative": "The Microsoft pages say only that the query measure overrides the model measure of the same name. If the override also applies inside model measures, [Sales Amount] is 15 there and the result is the integer 30.",
+  "tags": [
+    "define-measure",
+    "measure-override",
+    "measure-dependency"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "title": "EXP ( 1 ) is e and LN ( 1 ) is 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"e\", EXP ( 1 ), \"zero\", LN ( 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[e]",
+          "type": "double"
+        },
+        {
+          "name": "[zero]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.718281828459045,
+          0.0
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-12,
+  "source": [
+    {
+      "url": "https://dax.guide/exp/",
+      "quote": "EXP(1) returns the approximate value of e",
+      "supports": "EXP ( 1 ) is e"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/exp-function-dax",
+      "quote": "The constant e equals 2.71828182845904, the base of the natural logarithm.",
+      "supports": "the value of e to 14 decimals; Return value: a decimal number"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/ln-function-dax",
+      "quote": "Returns the natural logarithm of a number.",
+      "supports": "the natural logarithm of 1 is 0; Return value: a decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "e is 2.718281828459045 as a double (the page prints 2.71828182845904). The natural logarithm of 1 is 0.",
+  "tags": [
+    "math-functions",
+    "exp",
+    "ln"
+  ]
+}

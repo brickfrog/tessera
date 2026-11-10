@@ -1,0 +1,31 @@
+{
+  "title": "DATE ( 50, 1, 2 ) is January 2, 1950: years 50 to 99 have 1900 added",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 50, 1, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1950-01-02T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/date-function-dax",
+    "quote": "The following formula returns January 2, 1950: (1900+50).",
+    "supports": "the example = DATE(50,1,2)"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "date",
+    "two-digit-year"
+  ]
+}

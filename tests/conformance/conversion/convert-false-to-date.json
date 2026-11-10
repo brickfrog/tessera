@@ -1,0 +1,32 @@
+{
+  "title": "CONVERT ( FALSE, DATETIME ) is 1899-12-30, the zero date",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( FALSE, DATETIME ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1899-12-30T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "( \"Date4\", CONVERT ( FALSE, DATETIME ) )",
+    "supports": "the example shows 1899-12-30 00:00:00 for Date4"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "date",
+    "boolean"
+  ]
+}

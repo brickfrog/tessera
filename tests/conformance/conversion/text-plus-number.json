@@ -1,0 +1,31 @@
+{
+  "title": "\"22\" + 22 is 44: text that is a number is converted in an addition",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"22\" + 22 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          44
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "The expression = \"22\" + 22 returns 44",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "text-to-number"
+  ],
+  "notes": "The column's type is not asserted: no source says which numeric type the text becomes."
+}

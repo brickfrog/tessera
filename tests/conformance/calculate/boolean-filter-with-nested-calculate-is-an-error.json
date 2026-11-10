@@ -1,0 +1,26 @@
+{
+  "title": "A boolean filter argument that uses CALCULATE is an error",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], 'Product'[Price] > CALCULATE ( AVERAGE ( 'Product'[Price] ) ) ) )",
+  "expected": {
+    "error": "CALCULATE has been used in a True/False expression that is used as a table filter expression. This is not allowed."
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/calculate-function-dax",
+      "quote": "It can't use a nested CALCULATE function.",
+      "supports": "the rules for Boolean filter expressions"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "It cannot reference a measure, and it cannot use CALCULATE.",
+      "supports": "the limits of a True/False filter argument"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "calculate",
+    "nested-calculate",
+    "error"
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "title": "ORDER BY accepts an expression computed for each row of the result",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Price\", Product[Price] ) ORDER BY [Price] * -1",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Price]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          100.0
+        ],
+        [
+          "Scooter",
+          50.0
+        ],
+        [
+          "Helmet",
+          20.0
+        ],
+        [
+          "Lock",
+          10.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "Any expression that can be evaluated for each row of the result is valid.",
+      "supports": "ORDER BY takes an expression over the result columns"
+    },
+    {
+      "url": "https://dax.guide/st/order-by/",
+      "quote": "It can include only columns that are part of EVALUATE or expressions that can be computed in the row context of the result.",
+      "supports": "ORDER BY takes an expression over the result columns"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The sort key is the price negated: -100 (Bike), -50 (Scooter), -20 (Helmet), -10 (Lock), ascending.",
+  "tags": [
+    "order-by",
+    "selectcolumns",
+    "evaluate"
+  ]
+}

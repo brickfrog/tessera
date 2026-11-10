@@ -1,0 +1,60 @@
+{
+  "title": "A column is cross-filtered, not filtered, by a filter on another column of its table",
+  "model": "sales",
+  "query": [
+    "EVALUATE CALCULATETABLE (",
+    "  {",
+    "    ( \"ISFILTERED Sales[Amount]\", ISFILTERED ( Sales[Amount] ) ),",
+    "    ( \"ISFILTERED Sales[Quantity]\", ISFILTERED ( Sales[Quantity] ) ),",
+    "    ( \"ISFILTERED Sales\", ISFILTERED ( Sales ) ),",
+    "    ( \"ISCROSSFILTERED Sales[Quantity]\", ISCROSSFILTERED ( Sales[Quantity] ) )",
+    "  },",
+    "  Sales[Amount] > 10 )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value1]",
+          "type": "string"
+        },
+        {
+          "name": "[Value2]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "ISFILTERED Sales[Amount]",
+          true
+        ],
+        [
+          "ISFILTERED Sales[Quantity]",
+          false
+        ],
+        [
+          "ISFILTERED Sales",
+          true
+        ],
+        [
+          "ISCROSSFILTERED Sales[Quantity]",
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isfiltered/",
+    "quote": "With a table argument, ISFILTERED returns TRUE if any column -- of the table has a direct filter.",
+    "supports": "the page shows this query for a filter on Sales[Unit Price] with these four results"
+  },
+  "confidence": "derived",
+  "derivation": "The filter is on Sales[Amount]. Sales[Quantity] has no filter of its own (FALSE) but is in the same table as a filtered column (cross-filtered, TRUE). ISFILTERED ( Sales ) is TRUE because one of its columns is filtered.",
+  "tags": [
+    "isfiltered",
+    "iscrossfiltered",
+    "calculatetable",
+    "direct-filter",
+    "cross-filter"
+  ]
+}

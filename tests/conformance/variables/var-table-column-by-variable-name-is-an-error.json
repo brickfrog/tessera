@@ -1,0 +1,27 @@
+{
+  "title": "A column of a table variable cannot be referenced as Variable[Column]",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR Expensive = FILTER ( Product, Product[Price] >= 50 ) RETURN SUMX ( Expensive, Expensive[Price] ) )",
+  "expected": {
+    "error": "Expensive is a variable, not a table of the model: Expensive[Price] cannot be resolved"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/var-dax",
+      "quote": "You can't reference columns in table variables by using TableName[ColumnName] syntax.",
+      "supports": "the variable name is not a table name for column references"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/variables-in-dax/",
+      "quote": "It would seem intuitive to refer to the Unit Price column in BestProducts as BestProducts[Unit Price] . Unfortunately, this syntax is not available.",
+      "supports": "Variable[Column] is not available"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Expensive[Price] uses the variable name as a table prefix, which both sources say is not possible, so the query fails.",
+  "tags": [
+    "var",
+    "table-variable",
+    "error"
+  ]
+}

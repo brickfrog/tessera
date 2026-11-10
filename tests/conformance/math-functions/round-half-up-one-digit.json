@@ -1,0 +1,31 @@
+{
+  "title": "ROUND ( 2.15, 1 ) is 2.2",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUND ( 2.15, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/round-function-dax",
+    "quote": "The following formula rounds 2.15 up, to one decimal place. The expected result is 2.2.",
+    "supports": "the example gives the result 2.2; Return value: a decimal number"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "round"
+  ],
+  "notes": "2.15 has no exact binary representation (it is slightly below 2.15), so an engine that rounds the binary value gives 2.1. The documentation says 2.2."
+}

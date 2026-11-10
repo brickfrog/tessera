@@ -1,0 +1,42 @@
+{
+  "title": "A filter on another table reaches the groups through the measure",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], TREATAS ( { \"JP\" }, Customer[Country] ), \"Amt\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          200.0
+        ],
+        [
+          "Blue",
+          30.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/summarizecolumns/",
+    "quote": "They do not apply to group-by columns from other tables directly, but indirectly through the implied non-empty filter from measures.",
+    "supports": "the country filter changes the measure, and blank groups drop out"
+  },
+  "confidence": "derived",
+  "derivation": "Only Cho is in JP: Sales rows 5 (Bike, Red, 200) and 6 (Lock, Blue, 30). Red 200, Blue 30; Green is BLANK and dropped.",
+  "tags": [
+    "summarizecolumns",
+    "filter-table",
+    "treatas",
+    "filter-propagation"
+  ]
+}

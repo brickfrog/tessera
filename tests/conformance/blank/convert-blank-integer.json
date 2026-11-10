@@ -1,0 +1,37 @@
+{
+  "title": "CONVERT ( BLANK, INTEGER ) is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( BLANK (), INTEGER ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "CONVERT ( BLANK (), INTEGER ) Blank value",
+      "supports": "the table of expressions with a blank value"
+    },
+    {
+      "url": "https://dax.guide/convert/",
+      "quote": "When Expression is BLANK , CONVERT returns BLANK",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "convert"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

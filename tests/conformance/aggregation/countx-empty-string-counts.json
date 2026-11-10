@@ -1,0 +1,31 @@
+{
+  "title": "COUNTX counts an empty string as a value",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTX ( V, \"\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/countx/",
+    "quote": "COUNTX counts an empty string as a value. Only BLANK results are not counted.",
+    "supports": "the page says COUNTX ( Customer, \"\" ) returns the number of rows in Customer"
+  },
+  "confidence": "derived",
+  "derivation": "The expression is \"\" for each of the 7 rows of V, and an empty string is counted.",
+  "tags": [
+    "countx",
+    "empty-string"
+  ]
+}

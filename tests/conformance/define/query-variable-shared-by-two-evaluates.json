@@ -1,0 +1,64 @@
+{
+  "title": "A DEFINE VAR variable can be used in every EVALUATE of the query",
+  "model": "sales",
+  "query": [
+    "DEFINE VAR MinimumAmount = 100",
+    "EVALUATE FILTER ( ADDCOLUMNS ( VALUES ( Product[Color] ), \"Amount\", [Sales Amount] ), [Amount] >= MinimumAmount )",
+    "EVALUATE ROW ( \"r\", MinimumAmount * 2 )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ]
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          200
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/st/define/",
+      "quote": "One DEFINE can be applied to one or more EVALUATE statements.",
+      "supports": "the page shows one query variable used in two EVALUATE statements"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/define-statement-dax",
+      "quote": "Definitions in the DEFINE statement can apply to any EVALUATE statements in the query.",
+      "supports": "definitions are shared by the EVALUATE statements"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "First result: Red 460, Blue 80, Green BLANK; only Red is at least 100 (BLANK >= 100 is FALSE). Second result: 100 * 2 = 200.",
+  "tags": [
+    "define",
+    "query-variable",
+    "var",
+    "multiple-evaluate",
+    "filter",
+    "addcolumns"
+  ]
+}

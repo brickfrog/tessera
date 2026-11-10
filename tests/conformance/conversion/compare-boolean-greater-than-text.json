@@ -1,0 +1,34 @@
+{
+  "title": "FALSE > \"true\" is an error: a Boolean is not compared with text",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IF ( FALSE () > \"true\", \"Expression is true\", \"Expression is false\" ) )",
+  "expected": {
+    "error": "comparison operations do not support comparing values of type True/False with values of type Text"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "Other mixed data-type comparisons will return an error",
+      "supports": "Boolean with String is not a supported pair"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "=IF(FALSE()>\"true\",\"Expression is true\", \"Expression is false\") returns \"Expression is true\"",
+      "supports": "the other reading"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The left operand is a Boolean and the right is text. That pair is not among the supported comparisons (Numeric with Numeric, Boolean with Boolean, String with String), so the query fails.",
+  "uncertain": true,
+  "alternative": "The Power BI data types page says this very formula returns \"Expression is true\" (a Boolean ranks above text): one row, [r] = \"Expression is true\" (string).",
+  "tags": [
+    "conversion",
+    "comparison",
+    "operator-greater-than",
+    "if",
+    "mixed-types",
+    "boolean",
+    "error"
+  ],
+  "notes": "The Microsoft pages disagree. The operator reference says a comparison of text (or a Boolean) with a number is an error. The Power BI data types page gives a result, ranking Boolean above text and text above numbers."
+}

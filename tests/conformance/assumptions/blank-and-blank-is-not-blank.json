@@ -1,0 +1,47 @@
+{
+  "title": "BLANK () && BLANK () is FALSE, not BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ISBLANK ( BLANK () && BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "If both expressions return TRUE, the combination of the expressions also returns TRUE; otherwise the combination returns FALSE",
+      "supports": "&& returns TRUE or FALSE"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "a BLANK in a logical expression is converted to a FALSE value",
+      "supports": "a logical expression returns TRUE or FALSE; BLANK counts as FALSE"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "BLANK AND BLANK",
+      "supports": "the other reading: the table of BLANK in operations gives BLANK for BLANK AND BLANK and for BLANK OR BLANK"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The operator reference says && returns TRUE when both sides are TRUE and FALSE otherwise. BLANK counts as FALSE, so the result is FALSE, and ISBLANK of FALSE is FALSE.",
+  "uncertain": true,
+  "alternative": "Microsoft's table of BLANK in operations lists BLANK AND BLANK as BLANK. Under that reading ISBLANK gives TRUE.",
+  "tags": [
+    "assumption:logical-blank",
+    "operator-and",
+    "isblank",
+    "blank"
+  ]
+}

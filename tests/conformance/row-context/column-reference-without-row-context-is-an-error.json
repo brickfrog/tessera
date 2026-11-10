@@ -1,0 +1,22 @@
+{
+  "title": "A measure that is a bare column reference is an error: there is no row context",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[SalesAmount] = Sales[Amount]",
+    "EVALUATE ROW ( \"r\", [SalesAmount] )"
+  ],
+  "expected": {
+    "error": "A single value for column Amount in table Sales cannot be determined: a column reference needs a row context and a measure has none"
+  },
+  "source": {
+    "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+    "quote": "If you only write a column reference in a DAX measure, you get an error because no row context exists.",
+    "supports": "the article gives SalesAmount := Sales[Amount] as a measure that is not valid"
+  },
+  "confidence": "published",
+  "tags": [
+    "define-measure",
+    "row-context",
+    "error"
+  ]
+}

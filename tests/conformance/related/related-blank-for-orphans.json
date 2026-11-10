@@ -1,0 +1,58 @@
+{
+  "title": "RELATED is BLANK for a many-side row whose key has no row on the one side",
+  "model": "sales-orphans",
+  "query": "EVALUATE SELECTCOLUMNS ( Sales, \"SalesKey\", Sales[SalesKey], \"Product\", RELATED ( Product[Product] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[SalesKey]",
+          "type": "int64"
+        },
+        {
+          "name": "[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike"
+        ],
+        [
+          2,
+          "Lock"
+        ],
+        [
+          3,
+          null
+        ],
+        [
+          4,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "In the expanded table, the new row has (Blank) values for the Category and Product table columns",
+      "supports": "in the expanded table a row with no match has BLANK in the one-side columns"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "If a relationship is invalid, the VertiPaq engine automatically adds a row containing BLANK in every column of the table on the one-side of the relationship",
+      "supports": "orphans are linked to a row that is BLANK in every column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Row 1 has ProductKey 1 (Bike), row 2 has 2 (Lock). Rows 3 and 4 have ProductKey 9, which Product lacks: they are linked to the blank row, whose Product is BLANK.",
+  "tags": [
+    "related",
+    "selectcolumns",
+    "relationship",
+    "blank-row",
+    "row-context"
+  ]
+}

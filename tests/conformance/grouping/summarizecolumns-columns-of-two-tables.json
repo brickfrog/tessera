@@ -1,0 +1,58 @@
+{
+  "title": "SUMMARIZECOLUMNS with group columns from two tables keeps the combinations with a non-blank expression",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Category], Customer[Country], \"Amt\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Vehicles",
+          "US",
+          200.0
+        ],
+        [
+          "Vehicles",
+          "JP",
+          200.0
+        ],
+        [
+          "Accessories",
+          "US",
+          110.0
+        ],
+        [
+          "Accessories",
+          "JP",
+          30.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/summarizecolumns/",
+    "quote": "If all expressions evaluate to BLANK for a row, that row is not included in the table returned.",
+    "supports": "the cross join of the two columns is reduced to the rows with a value"
+  },
+  "confidence": "derived",
+  "derivation": "Categories: Vehicles (Bike, Scooter), Accessories (Helmet, Lock). Countries: Ann and Bob US, Cho JP, Dee FR. Vehicles US: rows 1, 7 = 200. Vehicles JP: row 5 = 200. Accessories US: rows 2, 3, 4 = 40 + 20 + 50 = 110. Accessories JP: row 6 = 30. Both FR combinations are BLANK and dropped. Total 540.",
+  "tags": [
+    "summarizecolumns",
+    "blank",
+    "relationship",
+    "measure"
+  ]
+}

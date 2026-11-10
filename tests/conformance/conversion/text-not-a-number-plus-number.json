@@ -1,0 +1,28 @@
+{
+  "title": "\"abc\" + 1 is an error: the text is not a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"abc\" + 1 )",
+  "expected": {
+    "error": "the text \"abc\" cannot be converted to a number for the addition"
+  },
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "the string is automatically converted into a corresponding number, as long as the string is a valid representation of a number",
+      "supports": "the conversion only works for text that represents a number"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "If the data in the column you specify as an argument is incompatible with the data type the function requires, DAX might return an error",
+      "supports": "a value that cannot be converted is an error"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "\"abc\" is not a valid representation of a number, so the implicit conversion that + needs fails and the query fails.",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "text-to-number",
+    "error"
+  ]
+}

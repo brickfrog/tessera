@@ -1,0 +1,42 @@
+{
+  "title": "In FIRSTNONBLANK an aggregate that is not a measure is not filtered by the current value",
+  "model": "sales",
+  "query": "EVALUATE FIRSTNONBLANK ( Customer[Country], SUM ( Sales[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "FR"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/firstnonblank/",
+      "quote": "Returns the first value in the column for which the expression has a non blank value.",
+      "supports": "the first value, in the order of the column values, whose expression is not blank"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "By using the SUMX expression, the context transition does not happen because the implicit CALCULATE around the measure reference is missing.",
+      "supports": "an aggregation written out, unlike a measure reference, has no context transition inside an iteration"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The expression is evaluated in a row context for each country. SUM ( Sales[Amount] ) is not a measure reference and has no CALCULATE, so the row context does not filter it: it is 540 for every country, FR included. The first country in order is FR.",
+  "uncertain": true,
+  "alternative": "The quoted rule is stated for expressions in iterators in general, not for FIRSTNONBLANK. If FIRSTNONBLANK filtered the aggregate by the current value, as it does for a measure, FR would be BLANK and the result would be JP.",
+  "tags": [
+    "firstnonblank",
+    "sum",
+    "row-context",
+    "no-context-transition"
+  ]
+}

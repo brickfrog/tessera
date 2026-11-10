@@ -1,0 +1,48 @@
+{
+  "title": "A SUMMARIZE extension column sees the group-by column in a row context and in the filter context",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZE ( Sales, Product[Color], \"Color 1\", Product[Color], \"Color 2\", SELECTEDVALUE ( Product[Color] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Color 1]",
+          "type": "string"
+        },
+        {
+          "name": "[Color 2]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          "Red",
+          "Red"
+        ],
+        [
+          "Blue",
+          "Blue",
+          "Blue"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/all-the-secrets-of-summarize/",
+    "quote": "Color 1 is based on the row context, which contains only the cluster headers. Color 2 and Color 3 rely on the filter context.",
+    "supports": "the article shows this query and says each column repeats the colour"
+  },
+  "confidence": "derived",
+  "derivation": "Groups are Red and Blue (the colours with sales). The bare column reference reads the group header from the row context; SELECTEDVALUE reads the single colour visible in the filter context of the cluster.",
+  "tags": [
+    "summarize",
+    "row-context",
+    "filter-context",
+    "selectedvalue"
+  ]
+}

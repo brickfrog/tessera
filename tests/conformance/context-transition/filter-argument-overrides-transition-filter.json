@@ -1,0 +1,55 @@
+{
+  "title": "An explicit filter argument overrides the filter made by the context transition on the same column",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( 'Product'[Color] ), \"Red\", CALCULATE ( [Sales Amount], 'Product'[Color] = \"Red\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Red]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ],
+        [
+          "Blue",
+          460.0
+        ],
+        [
+          "Green",
+          460.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+      "quote": "context transition happens before further filters in CALCULATE",
+      "supports": "the transition happens before the filter arguments are applied, so they can override its filters"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "A filter argument overrides the existing corresponding filters over the same column(s), unless it is embedded within KEEPFILTERS",
+      "supports": "a filter argument overrides the existing filter on the same column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "On each row the transition filters Product[Color] to that row's color; the argument Product[Color] = \"Red\" then replaces it. Red sales: rows 1, 2, 3, 5, 7 = 100 + 40 + 20 + 200 + 100 = 460 on all three rows.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "calculate",
+    "context-transition",
+    "filter-overwrite"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

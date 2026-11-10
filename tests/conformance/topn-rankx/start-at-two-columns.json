@@ -1,0 +1,58 @@
+{
+  "title": "START AT begins the result at the given values of the ORDER BY columns",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "ALL ( Product[Category], Product[Product] )",
+    "ORDER BY Product[Category], Product[Product]",
+    "START AT \"Accessories\", \"Lock\""
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Accessories",
+          "Lock"
+        ],
+        [
+          "Vehicles",
+          "Bike"
+        ],
+        [
+          "Vehicles",
+          "Scooter"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/st/start-at/",
+      "quote": "defines the rows to skip before the specified values according to the sort order specified in the ORDER BY section",
+      "supports": "the page shows the same shape on two columns: the result starts at the pair and continues with later values of the first column"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "The second argument in the START AT defines the starting value in column 2 of the ORDER BY columns within the rows that meet the first value for column 1.",
+      "supports": "the second value applies within the first"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sorted pairs: Accessories Helmet, Accessories Lock, Vehicles Bike, Vehicles Scooter. The result starts at Accessories Lock, so Accessories Helmet is skipped. Vehicles Bike stays although Bike sorts before Lock, because its category comes after Accessories.",
+  "tags": [
+    "start-at",
+    "order-by",
+    "all"
+  ]
+}

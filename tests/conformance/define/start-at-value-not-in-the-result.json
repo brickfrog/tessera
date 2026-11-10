@@ -1,0 +1,47 @@
+{
+  "title": "START AT with a value that is not in the result starts at the first row after it",
+  "model": "sales",
+  "query": "EVALUATE VALUES ( Product[Product] ) ORDER BY Product[Product] START AT \"Hat\"",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Helmet"
+        ],
+        [
+          "Lock"
+        ],
+        [
+          "Scooter"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "It defines the value at which the query results begin.",
+      "supports": "the result begins at the value"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "Rows before this sales order are not included in the result table.",
+      "supports": "the rows that sort before the value are left out"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sorted: Bike, Helmet, Lock, Scooter. \"Hat\" sorts after \"Bike\" and before \"Helmet\" (a before e), so Bike is before the starting value and is left out.",
+  "tags": [
+    "start-at",
+    "order-by",
+    "values",
+    "evaluate"
+  ]
+}

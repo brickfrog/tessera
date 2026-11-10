@@ -1,0 +1,64 @@
+{
+  "title": "ORDER BY with two descending keys orders tied rows by the second key",
+  "model": "d-values",
+  "query": "EVALUATE Player ORDER BY Player[Score] DESC, Player[Name] DESC",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          90
+        ],
+        [
+          "Cho",
+          80
+        ],
+        [
+          "Bob",
+          80
+        ],
+        [
+          "Eve",
+          70
+        ],
+        [
+          "Dee",
+          70
+        ],
+        [
+          "Fay",
+          50
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/st/order-by/",
+      "quote": "It can include only columns that are part of EVALUATE or expressions that can be computed in the row context of the result.",
+      "supports": "the keys are columns of the result"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+      "quote": "DESC Descending sort order.",
+      "supports": "each key has its own direction"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Player scores: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. By score descending; within the 80s and the 70s by name descending: Cho before Bob, Eve before Dee.",
+  "tags": [
+    "order-by",
+    "ties"
+  ]
+}

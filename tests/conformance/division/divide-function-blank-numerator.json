@@ -1,0 +1,41 @@
+{
+  "title": "DIVIDE ( BLANK, 5 ) is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DIVIDE ( BLANK (), 5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "BLANK () / 4 Blank value",
+      "supports": "the / operator gives BLANK for a BLANK numerator"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The division (/) operator displays the same behavior as the DIVIDE function",
+      "supports": "said of result types; taken here to hold for a BLANK numerator too"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "No source shows DIVIDE with a BLANK numerator. The / operator gives BLANK for BLANK / 4, and DIVIDE is taken to do the same for a non-zero denominator.",
+  "uncertain": true,
+  "alternative": "The BLANK numerator is converted to 0 and the result is 0.0 (double).",
+  "tags": [
+    "division",
+    "divide",
+    "blank"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

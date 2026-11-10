@@ -1,0 +1,38 @@
+{
+  "title": "CEILING ( 4.42, 0.05 ) is 4.45",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CEILING ( 4.42, 0.05 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          4.45
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-09,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/ceiling-function-dax",
+      "quote": "The following formula returns 4.45.",
+      "supports": "the example = CEILING(4.42,0.05)"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/ceiling-function-dax",
+      "quote": "The return type is usually of the same type of the significant argument",
+      "supports": "a decimal significance gives a decimal number"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "ceiling"
+  ]
+}

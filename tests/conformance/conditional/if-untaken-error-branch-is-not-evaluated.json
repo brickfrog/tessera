@@ -1,0 +1,53 @@
+{
+  "title": "An IF branch that would raise an error is not evaluated when it is not taken",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Product[Checked Color] = IF ( SELECTEDVALUE ( Product[Color] ) = \"Magenta\", ERROR ( \"magenta color encountered\" ), SELECTEDVALUE ( Product[Color] ) )",
+    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Measure\", [Checked Color] ) ORDER BY Product[Color]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Measure]"
+        }
+      ],
+      "rows": [
+        [
+          "Blue",
+          "Blue"
+        ],
+        [
+          "Green",
+          "Green"
+        ],
+        [
+          "Red",
+          "Red"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/error-function-dax",
+    "quote": "Because Magenta is not one of the product colors, the ERROR function is not executed.",
+    "supports": "the page shows this query shape returning its rows when the ERROR branch is never taken"
+  },
+  "confidence": "derived",
+  "derivation": "The colors are Red, Blue, Green. None is Magenta, so in every row the condition is FALSE, the ERROR branch is not evaluated, and the measure returns the color. No row is blank, so all three are returned.",
+  "tags": [
+    "if",
+    "error",
+    "short-circuit",
+    "selectedvalue",
+    "summarizecolumns",
+    "define-measure",
+    "order-by"
+  ],
+  "notes": "The type of [Measure] is left out: ERROR has no data type, so no source settles whether the column is a string or a variant."
+}

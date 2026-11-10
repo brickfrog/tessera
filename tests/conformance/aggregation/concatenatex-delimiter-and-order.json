@@ -1,0 +1,39 @@
+{
+  "title": "CONCATENATEX joins with the delimiter in the order of the sort expression",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CONCATENATEX ( Product, Product[Product], \", \", Product[Price], DESC ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Bike, Scooter, Helmet, Lock"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/concatenatex-function-dax",
+      "quote": "Any DAX expression where the result value is used to sort the concatenated values in the output string.",
+      "supports": "the fourth argument sorts, the fifth gives the direction"
+    },
+    {
+      "url": "https://dax.guide/concatenatex/",
+      "quote": "All the expressions are concatenated using the separator provided as third argument.",
+      "supports": "the delimiter"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Prices: Bike 100, Helmet 20, Lock 10, Scooter 50. Descending by price: Bike, Scooter, Helmet, Lock, joined with \", \".",
+  "tags": [
+    "concatenatex",
+    "order",
+    "row-context"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "title": "CURRENCY ( -1.00006 ) is -1.0001: a negative value rounds to the nearest, not toward zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( -1.00006 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          -1.0001
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/currency-function-dax",
+      "quote": "Rounding up occurs if the 5th significant decimal is equal or larger than 5",
+      "supports": "CURRENCY rounds on the fifth decimal; the page gives 3.6666666666666 as 3.6667 and 3.0123456789 as 3.0123"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "truncating the values past the four digits to the right of decimal separator",
+      "supports": "the other reading: the fixed decimal type truncates past four decimals"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The fifth decimal of -1.00006 is 6, which is 5 or larger, so the fourth decimal rounds in magnitude: -1.0001. The value is not a tie (the nearest multiple of 0.0001 is -1.0001).",
+  "uncertain": true,
+  "alternative": "The CURRENCY page speaks of 'rounding up' and shows positive numbers only, and the data types page says the type truncates. Truncation, or rounding up toward positive infinity, gives -1.0 (the decimal -1.0000).",
+  "tags": [
+    "assumption:currency-rounding",
+    "currency",
+    "rounding",
+    "negative"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "title": "A DEFINE TABLE can be evaluated by name; its column is named after the query table",
+  "model": "sales",
+  "query": [
+    "DEFINE TABLE Colors = DISTINCT ( Product[Color] )",
+    "EVALUATE Colors"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Colors[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/st/table/",
+    "quote": "The syntax after TABLE defines a query table, which has a data lineage and it is populated in an empty filter context before the query is executed.",
+    "supports": "the page defines this table and refers to its column as Colors[Color]"
+  },
+  "confidence": "derived",
+  "derivation": "DISTINCT ( Product[Color] ) with no filter is Red, Blue, Green. The query table is a table of its own, and the page refers to its column as Colors[Color], so that is the name of the result column.",
+  "uncertain": true,
+  "alternative": "The page shows Colors[Color] in an expression, not as the name of a result column. If the result keeps the name of the source column instead, the column is Product[Color], with the same three rows.",
+  "tags": [
+    "define-table",
+    "query-table",
+    "distinct",
+    "column-names"
+  ]
+}

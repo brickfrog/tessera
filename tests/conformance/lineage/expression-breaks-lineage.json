@@ -1,0 +1,55 @@
+{
+  "title": "A column computed by an expression has no lineage and filters nothing",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( SELECTCOLUMNS ( VALUES ( Product[Color] ), \"New name\", Product[Color] & \"\" ), \"Amt\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[New name]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          540.0
+        ],
+        [
+          "Blue",
+          540.0
+        ],
+        [
+          "Green",
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+      "quote": "adding an empty string to Product[Category] in the previous expression does not change the column content, whereas it does break the data lineage",
+      "supports": "the article's query: concatenating an empty string keeps the content and breaks the lineage"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+      "quote": "The query returns the same value in the Amt column for all the rows",
+      "supports": "without lineage every row gets the same value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] & \"\" has the same text but is an expression, not a column reference: no lineage. Context transition on it filters no model column, so every row gets the total, 540.",
+  "tags": [
+    "addcolumns",
+    "selectcolumns",
+    "values",
+    "lineage",
+    "context-transition",
+    "operator-concatenate"
+  ]
+}

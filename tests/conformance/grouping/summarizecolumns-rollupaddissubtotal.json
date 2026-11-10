@@ -1,0 +1,66 @@
+{
+  "title": "ROLLUPADDISSUBTOTAL adds a total row and a column that flags it",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"IsTotal\" ), \"Amt\", [Sales Amount] )",
+    "ORDER BY [IsTotal], Product[Color]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[IsTotal]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Blue",
+          false,
+          80.0
+        ],
+        [
+          "Red",
+          false,
+          460.0
+        ],
+        [
+          null,
+          true,
+          540.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/rollupaddissubtotal/",
+      "quote": "adds a new column to the result indicating -- whether the current row is a subtotal or not",
+      "supports": "the page shows this query shape: the group column, the flag column, the amount, and a total row with a blank group and true"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/summarizecolumns-function-dax",
+      "quote": "adding rollup/subtotal rows to the result based on the groupBy_columnName columns",
+      "supports": "same"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Detail rows: Blue 80, Red 460 (Green is BLANK and dropped), flag FALSE. Total row: BLANK colour, flag TRUE, 540. Ordered by the flag (FALSE before TRUE) and then by colour.",
+  "tags": [
+    "summarizecolumns",
+    "rollupaddissubtotal",
+    "subtotal",
+    "order-by"
+  ],
+  "notes": "The column order (group column, flag, expression) is the one both pages show for a single rollup column."
+}

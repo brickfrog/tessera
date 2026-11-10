@@ -1,0 +1,150 @@
+{
+  "description": "Text columns for case, space, accent and empty-string cases. No relationships. CaseT[Txt]: apple, Apple, APPLE, pear (in that load order; 2 values when case is ignored). Spaces[Txt]: 'ab', 'ab ' (trailing space), ' ab' (leading space). Accent[Txt]: e, é, E. Empty[Txt]: '' (empty string), BLANK, x. Mixed[Txt]: cherry, Banana, apple (Ids 1, 2, 3).",
+  "culture": "en-US",
+  "tables": [
+    {
+      "name": "CaseT",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Txt",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "apple"
+        ],
+        [
+          2,
+          "Apple"
+        ],
+        [
+          3,
+          "APPLE"
+        ],
+        [
+          4,
+          "pear"
+        ]
+      ]
+    },
+    {
+      "name": "Spaces",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Txt",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "ab"
+        ],
+        [
+          2,
+          "ab "
+        ],
+        [
+          3,
+          " ab"
+        ]
+      ]
+    },
+    {
+      "name": "Accent",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Txt",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "e"
+        ],
+        [
+          2,
+          "é"
+        ],
+        [
+          3,
+          "E"
+        ]
+      ]
+    },
+    {
+      "name": "Empty",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Txt",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          ""
+        ],
+        [
+          2,
+          null
+        ],
+        [
+          3,
+          "x"
+        ]
+      ]
+    },
+    {
+      "name": "Mixed",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Txt",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "cherry"
+        ],
+        [
+          2,
+          "Banana"
+        ],
+        [
+          3,
+          "apple"
+        ]
+      ]
+    }
+  ]
+}

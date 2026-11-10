@@ -1,0 +1,38 @@
+{
+  "title": "STARTOFMONTH returns the first day of the month as a one-row table",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( STARTOFMONTH ( 'Date'[Date] ), 'Date'[Date] = DATE ( 2024, 5, 20 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-05-01T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/startofmonth/",
+      "quote": "If the selection is a single date, the result is a table with",
+      "supports": "the example for 2007-05-12 returns 2007-05-01"
+    },
+    {
+      "url": "https://dax.guide/startofmonth/",
+      "quote": "The result of time intelligence functions has the same data lineage as the date column or table provided as an argument.",
+      "supports": "the column is Date[Date]"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The month of 2024-05-20 starts on 2024-05-01. The result keeps the lineage of the column, so it is named Date[Date].",
+  "tags": [
+    "time-intelligence",
+    "startofmonth"
+  ]
+}

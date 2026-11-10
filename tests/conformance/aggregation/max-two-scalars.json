@@ -1,0 +1,31 @@
+{
+  "title": "MAX of two scalars returns the larger",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MAX ( 3, 7 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/max-function-dax",
+    "quote": "Returns the largest value in a column, or between two scalar expressions.",
+    "supports": "the two-argument form"
+  },
+  "confidence": "derived",
+  "derivation": "7 > 3.",
+  "tags": [
+    "max",
+    "scalar"
+  ]
+}

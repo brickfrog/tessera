@@ -1,0 +1,43 @@
+{
+  "title": "CURRENCY ( -0.03125 ) is -0.0313: a negative exact half rounds away from zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( -0.03125 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          -0.0313
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/currency-function-dax",
+      "quote": "Rounding up occurs if the 5th significant decimal is equal or larger than 5",
+      "supports": "CURRENCY rounds on the fifth decimal; the page gives 3.6666666666666 as 3.6667 and 3.0123456789 as 3.0123"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "truncating the values past the four digits to the right of decimal separator",
+      "supports": "the other reading: the fixed decimal type truncates past four decimals"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "-0.03125 is -1/32, exact in binary floating point: a true tie between -0.0312 and -0.0313. Reading the CURRENCY page's rule (the fourth decimal is rounded when the fifth is 5 or larger) on the magnitude gives -0.0313.",
+  "uncertain": true,
+  "alternative": "Round half to even, truncation, or rounding up toward positive infinity all give -0.0312.",
+  "tags": [
+    "assumption:currency-rounding",
+    "currency",
+    "rounding",
+    "tie",
+    "negative"
+  ]
+}

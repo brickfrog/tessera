@@ -1,0 +1,37 @@
+{
+  "title": "FORMAT with \"Scientific\" is 1.23E+04",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( 12345.67, \"Scientific\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1.23E+04"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "FORMAT accepts a set of predefined format strings to format numbers",
+      "supports": "the example table lists each predefined format applied to 12345.67"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "\"Scientific\" displays the number in scientific notation with two decimal digits.",
+      "supports": "Microsoft Learn shows 1.23E+04"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "predefined-numeric-format"
+  ]
+}

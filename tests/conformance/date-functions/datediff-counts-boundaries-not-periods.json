@@ -1,0 +1,36 @@
+{
+  "title": "DATEDIFF counts boundaries crossed: one day across New Year is 1 year, a whole year inside one calendar year is 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"across\", DATEDIFF ( DATE ( 2011, 12, 31 ), DATE ( 2012, 1, 1 ), YEAR ), \"inside\", DATEDIFF ( DATE ( 2011, 1, 1 ), DATE ( 2011, 12, 31 ), YEAR ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[across]",
+          "type": "int64"
+        },
+        {
+          "name": "[inside]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datediff/",
+    "quote": "DATEDIFF counts the interval boundaries between Date1 and Date2. It does not count complete intervals.",
+    "supports": "the page gives exactly these two expressions, returning 1 and 0"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "datediff",
+    "boundaries"
+  ]
+}

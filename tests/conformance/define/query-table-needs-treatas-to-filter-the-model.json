@@ -1,0 +1,52 @@
+{
+  "title": "A query table is used with TREATAS to filter the column it was built from",
+  "model": "sales",
+  "query": [
+    "DEFINE TABLE Colors = DISTINCT ( Product[Color] )",
+    "EVALUATE SELECTCOLUMNS ( Colors,",
+    "  \"Color\", Colors[Color],",
+    "  \"Sales Amount\", CALCULATE ( [Sales Amount], TREATAS ( { Colors[Color] }, Product[Color] ) ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ],
+        [
+          "Blue",
+          80.0
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/st/table/",
+    "quote": "The following example shows using a query table in a DAX query.",
+    "supports": "the page gives this query shape: ADDCOLUMNS over Colors with TREATAS onto Product[Color]"
+  },
+  "confidence": "derived",
+  "derivation": "For each row of Colors, TREATAS applies its color as a filter on Product[Color]: Red rows 1, 2, 3, 5, 7 = 460; Blue rows 4, 6 = 80; Green has no sales, BLANK.",
+  "tags": [
+    "define-table",
+    "query-table",
+    "treatas",
+    "calculate",
+    "selectcolumns"
+  ]
+}

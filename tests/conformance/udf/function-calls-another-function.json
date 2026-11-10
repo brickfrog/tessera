@@ -1,0 +1,37 @@
+{
+  "title": "A function can call another function defined in the same query",
+  "model": "scalar",
+  "query": [
+    "DEFINE",
+    "  FUNCTION AddTax = ( amount : NUMERIC ) => amount * 1.1",
+    "  FUNCTION AddTaxAndDiscount = ( amount : NUMERIC, discount : NUMERIC ) => AddTax ( amount - discount )",
+    "EVALUATE { AddTaxAndDiscount ( 10, 2 ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]"
+        }
+      ],
+      "rows": [
+        [
+          8.8
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+    "quote": "You can nest UDFs by calling a function from another.",
+    "supports": "the page shows this query with the comment \"Returns 8.8\""
+  },
+  "confidence": "published",
+  "tags": [
+    "udf",
+    "define-function",
+    "nested-function",
+    "type-hint"
+  ],
+  "notes": "The type is left out: it depends on the type of the literal 1.1, which the page does not state."
+}

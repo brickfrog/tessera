@@ -1,0 +1,33 @@
+{
+  "title": "A nested VAR block may define a variable with the name of the variable being defined around it",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VAR Result = SUMX ( T, VAR Result = T[n] * 10 RETURN Result ) RETURN Result )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          60
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+    "quote": "Please note that we used the Result variable twice. The inner Result is valid in the inner block, whereas the outer Result is valid in the outer box.",
+    "supports": "the article defines Result inside the SUMX that defines the outer Result"
+  },
+  "confidence": "derived",
+  "derivation": "T[n] is 1, 2, 3. The inner Result is n * 10 in each row: 10, 20, 30. SUMX gives 60, which is the outer Result. Integer times integer is an integer.",
+  "tags": [
+    "var",
+    "nested-var",
+    "sumx",
+    "variable-scope"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "title": "AVERAGEX leaves out the rows where the expression is BLANK",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", AVERAGEX ( V, IF ( V[N] > 0, V[N] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          4.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/averagex/",
+    "quote": "AVERAGEX ignores the blank values that Expression returns.",
+    "supports": "rows with a BLANK expression are not in the divisor"
+  },
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. IF without an else gives BLANK unless N > 0, so the values are 5, 5, 2 and four BLANKs: (5 + 5 + 2) / 3 = 4. Dividing by all 7 rows would give 1.714.",
+  "tags": [
+    "averagex",
+    "if",
+    "blank",
+    "row-context"
+  ]
+}

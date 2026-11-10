@@ -1,0 +1,30 @@
+{
+  "title": "ISBLANK ( 0 ) is FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ISBLANK ( 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isblank/",
+    "quote": "An empty string and 0 are not considered blank by ISBLANK",
+    "supports": "0 is not blank"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "isblank"
+  ]
+}

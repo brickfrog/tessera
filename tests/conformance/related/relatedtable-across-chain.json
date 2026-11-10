@@ -1,0 +1,62 @@
+{
+  "title": "RELATEDTABLE reaches the fact table across a chain of relationships",
+  "model": "c-snowflake",
+  "query": "EVALUATE SELECTCOLUMNS ( Category, \"Category\", Category[Category], \"Sales Rows\", COUNTROWS ( RELATEDTABLE ( Sales ) ), \"Products\", COUNTROWS ( RELATEDTABLE ( Product ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Category]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales Rows]",
+          "type": "int64"
+        },
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Bikes",
+          4,
+          3
+        ],
+        [
+          "Parts",
+          2,
+          2
+        ],
+        [
+          "Clothing",
+          null,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/using-related-and-relatedtable-in-dax/",
+      "quote": "The result is the number of rows in Sales that are related to each category",
+      "supports": "the article counts the Sales rows of each Category across Product and Subcategory"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/using-related-and-relatedtable-in-dax/",
+      "quote": "it returns the products that belong to the current category",
+      "supports": "RELATEDTABLE ( Product ) in a row context on Category returns the category's products"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Bikes: subcategories 10, 11; products 100, 101, 102 (3); Sales rows 1, 2, 3, 4 (4). Parts: subcategories 20, 21; products 103, 104 (2); Sales rows 5, 6 (2). Clothing: no subcategory, so no products and no sales: both BLANK.",
+  "tags": [
+    "relatedtable",
+    "countrows",
+    "selectcolumns",
+    "context-transition",
+    "relationship",
+    "snowflake"
+  ]
+}

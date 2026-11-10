@@ -1,0 +1,38 @@
+{
+  "title": "BLANK == BLANK is TRUE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () == BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "BLANK () == BLANK() True",
+      "supports": "the table of expressions with a blank value"
+    },
+    {
+      "url": "https://dax.guide/op/strictly-equal-to/",
+      "quote": "returns TRUE when the two arguments have the same value or are both BLANK",
+      "supports": "== is TRUE for two BLANKs"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-strict-equals",
+    "comparison"
+  ]
+}

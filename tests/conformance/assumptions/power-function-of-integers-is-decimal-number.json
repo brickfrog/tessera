@@ -1,0 +1,43 @@
+{
+  "title": "POWER ( 5, 2 ) is the decimal number 25",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", POWER ( 5, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          25.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/power-function-dax",
+      "quote": "The following example returns 25",
+      "supports": "POWER(5,2) is 25; the page's return value is a decimal number"
+    },
+    {
+      "url": "https://dax.guide/power/",
+      "quote": "The exponentiation operator ^ returns the same result as the POWER function",
+      "supports": "^ is POWER, and the page gives POWER's return value as a single decimal value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The Microsoft page shows POWER(5,2) returning 25 and gives the return value as a decimal number: the double 25.0.",
+  "uncertain": true,
+  "alternative": "Neither page shows the type for integer arguments. If integer arguments give an integer, the result is the int64 25.",
+  "tags": [
+    "assumption:power-result-type",
+    "power",
+    "math-functions",
+    "int64",
+    "result-type"
+  ]
+}

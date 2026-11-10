@@ -1,0 +1,39 @@
+{
+  "title": "DISTINCTCOUNT of a column holding apple, Apple, APPLE, pear is 2",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNT ( CaseT[Txt] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The engine that stores and queries data in Power BI is case insensitive, and treats different capitalization of letters as the same value",
+      "supports": "text that differs only in case is the same value, for comparison and for storage"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/string-storage-and-collation-in-tabular-models",
+      "quote": "The first instance of the string is used as the canonical representation",
+      "supports": "the first occurrence is what later equivalent strings are shown as"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CaseT[Txt] holds apple, Apple, APPLE, pear. The engine is case insensitive, so the three spellings of apple are one value: the distinct values are apple and pear, 2. DISTINCTCOUNT returns an integer.",
+  "tags": [
+    "distinctcount",
+    "case-insensitive",
+    "collation"
+  ]
+}

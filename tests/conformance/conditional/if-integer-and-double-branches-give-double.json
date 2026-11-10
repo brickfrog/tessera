@@ -1,0 +1,55 @@
+{
+  "title": "IF with a double branch and an integer branch returns doubles only",
+  "model": "scalar",
+  "query": "EVALUATE ADDCOLUMNS ( T, \"x\", IF ( T[n] > 1, T[n] / 2, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "T[n]",
+          "type": "int64"
+        },
+        {
+          "name": "[x]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          0.0
+        ],
+        [
+          2,
+          1.0
+        ],
+        [
+          3,
+          1.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+      "quote": "the formula IF(<condition>, 1.0, 0) returns only decimal values even though value_if_false is of the whole number data type",
+      "supports": "with two numeric branches IF converts to one type that holds both"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "Division (/)",
+      "supports": "the division table gives REAL for INTEGER / INTEGER"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "T[n] / 2 is a double (integer divided by integer is REAL), 0 is an integer. Both are numeric, so the column is double: n = 1 takes the else branch, 0 as a double; 2 / 2 = 1.0; 3 / 2 = 1.5.",
+  "tags": [
+    "if",
+    "result-type",
+    "implicit-conversion",
+    "operator-divide",
+    "addcolumns"
+  ],
+  "notes": "\"Decimal\" on the IF page is the decimal number type, which is double here, not the fixed decimal (currency) type."
+}

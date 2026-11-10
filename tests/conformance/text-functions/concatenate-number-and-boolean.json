@@ -1,0 +1,31 @@
+{
+  "title": "CONCATENATE ( 1.5, TRUE () ) is \"1.5TRUE\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONCATENATE ( 1.5, TRUE () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1.5TRUE"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/concatenate/",
+    "quote": "CONCATENATE converts numbers, dates, and Boolean values to text with the default format.",
+    "supports": "the page gives CONCATENATE ( 1.5, TRUE () ) returning \"1.5TRUE\""
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "concatenate",
+    "implicit-conversion"
+  ]
+}

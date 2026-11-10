@@ -1,0 +1,42 @@
+{
+  "title": "ALL ( Sales ) removes filters from the expanded table, so filters on the dimensions go too",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CALCULATE ( [Sales Amount], ALL ( Sales ) ) ), 'Product'[Color] = \"Red\", 'Date'[Year] = 2024 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+      "quote": "acts as REMOVEFILTERS on the expanded version of Sales, removing filters from the table and from all related dimension",
+      "supports": "ALL ( Sales ) removes filters from Sales and from all related dimensions"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "Sales Amount (ALL Sales)",
+      "supports": "in the page's last example ALL ( Sales ) gives the same value as ALL (), with filters on Product and Date outside"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The outer filters are on Product and Date, both on the one side of relationships from Sales, so both are columns of the expanded Sales table. ALL ( Sales ) removes them: 540 (the filtered value is 300).",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "all",
+    "expanded-table",
+    "filter-removal"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

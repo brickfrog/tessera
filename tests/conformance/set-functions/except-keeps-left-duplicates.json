@@ -1,0 +1,38 @@
+{
+  "title": "EXCEPT keeps the duplicates of a row that is only in the left table",
+  "model": "scalar",
+  "query": "EVALUATE EXCEPT ( { \"B\", \"C\", \"D\", \"D\", \"D\", \"E\", \"E\", \"E\" }, { \"A\", \"B\", \"B\", \"B\", \"C\", \"D\", \"D\" } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "E"
+        ],
+        [
+          "E"
+        ],
+        [
+          "E"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/except-function-dax",
+    "quote": "If a row appears in only tableExpression1, it and its duplicates will appear in the result set.",
+    "supports": "the page shows these two tables and this result for Except(States2, States1)"
+  },
+  "confidence": "published",
+  "derivation": "Left is now B, C, D, D, D, E, E, E. Only E is absent from the other table, and its three copies stay.",
+  "tags": [
+    "except",
+    "duplicates",
+    "table-constructor"
+  ]
+}

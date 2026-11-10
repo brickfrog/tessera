@@ -1,0 +1,42 @@
+{
+  "title": "ALLNOBLANKROW as a CALCULATE modifier only removes the filter: orphan rows still count",
+  "model": "sales-orphans",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CALCULATE ( [Sales Amount], ALLNOBLANKROW ( 'Product'[Color] ) ) ), 'Product'[Color] = \"Red\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          200.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/allnoblankrow/",
+      "quote": "It does not materialize the resulting table when called directly in a filter argument of CALCULATE or CALCULATETABLE",
+      "supports": "as a direct filter argument ALLNOBLANKROW removes the filters and is not materialized as a table"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+      "quote": "The behavior shown in this article applies to four functions",
+      "supports": "SQLBI lists ALLNOBLANKROW among the functions that act as filter removers in CALCULATE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "As a modifier ALLNOBLANKROW ( Product[Color] ) removes the filter Color = Red and applies no filter of its own. Nothing filters Sales: 100 + 30 + 50 + 20 = 200.",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "allnoblankrow",
+    "blank-row",
+    "filter-removal"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases. If ALLNOBLANKROW were instead applied as a table filter (the colors Red and Blue, without the blank row), the orphan Sales rows would be excluded and the result would be 100 + 30 = 130; both sources say it is not."
+}

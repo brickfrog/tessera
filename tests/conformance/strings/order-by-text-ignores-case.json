@@ -1,0 +1,53 @@
+{
+  "title": "ORDER BY on text sorts apple, Banana, cherry: case does not put capitals first",
+  "model": "a2-text",
+  "query": "EVALUATE Mixed ORDER BY Mixed[Txt]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Mixed[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Mixed[Txt]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          3,
+          "apple"
+        ],
+        [
+          2,
+          "Banana"
+        ],
+        [
+          1,
+          "cherry"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/string-storage-and-collation-in-tabular-models",
+      "quote": "The collation defines the ordering of the characters and their equivalence",
+      "supports": "the same collation that makes case irrelevant for equality also defines the sort order"
+    },
+    {
+      "url": "https://dax.guide/dt/string/",
+      "quote": "By default, the comparison between strings is case-insensitive and accent-sensitive",
+      "supports": "the default comparison ignores case and respects accents; the page gives \"e\" and \"è\" as different"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Mixed[Txt] holds cherry (Id 1), Banana (2), apple (3). The collation that ignores case also defines the order, so the values sort as apple < banana < cherry: Ids 3, 2, 1. A sort by code point would put Banana first (B is 66, a is 97).",
+  "tags": [
+    "order-by",
+    "case-insensitive",
+    "collation"
+  ]
+}

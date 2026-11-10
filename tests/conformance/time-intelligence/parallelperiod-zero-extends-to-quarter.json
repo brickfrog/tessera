@@ -1,0 +1,54 @@
+{
+  "title": "PARALLELPERIOD with 0 extends the selection to the whole quarter",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = PARALLELPERIOD ( 'Date'[Date], 0, QUARTER ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] = DATE ( 2024, 2, 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-01T00:00:00",
+          "2024-03-31T00:00:00",
+          91,
+          1500.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/parallelperiod/",
+      "quote": "in that case PARALLELPERIOD extends the selection to the period",
+      "supports": "the example with 0, MONTH returns the whole month of the selected date"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "For each interval with at least one value in Date[Date] , the function returns the entire interval shifted by the number of specified intervals.",
+      "supports": "PARALLELPERIOD returns whole intervals"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "February 10, 2024 is in the first quarter: January 1 to March 31, 31 + 29 + 31 = 91 days. Sales in Q1 2024: 1500.",
+  "tags": [
+    "time-intelligence",
+    "parallelperiod",
+    "leap-year"
+  ]
+}

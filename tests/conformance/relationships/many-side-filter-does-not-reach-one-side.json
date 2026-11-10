@@ -1,0 +1,42 @@
+{
+  "title": "A filter on a many-side column does not filter the one-side table of a single-direction relationship",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Products\", CALCULATE ( COUNTROWS ( Product ), Sales[CustomerKey] = 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/bidirectional-relationships-and-ambiguity-in-dax/",
+      "quote": "a filter on Customer automatically filters Sales, whereas a filter on Sales propagates neither to Product nor to Customer or Date",
+      "supports": "with single-direction relationships a filter on Sales does not propagate to Product"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/relationships-in-power-bi-and-tabular-models/",
+      "quote": "In a one-to-many relationship, the direction is always from the one-side of the relationship to the many-side",
+      "supports": "the direction is one side to many side only"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Customer 3 bought products 1 and 3 only (Sales rows 5 and 6), but Sales[ProductKey] -> Product[ProductKey] is single direction, so the filter on Sales[CustomerKey] stays on Sales. Product keeps its 4 rows.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "relationship",
+    "filter-propagation",
+    "single-direction"
+  ],
+  "notes": "An engine that propagates both ways would give 2."
+}

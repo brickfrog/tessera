@@ -1,0 +1,38 @@
+{
+  "title": "Without an expression, a filter on an unrelated table does not reduce the groups",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], FILTER ( Customer, Customer[Country] = \"JP\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/summarizecolumns-function-dax",
+    "quote": "Since they're not directly related, the filter expression is a no-op and the groupBy columns are not impacted.",
+    "supports": "the page shows this query shape: a filter on Customer with a group column of another dimension and no measure"
+  },
+  "confidence": "derived",
+  "derivation": "Customer and Product are related only through Sales, so the Customer filter does not touch Product[Color]. All three colours are returned, although only Red and Blue were sold in JP.",
+  "tags": [
+    "summarizecolumns",
+    "filter-table",
+    "filter"
+  ]
+}

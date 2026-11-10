@@ -1,0 +1,49 @@
+{
+  "title": "A valid relationship adds no blank row: VALUES, ALL and the table reference agree",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Table\", COUNTROWS ( Product ), \"Values\", COUNTROWS ( VALUES ( Product ) ), \"All\", COUNTROWS ( ALL ( Product ) ), \"Colors\", COUNTROWS ( VALUES ( Product[Color] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Table]",
+          "type": "int64"
+        },
+        {
+          "name": "[Values]",
+          "type": "int64"
+        },
+        {
+          "name": "[All]",
+          "type": "int64"
+        },
+        {
+          "name": "[Colors]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4,
+          4,
+          4,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+    "quote": "If the relationship is valid, that is if all the rows in Sales contain a value that matches one row in Product, then the two functions behave identically",
+    "supports": "with a valid relationship there is no blank row and the functions agree"
+  },
+  "confidence": "derived",
+  "derivation": "Every Sales[ProductKey] (1, 2, 2, 3, 1, 3, 1) is in Product, so there is no blank row. Product has 4 rows; its colors are Red, Red, Blue, Green: 3 distinct. Scooter (4) having no sales does not create a blank row.",
+  "tags": [
+    "countrows",
+    "values",
+    "all",
+    "blank-row",
+    "relationship"
+  ]
+}

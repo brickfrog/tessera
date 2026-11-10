@@ -1,0 +1,48 @@
+{
+  "title": "A filter in the middle of a chain goes down to the fact table but not up to the one side",
+  "model": "c-snowflake",
+  "query": "EVALUATE ROW ( \"Categories\", CALCULATE ( COUNTROWS ( Category ), Product[Product] = \"R1\" ), \"Quantity\", CALCULATE ( SUM ( Sales[Quantity] ), Product[Product] = \"R1\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Categories]",
+          "type": "int64"
+        },
+        {
+          "name": "[Quantity]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/relationships-in-power-bi-and-tabular-models/",
+      "quote": "In a one-to-many relationship, the direction is always from the one-side of the relationship to the many-side",
+      "supports": "single direction: one side to many side only"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "For one-to-many relationships, the cross filter direction is always from the \"one\" side, and optionally from the \"many\" side (bi-directional)",
+      "supports": "filters propagate from the one side"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product R1 (100) filters Sales to rows 1 and 2: Quantity 1 + 2 = 3. Product is on the many side of Product -> Subcategory, and Subcategory on the many side of Subcategory -> Category, both single direction, so Category keeps its 3 rows.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "sum",
+    "relationship",
+    "filter-propagation",
+    "snowflake",
+    "single-direction"
+  ]
+}

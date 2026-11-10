@@ -1,0 +1,32 @@
+{
+  "title": "COUNT over a table with no rows is BLANK",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNT ( Empty[x] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/count-function-dax",
+    "quote": "When the function finds no rows to count, it returns a blank.",
+    "supports": "no rows gives BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "Empty has no rows, so there is nothing to count.",
+  "tags": [
+    "count",
+    "blank",
+    "empty-table"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

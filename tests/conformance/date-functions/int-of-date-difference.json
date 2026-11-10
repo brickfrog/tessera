@@ -1,0 +1,31 @@
+{
+  "title": "INT of a date difference is the number of days",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( DATE ( 2012, 12, 15 ) - DATE ( 2011, 1, 1 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          714
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datediff/",
+    "quote": "DATEDIFF computes the delta between two dates, using different units of measure",
+    "supports": "the example shows \"Subtraction-1\", INT ( EndDate - StartDate ), as 714 for these two dates"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "operator-subtract",
+    "int"
+  ]
+}

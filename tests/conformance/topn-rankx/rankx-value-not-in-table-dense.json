@@ -1,0 +1,40 @@
+{
+  "title": "RANKX with DENSE counts the distinct values above a value not in the table",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", RANKX ( Player, Player[Score], 60, DESC, DENSE ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "If value is not among all possible values of expression then RANKX temporarily adds value to the values from expression and re-evaluates RANKX to determine the proper rank of value .",
+      "supports": "a value not in the list is ranked as if it were added"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-rankx-in-dax/",
+      "quote": "When DENSE is specified, at the end of step (1) DAX removes duplicates from the lookup table.",
+      "supports": "the list becomes 90, 80, 70, 50"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "With DENSE the list of scores is 90, 80, 70, 50. Three distinct scores are above 60, so 60 would be fourth: rank 4. With SKIP it would be 6 (five rows above).",
+  "tags": [
+    "rankx",
+    "value-argument",
+    "dense",
+    "ties"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "title": "LOOKUPVALUE returns the result column of the row matching one search value, and BLANK when no row matches",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( { 3, 99 }, \"Product\", LOOKUPVALUE ( Product[Product], Product[ProductKey], [Value] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        },
+        {
+          "name": "[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          3,
+          "Lock"
+        ],
+        [
+          99,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-lookupvalue/",
+      "quote": "LOOKUPVALUE searches a table for the value of a column, given a set of values for other columns in the same table",
+      "supports": "LOOKUPVALUE searches for the row with the given value"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/lookupvalue-function-dax",
+      "quote": "If no match satisfies all the search values, the function returns BLANK or alternateResult (if specified)",
+      "supports": "no match gives BLANK"
+    },
+    {
+      "url": "https://dax.guide/lookupvalue/",
+      "quote": "If there is no match that satisfies all the search values, a BLANK is returned",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "ProductKey 3 is Lock. No Product row has ProductKey 99: BLANK.",
+  "tags": [
+    "lookupvalue",
+    "addcolumns",
+    "table-constructor",
+    "blank"
+  ]
+}

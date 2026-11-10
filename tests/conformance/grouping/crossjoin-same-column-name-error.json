@@ -1,0 +1,27 @@
+{
+  "title": "CROSSJOIN of two tables with a column of the same name is an error",
+  "model": "scalar",
+  "query": "EVALUATE CROSSJOIN ( { 1, 2 }, { 3 } )",
+  "expected": {
+    "error": "both tables have a column named Value, and CROSSJOIN needs all column names to differ"
+  },
+  "source": [
+    {
+      "url": "https://dax.guide/crossjoin/",
+      "quote": "returns an error because both tables have a Value column",
+      "supports": "the page names this expression as an error"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/crossjoin-function-dax",
+      "quote": "Column names from table arguments must all be different in all tables or an error is returned.",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "crossjoin",
+    "table-constructor",
+    "error",
+    "column-names"
+  ]
+}

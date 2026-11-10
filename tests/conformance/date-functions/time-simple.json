@@ -1,0 +1,30 @@
+{
+  "title": "TIME returns a time on the zero date, December 30, 1899",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", TIME ( 22, 45, 30 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "1899-12-30T22:45:30"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/time/",
+    "quote": "DATE and TIME are useful to create DateTime columns",
+    "supports": "the example shows TIME ( 22, 45, 30 ) as 1899-12-30 22:45:30"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "time"
+  ]
+}

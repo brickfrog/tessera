@@ -1,0 +1,38 @@
+{
+  "title": "FORMAT with \"Long Time\" in en-US is the 12-hour time with seconds",
+  "model": "scalar",
+  "query": "EVALUATE VAR DT = DATE ( 2021, 1, 2 ) + TIME ( 15, 30, 0 ) RETURN ROW ( \"r\", FORMAT ( DT, \"Long Time\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "3:30:00 PM"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "FORMAT accepts a set of predefined format strings for Date/Time",
+      "supports": "the example table lists each predefined format applied to January 2, 2021 at 15:30:00"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Displays a time using your current culture's long time format; typically includes hours, minutes, seconds. For example, 11:07:31 AM.",
+      "supports": "the definition"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "predefined-date-format",
+    "culture"
+  ]
+}

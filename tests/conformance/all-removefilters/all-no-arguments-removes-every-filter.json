@@ -1,0 +1,41 @@
+{
+  "title": "ALL () with no arguments removes every filter of the filter context",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CALCULATE ( [Sales Amount], ALL () ) ), 'Product'[Color] = \"Red\", 'Date'[Year] = 2024 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "ALL without arguments can be used only as a CALCULATE or CALCULATETABLE modifier and removes all the filters from the filter context.",
+      "supports": "ALL without arguments removes all the filters from the filter context"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "Sales Amount (ALL)",
+      "supports": "the page's last example has this shape (two outer filters, CALCULATE with ALL ()) and shows the grand total"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Outer filters Color = Red and Year = 2024 give 300. ALL () removes both: 540.",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "all",
+    "filter-removal"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

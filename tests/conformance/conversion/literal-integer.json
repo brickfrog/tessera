@@ -1,0 +1,31 @@
+{
+  "title": "A literal without a decimal point is an integer",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+    "quote": "VAR Quantity = 100000 -- Integer VAR Discount = 0.10 -- Decimal VAR UnitPrice = CURRENCY ( 12.3456 ) -- Currency",
+    "supports": "a literal without a decimal point is an Integer, one with a decimal point a Decimal (double), CURRENCY ( ) gives a Currency"
+  },
+  "confidence": "derived",
+  "derivation": "1 has no decimal point, so it is an Integer (int64), as 100000 is in the article.",
+  "tags": [
+    "conversion",
+    "literal"
+  ]
+}

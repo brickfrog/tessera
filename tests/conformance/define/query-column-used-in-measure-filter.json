@@ -1,0 +1,45 @@
+{
+  "title": "A DEFINE COLUMN can be filtered in a query measure",
+  "model": "sales",
+  "query": [
+    "DEFINE",
+    "  COLUMN Product[Price Band] = IF ( Product[Price] >= 50, \"High\", \"Low\" )",
+    "  MEASURE Sales[High Sales] = CALCULATE ( [Sales Amount], Product[Price Band] = \"High\" )",
+    "EVALUATE ROW ( \"r\", [High Sales] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          400.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/st/column/",
+      "quote": "The COLUMN keyword introduces a table column ( DEFINE ) in a query (also known as query column).",
+      "supports": "the query column is a column of the table for the query"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/define-statement-dax",
+      "quote": "The expression can use any of the defined entities.",
+      "supports": "a query measure can use a query column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Price Band is High for Bike (100) and Scooter (50). Their sales: Bike rows 1, 5, 7 = 100 + 200 + 100 = 400; Scooter none. Total 400.",
+  "tags": [
+    "define-column",
+    "define-measure",
+    "query-column",
+    "calculate"
+  ]
+}

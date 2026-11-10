@@ -1,0 +1,39 @@
+{
+  "title": "A calculation item filtered in CALCULATE is applied to the measure: SELECTEDMEASURE () becomes the measure",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Adjust[Adjustment] = \"Plus 2\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          62
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-the-application-of-calculation-items/",
+      "quote": "A calculation item is applied by replacing measure references invoked when there is a calculation item active in the filter context.",
+      "supports": "[Total] is replaced by the item's expression with SELECTEDMEASURE () standing for [Total]"
+    },
+    {
+      "url": "https://dax.guide/selectedmeasure/",
+      "quote": "A reference to the measure that is currently in context when the calculation item is evaluated.",
+      "supports": "what SELECTEDMEASURE () is"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Plus 2 is SELECTEDMEASURE () + 2. [Total] = 10 + 20 + 30 = 60, so the result is 62. Integer + integer is an integer.",
+  "tags": [
+    "calculation-groups",
+    "selectedmeasure",
+    "calculate"
+  ]
+}

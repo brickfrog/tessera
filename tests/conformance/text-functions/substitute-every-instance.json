@@ -1,0 +1,31 @@
+{
+  "title": "SUBSTITUTE with no instance number replaces every occurrence",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SUBSTITUTE ( \"a-b-c\", \"-\", \"+\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "a+b+c"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/substitute-function-dax",
+    "quote": "If omitted, every instance of old_text is replaced",
+    "supports": "all occurrences are replaced"
+  },
+  "confidence": "derived",
+  "derivation": "Both hyphens are replaced.",
+  "tags": [
+    "text-functions",
+    "substitute"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "title": "The sum of a double column is a double",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", SUM ( V[D] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          5.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/sum/",
+      "quote": "corresponds to the following SUMX call",
+      "supports": "SUM ( t[c] ) is SUMX ( t, t[c] ): a chain of additions"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "When a decimal is involved, the result is decimal.",
+      "supports": "decimal (floating point) + decimal is decimal; SQLBI calls the double type Decimal"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[D] holds 1.5, BLANK, 0, -0.5, 1.5, 2.5, BLANK. 1.5 + 0 - 0.5 + 1.5 + 2.5 = 5.",
+  "tags": [
+    "sum",
+    "blank",
+    "result-type"
+  ]
+}

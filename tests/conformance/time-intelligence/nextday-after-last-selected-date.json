@@ -1,0 +1,54 @@
+{
+  "title": "NEXTDAY is the day after the last selected date",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = NEXTDAY ( 'Date'[Date] ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] >= DATE ( 2024, 2, 25 ) && 'Date'[Date] <= DATE ( 2024, 2, 28 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-02-29T00:00:00",
+          "2024-02-29T00:00:00",
+          1,
+          400.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/nextday/",
+      "quote": "NEXTDAY returns the day after the last day in the selection",
+      "supports": "the example for 2008-08-15..20 returns 2008-08-21"
+    },
+    {
+      "url": "https://dax.guide/nextday/",
+      "quote": "DATEADD ( LASTDATE ( <Dates> ), 1, DAY )",
+      "supports": "the definition"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The last selected date is 2024-02-28; the next day is the leap day 2024-02-29. Sales on that date: 400.",
+  "tags": [
+    "time-intelligence",
+    "nextday",
+    "leap-year"
+  ]
+}

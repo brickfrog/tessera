@@ -1,0 +1,31 @@
+{
+  "title": "ROUNDUP ( PI (), 4 ) is 3.1416",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUNDUP ( PI (), 4 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          3.1416
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/roundup-function-dax",
+    "quote": "The following formula rounds Pi to four decimal places. The expected result is 3.1416.",
+    "supports": "the example gives 3.1416; Return value: a decimal number"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "roundup",
+    "pi"
+  ]
+}

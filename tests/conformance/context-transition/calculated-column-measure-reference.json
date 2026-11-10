@@ -1,0 +1,62 @@
+{
+  "title": "A measure reference in a calculated column is filtered to the current row",
+  "model": "sales",
+  "query": [
+    "DEFINE COLUMN Customer[Sales] = [Sales Amount]",
+    "EVALUATE SELECTCOLUMNS ( Customer, \"Customer\", Customer[Customer], \"Sales\", Customer[Sales] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Customer]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          240.0
+        ],
+        [
+          "Bob",
+          70.0
+        ],
+        [
+          "Cho",
+          230.0
+        ],
+        [
+          "Dee",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition-in-dax/",
+      "quote": "There is a row context because the code is that of a calculated column",
+      "supports": "the article's calculated column Customer[Sales] = [Sales Amount] has a row context and a hidden CALCULATE, so the transition happens"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition-in-dax/",
+      "quote": "The result of Sales 2 is the amount of sales to all customers, whereas the result of Sales 1 is the amount of sales to the current customer only.",
+      "supports": "the measure reference gives the sales of the current customer only"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Ann (1): Sales rows 1, 2, 7 = 100 + 40 + 100 = 240. Bob (2): rows 3, 4 = 20 + 50 = 70. Cho (3): rows 5, 6 = 200 + 30 = 230. Dee (4): no sales, BLANK.",
+  "tags": [
+    "define-column",
+    "calculated-column",
+    "measure",
+    "selectcolumns",
+    "context-transition"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

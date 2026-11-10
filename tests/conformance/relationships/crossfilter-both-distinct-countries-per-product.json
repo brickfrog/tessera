@@ -1,0 +1,61 @@
+{
+  "title": "CROSSFILTER BOTH on the customer relationship lets a product filter reach Customer",
+  "model": "c-bidirectional",
+  "query": [
+    "DEFINE MEASURE Sales[Different Countries Sold] =",
+    "    CALCULATE ( DISTINCTCOUNT ( Customer[Country] ), CROSSFILTER ( Customer[CustomerCode], Sales[CustomerCode], BOTH ) )",
+    "EVALUATE SUMMARIZECOLUMNS ( Product[Product], \"Quantity\", SUM ( Sales[Quantity] ), \"Countries\", [Different Countries Sold] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Quantity]",
+          "type": "int64"
+        },
+        {
+          "name": "[Countries]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "T-shirt",
+          40,
+          2
+        ],
+        [
+          "Jeans",
+          20,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-bidirectional-filtering",
+      "quote": "the relationship between the Customer and Sales tables filters in both directions",
+      "supports": "the page defines this measure on these rows: during its evaluation the Customer relationship filters both ways"
+    },
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "If all expressions evaluate to BLANK for a row, that row is not included in the table returned",
+      "supports": "the Hat has no sales: both expressions are BLANK and the row is removed"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "T-shirt (CL-01): Sales rows 1 and 3, Quantity 10 + 30 = 40, customers CUST-01 and CUST-02, countries United States and Australia: 2. Jeans (CL-02): row 2, Quantity 20, CUST-01: 1 country. Hat (AC-01): no Sales rows; Quantity is BLANK, and with both directions no customer remains, so DISTINCTCOUNT has no rows and is BLANK: the row is removed.",
+  "tags": [
+    "summarizecolumns",
+    "calculate",
+    "crossfilter",
+    "distinctcount",
+    "relationship",
+    "bidirectional"
+  ]
+}

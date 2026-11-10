@@ -1,0 +1,32 @@
+{
+  "title": "A variable that is defined but never referenced is not evaluated, so its error is not raised",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR Err = ERROR ( \"not evaluated\" ) VAR n = [Order Count] RETURN n )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+    "quote": "If the variable is defined but not referenced, then it is not evaluated.",
+    "supports": "the article shows a measure with an unreferenced ERROR variable returning its result"
+  },
+  "confidence": "derived",
+  "derivation": "Err is never referenced, so ERROR is not evaluated. n is COUNTROWS ( Sales ) = 7.",
+  "tags": [
+    "var",
+    "error",
+    "lazy-evaluation"
+  ]
+}

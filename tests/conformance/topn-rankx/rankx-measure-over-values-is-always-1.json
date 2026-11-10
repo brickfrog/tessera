@@ -1,0 +1,62 @@
+{
+  "title": "Ranking a measure over VALUES of the grouped column gives 1 everywhere",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS (",
+    "    Product[Product],",
+    "    \"Amt\", [Sales Amount],",
+    "    \"Rank\", IF ( NOT ISBLANK ( [Sales Amount] ), RANKX ( VALUES ( Product[Product] ), [Sales Amount] ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          400.0,
+          1
+        ],
+        [
+          "Lock",
+          80.0,
+          1
+        ],
+        [
+          "Helmet",
+          60.0,
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-rankx-in-dax/",
+    "quote": "The reason behind the constant value of 1 is that VALUES , for each cell, returns a table with a single row only.",
+    "supports": "the article shows this mistake and its constant result"
+  },
+  "confidence": "derived",
+  "derivation": "In each group the filter context holds one product, so VALUES ( Product[Product] ) has one row and the list has one value, the amount of that product. Its rank in a list of itself is 1. Scooter is BLANK in both expressions and dropped.",
+  "tags": [
+    "rankx",
+    "values",
+    "measure",
+    "filter-context",
+    "summarizecolumns",
+    "if"
+  ]
+}

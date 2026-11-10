@@ -1,0 +1,39 @@
+{
+  "title": "\"\" == BLANK is FALSE: the empty string is not BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"\" == BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/isblank/",
+      "quote": "An empty string and 0 are not considered blank by ISBLANK",
+      "supports": "the example shows EmptyString == BLANK() as false, with EmptyString = \"\""
+    },
+    {
+      "url": "https://dax.guide/op/strictly-equal-to/",
+      "quote": "Returns TRUE if Product[Color] is BLANK, returns FALSE if it is \"\" or any other value",
+      "supports": "== BLANK () is FALSE for an empty string"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-strict-equals",
+    "comparison",
+    "empty-string"
+  ]
+}

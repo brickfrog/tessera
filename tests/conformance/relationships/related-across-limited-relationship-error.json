@@ -1,0 +1,34 @@
+{
+  "title": "RELATED cannot be used across a many-to-many cardinality relationship",
+  "model": "c-weak",
+  "query": "EVALUATE ADDCOLUMNS ( Target, \"Color\", RELATED ( Product[Color] ) )",
+  "expected": {
+    "error": "Target[Category] -> Product[Category] has many-to-many cardinality, so it is a limited relationship: RELATED cannot fetch Product[Color]"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "The RELATED DAX function can't be used to retrieve the \"one\" side column values",
+      "supports": "RELATED is not available across a limited relationship"
+    },
+    {
+      "url": "https://dax.guide/related/",
+      "quote": "The RELATED function cannot be used to fetch a column across a limited relationship",
+      "supports": "same statement"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "The relationship uses a many-to-many cardinality type (even if one or both columns contain unique values)",
+      "supports": "a many-to-many cardinality relationship is limited"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "related",
+    "addcolumns",
+    "relationship",
+    "many-to-many-cardinality",
+    "limited-relationship",
+    "error"
+  ]
+}

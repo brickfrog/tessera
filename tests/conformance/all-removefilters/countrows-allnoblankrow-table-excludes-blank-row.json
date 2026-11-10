@@ -1,0 +1,41 @@
+{
+  "title": "COUNTROWS ( ALLNOBLANKROW ( Product ) ) does not count the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( ALLNOBLANKROW ( 'Product' ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "ALLNOBLANKROW does not return the blank row",
+      "supports": "ALLNOBLANKROW does not return the blank row"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/allnoblankrow-function-dax",
+      "quote": "The results show a difference of 1 row in the table rows count.",
+      "supports": "COUNTROWS(ALLNOBLANKROW(table)) is the number of real rows"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product has 3 real rows: Bike, Lock, Bell.",
+  "tags": [
+    "allnoblankrow",
+    "countrows",
+    "blank-row",
+    "table-function",
+    "relationship"
+  ]
+}

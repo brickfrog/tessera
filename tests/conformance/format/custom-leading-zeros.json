@@ -1,0 +1,39 @@
+{
+  "title": "FORMAT ( 5, \"000\" ) is the text \"005\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( 5, \"000\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "005"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "If the number has fewer digits than there are zeros (on either side of the decimal) in the format expression, display leading or trailing zeros.",
+      "supports": "leading zeros"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "A string containing value formatted as defined by format_string .",
+      "supports": "the result is a string"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "5 has one digit and the format three zeros, so two leading zeros are added. The result is text, not a number.",
+  "tags": [
+    "format",
+    "custom-numeric-format",
+    "result-type"
+  ]
+}

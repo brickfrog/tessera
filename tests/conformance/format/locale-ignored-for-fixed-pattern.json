@@ -1,0 +1,41 @@
+{
+  "title": "A fixed pattern is not reordered by the locale",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( dt\"2020-12-15T12:30:59\", \"mm/dd/yyyy\", \"en-GB\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "12/15/2020"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "The third optional argument specifies the locale identifier",
+      "supports": "the example shows FORMAT( dt\"2020-12-15T12:30:59\", \"mm/dd/yyyy\", \"en-GB\" ) as 12/15/2020"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Because a non-locale dependent format string is specified, the locale is not applied and the non-locale format is returned.",
+      "supports": "the explanation"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "DAX Guide shows 12/15/2020 for this formula and Microsoft Learn explains that the month stays first. Microsoft Learn prints the result as \"12/15/2020 12:30:59\", which cannot come from a format string with no time part.",
+  "uncertain": true,
+  "alternative": "Microsoft Learn lists the result of this formula as \"12/15/2020 12:30:59\".",
+  "tags": [
+    "format",
+    "locale",
+    "datetime-literal"
+  ]
+}

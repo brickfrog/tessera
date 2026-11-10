@@ -1,0 +1,39 @@
+{
+  "title": "MAXX returns the largest value of the expression over the rows",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", MAXX ( Sales, Sales[Quantity] * Sales[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          400.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/maxx-function-dax",
+      "quote": "Returns the highest value that results from evaluating an expression for each row of a table.",
+      "supports": "the expression is evaluated per row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "it returns a currency when a currency and a non-currency type are involved",
+      "supports": "integer * currency is currency"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Quantity * Amount per Sales row: 100, 80, 20, 250, 400, 90, 100. The largest is 400 (row 5: 2 * 200).",
+  "tags": [
+    "maxx",
+    "row-context",
+    "decimal"
+  ]
+}

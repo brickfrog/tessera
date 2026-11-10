@@ -1,0 +1,25 @@
+{
+  "title": "A text that is not a number passed to an INT64 parameter is an error",
+  "model": "scalar",
+  "query": [
+    "DEFINE FUNCTION CastToInt = ( x : INT64 ) => x",
+    "EVALUATE { CastToInt ( \"abc\" ) }"
+  ],
+  "expected": {
+    "error": "\"abc\" cannot be converted to an integer"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+    "quote": "Non-numeric strings will result in an error.",
+    "supports": "the page says so for this function"
+  },
+  "confidence": "derived",
+  "derivation": "The parameter is INT64, so the argument is converted to an integer; \"abc\" is not numeric and the conversion fails.",
+  "tags": [
+    "udf",
+    "define-function",
+    "type-hint",
+    "implicit-conversion",
+    "error"
+  ]
+}

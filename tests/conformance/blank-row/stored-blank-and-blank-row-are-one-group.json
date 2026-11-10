@@ -1,0 +1,67 @@
+{
+  "title": "A stored BLANK in a one-side column and the blank row form a single BLANK group",
+  "model": "c-blank-key",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Amount\", [Sales Amount], \"Products\", COUNTROWS ( VALUES ( Product ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          100.0,
+          1
+        ],
+        [
+          "Blue",
+          30.0,
+          1
+        ],
+        [
+          null,
+          70.0,
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "The values obtained for the group-by columns include the blank values of invalid relationships",
+      "supports": "the group-by values include the blank row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "If a relationship is invalid, the VertiPaq engine automatically adds a row containing BLANK in every column of the table on the one-side of the relationship",
+      "supports": "the blank row has BLANK in its Color"
+    },
+    {
+      "url": "https://dax.guide/values/",
+      "quote": "returns a table with the same columns and all the rows of the table (including duplicates) with the additional blank row caused by an invalid relationship if present",
+      "supports": "VALUES of the table counts the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Red is Bike: 100, 1 row. Blue is Lock: 30, 1 row. BLANK is both Bell (stored BLANK color, no sales) and the blank row (Sales rows 3 and 4: 50 + 20 = 70): one group, Amount 70, and VALUES ( Product ) has 2 rows there, Bell and the blank row.",
+  "tags": [
+    "summarizecolumns",
+    "values",
+    "countrows",
+    "blank-row",
+    "relationship",
+    "blank"
+  ]
+}

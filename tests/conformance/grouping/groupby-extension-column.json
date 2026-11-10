@@ -1,0 +1,58 @@
+{
+  "title": "GROUPBY groups by a column added in the query, which has no lineage",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "GROUPBY (",
+    "    ADDCOLUMNS ( Sales, \"Size\", IF ( Sales[Quantity] > 1, \"Large\", \"Small\" ) ),",
+    "    [Size],",
+    "    \"Amt\", SUMX ( CURRENTGROUP (), Sales[Amount] ),",
+    "    \"Rows\", COUNTX ( CURRENTGROUP (), 1 )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Size]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Rows]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Large",
+          320.0,
+          4
+        ],
+        [
+          "Small",
+          220.0,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/groupby/",
+    "quote": "-- GROUPBY is useful to group by columns with no lineage -- Each column added by GROUPBY must iterate CURRENTGROUP().",
+    "supports": "the page groups a computed column and counts with COUNTX ( CURRENTGROUP (), 1 )"
+  },
+  "confidence": "derived",
+  "derivation": "Quantity per Sales row: 1, 2, 1, 5, 2, 3, 1. Large: rows 2, 4, 5, 6 = 40 + 50 + 200 + 30 = 320, 4 rows. Small: rows 1, 3, 7 = 100 + 20 + 100 = 220, 3 rows.",
+  "tags": [
+    "groupby",
+    "currentgroup",
+    "addcolumns",
+    "sumx",
+    "countx",
+    "column-names"
+  ]
+}

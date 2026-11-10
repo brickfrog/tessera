@@ -1,0 +1,38 @@
+{
+  "title": "MINX ( { 2, BLANK() }, [Value] ) is 2: an iterator's minimum ignores BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MINX ( { 2, BLANK () }, [Value] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/min/",
+      "quote": "MIN consider the BLANK value as significative, whereas MINX ignores it",
+      "supports": "the page gives MINX ( { 2, BLANK() }, [Value] ) as returning 2"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/minx-function-dax",
+      "quote": "Blank values are skipped",
+      "supports": "MINX skips blanks"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "minx",
+    "blank",
+    "table-constructor"
+  ]
+}

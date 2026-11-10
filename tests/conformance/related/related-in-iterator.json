@@ -1,0 +1,33 @@
+{
+  "title": "RELATED inside SUMX reads the one-side value for each iterated row",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"ListPrice\", SUMX ( Sales, RELATED ( Product[Price] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[ListPrice]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          360.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/related/",
+    "quote": "The RELATED function needs a row context",
+    "supports": "RELATED works in the row context of an iterator such as SUMX"
+  },
+  "confidence": "derived",
+  "derivation": "Price of each row's product: rows 1, 5, 7 Bike 100; rows 2, 3 Helmet 20; rows 4, 6 Lock 10. 3 x 100 + 2 x 20 + 2 x 10 = 360. Price is a fixed decimal column, and so is its sum.",
+  "tags": [
+    "related",
+    "sumx",
+    "relationship",
+    "row-context"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "title": "FORMAT with \"0.00\" pads with zeros and rounds",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"pad\", FORMAT ( 5, \"0.00\" ), \"round\", FORMAT ( 3.14159, \"0.00\" ), \"small\", FORMAT ( 0.5, \"0.00\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[pad]",
+          "type": "string"
+        },
+        {
+          "name": "[round]",
+          "type": "string"
+        },
+        {
+          "name": "[small]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "5.00",
+          "3.14",
+          "0.50"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "If the number has fewer digits than there are zeros (on either side of the decimal) in the format expression, display leading or trailing zeros.",
+      "supports": "the 0 placeholder pads"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "round the number to as many decimal places as there are zeros",
+      "supports": "and rounds"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "5 becomes \"5.00\"; 3.14159 rounds to \"3.14\"; 0.5 becomes \"0.50\".",
+  "tags": [
+    "format",
+    "custom-numeric-format"
+  ]
+}

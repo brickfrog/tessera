@@ -1,0 +1,44 @@
+{
+  "title": "A date with a time concatenated to text reads 1/31/2024 1:05:00 PM",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ( DATE ( 2024, 1, 31 ) + TIME ( 13, 5, 0 ) ) & \"\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1/31/2024 1:05:00 PM"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/concatenate/",
+      "quote": "CONCATENATE converts numbers, dates, and Boolean values to text with the default format",
+      "supports": "a date joined to text takes the default format; the page says & gives the same result as CONCATENATE"
+    },
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "FORMAT accepts a set of predefined format strings for Date/Time",
+      "supports": "the example shows General Date of 2021-01-02 15:30 as 1/2/2021 3:30:00 PM and Long Time as 3:30:00 PM"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Concatenation converts a date to text with the default format, taken to be General Date. DAX Guide shows General Date of 2021-01-02 15:30 in en-US as 1/2/2021 3:30:00 PM: month/day/year, then a 12-hour time with seconds and AM/PM. For 2024-01-31 13:05:00 that is 1/31/2024 1:05:00 PM.",
+  "uncertain": true,
+  "alternative": "No source names the default format of the implicit conversion. A 24-hour or ISO rendering would give 1/31/2024 13:05:00 or 2024-01-31 13:05:00.",
+  "tags": [
+    "assumption:date-to-text",
+    "operator-concatenate",
+    "date",
+    "time",
+    "implicit-conversion",
+    "date-functions"
+  ]
+}

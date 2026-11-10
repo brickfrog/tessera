@@ -1,0 +1,45 @@
+{
+  "title": "ALLNOBLANKROW returns a BLANK that is stored in the column",
+  "model": "c-blank-key",
+  "query": "EVALUATE ALLNOBLANKROW ( Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/allnoblankrow/",
+      "quote": "If the table contains blank values in columns, these values are included in the result",
+      "supports": "blank values stored in the column are returned"
+    },
+    {
+      "url": "https://dax.guide/allnoblankrow/",
+      "quote": "The only blank row that is ignored is the one added to a table in case of an invalid relationship",
+      "supports": "only the blank row of the invalid relationship is ignored"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] stores Red, Blue and a BLANK (Bell): 3 values. Only the blank row added for the orphan Sales rows is left out.",
+  "tags": [
+    "allnoblankrow",
+    "blank-row",
+    "blank"
+  ]
+}

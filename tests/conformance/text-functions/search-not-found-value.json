@@ -1,0 +1,31 @@
+{
+  "title": "SEARCH returns its 4th argument when the text is not found",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SEARCH ( \"z\", \"abc\", 1, -1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/search-function-dax",
+    "quote": "The value to return when the operation doesn't find a matching substring, typically 0, -1, or BLANK().",
+    "supports": "the 4th argument is returned when nothing matches"
+  },
+  "confidence": "derived",
+  "derivation": "\"abc\" has no \"z\", so the NotFoundValue -1 is returned.",
+  "tags": [
+    "text-functions",
+    "search"
+  ]
+}

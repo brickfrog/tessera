@@ -1,0 +1,38 @@
+{
+  "title": "ENDOFYEAR returns the last day of the year of the last selected date",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ENDOFYEAR ( 'Date'[Date] ), 'Date'[Date] >= DATE ( 2023, 11, 5 ) && 'Date'[Date] <= DATE ( 2024, 5, 12 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-12-31T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/endofyear/",
+      "quote": "the end of the entire period.",
+      "supports": "the example for 2006-11-05 to 2007-05-12 returns 2007-12-31"
+    },
+    {
+      "url": "https://dax.guide/endofyear/",
+      "quote": "that is in the same year as the latest visible date in <Dates>.",
+      "supports": "the definition"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The last selected date is 2024-05-12; the last date of 2024 in the Date table is 2024-12-31.",
+  "tags": [
+    "time-intelligence",
+    "endofyear"
+  ]
+}

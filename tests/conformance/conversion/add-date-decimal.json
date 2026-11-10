@@ -1,0 +1,40 @@
+{
+  "title": "Date + 0.5 is a date twelve hours later",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2024, 1, 1 ) + 0.5 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-01T12:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "Addition (+) INTEGER CURRENCY REAL Date/time INTEGER INTEGER CURRENCY REAL Date/time",
+      "supports": "the Addition (+) table: any type added to Date/time gives Date/time"
+    },
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "the decimal part identifies the fraction of the day",
+      "supports": "0.5 is half a day"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Date/time + REAL is Date/time. Half a day after 2024-01-01 00:00 is 2024-01-01 12:00.",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "result-type",
+    "date"
+  ]
+}

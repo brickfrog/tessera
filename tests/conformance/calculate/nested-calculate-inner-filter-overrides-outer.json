@@ -1,0 +1,33 @@
+{
+  "title": "In nested CALCULATE the inner filter on a column overrides the outer filter on the same column",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( CALCULATE ( [Sales Amount], Customer[Country] = \"JP\" ), Customer[Country] = \"US\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          230.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/keepfilters-function-dax",
+    "quote": "the default behavior of CALCULATE overrides the outer filters in 'Geography'[State Province Code] and substitutes its own filter arguments, because the filters apply to the same column",
+    "supports": "the page's '$$ in WA and OR ??' expression: the inner CALCULATE's filter replaces the outer filter on the same column"
+  },
+  "confidence": "derived",
+  "derivation": "The outer filter Country = US is applied first; the inner Country = JP then overwrites it. JP: rows 5, 6 = 200 + 30 = 230. (US would be 310, and an intersection BLANK.)",
+  "tags": [
+    "calculate",
+    "nested-calculate",
+    "filter-overwrite"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

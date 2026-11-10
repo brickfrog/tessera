@@ -1,0 +1,41 @@
+{
+  "title": "A one-to-one relationship filters from the first table to the second",
+  "model": "c-onetoone",
+  "query": "EVALUATE ROW ( \"Categories\", CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Green\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Categories]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "For one-to-one relationships, the cross filter direction is always from both tables",
+      "supports": "one-to-one relationships always filter from both tables"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-one-to-one",
+      "quote": "The relationship filters in both directions, which is always the case for one-to-one relationships",
+      "supports": "same statement, on these rows"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Color Green is SKU CL-01, which is one ProductCategory row (Clothing).",
+  "tags": [
+    "calculate",
+    "countrows",
+    "relationship",
+    "one-to-one",
+    "bidirectional"
+  ]
+}

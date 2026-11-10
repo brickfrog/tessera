@@ -1,0 +1,48 @@
+{
+  "title": "SELECTCOLUMNS without a name keeps the model name of a plain column reference",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/selectcolumns/",
+      "quote": "The <Name> argument can be skipped if the correspondent <Expression> argument is a simple column reference of the iterated table",
+      "supports": "the name may be left out"
+    },
+    {
+      "url": "https://dax.guide/selectcolumns/",
+      "quote": "-- Both column name and data lineage -- are 'Product'[Product Name]",
+      "supports": "the unnamed column keeps the full column name"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The column is a plain reference, so it is returned as Product[Color], with the 4 rows of Product.",
+  "tags": [
+    "selectcolumns",
+    "duplicates",
+    "column-names"
+  ]
+}

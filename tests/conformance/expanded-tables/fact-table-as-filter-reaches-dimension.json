@@ -1,0 +1,47 @@
+{
+  "title": "The fact table used as a CALCULATE filter filters the dimension through its expanded table",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Products\", COUNTROWS ( Product ), \"ProductsSold\", CALCULATE ( COUNTROWS ( Product ), Sales ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "int64"
+        },
+        {
+          "name": "[ProductsSold]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4,
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+      "quote": "the filter context contains all the columns of the expanded version of Sales",
+      "supports": "the article's NumOfProductsSold: a table filter argument filters every column of the expanded table"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/expanded-tables-in-dax/",
+      "quote": "An expanded table contains all the columns of the base table and all the columns of the tables that are linked to the base table through one or more cascading many-to-one or one-to-one relationships",
+      "supports": "expanded Sales includes the columns of Product"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product has 4 rows. Sales as a filter argument is the expanded Sales table, which includes Product's columns: only products that appear in Sales stay. Sales[ProductKey] holds 1, 2, 3: Scooter (4) is filtered out, 3 rows.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "expanded-table",
+    "table-filter",
+    "relationship"
+  ],
+  "notes": "The relationship is single direction: it is table expansion, not cross-filtering, that filters Product here."
+}

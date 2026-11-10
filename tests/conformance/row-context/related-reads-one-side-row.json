@@ -1,0 +1,42 @@
+{
+  "title": "RELATED reads the related one-side row from the row context of the many side",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( FILTER ( Sales, RELATED ( 'Product'[Color] ) = \"Red\" ), Sales[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          460.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+      "quote": "you can access the row of a parent table using RELATED",
+      "supports": "from a row context on Sales, RELATED gives access to the row of the parent table Product"
+    },
+    {
+      "url": "https://dax.guide/related/",
+      "quote": "the function follows a chain of one or more many-to-one relationships to fetch the value from the specified column in the related table",
+      "supports": "RELATED follows the many-to-one relationship Sales[ProductKey] -> Product[ProductKey]"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Red products are Bike (1) and Helmet (2). Sales rows with ProductKey 1 or 2: rows 1, 2, 3, 5, 7 = 100 + 40 + 20 + 200 + 100 = 460.",
+  "tags": [
+    "sumx",
+    "filter",
+    "related",
+    "row-context",
+    "relationship"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

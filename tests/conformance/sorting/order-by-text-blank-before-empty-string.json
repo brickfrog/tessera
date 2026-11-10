@@ -1,0 +1,60 @@
+{
+  "title": "ORDER BY on text puts BLANK before the empty string",
+  "model": "a2-sort",
+  "query": "EVALUATE Texts ORDER BY Texts[T], Texts[Id]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Texts[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Texts[T]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          3,
+          null
+        ],
+        [
+          2,
+          ""
+        ],
+        [
+          4,
+          "a"
+        ],
+        [
+          1,
+          "b"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/orderby-statement-dax",
+      "quote": "Ascending sort order",
+      "supports": "ASC is the default and sorts ascending; the page does not say where BLANK goes"
+    },
+    {
+      "url": "https://dax.guide/op/strictly-equal-to/",
+      "quote": "A comparison between BLANK and any other value returns FALSE",
+      "supports": "BLANK and the empty string are different values, so a sort may tell them apart"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Texts[T] by Id: b (1), '' (2), BLANK (3), a (4). a sorts before b. The empty string sorts before any other text. BLANK is taken as the lowest value of all, before the empty string: Ids 3, 2, 4, 1.",
+  "uncertain": true,
+  "alternative": "No source states where BLANK sorts in text. If ORDER BY treats BLANK and the empty string as equal (as = does), the tie falls to Texts[Id] and the order is Ids 2, 3, 4, 1.",
+  "tags": [
+    "order-by",
+    "blank",
+    "empty-string"
+  ],
+  "notes": "The empty string has the lower Id on purpose, so the two readings give different orders."
+}

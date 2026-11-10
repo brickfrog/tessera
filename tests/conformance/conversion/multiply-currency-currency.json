@@ -1,0 +1,45 @@
+{
+  "title": "Currency * currency is a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( 1.5 ) * CURRENCY ( 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          3.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a multiplication operation combines an integer with a real number, DAX converts both numbers to real numbers, and the return value is also REAL",
+      "supports": "the Multiplication (*) table of result types: INTEGER*INTEGER is INTEGER, INTEGER*CURRENCY is CURRENCY, CURRENCY*CURRENCY is REAL, CURRENCY*REAL is CURRENCY"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The only particular case is that when multiplying two numbers of currency data type, the result is a decimal",
+      "supports": "stated outright"
+    },
+    {
+      "url": "https://dax.guide/currency/",
+      "quote": "Returns the value as a currency data type",
+      "supports": "CURRENCY ( x ) is a currency (fixed decimal) value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CURRENCY * CURRENCY is REAL: 1.5 * 2 = 3.0.",
+  "tags": [
+    "conversion",
+    "operator-multiply",
+    "result-type",
+    "currency"
+  ]
+}

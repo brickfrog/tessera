@@ -1,0 +1,38 @@
+{
+  "title": "DISTINCT returns a BLANK that is stored in the column",
+  "model": "c-blank-key",
+  "query": "EVALUATE DISTINCT ( Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/distinct/",
+    "quote": "DISTINCT does not return the blank row caused by an invalid relationship",
+    "supports": "DISTINCT leaves out only the blank row caused by the invalid relationship"
+  },
+  "confidence": "derived",
+  "derivation": "Product[Color] stores Red, Blue and a BLANK (Bell). The stored BLANK is a value of the column and is returned: 3 rows. The blank row of the relationship is not, but its Color is BLANK too, so the values are the same.",
+  "tags": [
+    "distinct",
+    "blank-row",
+    "blank"
+  ]
+}

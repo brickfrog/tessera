@@ -1,0 +1,73 @@
+{
+  "title": "REMOVEFILTERS on the grouped column gives the denominator of a percent of total",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Qty] = SUM ( Sales[Quantity] )",
+    "MEASURE Sales[Pct] = DIVIDE ( [Qty], CALCULATE ( [Qty], REMOVEFILTERS ( 'Product'[Color] ) ) )",
+    "EVALUATE SUMMARIZECOLUMNS ( 'Product'[Color], \"Qty\", [Qty], \"Pct\", [Pct] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Qty]",
+          "type": "int64"
+        },
+        {
+          "name": "[Pct]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          7,
+          0.4666666666666667
+        ],
+        [
+          "Blue",
+          8,
+          0.5333333333333333
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/removefilters-function-dax",
+      "quote": "REMOVEFILTERS(DimProductSubcategory[EnglishProductSubcategoryName])",
+      "supports": "the page's Example 2 computes %Sales the same way: the measure divided by itself with the grouped column's filter removed"
+    },
+    {
+      "url": "https://dax.guide/removefilters/",
+      "quote": "it can be used only as a CALCULATE modifier and not as a table expression like ALL",
+      "supports": "REMOVEFILTERS is ALL as a CALCULATE modifier"
+    },
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "If all expressions evaluate to BLANK for a row, that row is not included in the table returned.",
+      "supports": "Green has BLANK for both expressions and is left out"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "The operator determines the type of conversion DAX performs by casting the values it requires before doing the requested operation.",
+      "supports": "the division table gives INTEGER / INTEGER as REAL"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Quantity: Red rows 1, 2, 3, 5, 7 = 1 + 2 + 1 + 2 + 1 = 7; Blue rows 4, 6 = 5 + 3 = 8; total 15. Pct: 7 / 15 = 0.4666..., 8 / 15 = 0.5333.... Green: Qty BLANK and DIVIDE ( BLANK, 15 ) BLANK, so SUMMARIZECOLUMNS drops the row.",
+  "tags": [
+    "calculate",
+    "removefilters",
+    "divide",
+    "summarizecolumns",
+    "define-measure",
+    "percent-of-total",
+    "filter-removal"
+  ],
+  "notes": "DIVIDE of two integers is taken to be a double (learn: 'A decimal number')."
+}

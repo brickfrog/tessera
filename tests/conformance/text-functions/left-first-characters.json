@@ -1,0 +1,30 @@
+{
+  "title": "LEFT ( \"DAX is so cool!\", 3 ) is \"DAX\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", LEFT ( \"DAX is so cool!\", 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "DAX"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/left/",
+    "quote": "LEFT, RIGHT, MID and LEN are the basic string-manipulation functions",
+    "supports": "the example lists LEFT ( Val, 3 ) with the result DAX for Val = \"DAX is so cool!\""
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "left"
+  ]
+}

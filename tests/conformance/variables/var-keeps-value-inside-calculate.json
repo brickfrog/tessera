@@ -1,0 +1,39 @@
+{
+  "title": "A variable holding a measure value keeps it inside CALCULATE with another filter",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR Total = [Sales Amount] RETURN CALCULATE ( Total, Product[Color] = \"Blue\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/variables-in-dax/",
+      "quote": "Its value has already been computed and it does not change depending on the filter context.",
+      "supports": "a variable referenced inside CALCULATE is not recomputed under the new filter"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/var-dax",
+      "quote": "After DAX calculates the values for a variable expression, those values don't change, even if you reference the variable in another expression.",
+      "supports": "the value of a variable does not change when it is referenced under another context"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Total is defined with no filter: [Sales Amount] = 100 + 40 + 20 + 50 + 200 + 30 + 100 = 540. CALCULATE adds Color = Blue but Total is already a value, so the result is 540, not the Blue amount 80. SUM of a fixed decimal column is a fixed decimal.",
+  "tags": [
+    "var",
+    "calculate",
+    "variable-evaluated-once"
+  ]
+}

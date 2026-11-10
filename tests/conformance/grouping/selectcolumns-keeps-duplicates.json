@@ -1,0 +1,48 @@
+{
+  "title": "SELECTCOLUMNS returns one row per source row, duplicates included, under the new name",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"Color\", Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          "Green"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/from-sql-to-dax-projection/",
+      "quote": "Both SELECTCOLUMNS and ADDCOLUMNS keep the duplicated rows included in the original table expression.",
+      "supports": "no distinct is applied"
+    },
+    {
+      "url": "https://dax.guide/selectcolumns/",
+      "quote": "When the <Name> argument is specified, it defines a new name for the column reference, regardless of the data lineage result.",
+      "supports": "the result column is named by the Name argument"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product has 4 rows with colours Red, Red, Blue, Green. All 4 are returned, in a column named [Color].",
+  "tags": [
+    "selectcolumns",
+    "duplicates",
+    "column-names"
+  ]
+}

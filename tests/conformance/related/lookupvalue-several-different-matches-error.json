@@ -1,0 +1,31 @@
+{
+  "title": "LOOKUPVALUE is an error when the matching rows have different result values and no alternate result is given",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", LOOKUPVALUE ( Product[Product], Product[Color], \"Red\" ) )",
+  "expected": {
+    "error": "Product[Color] = Red matches Bike and Helmet, two different values of Product[Product]: a table of multiple values was provided where a single value was expected"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/lookupvalue-function-dax",
+      "quote": "if result_columnName returns different values, the function returns an error or alternateResult (if specified)",
+      "supports": "different values in the result column give an error"
+    },
+    {
+      "url": "https://dax.guide/lookupvalue/",
+      "quote": "if Result_Column returns different values, the function returns Alternate_Result if defined, otherwise it returns an error",
+      "supports": "same statement"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-lookupvalue/",
+      "quote": "A table of multiple values was provided where a single value was expected",
+      "supports": "the error message"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Two products are Red: Bike and Helmet. Their Product values differ, and there is no alternate result: an error.",
+  "tags": [
+    "lookupvalue",
+    "error"
+  ]
+}

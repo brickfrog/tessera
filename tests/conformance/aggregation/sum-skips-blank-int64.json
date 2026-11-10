@@ -1,0 +1,44 @@
+{
+  "title": "SUM skips BLANK values, and the sum of an int64 column is an int64",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", SUM ( V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          9
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/sumx-function-dax",
+      "quote": "Only the numbers in the column are counted. Blanks, logical values, and text are ignored.",
+      "supports": "blanks do not take part in the sum"
+    },
+    {
+      "url": "https://dax.guide/sum/",
+      "quote": "corresponds to the following SUMX call",
+      "supports": "SUM ( t[c] ) is SUMX ( t, t[c] ): a chain of additions"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is integer only when both operands are also integers.",
+      "supports": "adding integers gives an integer, so a sum of an integer column is an integer"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. Skipping the two BLANKs: 5 + 0 - 3 + 5 + 2 = 9. Integer + integer is an integer.",
+  "tags": [
+    "sum",
+    "blank",
+    "result-type"
+  ]
+}

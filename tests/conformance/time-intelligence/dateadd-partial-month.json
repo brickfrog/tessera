@@ -1,0 +1,53 @@
+{
+  "title": "DATEADD moves the first 10 days of a month to the first 10 days of the month before",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = DATEADD ( 'Date'[Date], -1, MONTH ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] >= DATE ( 2024, 3, 1 ) && 'Date'[Date] <= DATE ( 2024, 3, 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-02-01T00:00:00",
+          "2024-02-10T00:00:00",
+          10,
+          300.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/dateadd/",
+      "quote": "If the <Dates> argument includes the first 15 days in April (15 rows), the result for the previous month includes the first 15 days in March (15 rows).",
+      "supports": "a partial month moves day by day"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "If not all the days of the month are selected, then each day is shifted by the number of intervals specified.",
+      "supports": "a partly selected month moves day by day"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "March 1 to 10, 2024 is not a whole month, so each day moves back one month: February 1 to 10, 10 days. Sales on Feb 10: 300.",
+  "tags": [
+    "time-intelligence",
+    "dateadd"
+  ]
+}

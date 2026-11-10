@@ -1,0 +1,31 @@
+{
+  "title": "CONCATENATE of two BLANKs is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONCATENATE ( BLANK (), BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/concatenate/",
+    "quote": "If both arguments are BLANK , the result is BLANK .",
+    "supports": "states the result"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "concatenate",
+    "blank"
+  ],
+  "notes": "The type of the all-BLANK column is not asserted."
+}

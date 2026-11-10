@@ -1,0 +1,37 @@
+{
+  "title": "FORMAT with \"0%\" multiplies by 100 and appends the sign",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"a\", FORMAT ( 0.25, \"0%\" ), \"b\", FORMAT ( 0.256, \"0.0%\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "string"
+        },
+        {
+          "name": "[b]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "25%",
+          "25.6%"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+    "quote": "Percentage placeholder. The expression is multiplied by 100. The percent character ( % ) is inserted in the position where it appears in the format string.",
+    "supports": "the % placeholder"
+  },
+  "confidence": "derived",
+  "derivation": "0.25 * 100 = 25, then \"%\": \"25%\". 0.256 * 100 = 25.6 with one decimal: \"25.6%\".",
+  "tags": [
+    "format",
+    "custom-numeric-format",
+    "percent"
+  ]
+}

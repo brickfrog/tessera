@@ -1,0 +1,62 @@
+{
+  "title": "A VAL argument is evaluated in the row context of the call",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION Twice = ( x : NUMERIC VAL ) => x * 2",
+    "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Twice\", Twice ( Product[Price] ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Twice]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          200.0
+        ],
+        [
+          "Helmet",
+          40.0
+        ],
+        [
+          "Lock",
+          20.0
+        ],
+        [
+          "Scooter",
+          100.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "a val parameter is evaluated eagerly before entering the function body, and therefore inherits both the row context and the filter context of the caller",
+      "supports": "the argument is evaluated in the row of the caller"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "UDFs can be used in a calculated column to apply reusable logic to every row in a table.",
+      "supports": "the page passes a column of the current row to a function"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "In each row Product[Price] is evaluated before the call: 100, 20, 10, 50. The body doubles it. A fixed decimal times an integer is a fixed decimal.",
+  "tags": [
+    "udf",
+    "define-function",
+    "val-parameter",
+    "row-context",
+    "selectcolumns",
+    "type-hint"
+  ]
+}

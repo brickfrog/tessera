@@ -1,0 +1,94 @@
+{
+  "description": "Two tables with the same data, for context transition over duplicated rows. Dup has no key and fully duplicated rows: (A, 10) twice, (B, 5) once, (C, 1) three times; 6 rows, Value total 28 (A 20, B 5, C 3). Keyed has the same Name and Value pairs with a unique Id 1 to 6 (ids 1, 2 are A; 3 is B; 4, 5, 6 are C). No relationships.",
+  "tables": [
+    {
+      "name": "Dup",
+      "columns": [
+        {
+          "name": "Name",
+          "type": "string"
+        },
+        {
+          "name": "Value",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "A",
+          10
+        ],
+        [
+          "A",
+          10
+        ],
+        [
+          "B",
+          5
+        ],
+        [
+          "C",
+          1
+        ],
+        [
+          "C",
+          1
+        ],
+        [
+          "C",
+          1
+        ]
+      ]
+    },
+    {
+      "name": "Keyed",
+      "columns": [
+        {
+          "name": "Id",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Name",
+          "type": "string"
+        },
+        {
+          "name": "Value",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "A",
+          10
+        ],
+        [
+          2,
+          "A",
+          10
+        ],
+        [
+          3,
+          "B",
+          5
+        ],
+        [
+          4,
+          "C",
+          1
+        ],
+        [
+          5,
+          "C",
+          1
+        ],
+        [
+          6,
+          "C",
+          1
+        ]
+      ]
+    }
+  ]
+}

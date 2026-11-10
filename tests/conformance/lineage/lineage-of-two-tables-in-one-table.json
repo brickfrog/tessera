@@ -1,0 +1,60 @@
+{
+  "title": "Columns from two tables in one table each filter their own table",
+  "model": "sales",
+  "query": "EVALUATE FILTER ( ADDCOLUMNS ( CROSSJOIN ( VALUES ( Product[Color] ), VALUES ( 'Date'[Year] ) ), \"Amt\", [Sales Amount] ), [Amt] > 0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "Date[Year]",
+          "type": "int64"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          2023,
+          160.0
+        ],
+        [
+          "Red",
+          2024,
+          300.0
+        ],
+        [
+          "Blue",
+          2023,
+          50.0
+        ],
+        [
+          "Blue",
+          2024,
+          30.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+    "quote": "Each column has its own data lineage, even though a table contains columns originating from different tables",
+    "supports": "the article's query: each column keeps its own lineage and both filter the measure"
+  },
+  "confidence": "derived",
+  "derivation": "Red 2023: Sales rows 1, 2, 3 = 100 + 40 + 20 = 160. Red 2024: rows 5, 7 = 200 + 100 = 300. Blue 2023: row 4 = 50. Blue 2024: row 6 = 30. Green has no sales in either year: BLANK is not greater than 0, so those rows are removed. 160 + 300 + 50 + 30 = 540.",
+  "tags": [
+    "filter",
+    "addcolumns",
+    "crossjoin",
+    "values",
+    "lineage",
+    "context-transition"
+  ]
+}

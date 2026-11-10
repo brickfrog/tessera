@@ -1,0 +1,43 @@
+{
+  "title": "1 / CURRENCY ( 3 ) is the decimal number 0.3333333333333333, not the fixed decimal 0.3333",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1 / CURRENCY ( 3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          0.3333333333333333
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency",
+      "supports": "an integer divided by a currency is a decimal number; a currency divided by an integer is a currency"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a division operation combines an integer with a currency value, DAX converts both values to real numbers, and the result is also a real number",
+      "supports": "INTEGER / CURRENCY is REAL according to this sentence; the table above it has CURRENCY in that cell"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "SQLBI's division table and the sentence under Microsoft's table both give a decimal (real) number for an integer divided by a currency. 1 / 3 as a double is 0.3333333333333333.",
+  "uncertain": true,
+  "alternative": "The cell of Microsoft's division table for INTEGER / CURRENCY says CURRENCY. Under that reading the result is the fixed decimal 0.3333.",
+  "tags": [
+    "assumption:integer-divided-by-currency",
+    "operator-divide",
+    "currency",
+    "int64",
+    "result-type"
+  ]
+}

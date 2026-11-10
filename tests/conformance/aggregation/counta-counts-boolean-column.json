@@ -1,0 +1,39 @@
+{
+  "title": "COUNTA counts the non-blank values of a Boolean column",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTA ( V[Flag] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/counta-function-dax",
+      "quote": "Unlike COUNT , COUNTA supports Boolean data type.",
+      "supports": "COUNTA works on a Boolean column"
+    },
+    {
+      "url": "https://dax.guide/counta/",
+      "quote": "COUNTA does not count BLANK values.",
+      "supports": "blanks are not counted"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[Flag] holds TRUE, BLANK, FALSE, TRUE, TRUE, FALSE, BLANK: 5 values are not BLANK (FALSE counts).",
+  "tags": [
+    "counta",
+    "blank",
+    "boolean"
+  ]
+}

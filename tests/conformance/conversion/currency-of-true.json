@@ -1,0 +1,31 @@
+{
+  "title": "CURRENCY ( TRUE ) is 1 as a currency",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( TRUE () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/currency-function-dax",
+    "quote": "will return \\$1.0000 for True values and \\$0.0000 for False values",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "currency",
+    "boolean"
+  ]
+}

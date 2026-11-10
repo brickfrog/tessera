@@ -1,0 +1,31 @@
+{
+  "title": "SUBSTITUTE with an instance number replaces only that occurrence",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SUBSTITUTE ( \"a-b-c\", \"-\", \"+\", 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "a-b+c"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/substitute-function-dax",
+    "quote": "The occurrence of old_text you want to replace.",
+    "supports": "the 4th argument picks the occurrence"
+  },
+  "confidence": "derived",
+  "derivation": "Only the second hyphen is replaced.",
+  "tags": [
+    "text-functions",
+    "substitute"
+  ]
+}

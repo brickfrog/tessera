@@ -1,0 +1,32 @@
+{
+  "title": "CONVERT ( 1.123456, CURRENCY ) is 1.1235",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( 1.123456, CURRENCY ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1.1235
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "When DataType is CURRENCY , CONVERT rounds the value to four decimal places. For example, CONVERT ( 1.123456, CURRENCY ) returns 1.1235",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "currency",
+    "rounding"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "title": "Adding 0 turns the BLANK count of an empty RELATEDTABLE into 0",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Orders\", COUNTROWS ( RELATEDTABLE ( Sales ) ) + 0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Orders]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          3
+        ],
+        [
+          "Helmet",
+          2
+        ],
+        [
+          "Lock",
+          2
+        ],
+        [
+          "Scooter",
+          0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/countrows-function-dax",
+      "quote": "When the table argument contains no rows, the function returns BLANK",
+      "supports": "COUNTROWS of an empty table is BLANK"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "BLANK + 5",
+      "supports": "BLANK plus a number is the number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Counts are 3, 2, 2 and BLANK for Scooter. BLANK + 0 = 0; the others are unchanged. Whole number + whole number is a whole number.",
+  "tags": [
+    "relatedtable",
+    "countrows",
+    "selectcolumns",
+    "relationship",
+    "context-transition",
+    "blank",
+    "operator-add"
+  ]
+}

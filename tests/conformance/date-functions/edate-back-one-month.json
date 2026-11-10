@@ -1,0 +1,30 @@
+{
+  "title": "EDATE ( DATE ( 2005, 1, 10 ), -1 ) is December 10, 2004",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", EDATE ( DATE ( 2005, 1, 10 ), -1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2004-12-10T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/edate/",
+    "quote": "EDATE adds months to a date",
+    "supports": "the example table lists 2005-01-10 with EDATE, -1 = 2004-12-10"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "edate"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "title": "SECOND ( 25.56 ) is 24: a number is read as a date serial",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SECOND ( 25.56 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          24
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/second-function-dax",
+    "quote": "the formula returns 24. That is because, when formatted as a date, the value 25.56 is equivalent to January 25, 1900, 1:26:24 PM.",
+    "supports": "states the result for the value 25.56"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "second",
+    "implicit-conversion"
+  ]
+}

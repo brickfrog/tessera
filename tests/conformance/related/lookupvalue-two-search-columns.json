@@ -1,0 +1,37 @@
+{
+  "title": "LOOKUPVALUE with two search pairs needs both to match",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Price\", LOOKUPVALUE ( Product[Price], Product[Color], \"Red\", Product[Category], \"Accessories\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Price]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          20.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-lookupvalue/",
+      "quote": "The second and third arguments form a pair that can be repeated multiple times",
+      "supports": "search pairs can be repeated"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/lookupvalue-function-dax",
+      "quote": "If no match satisfies all the search values, the function returns BLANK or alternateResult (if specified)",
+      "supports": "all pairs must match"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Red products are Bike and Helmet; Accessories are Helmet and Lock. Only Helmet matches both: Price 20.",
+  "tags": [
+    "lookupvalue"
+  ]
+}

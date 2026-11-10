@@ -1,0 +1,45 @@
+{
+  "title": "Currency / currency is a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( 10 ) / CURRENCY ( 4 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "In the following table, the row header is the numerator and the column header is the denominator.",
+      "supports": "the Division (/) table of result types: INTEGER/INTEGER is REAL, INTEGER/CURRENCY is CURRENCY, CURRENCY/INTEGER is CURRENCY, CURRENCY/CURRENCY is REAL, CURRENCY/REAL is CURRENCY"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The division of a currency only returns a decimal when the denominator is another currency (B)",
+      "supports": "stated outright"
+    },
+    {
+      "url": "https://dax.guide/currency/",
+      "quote": "Returns the value as a currency data type",
+      "supports": "CURRENCY ( x ) is a currency (fixed decimal) value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CURRENCY / CURRENCY is REAL: 10 / 4 = 2.5.",
+  "tags": [
+    "conversion",
+    "operator-divide",
+    "result-type",
+    "currency"
+  ]
+}

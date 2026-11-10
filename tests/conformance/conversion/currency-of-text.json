@@ -1,0 +1,39 @@
+{
+  "title": "CURRENCY ( \"1950.00\" ) is 1950 as a currency",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( \"1950.00\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1950.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/currency/",
+      "quote": "( \"Currency 3\", FORMAT ( CURRENCY ( \"1950.00\" ), \"#.00000\" ) )",
+      "supports": "the example shows 1950.00000 for this value"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/currency-function-dax",
+      "quote": "will try to convert text to a number. If conversion succeeds the number will be converted to currency",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The text \"1950.00\" converts to the number 1950, which becomes the currency 1950.0. The page's example formats the same value and shows 1950.00000.",
+  "tags": [
+    "conversion",
+    "currency",
+    "text-to-number"
+  ]
+}

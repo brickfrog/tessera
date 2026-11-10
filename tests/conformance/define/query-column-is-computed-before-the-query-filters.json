@@ -1,0 +1,56 @@
+{
+  "title": "A query column is populated before the query runs, so a filter in the query does not change its values",
+  "model": "sales",
+  "query": [
+    "DEFINE COLUMN Product[Product Sales] = [Sales Amount]",
+    "EVALUATE CALCULATETABLE (",
+    "  SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Sales\", Product[Product Sales] ),",
+    "  'Date'[Year] = 2023 )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          400.0
+        ],
+        [
+          "Helmet",
+          60.0
+        ],
+        [
+          "Lock",
+          80.0
+        ],
+        [
+          "Scooter",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/st/column/",
+    "quote": "The syntax after COLUMN defines a query column, which has a data lineage and it is populated in an empty filter context before the query is executed.",
+    "supports": "the values are fixed before the query filters exist"
+  },
+  "confidence": "derived",
+  "derivation": "The column is computed with only the context transition of its row: Bike rows 1, 5, 7 = 400; Helmet rows 2, 3 = 60; Lock rows 4, 6 = 80; Scooter BLANK. The filter on Date[Year] does not reach Product (Date filters Sales, not Product), so all four rows are returned with the stored values, not the 2023 amounts (100, 60, 50).",
+  "tags": [
+    "define-column",
+    "query-column",
+    "context-transition",
+    "calculatetable",
+    "selectcolumns"
+  ]
+}

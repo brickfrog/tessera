@@ -1,0 +1,42 @@
+{
+  "title": "2.0 * ( DATE ( 2020, 10, 23 ) + TIME ( 12, 0, 0 ) ) is the decimal number 88255",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 2.0 * ( DATE ( 2020, 10, 23 ) + TIME ( 12, 0, 0 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          88255.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a multiplication operation combines an integer with a real number, DAX converts both numbers to real numbers, and the return value is also REAL",
+      "supports": "the multiplication table above this sentence has a Date/time column: INTEGER gives INTEGER, REAL gives REAL. It has no Date/time row"
+    },
+    {
+      "url": "https://dax.guide/value/",
+      "quote": "VALUE converts a text string that represents a number to a number",
+      "supports": "the example shows DATE ( 2020, 10, 23 ) as the number 44127"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The multiplication table gives REAL for a REAL multiplied by a Date/time. 2020-10-23 is day 44127 and noon is half a day: 44127.5. 2.0 * 44127.5 = 88255.0.",
+  "tags": [
+    "assumption:date-multiplication",
+    "operator-multiply",
+    "date",
+    "time",
+    "implicit-conversion",
+    "date-functions"
+  ]
+}

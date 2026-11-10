@@ -1,0 +1,30 @@
+{
+  "title": "MOD ( -3, -2 ) is -1",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MOD ( -3, -2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          -1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/mod-function-dax",
+    "quote": "Note that the sign is always the same as the sign of the divisor.",
+    "supports": "the example = MOD(-3,-2) returns -1"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "mod"
+  ],
+  "notes": "The type is not asserted (see mod-positive)."
+}

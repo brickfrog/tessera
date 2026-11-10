@@ -1,0 +1,55 @@
+{
+  "title": "In SUMMARIZECOLUMNS, ISINSCOPE is TRUE for a group-by column and FALSE for another column of the table",
+  "model": "sales",
+  "query": [
+    "EVALUATE SUMMARIZECOLUMNS ( Product[Color],",
+    "  \"Color in scope\", ISINSCOPE ( Product[Color] ),",
+    "  \"Category in scope\", ISINSCOPE ( Product[Category] ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Color in scope]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Category in scope]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          true,
+          false
+        ],
+        [
+          "Blue",
+          true,
+          false
+        ],
+        [
+          "Green",
+          true,
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isinscope/",
+    "quote": "ISINSCOPE is useful to detect if a column is currently -- in the rows or columns of a visual (like groupby columns -- of SUMMARIZECOLUMNS)",
+    "supports": "the page shows true for the group-by columns and false for a column that is not grouped"
+  },
+  "confidence": "derived",
+  "derivation": "Product[Color] is the group-by column, so it is in scope in each row. Product[Category] is not grouped. The expressions are never BLANK, so all three colors are returned, Green included.",
+  "tags": [
+    "isinscope",
+    "summarizecolumns"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "title": "ALL ( Sales ) as a filter argument removes filters and adds none",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"Sold\", CALCULATE ( COUNTROWS ( Product ), Sales ), \"AllSales\", CALCULATE ( COUNTROWS ( Product ), ALL ( Sales ) ) ), Product[Color] = \"Red\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Sold]",
+          "type": "int64"
+        },
+        {
+          "name": "[AllSales]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2,
+          4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+    "quote": "ALL requires the removal of any filters from the expanded Sales table, which includes Product[Color]",
+    "supports": "ALL ( Sales ) removes the filters of expanded Sales and returns nothing to filter with: the article's denominator is the count of all products"
+  },
+  "confidence": "derived",
+  "derivation": "Under Color = Red. Sold: Sales is evaluated under the Red filter (rows 1, 2, 3, 5, 7); its expanded table keeps products 1 and 2: 2. AllSales: the color filter is removed and no filter is added, so the unsold Scooter counts too: all 4 products.",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "all",
+    "countrows",
+    "expanded-table",
+    "filter-removal",
+    "table-filter"
+  ],
+  "notes": "An engine that treats ALL ( Sales ) as the table of all Sales rows would give 3 for AllSales."
+}

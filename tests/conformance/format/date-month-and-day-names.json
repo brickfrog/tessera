@@ -1,0 +1,53 @@
+{
+  "title": "FORMAT gives month and weekday names in English for en-US",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"mmm\", FORMAT ( DATE ( 2020, 1, 2 ), \"mmm\" ), \"mmmm\", FORMAT ( DATE ( 2020, 1, 2 ), \"mmmm\" ), \"ddd\", FORMAT ( DATE ( 2020, 1, 9 ), \"ddd\" ), \"dddd\", FORMAT ( DATE ( 2020, 1, 9 ), \"dddd\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[mmm]",
+          "type": "string"
+        },
+        {
+          "name": "[mmmm]",
+          "type": "string"
+        },
+        {
+          "name": "[ddd]",
+          "type": "string"
+        },
+        {
+          "name": "[dddd]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Jan",
+          "January",
+          "Thu",
+          "Thursday"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "The \"m\" format string offers many options, depending on the",
+      "supports": "the example shows mmm = Jan and mmmm = January for DATE ( 2020, 1, 2 )"
+    },
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "The \"d\" format string offers many options, depending on the",
+      "supports": "the example shows ddd = Thu and dddd = Thursday for DATE ( 2020, 1, 9 )"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "format",
+    "custom-date-format",
+    "culture"
+  ]
+}

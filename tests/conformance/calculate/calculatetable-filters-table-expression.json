@@ -1,0 +1,41 @@
+{
+  "title": "CALCULATETABLE evaluates a table expression in the modified filter context",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( VALUES ( 'Product'[Product] ), 'Product'[Category] = \"Accessories\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Helmet"
+        ],
+        [
+          "Lock"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/calculatetable/",
+      "quote": "CALCULATETABLE follows the same steps as CALCULATE to evaluate its result.",
+      "supports": "CALCULATETABLE works as CALCULATE and returns a table"
+    },
+    {
+      "url": "https://dax.guide/calculatetable/",
+      "quote": "Returns the colors of Proseware branded products",
+      "supports": "the page's example is the same shape: VALUES of one column under a filter on another column of the table"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Accessories products are Helmet and Lock.",
+  "tags": [
+    "calculatetable",
+    "values"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "title": "With every expression under IGNORE, groups with a BLANK result are returned",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Amt\", IGNORE ( [Sales Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amt]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ],
+        [
+          "Blue",
+          80.0
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/ignore/",
+      "quote": "-- IGNORE tags a measure in SUMMARIZECOLUMNS to be ignored when -- determining the non-blank rows.",
+      "supports": "the page shows the same query by year: the years with a blank amount come back"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/summarizecolumns-function-dax",
+      "quote": "Even though both expressions return blank for some rows, they're included since there are no unignored expressions which return blank.",
+      "supports": "all expressions ignored: no row is removed"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Red 460, Blue 80, Green BLANK. The only expression is under IGNORE, so Green is not removed.",
+  "tags": [
+    "summarizecolumns",
+    "ignore",
+    "blank"
+  ]
+}

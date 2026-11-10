@@ -1,0 +1,41 @@
+{
+  "title": "COALESCE does not evaluate the arguments after the first non-blank one",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", COALESCE ( [Order Count], ERROR ( \"second argument\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/coalesce/",
+      "quote": "COALESCE returns the first argument that is not BLANK .",
+      "supports": "the first argument is returned when it is not BLANK"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+      "quote": "To execute the branch expressions regardless of the condition expression, use IF.EAGER instead.",
+      "supports": "IF, which COALESCE stands for, does not evaluate the branch it does not take"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "[Order Count] is 7, not BLANK. Reading COALESCE ( a, b ) as IF ( ISBLANK ( a ), b, a ), the second argument is not evaluated and the result is 7.",
+  "uncertain": true,
+  "alternative": "No source says whether COALESCE evaluates the arguments it does not return. If it evaluates all of them, the query fails with the error \"second argument\".",
+  "tags": [
+    "coalesce",
+    "error",
+    "short-circuit"
+  ],
+  "notes": "The type is left out because ERROR has no data type."
+}

@@ -1,0 +1,32 @@
+{
+  "title": "BLANK = BLANK is TRUE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () = BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/equal-to/",
+    "quote": "Sales[Quantity] = BLANK() -- Returns TRUE if Sales[Quantity] is either BLANK or 0, otherwise returns FALSE",
+    "supports": "a comparison with BLANK () by = is TRUE when the other side is BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "The left side is BLANK and the right side is BLANK (), so the comparison the page describes returns TRUE.",
+  "tags": [
+    "blank",
+    "operator-equals",
+    "comparison"
+  ]
+}

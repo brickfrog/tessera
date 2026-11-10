@@ -1,0 +1,41 @@
+{
+  "title": "HASONEFILTER on an unfiltered column that has a single value",
+  "model": "e-params",
+  "query": "EVALUATE ROW ( \"r\", HASONEFILTER ( Param[Value] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/hasonefilter/",
+      "quote": "HASONEFILTER corresponds to the following code: COUNTROWS ( FILTERS ( <ColumnName> ) ) = 1",
+      "supports": "HASONEFILTER counts the directly filtered values"
+    },
+    {
+      "url": "https://dax.guide/filters/",
+      "quote": "Filter on one column does not affect other columns, -- which are cross-filtered but not filtered.",
+      "supports": "the page shows FILTERS returning every value of a column that has no direct filter"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "With no direct filter FILTERS returns all the values of the column (the page shows all 8 categories for an unfiltered column). Param[Value] has one value, so COUNTROWS ( FILTERS ( ... ) ) = 1 is TRUE.",
+  "uncertain": true,
+  "alternative": "The description \"TRUE when the number of directly filtered values on ColumnName is one\" can be read as needing a direct filter. In that reading the result is FALSE, because the column is not filtered.",
+  "tags": [
+    "hasonefilter",
+    "filters",
+    "no-filter"
+  ]
+}

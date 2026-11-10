@@ -1,0 +1,20 @@
+{
+  "title": "CONVERT ( \"abc\", INTEGER ) is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONVERT ( \"abc\", INTEGER ) )",
+  "expected": {
+    "error": "\"abc\" cannot be converted to an integer"
+  },
+  "source": {
+    "url": "https://dax.guide/convert/",
+    "quote": "CONVERT returns an error when it cannot convert Expression to DataType",
+    "supports": "the page gives CONVERT ( \"abc\", INTEGER ) as its example of the error"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "convert",
+    "text-to-number",
+    "error"
+  ]
+}

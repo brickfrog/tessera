@@ -1,0 +1,39 @@
+{
+  "title": "\"a\" < \"B\" is TRUE: text is ordered without regard to case",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"a\" < \"B\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/dt/string/",
+      "quote": "By default, the comparison between strings is case-insensitive and accent-sensitive",
+      "supports": "the default comparison ignores case and respects accents; the page gives \"e\" and \"è\" as different"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/string-storage-and-collation-in-tabular-models",
+      "quote": "The collation defines the ordering of the characters and their equivalence",
+      "supports": "the same collation that makes case irrelevant for equality also defines the sort order"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "String comparison is case-insensitive, so \"a\" against \"B\" compares as a against b, and a comes before b: TRUE. By code point the answer would be FALSE (a is 97, B is 66).",
+  "tags": [
+    "operator-less-than",
+    "comparison",
+    "case-insensitive"
+  ]
+}

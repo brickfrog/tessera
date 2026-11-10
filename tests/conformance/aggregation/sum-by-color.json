@@ -29,8 +29,8 @@
   ],
   "source": {
     "url": "https://dax.guide/summarizecolumns/",
-    "quote": "SUMMARIZECOLUMNS always combines all the filters on the same table into a single filter",
-    "supports": "SUMMARIZECOLUMNS groups by the columns given and removes rows where every expression is blank"
+    "quote": "If all expressions evaluate to BLANK for a row, that row is not included in the table returned.",
+    "supports": "SUMMARIZECOLUMNS groups by the column and leaves out a group whose only expression is BLANK (Green)"
   },
   "confidence": "derived",
   "derivation": "Red products are Bike (1) and Helmet (2): Sales rows 1, 2, 3, 5, 7 = 100 + 40 + 20 + 200 + 100 = 460. Blue is Lock (3): rows 4, 6 = 50 + 30 = 80. Green (Scooter) has no sales: its measure is BLANK, so SUMMARIZECOLUMNS drops the row. SUM of a fixed decimal column is a fixed decimal.",

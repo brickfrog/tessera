@@ -1,0 +1,32 @@
+{
+  "title": "LASTNONBLANK returns the last value of the column for which the measure is not BLANK",
+  "model": "sales",
+  "query": "EVALUATE LASTNONBLANK ( Product[Product], [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Lock"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/lastnonblank/",
+    "quote": "Returns the last value in the column for which the expression has a non blank value.",
+    "supports": "the last value whose expression is not blank"
+  },
+  "confidence": "derived",
+  "derivation": "Products in order: Bike, Helmet, Lock, Scooter. Scooter has no sales, so its measure is BLANK; Lock is 80 (rows 4, 6). The last non-blank is Lock.",
+  "tags": [
+    "lastnonblank",
+    "context-transition",
+    "blank"
+  ]
+}

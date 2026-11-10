@@ -1,0 +1,31 @@
+{
+  "title": "MAX ( 1, BLANK ) is 1",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MAX ( 1, BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/max-function-dax",
+    "quote": "Max(1, Blank() ) returns 1",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "max",
+    "blank",
+    "scalar"
+  ]
+}

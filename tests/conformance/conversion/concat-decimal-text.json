@@ -1,0 +1,39 @@
+{
+  "title": "1.5 & \"x\" is \"1.5x\": a decimal number becomes text in the default format",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1.5 & \"x\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1.5x"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/concatenate/",
+      "quote": "CONCATENATE converts numbers, dates, and Boolean values to text with the default format",
+      "supports": "the page's example shows 1.5 becoming the text 1.5"
+    },
+    {
+      "url": "https://dax.guide/concatenate/",
+      "quote": "CONCATENATE ( Text1, Text2 ) gives the same result as Text1 & Text2",
+      "supports": "& behaves as CONCATENATE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "1.5 is converted to the text \"1.5\" (the model culture is en-US, so the decimal separator is a point), then \"x\" is appended: \"1.5x\".",
+  "tags": [
+    "conversion",
+    "operator-concatenate",
+    "number-to-text"
+  ]
+}

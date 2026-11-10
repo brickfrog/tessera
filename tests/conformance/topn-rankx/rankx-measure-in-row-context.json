@@ -1,0 +1,59 @@
+{
+  "title": "RANKX over a table of products with a measure, blank amount last",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Product[Product] ), \"Rank\", RANKX ( VALUES ( Product[Product] ), [Sales Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          1
+        ],
+        [
+          "Lock",
+          2
+        ],
+        [
+          "Helmet",
+          3
+        ],
+        [
+          "Scooter",
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/rankx/",
+      "quote": "-- The expression is evaluated during the iteration over the -- table and then in the evaluation context of RANKX.",
+      "supports": "the measure is computed per row of the table, then for the current row"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "If expression or value evaluates to BLANK it is treated as a 0 (zero) for all expressions that result in a number, or as an empty text for all text expressions.",
+      "supports": "a BLANK is ranked as 0"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "There is no filter context here, so VALUES returns all four products. Amounts: Bike 400, Lock 80, Helmet 60, Scooter BLANK. The measure of the current row is found by context transition. Descending: Bike 1, Lock 2, Helmet 3, and the BLANK of Scooter, ranked as 0, is 4.",
+  "tags": [
+    "rankx",
+    "values",
+    "measure",
+    "context-transition",
+    "blank",
+    "addcolumns"
+  ]
+}

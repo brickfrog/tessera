@@ -1,0 +1,46 @@
+{
+  "title": "ORDER BY on dates sorts by date, then time of day",
+  "model": "a2-sort",
+  "query": "EVALUATE FILTER ( Dates, NOT ISBLANK ( Dates[D] ) ) ORDER BY Dates[D]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Dates[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Dates[D]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          3,
+          "2023-12-31T00:00:00"
+        ],
+        [
+          4,
+          "2024-01-05T13:00:00"
+        ],
+        [
+          1,
+          "2024-03-01T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/dt/datetime/",
+    "quote": "the integer corresponds to the number of days since December 30, 1899, and the decimal part identifies the fraction of the day",
+    "supports": "dates order as their numbers do: later dates and later times are larger"
+  },
+  "confidence": "derived",
+  "derivation": "Dates[D] by Id: 2024-03-01 (1), BLANK (2), 2023-12-31 (3), 2024-01-05 13:00 (4). The filter drops the BLANK row. In day numbers 2023-12-31 < 2024-01-05.54 < 2024-03-01: Ids 3, 4, 1.",
+  "tags": [
+    "order-by",
+    "datetime",
+    "filter"
+  ]
+}

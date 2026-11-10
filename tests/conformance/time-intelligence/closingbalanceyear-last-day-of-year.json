@@ -1,0 +1,31 @@
+{
+  "title": "CLOSINGBALANCEYEAR evaluates the expression on the last date of the year",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CLOSINGBALANCEYEAR ( [Sales], 'Date'[Date] ) ), 'Date'[Date] = DATE ( 2024, 2, 10 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          800.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/closingbalanceyear/",
+    "quote": "CALCULATE ( <Expression>, ENDOFYEAR ( <Dates> [, <YearEndDate>] ) [, <Filter>] )",
+    "supports": "the definition"
+  },
+  "confidence": "derived",
+  "derivation": "The year of 2024-02-10 ends on 2024-12-31; sales on that date are 800.",
+  "tags": [
+    "time-intelligence",
+    "closingbalanceyear"
+  ]
+}

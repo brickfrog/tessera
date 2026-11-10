@@ -1,0 +1,32 @@
+{
+  "title": "VALUE ( \"2020-10-23\" ) is 44127: text in ISO date form converts to the date's day number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VALUE ( \"2020-10-23\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          44127.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/value/",
+    "quote": "The value passed as the text parameter can be in any of the constant, number, date, or time formats recognized by DAX",
+    "supports": "the example lists VALUE ( \"2020-10-23\" ) with the result 44127; the return value is a decimal number"
+  },
+  "confidence": "published",
+  "tags": [
+    "assumption:text-to-date",
+    "value",
+    "text-functions",
+    "iso-date"
+  ]
+}

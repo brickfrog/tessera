@@ -1,0 +1,59 @@
+{
+  "title": "Iterating VALUES of a one-side column, the measure on the blank row is the orphans' amount",
+  "model": "sales-orphans",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Product[Color] ), \"Amount\", [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          100.0
+        ],
+        [
+          "Blue",
+          30.0
+        ],
+        [
+          null,
+          70.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "The values obtained for the group-by columns include the blank values of invalid relationships",
+      "supports": "the page gives SUMMARIZECOLUMNS as an optimized ADDCOLUMNS over VALUES of the group-by column, blank row included"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "the VALUES function treats the blank row as a regular row, returning it. On the other hand, DISTINCT never returns the blank row",
+      "supports": "VALUES returns the blank row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "all the different values of Sales[ProductKey] with no corresponding row in Product are linked to the single blank row",
+      "supports": "orphaned rows are linked to the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "VALUES ( Product[Color] ) is Red, Blue and the blank row's BLANK. Context transition filters Product[Color] to each: Red 100 (Sales row 1), Blue 30 (row 2), BLANK selects the blank row, to which Sales rows 3 and 4 are linked: 50 + 20 = 70.",
+  "tags": [
+    "addcolumns",
+    "values",
+    "context-transition",
+    "blank-row",
+    "relationship"
+  ]
+}

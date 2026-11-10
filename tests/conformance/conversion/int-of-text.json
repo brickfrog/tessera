@@ -1,0 +1,38 @@
+{
+  "title": "INT ( \"1950.00\" ) is 1950: INT converts text to a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( \"1950.00\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1950
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "( \"Integer 3\", INT ( \"1950.00\" ) )",
+      "supports": "the example shows 1,950 for this expression"
+    },
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "INT performs a type conversion to an integer and always returns an integer value",
+      "supports": "the result is an integer"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "int",
+    "text-to-number"
+  ]
+}

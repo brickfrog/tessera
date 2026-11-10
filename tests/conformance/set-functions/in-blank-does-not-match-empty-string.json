@@ -1,0 +1,33 @@
+{
+  "title": "BLANK IN { \"\" } is FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () IN { \"\" } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/containsrow/",
+    "quote": "For example, the BLANK value does not match 0 or an empty string.",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "in",
+    "blank",
+    "empty-string",
+    "strict-comparison",
+    "table-constructor"
+  ]
+}

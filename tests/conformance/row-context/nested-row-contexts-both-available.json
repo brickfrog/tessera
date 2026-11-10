@@ -1,0 +1,41 @@
+{
+  "title": "Nested iterators give two row contexts, and the inner expression can read both",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( Customer, SUMX ( 'Product', Customer[CustomerKey] * 'Product'[ProductKey] ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          100
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+      "quote": "You can safely do this because there are two row contexts: the first one introduced by AVERAGEX over Customer and the second one introduced by SUMX over Sales.",
+      "supports": "the innermost expression references columns of both iterated tables, one from each row context"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+      "quote": "A row context does not propagate through relationships.",
+      "supports": "the outer row context on Customer does not restrict the rows of Product that the inner SUMX iterates"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Customer keys are 1, 2, 3, 4 and Product keys are 1, 2, 3, 4. For each customer the inner SUMX iterates all 4 products: sum of c * p = (1 + 2 + 3 + 4) * (1 + 2 + 3 + 4) = 10 * 10 = 100.",
+  "tags": [
+    "sumx",
+    "row-context",
+    "nested-row-context",
+    "iterator"
+  ],
+  "notes": "Type: INTEGER * INTEGER is INTEGER; the sum is taken to have the type of the summed expression."
+}

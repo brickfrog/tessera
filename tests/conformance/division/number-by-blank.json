@@ -1,0 +1,40 @@
+{
+  "title": "5 / BLANK is Infinity: a BLANK denominator is zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 5 / BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          "Infinity"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "5/BLANK Infinity",
+      "supports": "the table of BLANK in operations gives Infinity for 5/BLANK"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "4 / BLANK () Infinite",
+      "supports": "the same for 4 / BLANK ()"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "division",
+    "blank",
+    "operator-divide",
+    "divide-by-zero",
+    "infinity"
+  ]
+}

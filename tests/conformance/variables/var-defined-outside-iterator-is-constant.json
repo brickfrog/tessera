@@ -1,0 +1,41 @@
+{
+  "title": "A variable defined before an iterator has the same value for every row",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR S = [Sales Amount] RETURN SUMX ( Customer, S ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2160.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+      "quote": "The value of CustomerSales is determined at the beginning, outside of the iteration over Customer . Therefore, its value is the total sales amount",
+      "supports": "a variable defined before SUMX is the total, not the value of the customer being iterated"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/when-are-variables-evaluated-in-dax/",
+      "quote": "Variables are evaluated in the filter context where they are defined, and their evaluation happens at most once.",
+      "supports": "a variable is evaluated where it is defined, not where it is used"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "S = 540 (all 7 sales rows). Customer has 4 rows (Ann, Bob, Cho, Dee) and no blank row, because every Sales[CustomerKey] exists in Customer. SUMX adds 540 four times: 2160. With the measure in place of S the result would be 540.",
+  "tags": [
+    "var",
+    "sumx",
+    "variable-evaluated-once",
+    "iterator"
+  ],
+  "notes": "The type is the type of the summed values, a fixed decimal."
+}

@@ -1,0 +1,53 @@
+{
+  "title": "FORMAT with \"#,##0\" has thousand separators and rounds to a whole number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"big\", FORMAT ( 1234567, \"#,##0\" ), \"round\", FORMAT ( 1234.567, \"#,##0\" ), \"zero\", FORMAT ( 0, \"#,##0\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[big]",
+          "type": "string"
+        },
+        {
+          "name": "[round]",
+          "type": "string"
+        },
+        {
+          "name": "[zero]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1,234,567",
+          "1,235",
+          "0"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Standard use of the thousand separator is specified if the format contains a thousand separator surrounded by digit placeholders ( 0 or # ).",
+      "supports": "the thousand separator"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Digit placeholder. Display a digit or nothing.",
+      "supports": "the # placeholder; the final 0 always shows a digit"
+    },
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "Consecutive commas not followed by 0 before the decimal point",
+      "supports": "the example shows FORMAT ( 103456789102, \"$#,0\" ) as $103,456,789,102"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "1234567 gets separators: \"1,234,567\". 1234.567 has no decimal placeholders, so it rounds to 1235: \"1,235\". 0 shows the one mandatory digit: \"0\".",
+  "tags": [
+    "format",
+    "custom-numeric-format"
+  ]
+}

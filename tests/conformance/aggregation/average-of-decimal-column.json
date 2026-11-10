@@ -1,0 +1,43 @@
+{
+  "title": "AVERAGE of a fixed decimal column",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", AVERAGE ( V[Amt] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          4.55
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/average/",
+      "quote": "A single value of one these types: currency , decimal",
+      "supports": "AVERAGE can return a currency, which can only be for a currency column"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/average-function-dax",
+      "quote": "Returns a decimal number that represents the arithmetic mean of the numbers in the column.",
+      "supports": "the Microsoft page says only decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[Amt] holds 10.5, BLANK, 0, -2.25, 10.5, 4, BLANK. Sum 22.75 over 5 non-blank values: 4.55. DAX Guide lists currency among the return types, taken here to mean a currency column gives a currency.",
+  "uncertain": true,
+  "alternative": "The result is a double: the same value, 4.55, with the column type double.",
+  "tags": [
+    "average",
+    "blank",
+    "result-type",
+    "decimal"
+  ],
+  "notes": "The value is the same under both readings; only the column type is in doubt."
+}

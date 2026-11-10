@@ -1,0 +1,47 @@
+{
+  "title": "INTERSECT returns the rows of the left table found in the right, with the duplicates of the left",
+  "model": "scalar",
+  "query": "EVALUATE INTERSECT ( { \"A\", \"A\", \"B\", \"B\", \"B\", \"C\", \"D\", \"D\" }, { \"B\", \"C\", \"D\", \"D\", \"D\", \"E\" } )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "B"
+        ],
+        [
+          "B"
+        ],
+        [
+          "B"
+        ],
+        [
+          "C"
+        ],
+        [
+          "D"
+        ],
+        [
+          "D"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/intersect-function-dax",
+    "quote": "If a row appears in tableExpression1 and tableExpression2, it and all duplicates in tableExpression1 are included in the result set.",
+    "supports": "the page shows these two tables (States1, States2) and this result"
+  },
+  "confidence": "published",
+  "derivation": "Left: A, A, B, B, B, C, D, D. Right holds B, C, D (and E). The left rows B (3 times), C, D (twice) are kept; D is in the right table three times but that does not add rows.",
+  "tags": [
+    "intersect",
+    "duplicates",
+    "table-constructor"
+  ]
+}

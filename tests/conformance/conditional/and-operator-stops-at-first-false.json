@@ -1,0 +1,41 @@
+{
+  "title": "The && operator does not evaluate its right side when the left is FALSE",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", [Order Count] < 0 && ERROR ( \"right side\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/op/and/",
+      "quote": "returns FALSE if any of the arguments is FALSE",
+      "supports": "one FALSE argument settles the result"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/or-function-dax",
+      "quote": "The function evaluates the arguments until the first TRUE argument, then returns TRUE .",
+      "supports": "the same short-circuit is documented for OR only"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The left side is 7 < 0, FALSE, which settles the result. By symmetry with OR, which is documented to stop at the first TRUE, && stops at the first FALSE and ERROR is not evaluated.",
+  "uncertain": true,
+  "alternative": "Short-circuit evaluation is documented for OR, not for AND or &&. If && evaluates both sides, the query fails with the error \"right side\".",
+  "tags": [
+    "operator-and",
+    "error",
+    "short-circuit"
+  ]
+}

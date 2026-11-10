@@ -1,0 +1,31 @@
+{
+  "title": "COUNTROWS counts every row, whatever its columns hold",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( V ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          7
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/countrows/",
+    "quote": "COUNTROWS counts all the rows of the table, including duplicate rows and rows where every column is blank.",
+    "supports": "rows are counted, not values"
+  },
+  "confidence": "derived",
+  "derivation": "V has 7 rows. Row 2 is BLANK in every column but Id and Grp and still counts.",
+  "tags": [
+    "countrows",
+    "blank"
+  ]
+}

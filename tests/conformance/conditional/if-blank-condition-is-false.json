@@ -1,0 +1,33 @@
+{
+  "title": "A BLANK condition counts as FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IF ( BLANK (), \"T\", \"F\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "F"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "BLANK or a blank value is converted to 0 , \"\" , or False , depending on the data type of the other compared value.",
+    "supports": "where a boolean is expected BLANK is FALSE"
+  },
+  "confidence": "derived",
+  "derivation": "The condition must be a boolean; BLANK converts to FALSE, so IF returns its third argument.",
+  "tags": [
+    "if",
+    "blank",
+    "implicit-conversion",
+    "boolean"
+  ]
+}

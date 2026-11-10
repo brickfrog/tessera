@@ -1,0 +1,45 @@
+{
+  "title": "VALUES returns one BLANK when the column stores a BLANK and the table has the blank row",
+  "model": "c-blank-key",
+  "query": "EVALUATE VALUES ( Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ],
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/values/",
+      "quote": "VALUES includes the blank row caused by an invalid relationship, if present",
+      "supports": "VALUES includes the blank row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "If a relationship is invalid, the VertiPaq engine automatically adds a row containing BLANK in every column of the table on the one-side of the relationship",
+      "supports": "the blank row's Color is BLANK"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Stored values: Red, Blue, BLANK (Bell). The blank row adds a BLANK, which is the same value as the stored one. VALUES of a column returns unique values: 3 rows, not 4.",
+  "tags": [
+    "values",
+    "blank-row",
+    "blank"
+  ]
+}

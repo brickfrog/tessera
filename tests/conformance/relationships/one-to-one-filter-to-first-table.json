@@ -1,0 +1,41 @@
+{
+  "title": "A one-to-one relationship filters from the second table to the first",
+  "model": "c-onetoone",
+  "query": "EVALUATE ROW ( \"Products\", CALCULATE ( COUNTROWS ( Product ), ProductCategory[Category] = \"Clothing\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "For one-to-one relationships, the cross filter direction is always from both tables",
+      "supports": "one-to-one relationships always filter from both tables"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/relationships-in-power-bi-and-tabular-models/",
+      "quote": "An SSR relationship always uses bidirectional filtering",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Category Clothing is SKU CL-01, which is one Product row (T-shirt).",
+  "tags": [
+    "calculate",
+    "countrows",
+    "relationship",
+    "one-to-one",
+    "bidirectional"
+  ]
+}

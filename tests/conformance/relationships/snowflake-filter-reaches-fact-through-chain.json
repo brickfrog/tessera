@@ -1,0 +1,55 @@
+{
+  "title": "A filter on the far end of a chain of one-to-many relationships reaches the fact table",
+  "model": "c-snowflake",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Category[Category], \"Amount\", SUM ( Sales[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Category[Category]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bikes",
+          3100.0
+        ],
+        [
+          "Parts",
+          70.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "Filters will propagate so long as there's a relationship path to follow, which can involve propagation to multiple tables",
+      "supports": "propagation follows the whole relationship path Category -> Subcategory -> Product -> Sales"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "The filter on the Category table propagates to the Product table",
+      "supports": "the page walks a Category filter through Product to Sales"
+    },
+    {
+      "url": "https://dax.guide/summarizecolumns/",
+      "quote": "If all expressions evaluate to BLANK for a row, that row is not included in the table returned",
+      "supports": "Clothing has no sales, its Amount is BLANK and the row is left out"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Bikes has subcategories Road (10) and Mountain (11), with products 100, 101, 102: Sales rows 1, 2, 3, 4 = 500 + 1000 + 700 + 900 = 3100. Parts has Brakes (20) and Chains (21), with products 103, 104: rows 5, 6 = 50 + 20 = 70. Clothing has no subcategory, so no sales: BLANK, row removed.",
+  "tags": [
+    "summarizecolumns",
+    "sum",
+    "relationship",
+    "filter-propagation",
+    "snowflake"
+  ]
+}

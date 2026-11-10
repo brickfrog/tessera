@@ -1,0 +1,40 @@
+{
+  "title": "Date + integer is a date: adding 1 adds a day",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2024, 1, 31 ) + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2024-02-01T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "Addition (+) INTEGER CURRENCY REAL Date/time INTEGER INTEGER CURRENCY REAL Date/time",
+      "supports": "the Addition (+) table: any type added to Date/time gives Date/time"
+    },
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "the following expression returns the current date plus one day (exactly 24 hours)",
+      "supports": "adding 1 to a date adds one day"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Date/time + INTEGER is Date/time. One day after 2024-01-31 is 2024-02-01.",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "result-type",
+    "date"
+  ]
+}

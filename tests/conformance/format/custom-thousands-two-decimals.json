@@ -1,0 +1,38 @@
+{
+  "title": "FORMAT ( 1234.567, \"#,0.00\" ) is \"1,234.57\": extra decimals are rounded",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( 1234.567, \"#,0.00\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1,234.57"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "Use comma as thousand separator and dot as decimal separator",
+      "supports": "the example shows FORMAT( 1234.567, \"#,0.00\", \"en-US\" ) as 1,234.57; the model culture is en-US"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "round the number to as many decimal places as there are zeros",
+      "supports": "more digits than zero placeholders are rounded"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The page shows the result with the locale \"en-US\" given; here the locale comes from the model, which is en-US. 1234.567 rounds to 1234.57 and gets a thousand separator.",
+  "tags": [
+    "format",
+    "custom-numeric-format"
+  ]
+}

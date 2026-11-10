@@ -1,0 +1,41 @@
+{
+  "title": "DISTINCTCOUNT over '', BLANK and x is 3: the empty string and BLANK are different values",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNT ( Empty[Txt] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/distinctcount-function-dax",
+      "quote": "DISTINCTCOUNT function counts the BLANK value",
+      "supports": "BLANK is one of the counted values"
+    },
+    {
+      "url": "https://dax.guide/op/strictly-equal-to/",
+      "quote": "Returns TRUE if Product[Color] is an empty string, returns FALSE if it is BLANK or any other value",
+      "supports": "Column == \"\" is TRUE only for the empty string"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Empty[Txt] holds '' (Id 1), BLANK (Id 2), x (Id 3). DISTINCTCOUNT counts BLANK as a value. == and ISBLANK tell the empty string from BLANK, so they are separate values: '', BLANK and x make 3.",
+  "uncertain": true,
+  "alternative": "No source says outright that a column keeps the empty string and BLANK as two dictionary values. If grouping compares them as = does (BLANK equal to the empty string), the result is 2.",
+  "tags": [
+    "distinctcount",
+    "empty-string",
+    "blank"
+  ]
+}

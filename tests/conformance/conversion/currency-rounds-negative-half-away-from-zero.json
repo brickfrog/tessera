@@ -1,0 +1,43 @@
+{
+  "title": "CURRENCY ( -0.03125 ) is -0.0313: a half rounds away from zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( -0.03125 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          -0.0313
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/currency-function-dax",
+      "quote": "Rounding up occurs if the 5th significant decimal is equal or larger than 5",
+      "supports": "the rule, stated without saying what up means for a negative number"
+    },
+    {
+      "url": "https://dax.guide/convert/",
+      "quote": "A value that ends in .5 is rounded away from zero",
+      "supports": "the rule CONVERT follows for integers, taken to hold for currency too"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "-0.03125 is -1/32, exact in a double, so the fifth decimal is exactly 5. Rounding the magnitude up gives -0.0313.",
+  "uncertain": true,
+  "alternative": "\"Rounding up\" means towards positive infinity, or the rounding is half-even: -0.0312.",
+  "tags": [
+    "conversion",
+    "currency",
+    "rounding",
+    "assumption:currency-rounding"
+  ],
+  "notes": "No source shows a negative value converted to currency."
+}

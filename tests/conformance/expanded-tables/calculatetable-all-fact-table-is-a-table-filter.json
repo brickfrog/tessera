@@ -1,0 +1,44 @@
+{
+  "title": "CALCULATETABLE ( ALL ( Sales ) ) as a filter argument filters with all the rows of Sales",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CALCULATE ( COUNTROWS ( Product ), CALCULATETABLE ( ALL ( Sales ) ) ) ), Product[Color] = \"Red\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+      "quote": "ALL still behaves like a REMOVEFILTERS , but CALCULATETABLE forces the result back",
+      "supports": "inside CALCULATETABLE the rows of ALL ( Sales ) are returned and act as a filter"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+      "quote": "the filter context contains all the columns of the expanded version of Sales",
+      "supports": "a table filter argument filters all the columns of expanded Sales"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CALCULATETABLE returns all 7 Sales rows, ignoring the Red filter. As a filter argument this is the expanded Sales table: it overwrites the color filter and keeps the products that have sales, 1, 2 and 3: 3. Scooter (4) has none.",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "all",
+    "countrows",
+    "expanded-table",
+    "table-filter",
+    "filter-overwrite"
+  ],
+  "notes": "Compare all-fact-table-is-a-filter-removal-not-a-table, where the bare ALL ( Sales ) gives 4."
+}

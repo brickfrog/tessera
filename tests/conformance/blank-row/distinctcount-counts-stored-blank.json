@@ -1,0 +1,39 @@
+{
+  "title": "DISTINCTCOUNT counts a stored BLANK as a value",
+  "model": "c-blank-key",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNT ( Product[Color] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/distinctcount-function-dax",
+      "quote": "DISTINCTCOUNT function counts the BLANK value",
+      "supports": "DISTINCTCOUNT counts BLANK"
+    },
+    {
+      "url": "https://dax.guide/distinctcount/",
+      "quote": "DISTINCTCOUNT considers BLANK as a valid value, whereas",
+      "supports": "BLANK is a valid value for DISTINCTCOUNT"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] stores Red, Blue and BLANK (Bell): 3 distinct values, the BLANK included. The blank row's BLANK is the same value, so the answer is 3 whether or not the blank row counts.",
+  "tags": [
+    "distinctcount",
+    "blank",
+    "blank-row"
+  ]
+}

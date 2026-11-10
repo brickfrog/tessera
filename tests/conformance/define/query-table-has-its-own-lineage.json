@@ -1,0 +1,52 @@
+{
+  "title": "A row of a query table does not filter the model column it was built from",
+  "model": "sales",
+  "query": [
+    "DEFINE TABLE Colors = DISTINCT ( Product[Color] )",
+    "EVALUATE SELECTCOLUMNS ( Colors, \"Color\", Colors[Color], \"Sales Amount\", [Sales Amount] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          540.0
+        ],
+        [
+          "Blue",
+          540.0
+        ],
+        [
+          "Green",
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/st/table/",
+    "quote": "The syntax after TABLE defines a query table, which has a data lineage and it is populated in an empty filter context before the query is executed.",
+    "supports": "the query table has a lineage of its own; the example on the page needs TREATAS to filter Product[Color] with it"
+  },
+  "confidence": "derived",
+  "derivation": "The measure does a context transition on the row of Colors, which filters Colors[Color]. Colors has no relationship with Sales, so the measure is the total 540 in each row.",
+  "uncertain": true,
+  "alternative": "If the query table kept the lineage of Product[Color], the context transition would filter Product: Red 460, Blue 80, Green BLANK.",
+  "tags": [
+    "define-table",
+    "query-table",
+    "data-lineage",
+    "context-transition",
+    "selectcolumns"
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "title": "BLANK * 5 is BLANK: BLANK propagates through a multiplication",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () * 5 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "BLANK * 5 BLANK",
+      "supports": "the table of BLANK in operations gives BLANK for BLANK * 5"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "BLANK () * 4 Blank value",
+      "supports": "the same for BLANK () * 4"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-multiply"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

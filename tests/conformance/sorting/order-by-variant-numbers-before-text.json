@@ -1,0 +1,50 @@
+{
+  "title": "ORDER BY on a column holding numbers and text puts the numbers first",
+  "model": "scalar",
+  "query": "EVALUATE SELECTCOLUMNS ( T, \"v\", IF ( T[n] = 2, \"x\", T[n] ) ) ORDER BY [v]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[v]",
+          "type": "variant"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ],
+        [
+          3
+        ],
+        [
+          "x"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "DAX considers Boolean values greater than string values, and string values greater than numeric or date/time values",
+      "supports": "the rank of types in comparisons: numbers and dates lowest, then strings, then booleans"
+    },
+    {
+      "url": "https://dax.guide/dt/variant/",
+      "quote": "The Variant data type is used for expressions that might return different data types, depending on the conditions",
+      "supports": "an IF with an integer branch and a string branch is a variant expression"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "T[n] holds 1, 2, 3. The expression gives 1, \"x\", 3: a variant column. String values rank above numeric values, so ascending order is the numbers in order and then the text: 1, 3, \"x\".",
+  "uncertain": true,
+  "alternative": "The ranking rule is documented for comparison expressions, not for ORDER BY. If ORDER BY does not accept a variant column the query fails with an error; if text sorted before numbers the order would be \"x\", 1, 3.",
+  "tags": [
+    "order-by",
+    "variant",
+    "selectcolumns",
+    "if",
+    "mixed-types"
+  ]
+}

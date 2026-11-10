@@ -1,0 +1,31 @@
+{
+  "title": "The = operator compares text case-insensitively",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"sqlbi\" = \"SQLBI\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/exact/",
+    "quote": "By default, DAX is not case sensitive in comparison.",
+    "supports": "the example shows A = B true for \"sqlbi\" and \"SQLBI\""
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "operator-equals",
+    "case-insensitive"
+  ]
+}

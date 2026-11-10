@@ -1,0 +1,50 @@
+{
+  "title": "COUNTROWS of the one-side table sees the filter coming from the many side of a both-direction relationship",
+  "model": "c-bidirectional",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Customer[Country], \"Products\", COUNTROWS ( Product ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        },
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "United States",
+          2
+        ],
+        [
+          "Australia",
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/bidirectional-relationships-and-ambiguity-in-dax/",
+      "quote": "the filter automatically propagates from Sales to Product",
+      "supports": "the filter goes from Sales to Product when the relationship is bidirectional"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-bidirectional-filtering",
+      "quote": "The product slicer now lists a single option: T-shirt",
+      "supports": "same rows; Australia leaves one product"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "United States is CUST-01: Sales rows 1 and 2, SKUs CL-01 and CL-02: 2 products. Australia is CUST-02: row 3, SKU CL-01: 1 product. The Hat (AC-01) has no sales and is in neither.",
+  "tags": [
+    "summarizecolumns",
+    "countrows",
+    "relationship",
+    "bidirectional",
+    "filter-propagation"
+  ]
+}

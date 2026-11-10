@@ -1,0 +1,42 @@
+{
+  "title": "SUMMARIZE over the fact table groups by a column of a related table and returns only the values in use",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZE ( Sales, Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/all-the-secrets-of-summarize/",
+      "quote": "A product that has never been sold does not appear, because there are no corresponding transactions for it in Sales .",
+      "supports": "grouping Sales by a Product column gives only the values some Sales row reaches"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/summarize-function-dax",
+      "quote": "groupBy_columnName must be either in table or in a related table to table .",
+      "supports": "a related column is allowed"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows by product colour (Bike and Helmet are Red, Lock is Blue, Scooter is Green): rows 1, 2, 3, 5, 7 are Red, rows 4, 6 are Blue, none is Green. So the groups are Red and Blue; Green (Scooter, never sold) is absent. The column keeps its model name.",
+  "tags": [
+    "summarize",
+    "relationship",
+    "column-names"
+  ]
+}

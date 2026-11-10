@@ -1,0 +1,38 @@
+{
+  "title": "DATEVALUE ( \"28/02/2020\" ) is February 28, 2020: when month first is impossible, day first is tried",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATEVALUE ( \"28/02/2020\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2020-02-28T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/datevalue/",
+      "quote": "If month and day are exchanged, the conversion still works",
+      "supports": "the example shows DATEVALUE ( \"28/02/2020\" ) as 2020-02-28"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/datevalue-function-dax",
+      "quote": "If conversion using the locale and date/time settings of the model fails, DATEVALUE will attempt to use other date formats.",
+      "supports": "the fallback"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "datevalue",
+    "culture"
+  ]
+}

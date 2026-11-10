@@ -1,0 +1,53 @@
+{
+  "title": "PARALLELPERIOD by YEAR for one date is the whole previous year",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = PARALLELPERIOD ( 'Date'[Date], -1, YEAR ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] = DATE ( 2024, 8, 15 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2023-01-01T00:00:00",
+          "2023-12-31T00:00:00",
+          365,
+          360.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/parallelperiod/",
+      "quote": "PARALLELPERIOD returns a full period shifted in time",
+      "supports": "the example for 2008-08-15 with -1, YEAR returns 2007-01-01 to 2007-12-31"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/differences-between-dateadd-and-parallelperiod-in-dax/",
+      "quote": "For each interval with at least one value in Date[Date] , the function returns the entire interval shifted by the number of specified intervals.",
+      "supports": "PARALLELPERIOD returns whole intervals"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The selection is one date in 2024; the result is all of 2023, 365 days. Sales in 2023: 360.",
+  "tags": [
+    "time-intelligence",
+    "parallelperiod"
+  ]
+}

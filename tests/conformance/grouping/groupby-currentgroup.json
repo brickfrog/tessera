@@ -1,0 +1,49 @@
+{
+  "title": "GROUPBY aggregates each group with an iterator over CURRENTGROUP",
+  "model": "sales",
+  "query": "EVALUATE GROUPBY ( Sales, Product[Color], \"Qty\", SUMX ( CURRENTGROUP (), Sales[Quantity] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Qty]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          7
+        ],
+        [
+          "Blue",
+          8
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/groupby-function-dax",
+      "quote": "CURRENTGROUP returns a set of rows from the table argument of GROUPBY that belong to the current row of the GROUPBY result.",
+      "supports": "the iterator runs over the rows of the group"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/groupby-function-dax",
+      "quote": "Start with the specified table (and all related tables in the \"to-one\" direction).",
+      "supports": "a related column can be the group-by column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows by product colour (Bike and Helmet are Red, Lock is Blue, Scooter is Green): rows 1, 2, 3, 5, 7 are Red, rows 4, 6 are Blue, none is Green. Red quantity: 1 + 2 + 1 + 2 + 1 = 7. Blue: 5 + 3 = 8. Green has no Sales rows, so no group.",
+  "tags": [
+    "groupby",
+    "currentgroup",
+    "sumx",
+    "relationship"
+  ]
+}

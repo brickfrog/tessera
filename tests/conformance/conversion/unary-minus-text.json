@@ -1,0 +1,32 @@
+{
+  "title": "- \"4\" is -4: unary minus converts text to a number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", - \"4\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          -4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/subtraction/",
+    "quote": "The following two expressions with a unary operator are return the same result",
+    "supports": "the page pairs - 4 with - \"4\""
+  },
+  "confidence": "derived",
+  "derivation": "The string \"4\" is converted to the number 4 and negated: -4.",
+  "tags": [
+    "conversion",
+    "operator-unary-minus",
+    "text-to-number"
+  ],
+  "notes": "The column's type is not asserted: no source says which numeric type the text becomes."
+}

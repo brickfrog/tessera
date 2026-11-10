@@ -1,0 +1,39 @@
+{
+  "title": "DISTINCTCOUNTNOBLANK does not count a stored BLANK",
+  "model": "c-blank-key",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNTNOBLANK ( Product[Color] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/distinctcountnoblank-function-dax",
+      "quote": "Unlike DISTINCTCOUNT function, DISTINCTCOUNTNOBLANK does not count the BLANK value",
+      "supports": "DISTINCTCOUNTNOBLANK does not count BLANK"
+    },
+    {
+      "url": "https://dax.guide/distinctcountnoblank/",
+      "quote": "The number of distinct values in ColumnName, ignoring the blank value",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] stores Red, Blue and BLANK. Without the BLANK: Red and Blue, 2.",
+  "tags": [
+    "distinctcountnoblank",
+    "blank",
+    "blank-row"
+  ]
+}

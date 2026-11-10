@@ -1,0 +1,30 @@
+{
+  "title": "MROUND ( -10, -3 ) is -9",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", MROUND ( -10, -3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -9.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/mround-function-dax",
+    "quote": "The following expression rounds -10 to the nearest multiple of -3. The expected result is -9.",
+    "supports": "the example gives -9; Return value: a decimal number"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "mround"
+  ]
+}

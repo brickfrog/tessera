@@ -1,0 +1,31 @@
+{
+  "title": "QUARTER of BLANK is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", QUARTER ( BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/quarter-function-dax",
+    "quote": "If the input value is BLANK, the output value is also BLANK.",
+    "supports": "states the result"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "quarter",
+    "blank"
+  ],
+  "notes": "The type of the all-BLANK column is not asserted."
+}

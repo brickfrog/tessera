@@ -1,0 +1,27 @@
+{
+  "title": "VALUES returning several rows where a scalar is expected is an error",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VALUES ( Product[Color] ) )",
+  "expected": {
+    "error": "VALUES ( Product[Color] ) has three rows and cannot be converted to a single value"
+  },
+  "source": [
+    {
+      "url": "https://dax.guide/if/",
+      "quote": "DAX tries to convert the table to a scalar value, and it fails if there are multiple rows.",
+      "supports": "a table of several rows does not convert to a scalar"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-selectedvalue",
+      "quote": "In this case, the VALUES function returns a table of multiple rows. Comparing a table of multiple rows to a scalar value results in an error.",
+      "supports": "VALUES with several rows used as a scalar is an error"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "With no filter Product[Color] has Red, Blue and Green. ROW needs a scalar for its column, and a three-row table cannot be converted to one.",
+  "tags": [
+    "values",
+    "table-to-scalar",
+    "error"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "title": "DATEDIFF with a BLANK date is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATEDIFF ( BLANK (), DATE ( 2012, 1, 1 ), DAY ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datediff/",
+    "quote": "If Date1 or Date2 is BLANK , the result is BLANK .",
+    "supports": "states the result"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "datediff",
+    "blank"
+  ],
+  "notes": "The type of the all-BLANK column is not asserted."
+}

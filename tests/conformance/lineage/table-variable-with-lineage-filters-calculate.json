@@ -1,0 +1,38 @@
+{
+  "title": "A table variable whose column has lineage filters the model when used as a CALCULATE filter",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "VAR NotRed = FILTER ( VALUES ( Product[Color] ), Product[Color] <> \"Red\" )",
+    "RETURN ROW ( \"r\", CALCULATE ( [Sales Amount], NotRed ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          80.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-data-lineage-in-dax/",
+    "quote": "What really matters is only the data lineage of a column, which is the original column the values have been retrieved from",
+    "supports": "the variable's column still has the lineage of Product[Color]"
+  },
+  "confidence": "derived",
+  "derivation": "NotRed holds Blue and Green, with the lineage of Product[Color]. As a filter argument it filters that column: Blue is rows 4, 6 = 80, Green has no sales. 80.",
+  "tags": [
+    "calculate",
+    "filter",
+    "values",
+    "variable",
+    "lineage"
+  ]
+}

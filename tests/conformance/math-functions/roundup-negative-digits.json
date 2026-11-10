@@ -1,0 +1,30 @@
+{
+  "title": "ROUNDUP ( 13.25, -1 ) is 20",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUNDUP ( 13.25, -1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          20.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/roundup-function-dax",
+    "quote": "When num_digits is less than zero, the number of places to the left of the decimal sign is increased by the value you specify.",
+    "supports": "the table of expected results for ROUNDUP([Values],-1) lists 13.25 with the result 20"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "roundup"
+  ]
+}

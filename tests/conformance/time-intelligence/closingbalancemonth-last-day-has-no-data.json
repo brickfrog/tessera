@@ -1,0 +1,39 @@
+{
+  "title": "CLOSINGBALANCEMONTH is BLANK when the last date of the month has no data",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CLOSINGBALANCEMONTH ( [Sales], 'Date'[Date] ) ), 'Date'[Date] >= DATE ( 2024, 3, 1 ) && 'Date'[Date] <= DATE ( 2024, 3, 31 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/closingbalancemonth/",
+      "quote": "It does not search for the last date that has data.",
+      "supports": "no row on the last day gives BLANK"
+    },
+    {
+      "url": "https://dax.guide/closingbalancemonth/",
+      "quote": "CALCULATE ( <Expression>, ENDOFMONTH ( <Dates> ) [, <Filter>] )",
+      "supports": "the definition: the expression on the last date of the month"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The last date of March 2024 is the 31st, which has no sales (the only March sale is on the 10th), so the result is BLANK.",
+  "tags": [
+    "time-intelligence",
+    "closingbalancemonth",
+    "blank"
+  ],
+  "notes": "The type of the BLANK column is not asserted."
+}

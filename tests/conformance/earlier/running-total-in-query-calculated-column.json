@@ -1,0 +1,65 @@
+{
+  "title": "EARLIER in a calculated column: running total of the rows up to the current value",
+  "model": "sales",
+  "query": [
+    "DEFINE COLUMN Product[Running Price] = SUMX ( FILTER ( Product, Product[Price] <= EARLIER ( Product[Price] ) ), Product[Price] )",
+    "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Running\", Product[Running Price] ) ORDER BY [Product]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Running]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          180.0
+        ],
+        [
+          "Helmet",
+          30.0
+        ],
+        [
+          "Lock",
+          10.0
+        ],
+        [
+          "Scooter",
+          80.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+      "quote": "Returns the current value of the specified column in an outer evaluation pass of the mentioned column.",
+      "supports": "EARLIER reads the row of the calculated column while FILTER scans the table again"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+      "quote": "EARLIER is mostly used in the context of calculated columns.",
+      "supports": "the calculated column supplies the outer row context"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Prices: Lock 10, Helmet 20, Scooter 50, Bike 100. Sum of the prices up to the current one: Lock 10; Helmet 10 + 20 = 30; Scooter 30 + 50 = 80; Bike 80 + 100 = 180. The sum of a fixed decimal column is a fixed decimal.",
+  "tags": [
+    "earlier",
+    "define-column",
+    "sumx",
+    "filter",
+    "row-context",
+    "running-total",
+    "selectcolumns",
+    "order-by"
+  ]
+}

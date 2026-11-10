@@ -1,0 +1,40 @@
+{
+  "title": "INT of a fixed decimal (currency) value returns a fixed decimal",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( CURRENCY ( 2.9 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "If <Number> is a Currency , then the result is also a Currency data type.",
+      "supports": "the result type follows a currency argument"
+    },
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "INT rounds <Number> towards −∞ to the nearest integer.",
+      "supports": "the value is rounded down"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CURRENCY ( 2.9 ) is the fixed decimal 2.9. INT rounds it down to 2 and, for a currency argument, keeps the currency type: the decimal 2.",
+  "tags": [
+    "math-functions",
+    "int",
+    "currency",
+    "result-type"
+  ]
+}

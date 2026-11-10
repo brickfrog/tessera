@@ -1,0 +1,54 @@
+{
+  "title": "ALL ( table ) as a CALCULATE modifier removes the filters on the table",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( 'Product'[Color], \"All products\", CALCULATE ( [Sales Amount], ALL ( 'Product' ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[All products]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          540.0
+        ],
+        [
+          "Blue",
+          540.0
+        ],
+        [
+          "Green",
+          540.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/all-function-dax",
+      "quote": "Removes all filters from the specified table.",
+      "supports": "ALL ( Table ) removes all filters from the table"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+      "quote": "when used as a CALCULATE filter, removes a filter. It does not return a table result.",
+      "supports": "as a CALCULATE filter ALL removes filters"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The color filter of each row is on a column of Product; ALL ( Product ) removes it. Grand total 540 on each of the three rows (Green too, as its value is not blank).",
+  "tags": [
+    "calculate",
+    "all",
+    "summarizecolumns",
+    "filter-removal"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

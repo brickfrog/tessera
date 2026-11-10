@@ -1,0 +1,39 @@
+{
+  "title": "AVERAGE leaves BLANK rows out of the divisor but counts zeros",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", AVERAGE ( V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1.8
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/average-function-dax",
+      "quote": "However, when a cell contains a blank, the row is not counted.",
+      "supports": "a zero is in the sum and the divisor, a blank is in neither; the return value is a decimal number"
+    },
+    {
+      "url": "https://dax.guide/average/",
+      "quote": "AVERAGE ignores blank values. A value of zero is included in the average.",
+      "supports": "same rule"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. Non-blank values: 5, 0, -3, 5, 2. Sum 9, count 5: 9 / 5 = 1.8. Counting all 7 rows would give 1.2857; dropping the zero would give 2.25. The average of an integer column is a decimal number (double).",
+  "tags": [
+    "average",
+    "blank",
+    "result-type"
+  ]
+}

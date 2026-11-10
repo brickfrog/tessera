@@ -1,0 +1,30 @@
+{
+  "title": "SELECTEDVALUE returns the alternate result when several values are visible",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SELECTEDVALUE ( Product[Color], \"Many\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Many"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/selectedvalue-function-dax",
+    "quote": "An equivalent expression for SELECTEDVALUE(<columnName>, <alternateResult>) is IF(HASONEVALUE(<columnName>), VALUES(<columnName>), <alternateResult>) .",
+    "supports": "SELECTEDVALUE returns the value when the column has one visible value, else the alternate"
+  },
+  "confidence": "derived",
+  "derivation": "With no filter Product[Color] has three values, not one, so the second argument is returned.",
+  "tags": [
+    "selectedvalue"
+  ]
+}

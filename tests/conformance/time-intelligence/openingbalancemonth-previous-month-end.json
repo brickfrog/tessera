@@ -1,0 +1,39 @@
+{
+  "title": "OPENINGBALANCEMONTH evaluates the expression on the last date of the previous month",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", OPENINGBALANCEMONTH ( [Sales], 'Date'[Date] ) ), 'Date'[Date] >= DATE ( 2024, 3, 1 ) && 'Date'[Date] <= DATE ( 2024, 3, 31 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          400.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/openingbalancemonth/",
+      "quote": "Evaluates the specified expression for the date corresponding to the end of the previous month after applying specified filters.",
+      "supports": "the definition"
+    },
+    {
+      "url": "https://dax.guide/openingbalancemonth/",
+      "quote": "OPENINGBALANCEMONTH uses the last date of the previous month in the Dates column or in the calendar.",
+      "supports": "not the first date of the current month"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The month before March 2024 ends on February 29, 2024; sales on that date are 400.",
+  "tags": [
+    "time-intelligence",
+    "openingbalancemonth",
+    "leap-year"
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "title": "TOTALYTD gives the same value as CALCULATE with DATESYTD",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"TotalYtd\", TOTALYTD ( [Sales], 'Date'[Date] ), \"Calculate\", CALCULATE ( [Sales], DATESYTD ( 'Date'[Date] ) ) ), 'Date'[Date] = DATE ( 2024, 5, 20 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[TotalYtd]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Calculate]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2100.0,
+          2100.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/totalytd/",
+      "quote": "TOTALYTD is just syntax sugar for CALCULATE / DATESYTD",
+      "supports": "the example shows the two forms returning the same value"
+    },
+    {
+      "url": "https://dax.guide/totalytd/",
+      "quote": "CALCULATE ( <Expression>, DATESYTD ( <Dates> [, <YearEndDate>] ) [, <Filter>] )",
+      "supports": "the definition"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Year to date at 2024-05-20: Jan 300 + Feb 700 + Mar 500 + May 20 600 = 2100, in both forms. [Sales] is the SUM of a fixed decimal column, so the type is decimal.",
+  "tags": [
+    "time-intelligence",
+    "totalytd",
+    "datesytd",
+    "calculate"
+  ]
+}

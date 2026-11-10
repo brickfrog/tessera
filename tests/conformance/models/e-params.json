@@ -1,0 +1,10 @@
+{
+  "description": "A one-row parameter table: Param[Name] = \"Scale\", Param[Value] = 1000. For cases about a column that has a single value with no filter at all.",
+  "tables": [
+    { "name": "Param",
+      "columns": [
+        { "name": "Name", "type": "string" },
+        { "name": "Value", "type": "int64" } ],
+      "rows": [ ["Scale", 1000] ] }
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "title": "RANKX and a BLANK next to a real 0: a tie, if BLANK is ranked as 0",
+  "model": "d-values",
+  "query": "EVALUATE ADDCOLUMNS ( Mixed, \"Rank\", RANKX ( Mixed, Mixed[v] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Mixed[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Mixed[v]",
+          "type": "int64"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          10,
+          1
+        ],
+        [
+          2,
+          null,
+          2
+        ],
+        [
+          3,
+          -5,
+          4
+        ],
+        [
+          4,
+          0,
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "If expression or value evaluates to BLANK it is treated as a 0 (zero) for all expressions that result in a number, or as an empty text for all text expressions.",
+      "supports": "a BLANK is ranked as 0"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "The next rank value, after a tie, is the rank value of the tie plus the count of tied values.",
+      "supports": "Skip is the default for ties"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Mixed[v] holds 10, BLANK, -5, 0. With BLANK treated as 0 the list is 10, 0, 0, -5: 10 is first, the BLANK and the 0 tie at rank 2, and -5 gets 2 + 2 = 4.",
+  "uncertain": true,
+  "alternative": "The page does not say that a BLANK ties with a real 0. If the engine keeps them apart, with BLANK just below 0, the ranks would be 10: 1, 0: 2, BLANK: 3, -5: 4.",
+  "tags": [
+    "rankx",
+    "blank",
+    "ties",
+    "addcolumns"
+  ]
+}

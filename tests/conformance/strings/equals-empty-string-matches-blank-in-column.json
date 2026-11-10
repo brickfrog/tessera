@@ -1,0 +1,34 @@
+{
+  "title": "Txt = \"\" matches both the empty-string row and the BLANK row",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( Empty, Empty[Txt] = \"\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/equal-to/",
+    "quote": "Returns TRUE if Product[Color] is either BLANK or an empty string, otherwise returns FALSE",
+    "supports": "Column = \"\" is TRUE for a BLANK and for an empty string"
+  },
+  "confidence": "derived",
+  "derivation": "Empty[Txt] holds '' (Id 1), BLANK (Id 2), x (Id 3). = treats BLANK as equal to the empty string, so rows 1 and 2 match: 2 rows.",
+  "tags": [
+    "operator-equals",
+    "filter",
+    "countrows",
+    "empty-string",
+    "blank"
+  ]
+}

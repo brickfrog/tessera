@@ -1,0 +1,55 @@
+{
+  "title": "A measure in a FILTER predicate is evaluated for the current row, not for the total",
+  "model": "sales",
+  "query": "EVALUATE FILTER ( ADDCOLUMNS ( VALUES ( Sales[ProductKey] ), \"S\", [Sales Amount] ), [S] >= [Sales Amount] * 0.5 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Sales[ProductKey]",
+          "type": "int64"
+        },
+        {
+          "name": "[S]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          400.0
+        ],
+        [
+          2,
+          60.0
+        ],
+        [
+          3,
+          80.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-context-transition/",
+      "quote": "the query really checks the sales of a product against 1% of the sales of the same product",
+      "supports": "a measure reference in the FILTER condition is wrapped in CALCULATE, so each row is compared with its own sales, not with the total"
+    },
+    {
+      "url": "https://dax.guide/addcolumns/",
+      "quote": "ADDCOLUMNS does not preserve the data lineage of the added columns for a following context transition",
+      "supports": "the added column S has no lineage; the transition in FILTER filters Sales[ProductKey] only"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "ProductKey 1: 100 + 200 + 100 = 400; 2: 40 + 20 = 60; 3: 50 + 30 = 80. In the predicate [Sales Amount] is evaluated under the transition on Sales[ProductKey], so it equals S: 400 >= 200, 60 >= 30, 80 >= 40 are all true and all 3 rows stay. Against the grand total (540 * 0.5 = 270) only key 1 would stay.",
+  "tags": [
+    "filter",
+    "addcolumns",
+    "values",
+    "measure",
+    "context-transition"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

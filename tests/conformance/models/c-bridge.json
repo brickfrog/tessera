@@ -1,0 +1,129 @@
+{
+  "description": "The bank accounts example of learn.microsoft.com/power-bi/guidance/relationships-many-to-many: Account and Customer related through the bridge AccountCustomer, and Transactions on Account. AccountCustomer[AccountID] -> Account[AccountID] filters in both directions; the other two relationships are single direction. No orphans. Amount: total 275; Account-01 75 (100 - 25), Account-02 200. Customer-91 holds account 1 (75); Customer-92 holds accounts 1 and 2 (275).",
+  "tables": [
+    {
+      "name": "Account",
+      "columns": [
+        {
+          "name": "AccountID",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Account",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Account-01"
+        ],
+        [
+          2,
+          "Account-02"
+        ]
+      ]
+    },
+    {
+      "name": "Customer",
+      "columns": [
+        {
+          "name": "CustomerID",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Customer",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          91,
+          "Customer-91"
+        ],
+        [
+          92,
+          "Customer-92"
+        ]
+      ]
+    },
+    {
+      "name": "AccountCustomer",
+      "columns": [
+        {
+          "name": "AccountID",
+          "type": "int64"
+        },
+        {
+          "name": "CustomerID",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          91
+        ],
+        [
+          1,
+          92
+        ],
+        [
+          2,
+          92
+        ]
+      ]
+    },
+    {
+      "name": "Transactions",
+      "columns": [
+        {
+          "name": "Date",
+          "type": "dateTime"
+        },
+        {
+          "name": "AccountID",
+          "type": "int64"
+        },
+        {
+          "name": "Amount",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2019-01-01T00:00:00",
+          1,
+          100
+        ],
+        [
+          "2019-02-02T00:00:00",
+          2,
+          200
+        ],
+        [
+          "2019-03-03T00:00:00",
+          1,
+          -25
+        ]
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "AccountCustomer[AccountID]",
+      "to": "Account[AccountID]",
+      "crossFilter": "both"
+    },
+    {
+      "from": "AccountCustomer[CustomerID]",
+      "to": "Customer[CustomerID]"
+    },
+    {
+      "from": "Transactions[AccountID]",
+      "to": "Account[AccountID]"
+    }
+  ]
+}

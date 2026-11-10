@@ -1,0 +1,35 @@
+{
+  "title": "POWER ( 4, -1 ) is 0.25 and POWER ( 16, 0.5 ) is 4",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"inv\", POWER ( 4, -1 ), \"root\", POWER ( 16, 0.5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[inv]",
+          "type": "double"
+        },
+        {
+          "name": "[root]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          0.25,
+          4.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/power/",
+    "quote": "POWER raises the number to the required power",
+    "supports": "the example table lists 4 with POWER -1 = 0.25 and 16 with POWER (0.5) = 4.00"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "power"
+  ]
+}

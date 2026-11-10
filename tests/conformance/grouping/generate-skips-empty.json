@@ -1,0 +1,52 @@
+{
+  "title": "GENERATE leaves out the rows of the first table for which the second is empty",
+  "model": "scalar",
+  "query": [
+    "EVALUATE",
+    "GENERATE (",
+    "    SELECTCOLUMNS ( { 1, 2, 3 }, \"a\", [Value] ),",
+    "    FILTER ( SELECTCOLUMNS ( { 1, 2 }, \"b\", [Value] ), [b] < [a] )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "int64"
+        },
+        {
+          "name": "[b]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          1
+        ],
+        [
+          3,
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/generate-function-dax",
+    "quote": "If the evaluation of table2 for the current row in table1 returns an empty table, then the result table will not contain the current row from table1 .",
+    "supports": "a row with no match is dropped; the second table is evaluated in the row context of the first"
+  },
+  "confidence": "derived",
+  "derivation": "For a = 1 no b is smaller: no row. For a = 2: b = 1. For a = 3: b = 1 and 2.",
+  "tags": [
+    "generate",
+    "row-context",
+    "table-constructor",
+    "selectcolumns"
+  ]
+}

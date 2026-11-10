@@ -1,0 +1,48 @@
+{
+  "title": "Integer - date is a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 45293 - DATE ( 2024, 1, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "In the following table, the row header is the minuend (left side) and the column header is the subtrahend (right side).",
+      "supports": "the Subtraction (-) table: INTEGER minus Date/time is REAL"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a subtraction operation uses a date with any other data type, DAX converts both values to dates, and the return value is also a date",
+      "supports": "the sentence under the table, which read alone gives a date: the other reading"
+    },
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "the integer corresponds to the number of days since December 30, 1899",
+      "supports": "a date as a number is the count of days since 1899-12-30"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "2024-01-01 is 45292 days after 1899-12-30: 2 days to 1900-01-01, then 124 years of 365 days = 45260, plus the 30 leap days of 1904 to 2020 (1900 is not a leap year). INTEGER - Date/time is REAL in the table: 45293 - 45292 = 1.0.",
+  "uncertain": true,
+  "alternative": "By the sentence under the table the result is a date: 1899-12-31T00:00:00 (dateTime), the number 1 as a date.",
+  "tags": [
+    "conversion",
+    "operator-subtract",
+    "result-type",
+    "date"
+  ],
+  "notes": "The table and the sentence under it disagree for a date on the right side."
+}

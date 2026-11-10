@@ -1,0 +1,66 @@
+{
+  "title": "RELATED crosses a chain of many-to-one relationships",
+  "model": "c-snowflake",
+  "query": "EVALUATE SELECTCOLUMNS ( Sales, \"SalesKey\", Sales[SalesKey], \"Category\", RELATED ( Category[Category] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[SalesKey]",
+          "type": "int64"
+        },
+        {
+          "name": "[Category]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bikes"
+        ],
+        [
+          2,
+          "Bikes"
+        ],
+        [
+          3,
+          "Bikes"
+        ],
+        [
+          4,
+          "Bikes"
+        ],
+        [
+          5,
+          "Parts"
+        ],
+        [
+          6,
+          "Parts"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/using-related-and-relatedtable-in-dax/",
+      "quote": "RELATED can traverse chains of relationships, as long as they all are in the same many-to-one direction",
+      "supports": "RELATED traverses chains in the many-to-one direction"
+    },
+    {
+      "url": "https://dax.guide/related/",
+      "quote": "the function follows a chain of one or more many-to-one relationships to fetch the value from the specified column in the related table",
+      "supports": "a chain of one or more many-to-one relationships"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Rows 1, 2: product 100 -> subcategory 10 -> category 1 Bikes. Row 3: 101 -> 10 -> Bikes. Row 4: 102 -> 11 -> Bikes. Rows 5, 6: 103 -> 20 -> category 2 Parts.",
+  "tags": [
+    "related",
+    "selectcolumns",
+    "relationship",
+    "snowflake",
+    "row-context"
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "title": "-5 / 0 is -Infinity",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", -5 / 0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          "-Infinity"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/division/",
+    "quote": "If the error is not intercepted, the division returns positive or negative infinity depending on the sign of the numerator, or NaN in case of 0 / 0",
+    "supports": "what / gives for a zero denominator"
+  },
+  "confidence": "derived",
+  "derivation": "The denominator is 0 and the numerator is negative: negative infinity.",
+  "tags": [
+    "division",
+    "operator-divide",
+    "divide-by-zero",
+    "infinity"
+  ]
+}

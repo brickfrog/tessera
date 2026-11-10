@@ -1,0 +1,30 @@
+{
+  "title": "BLANK - 4 is -4: next to a number, BLANK is zero in a subtraction",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () - 4 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "BLANK () - 4 -4",
+    "supports": "the table of expressions with a blank value gives -4 for BLANK () - 4"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-subtract"
+  ]
+}

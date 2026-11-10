@@ -1,0 +1,52 @@
+{
+  "title": "ALL ( fact table ) as a CALCULATE filter removes the filters on the related dimensions",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"Red\", [Sales Amount], \"AllSales\", CALCULATE ( [Sales Amount], ALL ( Sales ) ), \"AllQuantity\", CALCULATE ( [Sales Amount], ALL ( Sales[Quantity] ) ) ), Product[Color] = \"Red\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Red]",
+          "type": "decimal"
+        },
+        {
+          "name": "[AllSales]",
+          "type": "decimal"
+        },
+        {
+          "name": "[AllQuantity]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          460.0,
+          540.0,
+          460.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/managing-all-functions-in-dax-all-allselected-allnoblankrow-allexcept/",
+      "quote": "ALL ( Sales ) acts as REMOVEFILTERS on the expanded version of Sales, removing filters from the table and from all related dimension",
+      "supports": "ALL ( Sales ) removes filters from the expanded Sales table, the dimensions included"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "ALL with a table works on the expanded table, removing filters",
+      "supports": "the page's example: under a color filter, ALL ( Sales ) returns the same amount as ALL ()"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Under Product[Color] = Red: Sales rows 1, 2, 3, 5, 7 = 100 + 40 + 20 + 200 + 100 = 460. ALL ( Sales ) removes the filters from every column of expanded Sales, Product[Color] included: the total, 540. ALL ( Sales[Quantity] ) removes filters from that one column only; the color filter stays: 460.",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "all",
+    "expanded-table",
+    "filter-removal",
+    "relationship"
+  ]
+}

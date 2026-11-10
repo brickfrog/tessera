@@ -1,0 +1,32 @@
+{
+  "title": "COUNTROWS of a table with no rows is BLANK, not 0",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( Empty ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/countrows-function-dax",
+    "quote": "When the table argument contains no rows, the function returns BLANK.",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "derivation": "Empty has no rows.",
+  "tags": [
+    "countrows",
+    "blank",
+    "empty-table"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

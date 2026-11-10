@@ -1,0 +1,45 @@
+{
+  "title": "DATE ( 1900, 1, 1 ) = 2 is TRUE: a date is compared with a number by its serial value",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 1900, 1, 1 ) = 2 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "Numbers and date/time values have the same rank",
+      "supports": "a date and a number are compared as numbers"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/convert-function-dax",
+      "quote": "EVALUATE { CONVERT ( DATE ( 1900, 1, 1 ), INTEGER ) } Returns [Value] 2",
+      "supports": "1900-01-01 is the number 2"
+    },
+    {
+      "url": "https://dax.guide/dt/datetime/",
+      "quote": "the integer corresponds to the number of days since December 30, 1899",
+      "supports": "a date as a number is the count of days since 1899-12-30"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "1900-01-01 is 2 days after 1899-12-30, so as a number it is 2, and 2 = 2 is TRUE.",
+  "tags": [
+    "conversion",
+    "comparison",
+    "operator-equals",
+    "date"
+  ]
+}

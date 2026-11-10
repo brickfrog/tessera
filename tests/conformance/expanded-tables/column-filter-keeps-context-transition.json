@@ -1,0 +1,47 @@
+{
+  "title": "A column predicate on the fact table leaves the row's own filter in place",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( VALUES ( Product[Color] ), \"Amount\", CALCULATE ( [Sales Amount], Sales[Quantity] > 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          240.0
+        ],
+        [
+          "Blue",
+          80.0
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/context-transition-and-expanded-tables/",
+    "quote": "it will not spread its effects to the whole Product table, as a filter on Sales did",
+    "supports": "the article's corrected query: the column filter does not touch Product, so each color keeps its own value"
+  },
+  "confidence": "derived",
+  "derivation": "Rows with Quantity > 1: 2, 4, 5, 6. Red (products 1, 2): rows 2 and 5 = 40 + 200 = 240. Blue (product 3): rows 4 and 6 = 50 + 30 = 80. Green (product 4) has no sales: BLANK.",
+  "tags": [
+    "addcolumns",
+    "calculate",
+    "context-transition",
+    "expanded-table",
+    "column-filter"
+  ]
+}

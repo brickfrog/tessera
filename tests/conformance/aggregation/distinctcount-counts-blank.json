@@ -1,0 +1,32 @@
+{
+  "title": "DISTINCTCOUNT counts BLANK as one of the distinct values",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNT ( V[N] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/distinctcount-function-dax",
+    "quote": "DISTINCTCOUNT function counts the BLANK value.",
+    "supports": "BLANK is one of the values counted"
+  },
+  "confidence": "derived",
+  "derivation": "V[N] holds 5, BLANK, 0, -3, 5, BLANK, 2. Distinct values: 5, BLANK, 0, -3, 2. That is 5 with BLANK, 4 without.",
+  "tags": [
+    "distinctcount",
+    "blank",
+    "duplicates"
+  ]
+}

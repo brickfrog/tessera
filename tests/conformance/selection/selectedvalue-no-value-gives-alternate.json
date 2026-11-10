@@ -1,0 +1,32 @@
+{
+  "title": "SELECTEDVALUE returns the alternate result when no value is visible",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( SELECTEDVALUE ( Product[Color], \"None\" ), Product[Color] = \"Purple\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "None"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/using-the-selectedvalue-function-in-dax/",
+    "quote": "If the filter context returns zero rows for the referenced column, then SELECTEDVALUE returns the second argument",
+    "supports": "zero visible values give the alternate, not only two or more"
+  },
+  "confidence": "derived",
+  "derivation": "No product is Purple, so Product[Color] has no visible value. That is not exactly one value, so the alternate \"None\" is returned.",
+  "tags": [
+    "selectedvalue",
+    "calculate",
+    "empty-filter"
+  ]
+}

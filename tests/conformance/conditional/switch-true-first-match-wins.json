@@ -1,0 +1,49 @@
+{
+  "title": "SWITCH ( TRUE (), ... ) returns the result of the first condition that is TRUE",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Class\", SWITCH ( TRUE (), Product[Price] < 100, \"A\", Product[Price] < 30, \"B\", \"C\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Class]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          "C"
+        ],
+        [
+          "Helmet",
+          "A"
+        ],
+        [
+          "Lock",
+          "A"
+        ],
+        [
+          "Scooter",
+          "A"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/switch-function-dax",
+    "quote": "As soon as one value matches, the corresponding result is returned, and other subsequent values aren’t evaluated.",
+    "supports": "the page gives this example: the second result is never returned because the first condition is less restrictive"
+  },
+  "confidence": "derived",
+  "derivation": "Prices: Bike 100, Helmet 20, Lock 10, Scooter 50. Helmet, Lock and Scooter are below 100 and get \"A\" from the first condition, although Helmet and Lock are also below 30. Bike is below neither: \"C\". \"B\" never appears.",
+  "tags": [
+    "switch",
+    "switch-true",
+    "selectcolumns"
+  ]
+}

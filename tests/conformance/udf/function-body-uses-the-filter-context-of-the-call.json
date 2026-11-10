@@ -1,0 +1,46 @@
+{
+  "title": "A measure in a function body is evaluated in the filter context of the call",
+  "model": "sales",
+  "query": [
+    "DEFINE FUNCTION TotalSales = () => [Sales Amount]",
+    "EVALUATE ROW ( \"r\", CALCULATE ( TotalSales (), Product[Color] = \"Blue\" ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          80.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+      "quote": "Use a UDF in a measure to apply reusable logic with full filter context.",
+      "supports": "a function is evaluated in the filter context where it is called"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-user-defined-functions-in-dax/",
+      "quote": "Starting from the September 2025 version, it is possible to define functions, which are parametrized expressions that can be reused throughout the entire semantic model.",
+      "supports": "a function is an expression, evaluated where it is used"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The call is inside CALCULATE with Color = Blue, so the measure in the body sees that filter: rows 4, 6 = 50 + 30 = 80.",
+  "uncertain": true,
+  "alternative": "Neither page states outright in which filter context the body of a function is evaluated. If the body ignored the filter of the call, the result would be the total 540.",
+  "tags": [
+    "udf",
+    "define-function",
+    "no-parameters",
+    "calculate",
+    "filter-context"
+  ]
+}

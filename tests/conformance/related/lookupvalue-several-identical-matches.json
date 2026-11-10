@@ -1,0 +1,38 @@
+{
+  "title": "LOOKUPVALUE returns the value when several rows match and all have the same result value",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", LOOKUPVALUE ( Sales[CustomerKey], Sales[OrderDate], DATE ( 2023, 1, 15 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/lookupvalue-function-dax",
+      "quote": "If multiple rows match the search values and the values in the result_columnName for these rows are identical, that value is returned",
+      "supports": "identical result values are returned"
+    },
+    {
+      "url": "https://dax.guide/lookupvalue/",
+      "quote": "If multiple rows match the search values and in all cases Result_Column values are identical then that value is returned",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows 1 and 2 have OrderDate 2023-01-15. Both have CustomerKey 1, so 1 is returned.",
+  "tags": [
+    "lookupvalue",
+    "date"
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "title": "A number used as an IF condition is TRUE unless it is 0",
+  "model": "scalar",
+  "query": "EVALUATE { ( \"2\", IF ( 2, \"T\", \"F\" ) ), ( \"0\", IF ( 0, \"T\", \"F\" ) ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value1]",
+          "type": "string"
+        },
+        {
+          "name": "[Value2]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "2",
+          "T"
+        ],
+        [
+          "0",
+          "F"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+      "quote": "Any value or expression that can be evaluated to TRUE or FALSE .",
+      "supports": "the condition is converted to a boolean"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "DAX implicitly converts TRUE to the number 1",
+      "supports": "TRUE and 1 convert to each other; 0 is FALSE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "TRUE is 1 and FALSE is 0, so the number 0 converts to FALSE and a non-zero number to TRUE: IF ( 2, ... ) takes the first branch and IF ( 0, ... ) the second.",
+  "uncertain": true,
+  "alternative": "The pages say the condition is converted but do not state the rule for numbers outright. If a number were not accepted as a condition the query would fail with an error.",
+  "tags": [
+    "if",
+    "implicit-conversion",
+    "boolean"
+  ]
+}

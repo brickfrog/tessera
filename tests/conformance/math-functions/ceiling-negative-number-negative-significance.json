@@ -1,0 +1,37 @@
+{
+  "title": "CEILING ( -10.2, -1 ) is -11: a negative significance rounds a negative number downward",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CEILING ( -10.2, -1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -11
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/ceiling/",
+      "quote": "= CEILING ( -10.2, -1 ) -- Returns -11 (Integer)",
+      "supports": "the example states the value and the type"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/ceiling-function-dax",
+      "quote": "When using a negative multiple of significance, CEILING rounds negative numbers downward (toward negative infinity)",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "ceiling"
+  ]
+}

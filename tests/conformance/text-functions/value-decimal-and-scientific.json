@@ -1,0 +1,35 @@
+{
+  "title": "VALUE reads decimals and scientific notation",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"d\", VALUE ( \"123.45678\" ), \"e\", VALUE ( \"123e3\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[d]",
+          "type": "double"
+        },
+        {
+          "name": "[e]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          123.45678,
+          123000.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/value/",
+    "quote": "VALUE converts a text string that represents a number to a number.",
+    "supports": "the example shows VALUE ( \"123.45678\" ) = 123.45678 and VALUE ( \"123e3\" ) = 123000"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "value"
+  ]
+}

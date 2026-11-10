@@ -1,0 +1,41 @@
+{
+  "title": "A query measure can count the rows of a query table built with a measure filter",
+  "model": "sales",
+  "query": [
+    "DEFINE",
+    "  TABLE Unsold = FILTER ( Product, [Order Count] + 0 = 0 )",
+    "  MEASURE Unsold[Unsold Count] = COUNTROWS ( Unsold )",
+    "EVALUATE { [Unsold Count] }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+    "quote": "TABLE 'Unbought products' = FILTER('Product', [Orders] + 0 = 0)",
+    "supports": "the page gives this example: a query table of the products with no orders and a measure counting its rows"
+  },
+  "confidence": "derived",
+  "derivation": "In FILTER the measure has a context transition per product: Bike 3 rows, Helmet 2, Lock 2, Scooter none (BLANK). BLANK + 0 = 0, so only Scooter is kept. COUNTROWS ( Unsold ) = 1.",
+  "tags": [
+    "define-table",
+    "define-measure",
+    "query-table",
+    "filter",
+    "countrows",
+    "context-transition",
+    "table-constructor"
+  ]
+}

@@ -353,7 +353,7 @@ Run section C first: this relies on the same deployment, plus a TMSL `refresh` a
 else in tessera sends yet.
 
 What it does to the workspace: for every model of the corpus it creates, or **replaces without asking**, a
-database named `tessera-conformance-<model>` (about 30 of them), and with `--drop` deletes each afterwards. It
+database named `tessera-conformance-<model>` (about 20 of them), and with `--drop` deletes each afterwards. It
 never names any other database. Use a workspace where that is fine. The models are a few rows each.
 
 ### F1. One model first

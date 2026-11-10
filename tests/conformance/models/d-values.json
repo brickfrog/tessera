@@ -1,0 +1,38 @@
+{
+  "description": "Four unrelated tables for aggregation, set and ranking cases. V (7 rows) has BLANKs, zeros, negatives and duplicates: N (int64) = 5, BLANK, 0, -3, 5, BLANK, 2 (sum 9, 5 non-blank, 2 blank, average 1.8, min -3, max 5, distinct values 5 counting BLANK); Amt (decimal) = 10.5, BLANK, 0, -2.25, 10.5, 4, BLANK (sum 22.75, 5 non-blank, average 4.55); D (double) = 1.5, BLANK, 0, -0.5, 1.5, 2.5, BLANK (sum 5, average 1); T (string) has one BLANK and one empty string (6 non-blank values); Dt (dateTime) has 2 BLANKs, min 2023-02-10, max 2024-03-01; Flag (boolean) has 2 BLANKs (5 non-blank). Empty has no rows. Player has 6 rows with ties in Score: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. Mixed[v] = 10, BLANK, -5, 0 (Id 1 to 4).",
+  "tables": [
+    { "name": "V",
+      "columns": [
+        { "name": "Id", "type": "int64", "key": true },
+        { "name": "Grp", "type": "string" },
+        { "name": "N", "type": "int64" },
+        { "name": "Amt", "type": "decimal" },
+        { "name": "D", "type": "double" },
+        { "name": "T", "type": "string" },
+        { "name": "Dt", "type": "dateTime" },
+        { "name": "Flag", "type": "boolean" } ],
+      "rows": [
+        [1, "A", 5, 10.5, 1.5, "pear", "2024-03-01T00:00:00", true],
+        [2, "A", null, null, null, null, null, null],
+        [3, "A", 0, 0.0, 0.0, "", "2023-12-31T00:00:00", false],
+        [4, "B", -3, -2.25, -0.5, "Apple", "2024-01-05T00:00:00", true],
+        [5, "B", 5, 10.5, 1.5, "fig", "2024-03-01T00:00:00", true],
+        [6, "B", null, 4.0, 2.5, "Banana", "2023-02-10T00:00:00", false],
+        [7, "C", 2, null, null, "cherry", null, null] ] },
+    { "name": "Empty",
+      "columns": [
+        { "name": "x", "type": "int64" },
+        { "name": "a", "type": "decimal" } ],
+      "rows": [ ] },
+    { "name": "Player",
+      "columns": [
+        { "name": "Name", "type": "string", "key": true },
+        { "name": "Score", "type": "int64" } ],
+      "rows": [ ["Ann", 90], ["Bob", 80], ["Cho", 80], ["Dee", 70], ["Eve", 70], ["Fay", 50] ] },
+    { "name": "Mixed",
+      "columns": [
+        { "name": "Id", "type": "int64", "key": true },
+        { "name": "v", "type": "int64" } ],
+      "rows": [ [1, 10], [2, null], [3, -5], [4, 0] ] }
+  ]
+}

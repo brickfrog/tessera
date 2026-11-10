@@ -1,0 +1,32 @@
+{
+  "title": "COUNTROWS of a filter that keeps no row is BLANK",
+  "model": "d-values",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( V, FALSE ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "COUNTROWS ( FILTER ( Table, False ) ) Blank value",
+    "supports": "the table lists this expression with a blank result"
+  },
+  "confidence": "published",
+  "tags": [
+    "countrows",
+    "filter",
+    "blank",
+    "empty-table"
+  ],
+  "notes": "The column's type is not asserted: no source says what type an all-BLANK result has."
+}

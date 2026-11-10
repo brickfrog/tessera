@@ -1,0 +1,47 @@
+{
+  "title": "DIVIDE of a currency by an integer is a currency, as with /",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DIVIDE ( CURRENCY ( 10 ), 4 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The division (/) operator displays the same behavior as the DIVIDE function",
+      "supports": "DIVIDE has the result types of /"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency.",
+      "supports": "the result type of / and of DIVIDE"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/divide-function-dax",
+      "quote": "Return value A decimal number",
+      "supports": "Microsoft says DIVIDE returns a decimal number: the other reading"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "By SQLBI, DIVIDE has the result types of /, and a currency divided by an integer is a currency: 10 / 4 = 2.5.",
+  "uncertain": true,
+  "alternative": "DIVIDE always returns a decimal number, as the Microsoft page says: 2.5 (double).",
+  "tags": [
+    "division",
+    "divide",
+    "currency",
+    "result-type"
+  ]
+}

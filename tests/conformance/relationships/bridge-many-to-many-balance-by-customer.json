@@ -1,0 +1,52 @@
+{
+  "title": "A both-direction relationship on the bridge table carries a Customer filter to the accounts' transactions",
+  "model": "c-bridge",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Customer[Customer], \"Balance\", SUM ( Transactions[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Customer]",
+          "type": "string"
+        },
+        {
+          "name": "[Balance]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Customer-91",
+          75
+        ],
+        [
+          "Customer-92",
+          275
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-many-to-many",
+      "quote": "Customer-91 balance amount is 75",
+      "supports": "the page gives these rows and states the two balances once the Account / AccountCustomer relationship filters both ways: 75 and 275"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/relationships-in-power-bi-and-tabular-models/",
+      "quote": "The logical many-to-many relationship between Customer and Account is implemented through two physical SMR relationships",
+      "supports": "the bridge pattern with a bidirectional filter"
+    }
+  ],
+  "confidence": "published",
+  "derivation": "Customer-91 -> AccountCustomer row (1, 91) -> Account 1 (both directions) -> Transactions 100 and -25 = 75. Customer-92 -> rows (1, 92), (2, 92) -> Accounts 1 and 2 -> 100 + 200 - 25 = 275.",
+  "tags": [
+    "summarizecolumns",
+    "sum",
+    "relationship",
+    "bidirectional",
+    "many-to-many",
+    "bridge"
+  ],
+  "notes": "The model's Transactions table is the page's Transaction table; Amount is a whole number column, so the sum is int64."
+}

@@ -1,0 +1,67 @@
+{
+  "title": "A boolean filter argument is the same as FILTER over ALL of the column",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Red Sales] = CALCULATE ( [Sales Amount], 'Product'[Color] = \"Red\" )",
+    "MEASURE Sales[Red Sales Full] = CALCULATE ( [Sales Amount], FILTER ( ALL ( 'Product'[Color] ), 'Product'[Color] = \"Red\" ) )",
+    "EVALUATE SUMMARIZECOLUMNS ( 'Product'[Color], \"Red Sales\", [Red Sales], \"Red Sales Full\", [Red Sales Full] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Red Sales]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Red Sales Full]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0,
+          460.0
+        ],
+        [
+          "Blue",
+          460.0,
+          460.0
+        ],
+        [
+          "Green",
+          460.0,
+          460.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "the predicate shown in the first expression is internally converted in the second expression",
+      "supports": "a predicate on one column is converted to FILTER ( ALL ( column ), predicate )"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/filter-arguments-in-calculate/",
+      "quote": "The result of this filter will override any existing filter over the specified columns.",
+      "supports": "a filter built on ALL of a column overrides the existing filter on that column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "ALL ( Product[Color] ) is Red, Blue, Green whatever the current color; FILTER keeps Red; the resulting filter on Color replaces the row's. Both measures give Red sales, 460, on each of the three color rows.",
+  "tags": [
+    "calculate",
+    "filter",
+    "all",
+    "summarizecolumns",
+    "define-measure",
+    "filter-overwrite"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

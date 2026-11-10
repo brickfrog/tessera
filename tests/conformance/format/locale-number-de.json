@@ -1,0 +1,30 @@
+{
+  "title": "FORMAT with the locale \"de-DE\" swaps the separators",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( 1234.567, \"#,0.00\", \"de-DE\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "1.234,57"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/format/",
+    "quote": "Use dot as thousand separator and comma as decimal separator",
+    "supports": "the example shows FORMAT( 1234.567, \"#,0.00\", \"de-DE\" ) as 1.234,57"
+  },
+  "confidence": "published",
+  "tags": [
+    "format",
+    "locale"
+  ]
+}

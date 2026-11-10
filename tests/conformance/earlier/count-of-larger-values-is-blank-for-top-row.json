@@ -1,0 +1,59 @@
+{
+  "title": "Without + 1 the count of rows with a larger value is BLANK for the top row, not 0",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Higher\", COUNTROWS ( FILTER ( Product, Product[Price] > EARLIER ( Product[Price] ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Higher]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          null
+        ],
+        [
+          "Helmet",
+          2
+        ],
+        [
+          "Lock",
+          3
+        ],
+        [
+          "Scooter",
+          1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/earlier-function-dax",
+      "quote": "This technique returns a blank or zero value for the highest value in the table",
+      "supports": "the highest value has no row above it"
+    },
+    {
+      "url": "https://dax.guide/countrows/",
+      "quote": "If the table has no rows, COUNTROWS returns BLANK , not 0.",
+      "supports": "COUNTROWS of the empty filtered table is BLANK"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "SELECTCOLUMNS iterates Product; FILTER opens a second row context on Product and EARLIER reads the price of the SELECTCOLUMNS row. Bike 100: no larger price, empty table, BLANK. Scooter 50: Bike, 1. Helmet 20: Bike and Scooter, 2. Lock 10: 3.",
+  "tags": [
+    "earlier",
+    "countrows",
+    "filter",
+    "row-context",
+    "selectcolumns",
+    "blank"
+  ]
+}

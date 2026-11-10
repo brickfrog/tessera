@@ -1,0 +1,31 @@
+{
+  "title": "IF with two arguments returns BLANK when the condition is FALSE",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", IF ( [Order Count] > 100, \"Many\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+    "quote": "The value that's returned if the logical test is FALSE . If omitted, BLANK is returned.",
+    "supports": "the missing third argument is BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "[Order Count] is 7, not above 100. There is no third argument, so the result is BLANK. The only branch is a string, which gives the column its type.",
+  "tags": [
+    "if",
+    "blank"
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "title": "7 / CONVERT ( 2, CURRENCY ) is 3.5 as a decimal number",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 7 / CONVERT ( 2, CURRENCY ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          3.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency",
+      "supports": "an integer divided by a currency is a decimal number; a currency divided by an integer is a currency"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a division operation combines an integer with a currency value, DAX converts both values to real numbers, and the result is also a real number",
+      "supports": "INTEGER / CURRENCY is REAL according to this sentence; the table above it has CURRENCY in that cell"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "An integer divided by a currency is a decimal (real) number per SQLBI and per the sentence under Microsoft's table. 7 / 2 = 3.5.",
+  "uncertain": true,
+  "alternative": "Microsoft's table cell says CURRENCY: the value is the same, 3.5, with the type decimal (fixed decimal number). Only the type separates the readings here.",
+  "tags": [
+    "assumption:integer-divided-by-currency",
+    "operator-divide",
+    "currency",
+    "convert",
+    "int64",
+    "result-type"
+  ]
+}

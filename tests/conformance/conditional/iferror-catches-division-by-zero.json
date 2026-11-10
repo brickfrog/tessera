@@ -1,0 +1,40 @@
+{
+  "title": "IFERROR ( 25 / 0, 9999 ) returns 9999",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", IFERROR ( 25 / 0, 9999 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          9999
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/iferror-function-dax",
+      "quote": "The following example returns 9999 if the expression 25/0 evaluates to an error.",
+      "supports": "the page gives this formula and the value it returns"
+    },
+    {
+      "url": "https://dax.guide/iserror/",
+      "quote": "ISERROR also returns TRUE when the value is positive infinity, negative infinity or NaN (not a number).",
+      "supports": "25 / 0 is infinity, which ISERROR and IFERROR treat as an error"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "25 / 0 is positive infinity. DAX Guide says ISERROR is TRUE for infinity and that IFERROR behaves the same, so IFERROR returns its second argument, 9999, which is the value the Microsoft example gives.",
+  "tags": [
+    "iferror",
+    "division-by-zero",
+    "infinity",
+    "error"
+  ],
+  "notes": "The type is left out: 25 / 0 is a double and 9999 an integer, and the sources do not say which type the result takes."
+}

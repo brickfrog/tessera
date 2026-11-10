@@ -1,0 +1,38 @@
+{
+  "title": "LOOKUPVALUE returns the alternate result when the matching rows have different result values",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", LOOKUPVALUE ( Product[Product], Product[Color], \"Red\", \"several\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "several"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/lookupvalue-function-dax",
+      "quote": "if result_columnName returns different values, the function returns an error or alternateResult (if specified)",
+      "supports": "an error or the alternate result, if specified"
+    },
+    {
+      "url": "https://dax.guide/lookupvalue/",
+      "quote": "if Result_Column returns different values, the function returns Alternate_Result if defined, otherwise it returns an error",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Bike and Helmet are both Red, with different Product values. The alternate result \"several\" is returned instead of an error.",
+  "tags": [
+    "lookupvalue",
+    "alternate-result"
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "title": "ORDER BY on a column sorts by its own values, not by the model's sort-by column",
+  "model": "sales",
+  "query": "EVALUATE VALUES ( 'Date'[Month] ) ORDER BY 'Date'[Month]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Month]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Dec"
+        ],
+        [
+          "Feb"
+        ],
+        [
+          "Jan"
+        ],
+        [
+          "Mar"
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/dax-queries",
+    "quote": "Sort by column property in semantic models do not apply to DAX query results.",
+    "supports": "stated outright"
+  },
+  "confidence": "derived",
+  "derivation": "Date[Month] holds Jan, Feb, Dec, Jan, Feb, Mar and is sorted by MonthNo in the model. The distinct values, sorted as text: Dec, Feb, Jan, Mar. By MonthNo they would be Jan, Feb, Mar, Dec.",
+  "tags": [
+    "order-by",
+    "values",
+    "sort-by-column"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "title": "UNICHAR ( 65 ) is \"A\"",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", UNICHAR ( 65 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "A"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/unichar-function-dax",
+    "quote": "Returns the Unicode character referenced by the numeric value.",
+    "supports": "code point 65 is the upper-case letter A; the page uses = UNICHAR(65) as its example for upper-case A"
+  },
+  "confidence": "derived",
+  "derivation": "Unicode code point 65 is \"A\".",
+  "tags": [
+    "text-functions",
+    "unichar"
+  ]
+}

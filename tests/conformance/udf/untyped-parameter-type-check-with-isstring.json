@@ -1,0 +1,42 @@
+{
+  "title": "An untyped parameter keeps the type of its argument, which the body can test",
+  "model": "scalar",
+  "query": [
+    "DEFINE FUNCTION StringLength = ( s ) => IF ( ISSTRING ( s ), LEN ( s ), BLANK () )",
+    "EVALUATE { StringLength ( \"hello\" ), StringLength ( 123 ) }"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          5
+        ],
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+    "quote": "This prevents errors and allows you to decide how to handle non-string input into the function (in this example, returns BLANK ).",
+    "supports": "the page shows this query with the comment \"Returns: 5, BLANK\""
+  },
+  "confidence": "published",
+  "tags": [
+    "udf",
+    "define-function",
+    "isstring",
+    "len",
+    "if",
+    "blank",
+    "text-functions"
+  ],
+  "notes": "The page shows the values; the type is that of LEN, an integer."
+}

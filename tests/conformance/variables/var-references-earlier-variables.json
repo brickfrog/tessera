@@ -1,0 +1,38 @@
+{
+  "title": "A variable can use the variables defined before it",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", VAR a = [Order Count] VAR b = a * 2 VAR c = b + a RETURN c )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          21
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/variables-in-dax/",
+      "quote": "the definition of a variable can reference other variables provided that the other variables have been defined beforehand",
+      "supports": "later variables can use earlier ones"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/var-dax",
+      "quote": "Variables can refer to previously defined variables.",
+      "supports": "later variables can use earlier ones"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "[Order Count] is COUNTROWS ( Sales ) = 7. b = 7 * 2 = 14, c = 14 + 7 = 21. COUNTROWS is an integer and integer arithmetic stays integer.",
+  "tags": [
+    "var",
+    "variable-scope"
+  ]
+}

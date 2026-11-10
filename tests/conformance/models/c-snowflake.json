@@ -1,0 +1,191 @@
+{
+  "description": "A snowflake chain with no orphans: Sales -> Product -> Subcategory -> Category, all many-to-one, single direction. Totals: Amount 3170, Quantity 21, 6 sales rows. By Category: Bikes 3100 (4 rows), Parts 70 (2 rows), Clothing has no subcategories. By Subcategory: Road 2200, Mountain 900, Brakes 70 (Quantity 14), Chains has no products. Product B2 has no sales. Products per Category: Bikes 3, Parts 2.",
+  "tables": [
+    {
+      "name": "Category",
+      "columns": [
+        {
+          "name": "CategoryKey",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Category",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bikes"
+        ],
+        [
+          2,
+          "Parts"
+        ],
+        [
+          3,
+          "Clothing"
+        ]
+      ]
+    },
+    {
+      "name": "Subcategory",
+      "columns": [
+        {
+          "name": "SubcategoryKey",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Subcategory",
+          "type": "string"
+        },
+        {
+          "name": "CategoryKey",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          10,
+          "Road",
+          1
+        ],
+        [
+          11,
+          "Mountain",
+          1
+        ],
+        [
+          20,
+          "Brakes",
+          2
+        ],
+        [
+          21,
+          "Chains",
+          2
+        ]
+      ]
+    },
+    {
+      "name": "Product",
+      "columns": [
+        {
+          "name": "ProductKey",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Product",
+          "type": "string"
+        },
+        {
+          "name": "SubcategoryKey",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          100,
+          "R1",
+          10
+        ],
+        [
+          101,
+          "R2",
+          10
+        ],
+        [
+          102,
+          "M1",
+          11
+        ],
+        [
+          103,
+          "B1",
+          20
+        ],
+        [
+          104,
+          "B2",
+          20
+        ]
+      ]
+    },
+    {
+      "name": "Sales",
+      "columns": [
+        {
+          "name": "SalesKey",
+          "type": "int64"
+        },
+        {
+          "name": "ProductKey",
+          "type": "int64"
+        },
+        {
+          "name": "Quantity",
+          "type": "int64"
+        },
+        {
+          "name": "Amount",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          100,
+          1,
+          500.0
+        ],
+        [
+          2,
+          100,
+          2,
+          1000.0
+        ],
+        [
+          3,
+          101,
+          1,
+          700.0
+        ],
+        [
+          4,
+          102,
+          3,
+          900.0
+        ],
+        [
+          5,
+          103,
+          10,
+          50.0
+        ],
+        [
+          6,
+          103,
+          4,
+          20.0
+        ]
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Sales[ProductKey]",
+      "to": "Product[ProductKey]"
+    },
+    {
+      "from": "Product[SubcategoryKey]",
+      "to": "Subcategory[SubcategoryKey]"
+    },
+    {
+      "from": "Subcategory[CategoryKey]",
+      "to": "Category[CategoryKey]"
+    }
+  ]
+}

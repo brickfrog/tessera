@@ -1,0 +1,58 @@
+{
+  "title": "KEEPFILTERS intersects the new filter with the existing filter on the same column",
+  "model": "sales",
+  "query": [
+    "DEFINE MEASURE Sales[Only Red] = CALCULATE ( [Sales Amount], KEEPFILTERS ( 'Product'[Color] = \"Red\" ) )",
+    "EVALUATE ADDCOLUMNS ( VALUES ( 'Product'[Color] ), \"Only Red\", [Only Red] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Only Red]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          460.0
+        ],
+        [
+          "Blue",
+          null
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/keepfilters/",
+      "quote": "If Red is not included in the current filter context, the result is blank.",
+      "supports": "the page's Only Red Sales measure is blank when Red is not in the current filter context"
+    },
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "the filter is added to the filter context without overwriting existing filters over the same column(s)",
+      "supports": "with KEEPFILTERS the filter is added without overwriting the existing one"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Red row: Color = Red and Color = Red: 460. Blue row: Color = Blue and Color = Red: no product, BLANK. Green row: the same, BLANK. ADDCOLUMNS keeps the BLANK rows.",
+  "tags": [
+    "calculate",
+    "keepfilters",
+    "addcolumns",
+    "values",
+    "define-measure"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

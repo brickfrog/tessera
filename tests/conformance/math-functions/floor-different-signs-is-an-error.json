@@ -1,0 +1,29 @@
+{
+  "title": "FLOOR ( 2.5, -2 ) is an error: a positive number with a negative significance",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FLOOR ( 2.5, -2 ) )",
+  "expected": {
+    "error": "FLOOR needs the number and the significance to have the same sign"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/floor-function-dax",
+      "quote": "If number and significance have different signs, FLOOR returns the #NUM! error value.",
+      "supports": "different signs are documented as an error"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/floor-function-dax",
+      "quote": "The arguments number and significance must either both be positive, or both be negative.",
+      "supports": "the constraint on the arguments"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "2.5 is positive and -2 is negative: different signs, so the documented outcome is an error.",
+  "uncertain": true,
+  "alternative": "Excel (2010 and later) only fails for a positive number with a negative significance, which is this case, so both readings agree here; an engine that ignores the sign of the significance would return 2.",
+  "tags": [
+    "math-functions",
+    "floor",
+    "error"
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "title": "INT ( -4.3 ) is -5: INT rounds down, unlike CONVERT",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", INT ( -4.3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/int-function-dax",
+      "quote": "TRUNC(-4.3) returns -4, but INT(-4.3) returns -5 because -5 is the lower number",
+      "supports": "INT(-4.3) is -5"
+    },
+    {
+      "url": "https://dax.guide/int/",
+      "quote": "If <Number> is an Integer or a Decimal data type data type, then the result is an Integer data type",
+      "supports": "INT of a decimal number is an integer"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "assumption:convert-integer-rounding",
+    "int",
+    "math-functions",
+    "rounding",
+    "negative"
+  ],
+  "notes": "Contrast for CONVERT: CONVERT ( -4.3, INTEGER ) would be -4."
+}

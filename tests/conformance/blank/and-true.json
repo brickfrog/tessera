@@ -1,0 +1,31 @@
+{
+  "title": "BLANK && TRUE is FALSE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () && TRUE )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+    "quote": "BLANK () && TRUE False",
+    "supports": "the table of expressions with a blank value"
+  },
+  "confidence": "published",
+  "tags": [
+    "blank",
+    "operator-and",
+    "logical"
+  ]
+}

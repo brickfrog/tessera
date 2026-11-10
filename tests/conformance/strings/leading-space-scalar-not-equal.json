@@ -1,0 +1,32 @@
+{
+  "title": "\" a\" = \"a\" is FALSE: leading spaces count",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \" a\" = \"a\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "The Power BI engine automatically trims any trailing spaces that follow text data, but doesn't remove leading spaces that precede the data",
+    "supports": "trailing spaces are dropped from stored text, leading spaces are kept"
+  },
+  "confidence": "derived",
+  "derivation": "Leading spaces are never removed, in stored data or elsewhere, so \" a\" (two characters) and \"a\" (one character) are different strings.",
+  "tags": [
+    "operator-equals",
+    "comparison",
+    "leading-space"
+  ]
+}

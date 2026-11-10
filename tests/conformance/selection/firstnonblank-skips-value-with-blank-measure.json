@@ -1,0 +1,39 @@
+{
+  "title": "FIRSTNONBLANK returns the first value of the column for which the measure is not BLANK",
+  "model": "sales",
+  "query": "EVALUATE FIRSTNONBLANK ( Customer[Country], [Sales Amount] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "JP"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/firstnonblank/",
+      "quote": "Returns the first value in the column for which the expression has a non blank value.",
+      "supports": "the first value, in the order of the column values, whose expression is not blank"
+    },
+    {
+      "url": "https://dax.guide/firstnonblank/",
+      "quote": "A table containing a single column and single row with the computed first value.",
+      "supports": "the result is a one-row table of the column"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Countries in order: FR, JP, US. The measure does a context transition for each: FR (Dee) has no sales, BLANK; JP (Cho) is 230. The first non-blank is JP.",
+  "tags": [
+    "firstnonblank",
+    "context-transition",
+    "blank"
+  ]
+}

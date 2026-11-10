@@ -1,0 +1,43 @@
+{
+  "title": "START AT follows the direction of ORDER BY: with DESC the rows from the value downwards are returned",
+  "model": "sales",
+  "query": "EVALUATE VALUES ( Product[Price] ) ORDER BY Product[Price] DESC START AT 50",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          50.0
+        ],
+        [
+          20.0
+        ],
+        [
+          10.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/st/start-at/",
+    "quote": "defines the rows to skip before the specified values according to the sort order specified in the ORDER BY section of EVALUATE",
+    "supports": "the rows skipped are the ones before the value in the sort order of the query"
+  },
+  "confidence": "derived",
+  "derivation": "Sorted descending: 100, 50, 20, 10. The row before 50 in that order is 100, which is skipped: 50, 20, 10 remain.",
+  "uncertain": true,
+  "alternative": "No page shows START AT with DESC. If START AT keeps the rows whose value is at least the given one whatever the direction, the result is 100, 50.",
+  "tags": [
+    "start-at",
+    "order-by",
+    "descending",
+    "values",
+    "evaluate"
+  ]
+}

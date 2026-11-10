@@ -1,0 +1,33 @@
+{
+  "title": "FIND returns BLANK when asked to and the case does not match",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FIND ( \"Bike\", \"bike shop\", 1, BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/find-function-dax",
+    "quote": "If not found, FIND returns Blank. FIND is case-sensitive.",
+    "supports": "the documented example passes BLANK () as the NotFoundValue and gets blank where \"Bike\" is absent"
+  },
+  "confidence": "derived",
+  "derivation": "\"bike shop\" has no \"Bike\" with a capital B, so the NotFoundValue, BLANK, is returned.",
+  "tags": [
+    "text-functions",
+    "find",
+    "case-sensitive",
+    "blank"
+  ],
+  "notes": "The type of the all-BLANK column is not asserted."
+}

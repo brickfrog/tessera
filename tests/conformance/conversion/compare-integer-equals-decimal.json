@@ -1,0 +1,39 @@
+{
+  "title": "1 = 1.0 is TRUE: numbers of different types are compared by value",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 1 = 1.0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "Integer, Real Number, Currency, Date/time and Blank are considered numeric for comparison purposes",
+      "supports": "an integer and a real number can be compared"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "DAX does implicit conversions for numeric or date/time types as the following table describes",
+      "supports": "INTEGER compared with REAL is compared as REAL"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The integer 1 is converted to the real number 1.0, which equals 1.0.",
+  "tags": [
+    "conversion",
+    "comparison",
+    "operator-equals"
+  ]
+}

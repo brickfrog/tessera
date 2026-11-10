@@ -1,0 +1,30 @@
+{
+  "title": "COALESCE returns BLANK when every argument is BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COALESCE ( BLANK (), BLANK () ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/coalesce/",
+    "quote": "If all the arguments are BLANK , COALESCE returns BLANK .",
+    "supports": "all blank gives BLANK"
+  },
+  "confidence": "published",
+  "tags": [
+    "coalesce",
+    "blank"
+  ],
+  "notes": "The type is left out: no source settles the type of an all-BLANK expression."
+}

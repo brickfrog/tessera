@@ -1,0 +1,35 @@
+{
+  "title": "A filter on one dimension reaches the fact table but not another dimension",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"Customers\", CALCULATE ( COUNTROWS ( Customer ), Product[Color] = \"Blue\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Customers]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/bidirectional-relationships-and-ambiguity-in-dax/",
+    "quote": "a filter on Customer automatically filters Sales, whereas a filter on Sales propagates neither to Product nor to Customer or Date",
+    "supports": "a filter reaches Sales from a dimension, and from Sales it propagates to no other dimension"
+  },
+  "confidence": "derived",
+  "derivation": "Product[Color] = Blue filters Sales to rows 4 and 6 (customers 2 and 3). Sales[CustomerKey] -> Customer[CustomerKey] is single direction, so Customer is not filtered: 4 rows.",
+  "tags": [
+    "calculate",
+    "countrows",
+    "relationship",
+    "filter-propagation",
+    "single-direction"
+  ],
+  "notes": "With a both-direction relationship the answer would be 2; see crossfilter-both-in-calculate."
+}

@@ -1,0 +1,63 @@
+{
+  "title": "RANKX treats a BLANK value as 0: ascending, it ranks after the negative numbers",
+  "model": "a2-sort",
+  "query": "EVALUATE ADDCOLUMNS ( Nums, \"r\", RANKX ( Nums, Nums[N], , ASC ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Nums[Id]",
+          "type": "int64"
+        },
+        {
+          "name": "Nums[N]",
+          "type": "int64"
+        },
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          -5,
+          1
+        ],
+        [
+          2,
+          null,
+          3
+        ],
+        [
+          3,
+          3,
+          4
+        ],
+        [
+          4,
+          -1,
+          2
+        ],
+        [
+          5,
+          10,
+          5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+    "quote": "If expression or value evaluates to BLANK it is treated as a 0 (zero) for all expressions that result in a number",
+    "supports": "in RANKX a BLANK ranks as the number 0"
+  },
+  "confidence": "derived",
+  "derivation": "Nums[N] by Id: -5 (1), BLANK (2), 3 (3), -1 (4), 10 (5). With BLANK as 0 the values are -5, 0, 3, -1, 10. Ascending ranks: -5 is 1, -1 is 2, 0 (the BLANK) is 3, 3 is 4, 10 is 5. No ties.",
+  "tags": [
+    "rankx",
+    "addcolumns",
+    "blank"
+  ],
+  "notes": "Contrast with assumptions/order-by-asc-blank-before-negative, where ORDER BY is expected to put BLANK before -5. If RANKX ranked BLANK lowest, row 2 would rank 1 and rows 1 and 4 would rank 2 and 3."
+}

@@ -1,0 +1,72 @@
+{
+  "title": "RELATEDTABLE ( T ) and CALCULATETABLE ( T ) give the same rows in a row context",
+  "model": "sales",
+  "query": "EVALUATE SELECTCOLUMNS ( Product, \"Product\", Product[Product], \"Related\", SUMX ( RELATEDTABLE ( Sales ), Sales[Amount] ), \"Calculated\", SUMX ( CALCULATETABLE ( Sales ), Sales[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[Related]",
+          "type": "decimal"
+        },
+        {
+          "name": "[Calculated]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          400.0,
+          400.0
+        ],
+        [
+          "Helmet",
+          60.0,
+          60.0
+        ],
+        [
+          "Lock",
+          80.0,
+          80.0
+        ],
+        [
+          "Scooter",
+          null,
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/using-related-and-relatedtable-in-dax/",
+      "quote": "RELATEDTABLE is an alias for CALCULATETABLE",
+      "supports": "RELATEDTABLE is an alias for CALCULATETABLE"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/relatedtable-function-dax",
+      "quote": "This function is a shortcut for CALCULATETABLE function with no logical expression",
+      "supports": "same statement"
+    },
+    {
+      "url": "https://dax.guide/relatedtable/",
+      "quote": "The RELATEDTABLE function performs a context transition from row context(s) to a filter context",
+      "supports": "it performs a context transition"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Context transition filters Sales to the current product. Bike: rows 1, 5, 7 = 100 + 200 + 100 = 400. Helmet: rows 2, 3 = 40 + 20 = 60. Lock: rows 4, 6 = 50 + 30 = 80. Scooter: no rows, SUMX over an empty table is BLANK.",
+  "tags": [
+    "relatedtable",
+    "calculatetable",
+    "sumx",
+    "selectcolumns",
+    "context-transition",
+    "relationship"
+  ]
+}

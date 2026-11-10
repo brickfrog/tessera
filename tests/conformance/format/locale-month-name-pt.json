@@ -1,0 +1,31 @@
+{
+  "title": "FORMAT with the locale \"pt-BR\" gives the Portuguese month name",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", FORMAT ( dt\"2020-12-15T12:30:59\", \"dd mmmm yyyy\", \"pt-BR\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "15 dezembro 2020"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/format/",
+    "quote": "The third optional argument specifies the locale identifier",
+    "supports": "the example shows this formula as 15 dezembro 2020"
+  },
+  "confidence": "published",
+  "tags": [
+    "format",
+    "locale",
+    "datetime-literal"
+  ]
+}

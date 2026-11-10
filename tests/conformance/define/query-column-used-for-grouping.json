@@ -1,0 +1,47 @@
+{
+  "title": "A DEFINE COLUMN can be a group-by column of SUMMARIZECOLUMNS",
+  "model": "sales",
+  "query": [
+    "DEFINE COLUMN Product[Price Band] = IF ( Product[Price] >= 50, \"High\", \"Low\" )",
+    "EVALUATE SUMMARIZECOLUMNS ( Product[Price Band], \"Sales Amount\", [Sales Amount] ) ORDER BY Product[Price Band]"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Price Band]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "High",
+          400.0
+        ],
+        [
+          "Low",
+          140.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/st/column/",
+    "quote": "The syntax after COLUMN defines a query column, which has a data lineage and it is populated in an empty filter context before the query is executed.",
+    "supports": "the page shows a query column used as the group-by column of SUMMARIZECOLUMNS"
+  },
+  "confidence": "derived",
+  "derivation": "High: Bike (100) and Scooter (50); Bike rows 1, 5, 7 = 400, Scooter has no sales. Low: Helmet (20) rows 2, 3 = 60 and Lock (10) rows 4, 6 = 80, together 140.",
+  "tags": [
+    "define-column",
+    "query-column",
+    "summarizecolumns",
+    "if",
+    "order-by"
+  ]
+}

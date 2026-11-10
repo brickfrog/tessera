@@ -1,0 +1,122 @@
+{
+  "description": "The Customer / Product / Sales rows of learn.microsoft.com/power-bi/guidance/relationships-bidirectional-filtering. Sales[SKU] -> Product[SKU] filters in both directions; Sales[CustomerCode] -> Customer[CustomerCode] is single direction. No orphans. Quantity: total 60; T-shirt 40, Jeans 20, Hat none; United States 30, Australia 30. Australia bought only the T-shirt; United States bought T-shirt and Jeans.",
+  "tables": [
+    {
+      "name": "Customer",
+      "columns": [
+        {
+          "name": "CustomerCode",
+          "type": "string",
+          "key": true
+        },
+        {
+          "name": "Customer",
+          "type": "string"
+        },
+        {
+          "name": "Country",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "CUST-01",
+          "Customer-1",
+          "United States"
+        ],
+        [
+          "CUST-02",
+          "Customer-2",
+          "Australia"
+        ]
+      ]
+    },
+    {
+      "name": "Product",
+      "columns": [
+        {
+          "name": "SKU",
+          "type": "string",
+          "key": true
+        },
+        {
+          "name": "Product",
+          "type": "string"
+        },
+        {
+          "name": "Color",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "CL-01",
+          "T-shirt",
+          "Green"
+        ],
+        [
+          "CL-02",
+          "Jeans",
+          "Blue"
+        ],
+        [
+          "AC-01",
+          "Hat",
+          "Blue"
+        ]
+      ]
+    },
+    {
+      "name": "Sales",
+      "columns": [
+        {
+          "name": "OrderDate",
+          "type": "dateTime"
+        },
+        {
+          "name": "CustomerCode",
+          "type": "string"
+        },
+        {
+          "name": "SKU",
+          "type": "string"
+        },
+        {
+          "name": "Quantity",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2019-01-01T00:00:00",
+          "CUST-01",
+          "CL-01",
+          10
+        ],
+        [
+          "2019-02-02T00:00:00",
+          "CUST-01",
+          "CL-02",
+          20
+        ],
+        [
+          "2019-03-03T00:00:00",
+          "CUST-02",
+          "CL-01",
+          30
+        ]
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Sales[SKU]",
+      "to": "Product[SKU]",
+      "crossFilter": "both"
+    },
+    {
+      "from": "Sales[CustomerCode]",
+      "to": "Customer[CustomerCode]"
+    }
+  ]
+}

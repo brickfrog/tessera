@@ -1,0 +1,33 @@
+{
+  "title": "0 / BLANK is NaN",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 0 / BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          "NaN"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "0/BLANK NaN",
+    "supports": "the table of BLANK in operations gives NaN for 0/BLANK"
+  },
+  "confidence": "published",
+  "tags": [
+    "division",
+    "blank",
+    "operator-divide",
+    "divide-by-zero",
+    "nan"
+  ]
+}

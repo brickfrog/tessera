@@ -1,0 +1,28 @@
+{
+  "title": "NEXTDAY of the last date in the Date table is empty",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( NEXTDAY ( 'Date'[Date] ), 'Date'[Date] = DATE ( 2024, 12, 31 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": []
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/nextday/",
+    "quote": "The result table includes only dates that exist in the dates column.",
+    "supports": "a date the Date table does not have is not returned"
+  },
+  "confidence": "derived",
+  "derivation": "The day after 2024-12-31 is 2025-01-01, which is not in the Date table, so the result has no rows.",
+  "tags": [
+    "time-intelligence",
+    "nextday",
+    "empty-table"
+  ]
+}

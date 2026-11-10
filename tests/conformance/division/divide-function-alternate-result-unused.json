@@ -1,0 +1,39 @@
+{
+  "title": "DIVIDE ( 5, 2, 1 ) is 2.5: the alternate result is used only for a zero denominator",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DIVIDE ( 5, 2, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/divide-function-dax",
+      "quote": "The value returned when division by zero results in an error",
+      "supports": "the third argument applies to division by zero only"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/divide-function-dax",
+      "quote": "Return value A decimal number",
+      "supports": "the result type"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The denominator is 2, not zero, so the alternate result is not used: 5 / 2 = 2.5.",
+  "tags": [
+    "division",
+    "divide",
+    "alternate-result"
+  ]
+}

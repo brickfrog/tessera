@@ -1,0 +1,42 @@
+{
+  "title": "VALUE ( \"1,234\" ) is 1234",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VALUE ( \"1,234\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1234.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/value-function-dax",
+      "quote": "The value passed as the text parameter can be in any of the constant, number, date, or time formats recognized by the application or services you are using",
+      "supports": "VALUE accepts the number formats the engine recognizes; the page does not list them"
+    },
+    {
+      "url": "https://dax.guide/value/",
+      "quote": "The converted number in decimal data type",
+      "supports": "VALUE returns a decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "VALUE accepts the number formats the engine recognizes. In en-US 1,234 is the usual way to write 1234, so it is taken as recognized. VALUE returns a decimal number: 1234.0.",
+  "uncertain": true,
+  "alternative": "No source says whether a group separator is accepted. If it is not, VALUE returns an error.",
+  "tags": [
+    "assumption:text-to-number-separators",
+    "value",
+    "text-functions",
+    "thousands-separator"
+  ]
+}

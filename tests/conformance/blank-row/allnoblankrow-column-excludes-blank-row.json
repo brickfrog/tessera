@@ -1,0 +1,42 @@
+{
+  "title": "ALLNOBLANKROW of a column returns its values without the blank row's BLANK",
+  "model": "sales-orphans",
+  "query": "EVALUATE ALLNOBLANKROW ( Product[Color] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Red"
+        ],
+        [
+          "Blue"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/allnoblankrow/",
+      "quote": "The only blank row that is ignored is the one added to a table in case of an invalid relationship",
+      "supports": "only the blank row of an invalid relationship is ignored"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/allnoblankrow-function-dax",
+      "quote": "returns all rows but the blank row, or all distinct values of a column but the blank row",
+      "supports": "all distinct values of a column but the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] holds Red, Blue, Red: the distinct values are Red and Blue. The blank row's BLANK is not returned. ALL ( Product[Color] ) would return three rows.",
+  "tags": [
+    "allnoblankrow",
+    "blank-row",
+    "relationship"
+  ]
+}

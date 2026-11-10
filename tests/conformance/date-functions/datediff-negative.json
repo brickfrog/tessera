@@ -1,0 +1,39 @@
+{
+  "title": "DATEDIFF is negative when the first date is later",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATEDIFF ( DATE ( 2012, 1, 1 ), DATE ( 2011, 12, 31 ), DAY ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -1
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/datediff-function-dax",
+      "quote": "It returns a negative result if Date1 is larger than Date2.",
+      "supports": "a later first date gives a negative count"
+    },
+    {
+      "url": "https://dax.guide/datediff/",
+      "quote": "Previous versions of the DAX engine (earlier than 2018) could provide an error if Date1 is larger than Date2.",
+      "supports": "only old engines failed"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "From January 1, 2012 back to December 31, 2011 one day boundary is crossed, backwards: -1.",
+  "tags": [
+    "date-functions",
+    "datediff",
+    "negative"
+  ]
+}

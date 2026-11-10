@@ -1,0 +1,49 @@
+{
+  "title": "EXACT against a column compares with the casing the column stored, not the one loaded",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( FILTER ( CaseT, EXACT ( CaseT[Txt], \"apple\" ) ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "so it doesn't store those variations, but refers to the first variation it stored",
+      "supports": "of several casings of one value, the first one loaded is the one kept"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/string-storage-and-collation-in-tabular-models",
+      "quote": "The first instance of the string is used as the canonical representation",
+      "supports": "the first occurrence is what later equivalent strings are shown as"
+    },
+    {
+      "url": "https://dax.guide/exact/",
+      "quote": "EXACT is case-sensitive",
+      "supports": "EXACT compares case"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Rows 1 to 3 load as apple, Apple, APPLE. The engine keeps only the first variation, apple, and rows 2 and 3 refer to it, so all three rows hold \"apple\" and EXACT with \"apple\" is TRUE for each. pear is different. 3 rows.",
+  "uncertain": true,
+  "alternative": "If the column kept each row's own casing, only row 1 would match exactly and the result would be 1. If the engine kept a casing other than the first loaded, no row would match and COUNTROWS of the empty table would be BLANK.",
+  "tags": [
+    "exact",
+    "text-functions",
+    "filter",
+    "countrows",
+    "case-insensitive",
+    "collation"
+  ]
+}

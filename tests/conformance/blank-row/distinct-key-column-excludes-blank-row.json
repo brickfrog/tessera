@@ -1,0 +1,46 @@
+{
+  "title": "DISTINCT of the key column returns the stored keys only",
+  "model": "sales-orphans",
+  "query": "EVALUATE DISTINCT ( Product[ProductKey] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[ProductKey]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/distinct/",
+      "quote": "DISTINCT does not return the blank row caused by an invalid relationship",
+      "supports": "DISTINCT does not return the blank row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "the VALUES function treats the blank row as a regular row, returning it. On the other hand, DISTINCT never returns the blank row",
+      "supports": "same statement"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows 3 and 4 have ProductKey 9, which Product lacks, so the relationship is invalid and Product gets a blank row. DISTINCT returns the stored keys 1, 2, 3 and not the blank row's BLANK. The orphan key 9 is a value of Sales[ProductKey], not of Product[ProductKey].",
+  "tags": [
+    "distinct",
+    "blank-row",
+    "relationship"
+  ],
+  "notes": "VALUES ( Product[ProductKey] ) has a fourth row, BLANK: see isblank-on-blank-row-key."
+}

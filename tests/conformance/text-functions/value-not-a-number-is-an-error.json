@@ -1,0 +1,20 @@
+{
+  "title": "VALUE of text that is not a number is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", VALUE ( \"abc\" ) )",
+  "expected": {
+    "error": "VALUE cannot convert the text to a number"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/value-function-dax",
+    "quote": "If text is not in one of these formats, an error is returned.",
+    "supports": "text that is not a number, date or time is an error"
+  },
+  "confidence": "derived",
+  "derivation": "\"abc\" is not in a number, date or time format.",
+  "tags": [
+    "text-functions",
+    "value",
+    "error"
+  ]
+}

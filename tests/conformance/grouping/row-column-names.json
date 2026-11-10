@@ -1,0 +1,48 @@
+{
+  "title": "ROW returns one row with a column per name and expression pair",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"a\", 1, \"b\", \"x\", \"c\", 1.5 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "int64"
+        },
+        {
+          "name": "[b]",
+          "type": "string"
+        },
+        {
+          "name": "[c]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "x",
+          1.5
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/row-function-dax",
+      "quote": "Returns a table with a single row containing values that result from the expressions given to each column.",
+      "supports": "one row, one column per pair"
+    },
+    {
+      "url": "https://dax.guide/row/",
+      "quote": "-- ROW generates a table with one row only. -- You provide the name of the columns and their values.",
+      "supports": "same"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Three pairs give three columns named [a], [b], [c], holding an integer, a string and a decimal number.",
+  "tags": [
+    "row",
+    "column-names"
+  ]
+}

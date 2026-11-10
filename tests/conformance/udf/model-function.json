@@ -1,0 +1,40 @@
+{
+  "title": "A function defined in the model is called like a built-in function",
+  "model": {
+    "base": "sales",
+    "functions": [
+      {
+        "name": "Twice",
+        "expression": "( x : NUMERIC ) => x * 2"
+      }
+    ]
+  },
+  "query": "EVALUATE { Twice ( 21 ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          42
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-user-defined-functions",
+    "quote": "Once a UDF is defined and saved to the model, you can call it from measures, calculated columns, visual calculations, and other UDFs. This works the same as calling built-in DAX functions.",
+    "supports": "a model function is called by name"
+  },
+  "confidence": "derived",
+  "derivation": "Twice is ( x : NUMERIC ) => x * 2 in the model. 21 is an integer, which NUMERIC accepts as it is: 21 * 2 = 42, an integer.",
+  "tags": [
+    "udf",
+    "model-function",
+    "type-hint"
+  ]
+}

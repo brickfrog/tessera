@@ -1,0 +1,32 @@
+{
+  "title": "A column holding \"ab\", \"ab \" and \" ab\" has two distinct values",
+  "model": "a2-text",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNT ( Spaces[Txt] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+    "quote": "The Power BI engine automatically trims any trailing spaces that follow text data, but doesn't remove leading spaces that precede the data",
+    "supports": "trailing spaces are dropped from stored text, leading spaces are kept"
+  },
+  "confidence": "derived",
+  "derivation": "Spaces[Txt] holds 'ab', 'ab ' and ' ab'. The engine trims the trailing space of 'ab ', which makes it the same value as 'ab'. The leading space of ' ab' is kept, so it stays a separate value. 2 distinct values. The source's own example has four names collapse to two rows the same way.",
+  "tags": [
+    "distinctcount",
+    "trailing-space",
+    "leading-space"
+  ]
+}

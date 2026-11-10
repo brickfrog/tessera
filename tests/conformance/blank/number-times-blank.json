@@ -1,0 +1,31 @@
+{
+  "title": "5 * BLANK is BLANK: BLANK propagates from the right operand too",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 5 * BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/op/multiplication/",
+    "quote": "BLANK propagates in a multiplication: if one of the operands is BLANK (), then the result is BLANK ()",
+    "supports": "either operand being BLANK makes the product BLANK"
+  },
+  "confidence": "derived",
+  "derivation": "The right operand is BLANK, so the product is BLANK, whatever the left operand.",
+  "tags": [
+    "blank",
+    "operator-multiply"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

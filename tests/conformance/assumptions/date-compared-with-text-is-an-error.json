@@ -1,0 +1,32 @@
+{
+  "title": "DATE ( 2024, 1, 31 ) = \"2024-01-31\" fails: a date is not compared with text",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2024, 1, 31 ) = \"2024-01-31\" )",
+  "expected": {
+    "error": "comparison of a Date/time value with a Text value is not supported"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "Other mixed data-type comparisons will return an error",
+      "supports": "only Numeric/Numeric, Boolean/Boolean and String/String comparisons are supported"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "DAX doesn't do any implicit conversions for Boolean or string values",
+      "supports": "the other reading: no conversion, and the comparison returns a value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The operator reference supports comparison only for Numeric with Numeric, Boolean with Boolean and String with String, and Date/time counts as numeric. A date against a string is a mixed comparison and returns an error.",
+  "uncertain": true,
+  "alternative": "The data types page says a string is simply greater than any number or date and shows \"12\" = 12 as false: under that reading the result is FALSE. If the text were read as a date the result would be TRUE.",
+  "tags": [
+    "assumption:text-to-date",
+    "operator-equals",
+    "comparison",
+    "error",
+    "mixed-types",
+    "date-functions"
+  ]
+}

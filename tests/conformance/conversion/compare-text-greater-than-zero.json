@@ -1,0 +1,32 @@
+{
+  "title": "\"1\" > 0 is an error (the operator reference's example)",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", \"1\" > 0 )",
+  "expected": {
+    "error": "comparison operations do not support comparing values of type Text with values of type Integer"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/dax-operator-reference",
+      "quote": "Other mixed data-type comparisons will return an error. For example, a formula such as =\"1\" > 0 returns an error stating that DAX comparison operations do not support comparing values of type Text with values of type Integer",
+      "supports": "only Numeric with Numeric, Boolean with Boolean and String with String can be compared; anything else is an error"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "DAX considers Boolean values greater than string values, and string values greater than numeric or date/time values",
+      "supports": "the other reading"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The operator reference gives this formula as its example of a mixed comparison that returns an error.",
+  "uncertain": true,
+  "alternative": "By the Power BI data types page a string is greater than any number, so the result would be TRUE (boolean).",
+  "tags": [
+    "conversion",
+    "comparison",
+    "operator-greater-than",
+    "mixed-types",
+    "error"
+  ],
+  "notes": "The Microsoft pages disagree. The operator reference says a comparison of text (or a Boolean) with a number is an error. The Power BI data types page gives a result, ranking Boolean above text and text above numbers."
+}

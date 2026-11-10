@@ -1,0 +1,44 @@
+{
+  "title": "DATE ( 2020, 10, 23 ) * 2 is the integer 88254",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2020, 10, 23 ) * 2 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          88254
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "if a multiplication operation combines an integer with a real number, DAX converts both numbers to real numbers, and the return value is also REAL",
+      "supports": "the multiplication table above this sentence has a Date/time column: INTEGER gives INTEGER, REAL gives REAL. It has no Date/time row"
+    },
+    {
+      "url": "https://dax.guide/value/",
+      "quote": "VALUE converts a text string that represents a number to a number",
+      "supports": "the example shows DATE ( 2020, 10, 23 ) as the number 44127"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The multiplication table has no row for a Date/time on the left. Taking multiplication as symmetric, Date/time * INTEGER is INTEGER as INTEGER * Date/time is. 44127 * 2 = 88254.",
+  "uncertain": true,
+  "alternative": "No source covers a date as the left operand. If the date multiplies as a decimal number the result is the double 88254.0; if the result stayed a date it would be 2141-08-17 (day 88254).",
+  "tags": [
+    "assumption:date-multiplication",
+    "operator-multiply",
+    "date",
+    "implicit-conversion",
+    "date-functions"
+  ],
+  "notes": "Day 88254: 2141-08-17 is 44127 days after 2020-10-23."
+}

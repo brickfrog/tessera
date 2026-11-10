@@ -1,0 +1,30 @@
+{
+  "title": "TOPN with N = 0 returns an empty table",
+  "model": "d-values",
+  "query": "EVALUATE TOPN ( 0, Player, Player[Score], DESC )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        }
+      ],
+      "rows": []
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/topn-function-dax",
+    "quote": "If N_Value is 0 (zero) or less, TOPN returns an empty table.",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "topn",
+    "empty-table"
+  ]
+}

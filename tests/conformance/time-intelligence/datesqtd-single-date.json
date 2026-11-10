@@ -1,0 +1,46 @@
+{
+  "title": "DATESQTD is the first day of the quarter to the selected date",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = DATESQTD ( 'Date'[Date] ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] = DATE ( 2023, 8, 15 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2023-07-01T00:00:00",
+          "2023-08-15T00:00:00",
+          46,
+          70.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datesqtd/",
+    "quote": "Returns a set of dates in the quarter up to the last date visible in the filter context.",
+    "supports": "DATESQTD goes from the first day of the quarter to the last visible date"
+  },
+  "confidence": "derived",
+  "derivation": "August 15, 2023 is in the third quarter, which starts July 1: 31 + 15 = 46 days. Sales: Jul 1 70 (the year to date would be 280).",
+  "tags": [
+    "time-intelligence",
+    "datesqtd"
+  ]
+}

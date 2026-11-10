@@ -1,0 +1,39 @@
+{
+  "title": "CONCATENATEX sorts ascending when an order expression has no direction",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CONCATENATEX ( Product, Product[Product], \"|\", Product[Price] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Lock|Helmet|Scooter|Bike"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/concatenatex/",
+      "quote": "The default order is ASC (ascending) when OrderBy_Expression argument is present and the corresponding Order argument is not specified.",
+      "supports": "ascending by default"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/concatenatex-function-dax",
+      "quote": "This is the default value when the order parameter is omitted.",
+      "supports": "ascending is the default"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Prices: Bike 100, Helmet 20, Lock 10, Scooter 50. Ascending by price: Lock, Helmet, Scooter, Bike.",
+  "tags": [
+    "concatenatex",
+    "order"
+  ],
+  "notes": "The default differs from TOPN and RANKX, which default to descending."
+}

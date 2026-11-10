@@ -1,0 +1,53 @@
+{
+  "title": "SAMEPERIODLASTYEAR of one date is the same date a year earlier",
+  "model": "f-calendar",
+  "query": "EVALUATE CALCULATETABLE ( VAR R = SAMEPERIODLASTYEAR ( 'Date'[Date] ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) ), 'Date'[Date] = DATE ( 2024, 2, 15 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2023-02-15T00:00:00",
+          "2023-02-15T00:00:00",
+          1,
+          30.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/sameperiodlastyear/",
+      "quote": "SAMEPERIODLASTYEAR returns the selected period shifted back one year.",
+      "supports": "the example shifts 2008-07-25..31 to 2007-07-25..31"
+    },
+    {
+      "url": "https://dax.guide/sameperiodlastyear/",
+      "quote": "Internally SAMEPERIODLASTYEAR corresponds to the following call of DATEADD :",
+      "supports": "SAMEPERIODLASTYEAR is DATEADD ( <Dates>, -1, YEAR )"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "2024-02-15 moves back one year to 2023-02-15. Sales on that date: 30.",
+  "tags": [
+    "time-intelligence",
+    "sameperiodlastyear"
+  ]
+}

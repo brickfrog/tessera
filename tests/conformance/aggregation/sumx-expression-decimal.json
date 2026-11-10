@@ -1,0 +1,40 @@
+{
+  "title": "SUMX evaluates the expression row by row; integer * fixed decimal is a fixed decimal",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( Sales, Sales[Quantity] * Sales[Amount] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          1040.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/sumx-function-dax",
+      "quote": "Returns the sum of an expression evaluated for each row in a table.",
+      "supports": "the expression is evaluated per row"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "it returns a currency when a currency and a non-currency type are involved",
+      "supports": "integer * currency is currency"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Quantity * Amount per Sales row: 1*100 + 2*40 + 1*20 + 5*50 + 2*200 + 3*30 + 1*100 = 100 + 80 + 20 + 250 + 400 + 90 + 100 = 1040. Each product is a currency and currency + currency is a currency.",
+  "tags": [
+    "sumx",
+    "row-context",
+    "result-type",
+    "decimal"
+  ]
+}

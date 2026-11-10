@@ -1,0 +1,41 @@
+{
+  "title": "-5 / BLANK is -Infinity",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", -5 / BLANK () )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          "-Infinity"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "5/BLANK Infinity",
+      "supports": "a BLANK denominator behaves as zero"
+    },
+    {
+      "url": "https://dax.guide/op/division/",
+      "quote": "If the error is not intercepted, the division returns positive or negative infinity depending on the sign of the numerator, or NaN in case of 0 / 0",
+      "supports": "what / gives for a zero denominator"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The BLANK denominator is zero, as in 5/BLANK. The numerator is negative, so the result is negative infinity.",
+  "tags": [
+    "division",
+    "blank",
+    "operator-divide",
+    "divide-by-zero",
+    "infinity"
+  ]
+}

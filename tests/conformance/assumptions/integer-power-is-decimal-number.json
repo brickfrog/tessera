@@ -1,0 +1,42 @@
+{
+  "title": "2 ^ 3 is the decimal number 8, not an integer",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 2 ^ 3 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          8.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/power/",
+      "quote": "The exponentiation operator ^ returns the same result as the POWER function",
+      "supports": "^ is POWER, and the page gives POWER's return value as a single decimal value"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/power-function-dax",
+      "quote": "The following example returns 25",
+      "supports": "POWER(5,2) is 25; the page's return value is a decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "^ is syntax for POWER, and POWER returns a decimal number whatever its arguments. 2 * 2 * 2 = 8, as the double 8.0.",
+  "uncertain": true,
+  "alternative": "Both pages give the return type in general terms and neither shows the type for integer operands; DAX Guide's example prints POWER ( [Value], 4 ) without decimals (1, 256, 2,401) next to columns printed with two. If integer operands give an integer, the result is the int64 8.",
+  "tags": [
+    "assumption:power-result-type",
+    "operator-power",
+    "int64",
+    "result-type"
+  ]
+}

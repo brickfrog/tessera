@@ -1,0 +1,51 @@
+{
+  "title": "HASONEFILTER can be TRUE while the column shows no value at all",
+  "model": "sales",
+  "query": [
+    "EVALUATE CALCULATETABLE (",
+    "  ROW ( \"Has One Filter\", HASONEFILTER ( Product[Category] ), \"Has One Value\", HASONEVALUE ( Product[Category] ) ),",
+    "  Product[Category] = \"Vehicles\", Product[Product] = \"Lock\" )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Has One Filter]",
+          "type": "boolean"
+        },
+        {
+          "name": "[Has One Value]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true,
+          false
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/hasonefilter/",
+      "quote": "A column can be filtered without showing any values, -- because of cross-filters",
+      "supports": "the page shows HASONEFILTER true for a category filter combined with a product of another category"
+    },
+    {
+      "url": "https://dax.guide/hasonevalue/",
+      "quote": "HASONEVALUE corresponds to the following code: COUNTROWS ( VALUES ( <ColumnName> ) ) = 1",
+      "supports": "HASONEVALUE counts the visible values"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Lock is an Accessories product, so the two filters together leave no Product row. Product[Category] is directly filtered to one value, Vehicles: HASONEFILTER is TRUE. VALUES ( Product[Category] ) is empty, COUNTROWS of it is BLANK, and BLANK = 1 is FALSE.",
+  "tags": [
+    "hasonefilter",
+    "hasonevalue",
+    "calculatetable",
+    "cross-filter",
+    "direct-filter",
+    "empty-filter"
+  ]
+}

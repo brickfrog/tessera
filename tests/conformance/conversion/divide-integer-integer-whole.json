@@ -1,0 +1,39 @@
+{
+  "title": "Integer / integer is a decimal number even when the quotient is whole",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 4 / 2 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "In the following table, the row header is the numerator and the column header is the denominator.",
+      "supports": "the Division (/) table of result types: INTEGER/INTEGER is REAL, INTEGER/CURRENCY is CURRENCY, CURRENCY/INTEGER is CURRENCY, CURRENCY/CURRENCY is REAL, CURRENCY/REAL is CURRENCY"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-numeric-data-type-conversions-in-dax/",
+      "quote": "The result is always decimal, unless a currency is divided by an integer or by a decimal; in this case, the result is currency.",
+      "supports": "the result type of / and of DIVIDE"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "INTEGER / INTEGER is REAL: 4 / 2 = 2.0.",
+  "tags": [
+    "conversion",
+    "operator-divide",
+    "result-type"
+  ]
+}

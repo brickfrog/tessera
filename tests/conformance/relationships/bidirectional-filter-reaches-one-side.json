@@ -1,0 +1,41 @@
+{
+  "title": "With a both-direction relationship a filter on Customer reaches Product through Sales",
+  "model": "c-bidirectional",
+  "query": "EVALUATE CALCULATETABLE ( VALUES ( Product[Product] ), Customer[Country] = \"Australia\" )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "T-shirt"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/guidance/relationships-bidirectional-filtering",
+      "quote": "The product slicer now lists a single option: T-shirt",
+      "supports": "the page uses these rows and states that, sliced by Australia with the Product relationship set to both directions, only T-shirt remains"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/relationships-in-power-bi-and-tabular-models/",
+      "quote": "it also propagates from the many-side to the one-side",
+      "supports": "a both-direction relationship also propagates from the many side to the one side"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Australia is CUST-02. Sales rows of CUST-02: row 3 (CL-01). Sales[SKU] -> Product[SKU] filters both ways, so Product is filtered to CL-01, the T-shirt. There are no orphan Sales rows, so no blank row.",
+  "tags": [
+    "calculatetable",
+    "values",
+    "relationship",
+    "bidirectional",
+    "filter-propagation"
+  ]
+}

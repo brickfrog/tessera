@@ -1,0 +1,40 @@
+{
+  "title": "COUNTROWS ( ALL ( table ) ) counts the blank row",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( ALL ( Product ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "ALL considers the blank row as valid",
+      "supports": "ALL treats the blank row as a valid row"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "ALL includes in the result the additional blank row generated for invalid relationships",
+      "supports": "ALL includes the blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales rows 3 and 4 have ProductKey 9, which Product lacks, so the relationship is invalid and Product gets a blank row. ALL ( Product ) returns the 3 stored rows and the blank row: 4.",
+  "tags": [
+    "countrows",
+    "all",
+    "blank-row",
+    "relationship"
+  ]
+}

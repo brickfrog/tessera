@@ -1,0 +1,27 @@
+{
+  "title": "USERELATIONSHIP cannot name two columns that have no relationship in the model",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], USERELATIONSHIP ( Sales[Quantity], Product[ProductKey] ) ) )",
+  "expected": {
+    "error": "Sales[Quantity] and Product[ProductKey] are not the end points of a relationship: USERELATIONSHIP returns an error"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/userelationship-function-dax",
+      "quote": "An error is returned if any of the columns named as an argument is not part of a relationship or the arguments belong to different relationships",
+      "supports": "the columns must be the two ends of an existing relationship"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/using-userelationship-in-dax/",
+      "quote": "You cannot use USERELATIONSHIP to create a relationship on the fly",
+      "supports": "it cannot create a relationship"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "calculate",
+    "userelationship",
+    "relationship",
+    "error"
+  ]
+}

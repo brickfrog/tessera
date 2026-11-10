@@ -1,0 +1,33 @@
+{
+  "title": "DIVIDE ( 0, 0 ) is BLANK, not NaN",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DIVIDE ( 0, 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-divide-function-operator",
+    "quote": "If an alternate result is not passed in, and the denominator is zero or BLANK, the function returns BLANK",
+    "supports": "a zero denominator gives BLANK whatever the numerator"
+  },
+  "confidence": "derived",
+  "derivation": "The denominator is zero and no alternate result is given, so the result is BLANK.",
+  "tags": [
+    "division",
+    "divide",
+    "divide-by-zero",
+    "blank"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

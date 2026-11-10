@@ -1,0 +1,32 @@
+{
+  "title": "CURRENCY ( 3.6666666666666 ) is 3.6667: the fifth decimal rounds, it is not cut off",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CURRENCY ( 3.6666666666666 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          3.6667
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/currency-function-dax",
+    "quote": "Rounding up occurs if the 5th significant decimal is equal or larger than 5",
+    "supports": "CURRENCY rounds on the fifth decimal; the page gives 3.6666666666666 as 3.6667 and 3.0123456789 as 3.0123"
+  },
+  "confidence": "published",
+  "tags": [
+    "assumption:currency-rounding",
+    "currency",
+    "rounding"
+  ],
+  "notes": "Truncation would give 3.6666. This value is not a tie, so it separates rounding from truncation without depending on how a half is rounded."
+}

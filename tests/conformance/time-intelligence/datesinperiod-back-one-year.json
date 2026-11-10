@@ -1,0 +1,54 @@
+{
+  "title": "DATESINPERIOD going back one year from December 31 is the whole year",
+  "model": "f-calendar",
+  "query": "EVALUATE VAR R = DATESINPERIOD ( 'Date'[Date], DATE ( 2024, 12, 31 ), -1, YEAR ) RETURN ROW ( \"Min\", MINX ( R, 'Date'[Date] ), \"Max\", MAXX ( R, 'Date'[Date] ), \"Days\", COUNTROWS ( R ), \"Sales\", CALCULATE ( [Sales], R ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Min]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Max]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Days]",
+          "type": "int64"
+        },
+        {
+          "name": "[Sales]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "2024-01-01T00:00:00",
+          "2024-12-31T00:00:00",
+          366,
+          3600.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/datesinperiod/",
+      "quote": "The following expression evaluates the measure Sales Amount in the last 12 months starting from the last day of the period in the filter context.",
+      "supports": "the moving annual total pattern: -1, YEAR from the last day"
+    },
+    {
+      "url": "https://dax.guide/datesinperiod/",
+      "quote": "The result has the dates between the start date and the boundary date. The boundary date is not in the result.",
+      "supports": "the boundary, one year back, is excluded"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "One year back from 2024-12-31 the boundary is 2023-12-31, which is excluded: January 1 to December 31, 2024, 366 days in a leap year. Sales in 2024: 3600.",
+  "tags": [
+    "time-intelligence",
+    "datesinperiod",
+    "leap-year"
+  ]
+}

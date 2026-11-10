@@ -1,0 +1,44 @@
+{
+  "title": "The result of FORMAT is text: it concatenates and compares as a string",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"joined\", FORMAT ( 42, \"0\" ) & \"!\", \"is text\", ISTEXT ( FORMAT ( 42, \"0\" ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[joined]",
+          "type": "string"
+        },
+        {
+          "name": "[is text]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "42!",
+          true
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/format-function-dax",
+      "quote": "Using FORMAT changes a measure result to a text data type.",
+      "supports": "the result type"
+    },
+    {
+      "url": "https://dax.guide/format/",
+      "quote": "A single string value.",
+      "supports": "Return values"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "FORMAT ( 42, \"0\" ) is the text \"42\"; with \"!\" appended it is \"42!\", and ISTEXT of a text value is TRUE.",
+  "tags": [
+    "format",
+    "result-type",
+    "istext"
+  ]
+}

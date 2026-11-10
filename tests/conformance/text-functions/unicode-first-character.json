@@ -1,0 +1,43 @@
+{
+  "title": "UNICODE returns the code point of the first character",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"a\", UNICODE ( \"A\" ), \"abc\", UNICODE ( \"ABC\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[a]",
+          "type": "int64"
+        },
+        {
+          "name": "[abc]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          65,
+          65
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/unicode-function-dax",
+      "quote": "Returns the number (code point) corresponding to the first character of the text.",
+      "supports": "only the first character counts"
+    },
+    {
+      "url": "https://dax.guide/unicode/",
+      "quote": "A single integer value.",
+      "supports": "the result is an integer"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "\"A\" is code point 65; for \"ABC\" only the first character, \"A\", is used.",
+  "tags": [
+    "text-functions",
+    "unicode"
+  ]
+}

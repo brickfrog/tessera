@@ -1,0 +1,28 @@
+{
+  "title": "RELATED cannot go from the one side to the many side",
+  "model": "sales",
+  "query": "EVALUATE ADDCOLUMNS ( Product, \"Amount\", RELATED ( Sales[Amount] ) )",
+  "expected": {
+    "error": "Product is on the one side of its relationship with Sales: RELATED ( Sales[Amount] ) has no single related row to read"
+  },
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/using-related-and-relatedtable-in-dax/",
+      "quote": "RELATED works from the many-side of a relationship towards the one-side",
+      "supports": "RELATED only works from the many side towards the one side; the other direction needs RELATEDTABLE"
+    },
+    {
+      "url": "https://dax.guide/related/",
+      "quote": "the function follows a chain of one or more many-to-one relationships to fetch the value from the specified column in the related table",
+      "supports": "it follows many-to-one relationships"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The row context is on Product, the one side of Sales[ProductKey] -> Product[ProductKey]. Sales is not reachable from Product through many-to-one relationships, so Sales[Amount] is not a column of Product's expanded table and RELATED cannot return a single value: an error.",
+  "tags": [
+    "related",
+    "addcolumns",
+    "relationship",
+    "error"
+  ]
+}

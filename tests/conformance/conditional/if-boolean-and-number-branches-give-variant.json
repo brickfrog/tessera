@@ -1,0 +1,47 @@
+{
+  "title": "IF ( condition, TRUE (), 0 ) returns TRUE or 0, not a converted value",
+  "model": "scalar",
+  "query": "EVALUATE ADDCOLUMNS ( T, \"x\", IF ( T[n] > 1, TRUE (), 0 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "T[n]",
+          "type": "int64"
+        },
+        {
+          "name": "[x]",
+          "type": "variant"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          0
+        ],
+        [
+          2,
+          true
+        ],
+        [
+          3,
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/if-function-dax",
+    "quote": "the formula IF(<condition>, TRUE(), 0) returns TRUE or 0",
+    "supports": "a boolean branch and a numeric branch are not converted to one type"
+  },
+  "confidence": "derived",
+  "derivation": "n = 1 gets the integer 0; n = 2 and 3 get TRUE. A boolean is not a numeric type, so the two branches keep their types and the column is a variant.",
+  "tags": [
+    "if",
+    "result-type",
+    "variant",
+    "boolean",
+    "addcolumns"
+  ]
+}

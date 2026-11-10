@@ -1,0 +1,34 @@
+{
+  "title": "QUARTER of February 1 is 1 and of December 31 is 4",
+  "model": "scalar",
+  "query": "EVALUATE { QUARTER ( DATE ( 2019, 2, 1 ) ), QUARTER ( DATE ( 2018, 12, 31 ) ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1
+        ],
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/quarter-function-dax",
+    "quote": "Returns the quarter as a number from 1 (January – March) to 4 (October – December).",
+    "supports": "the documented query returns [Value] 1 and 4; Return value: an integer number from 1 to 4"
+  },
+  "confidence": "published",
+  "tags": [
+    "date-functions",
+    "quarter",
+    "table-constructor"
+  ]
+}

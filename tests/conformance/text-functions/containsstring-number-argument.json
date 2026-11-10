@@ -1,0 +1,31 @@
+{
+  "title": "CONTAINSSTRING converts numbers to text: CONTAINSSTRING ( 12345, 34 ) is TRUE",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CONTAINSSTRING ( 12345, 34 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/containsstring/",
+    "quote": "CONTAINSSTRING converts a number to text before the search.",
+    "supports": "the page gives CONTAINSSTRING ( 12345, 34 ) returning TRUE"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "containsstring",
+    "implicit-conversion"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "title": "TRUE + 1 is 2: TRUE is 1 in arithmetic",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", TRUE () + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "You can add TRUE + 1 and get the result 2 , because DAX implicitly converts TRUE to the number 1 , and does the operation 1+1",
+      "supports": "stated outright"
+    },
+    {
+      "url": "https://dax.guide/op/addition/",
+      "quote": "Boolean values are converted into numbers (0 for FALSE and 1 for TRUE) when they are involved in an addition",
+      "supports": "the same rule"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "operator-add",
+    "boolean"
+  ],
+  "notes": "The int64 type follows the page's wording, that the operation done is 1+1, an addition of two integers."
+}

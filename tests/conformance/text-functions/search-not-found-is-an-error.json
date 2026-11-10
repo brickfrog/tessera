@@ -1,0 +1,19 @@
+{
+  "title": "SEARCH with no 4th argument fails when the text is not found",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SEARCH ( \"z\", \"abc\" ) )",
+  "expected": {
+    "error": "SEARCH did not find the text and no NotFoundValue was given"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/search-function-dax",
+    "quote": "If the find_text can't be found in within_text , the formula returns an error.",
+    "supports": "not found without a NotFoundValue is an error"
+  },
+  "confidence": "published",
+  "tags": [
+    "text-functions",
+    "search",
+    "error"
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "title": "SUMMARIZE returns the combinations of several group-by columns that exist in the table",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZE ( Sales, Product[Product], Customer[Country] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Customer[Country]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          "US"
+        ],
+        [
+          "Helmet",
+          "US"
+        ],
+        [
+          "Lock",
+          "US"
+        ],
+        [
+          "Bike",
+          "JP"
+        ],
+        [
+          "Lock",
+          "JP"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-summarizecolumns/",
+    "quote": "you should use SUMMARIZE only to obtain the list of unique years and colors for which there is at least a row in the Sales table",
+    "supports": "only combinations with at least one Sales row are returned"
+  },
+  "confidence": "derived",
+  "derivation": "Sales rows as (product, customer country): 1 Bike US, 2 Helmet US, 3 Helmet US, 4 Lock US, 5 Bike JP, 6 Lock JP, 7 Bike US. Distinct pairs: Bike US, Helmet US, Lock US, Bike JP, Lock JP. Helmet JP, anything FR and Scooter do not occur.",
+  "tags": [
+    "summarize",
+    "relationship",
+    "distinct"
+  ]
+}

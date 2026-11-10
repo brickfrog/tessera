@@ -1,0 +1,41 @@
+{
+  "title": "DATE ( 2008, 0, 2 ) is December 2, 2007: month 0 is the month before January",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", DATE ( 2008, 0, 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "dateTime"
+        }
+      ],
+      "rows": [
+        [
+          "2007-12-02T00:00:00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/date/",
+      "quote": "If Month is 0 or negative, DATE goes back from January of Year by the magnitude of Month plus one month.",
+      "supports": "DAX Guide gives DATE ( 2008, 0, 2 ) returning December 2, 2007"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/date-function-dax",
+      "quote": "Negative integers are not supported. Valid values are 1-12.",
+      "supports": "Microsoft Learn calls only 1 to 12 valid and says nothing about 0"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "DAX Guide states the result outright: month 0 goes back one month from January 2008, to December 2, 2007. Microsoft Learn does not document month 0.",
+  "uncertain": true,
+  "alternative": "If the engine rejects a month outside 1 to 12 that is not above 12, as the Microsoft Learn wording could be read, the query fails.",
+  "tags": [
+    "date-functions",
+    "date",
+    "overflow"
+  ]
+}

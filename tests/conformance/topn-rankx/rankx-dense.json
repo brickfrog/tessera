@@ -1,0 +1,75 @@
+{
+  "title": "RANKX with DENSE gives the next rank after a tie",
+  "model": "d-values",
+  "query": "EVALUATE ADDCOLUMNS ( Player, \"Rank\", RANKX ( Player, Player[Score], Player[Score], DESC, DENSE ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Player[Name]",
+          "type": "string"
+        },
+        {
+          "name": "Player[Score]",
+          "type": "int64"
+        },
+        {
+          "name": "[Rank]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Ann",
+          90,
+          1
+        ],
+        [
+          "Bob",
+          80,
+          2
+        ],
+        [
+          "Cho",
+          80,
+          2
+        ],
+        [
+          "Dee",
+          70,
+          3
+        ],
+        [
+          "Eve",
+          70,
+          3
+        ],
+        [
+          "Fay",
+          50,
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rankx-function-dax",
+      "quote": "The next rank value, after a tie, is the next rank value.",
+      "supports": "Dense does not skip"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-rankx-in-dax/",
+      "quote": "When DENSE is specified, at the end of step (1) DAX removes duplicates from the lookup table.",
+      "supports": "ties count as one value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Player scores: Ann 90, Bob 80, Cho 80, Dee 70, Eve 70, Fay 50. Distinct scores descending: 90, 80, 70, 50 are ranks 1, 2, 3, 4.",
+  "tags": [
+    "rankx",
+    "ties",
+    "dense",
+    "addcolumns"
+  ]
+}

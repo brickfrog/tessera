@@ -1,0 +1,38 @@
+{
+  "title": "ABS ( -3 ) is 3",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ABS ( -3 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/abs/",
+      "quote": "The absolute value of a number with the same data type and without its sign.",
+      "supports": "DAX Guide: the type follows the argument"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/abs-function-dax",
+      "quote": "The absolute value of a number is a decimal number, whole or decimal, without its sign.",
+      "supports": "Microsoft Learn: the return value is a decimal number"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "-3 without its sign is 3.",
+  "tags": [
+    "math-functions",
+    "abs"
+  ],
+  "notes": "The type is not asserted: DAX Guide says the result keeps the argument type (an integer here), Microsoft Learn says the return value is a decimal number."
+}

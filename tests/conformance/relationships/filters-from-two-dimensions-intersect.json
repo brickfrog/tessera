@@ -1,0 +1,32 @@
+{
+  "title": "Filters arriving on the fact table from two dimensions are combined with AND",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Sales Amount], Product[Color] = \"Red\", 'Date'[Year] = 2024 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          300.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+    "quote": "it's always an AND operation, requiring that all conditions must be true",
+    "supports": "several filters reaching one table are intersected"
+  },
+  "confidence": "derived",
+  "derivation": "Red products are 1 and 2: Sales rows 1, 2, 3, 5, 7. Year 2024 by the active OrderDate relationship: rows 5, 6, 7. Both: rows 5 and 7 = 200 + 100 = 300.",
+  "tags": [
+    "calculate",
+    "relationship",
+    "filter-propagation"
+  ]
+}

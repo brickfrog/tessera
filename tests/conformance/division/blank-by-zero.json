@@ -1,0 +1,47 @@
+{
+  "title": "BLANK / 0 is BLANK: a BLANK numerator makes the quotient BLANK",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", BLANK () / 0 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/blank-handling-in-dax/",
+      "quote": "BLANK () / 4 Blank value",
+      "supports": "a BLANK numerator gives BLANK"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "BLANK/BLANK BLANK",
+      "supports": "a BLANK numerator gives BLANK even over a denominator that counts as zero"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/connect-data/desktop-data-types",
+      "quote": "0/BLANK NaN",
+      "supports": "zero over zero is NaN: the other reading, if the BLANK numerator is taken as 0"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "No source shows BLANK / 0. A BLANK numerator gives BLANK over 4 and over BLANK (which is zero as a denominator), so it is taken to give BLANK over 0 too.",
+  "uncertain": true,
+  "alternative": "The BLANK numerator is converted to 0 and 0 / 0 is NaN (a double).",
+  "tags": [
+    "division",
+    "blank",
+    "operator-divide",
+    "divide-by-zero"
+  ],
+  "notes": "The column's type is not asserted: no source says what type this result has."
+}

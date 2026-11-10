@@ -1,0 +1,32 @@
+{
+  "title": "COALESCE ( DATE ( 2020, 1, 1 ), 1 ) is the decimal number 43831, not a date",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COALESCE ( DATE ( 2020, 1, 1 ), 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          43831.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/coalesce/",
+    "quote": "For example, COALESCE ( DATE ( 2020, 1, 1 ), 1 ) returns the decimal number 43831, not a date",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "conversion",
+    "coalesce",
+    "date",
+    "result-type"
+  ]
+}

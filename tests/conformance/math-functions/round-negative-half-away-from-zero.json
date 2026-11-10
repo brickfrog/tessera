@@ -1,0 +1,38 @@
+{
+  "title": "ROUND ( -1.15, 1 ) is -1.2: ties round away from zero",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ROUND ( -1.15, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -1.2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/round-function-dax",
+      "quote": "= ROUND(-1.15, 1)",
+      "supports": "the table of examples under the tie rule gives -1.2 for ROUND(-1.15, 1)"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/round-function-dax",
+      "quote": "Ties are broken by rounding half away from zero (also known as commercial rounding).",
+      "supports": "ROUND breaks ties away from zero"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "round",
+    "rounding-half-away-from-zero"
+  ]
+}

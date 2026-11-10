@@ -1,0 +1,47 @@
+{
+  "title": "DISTINCTCOUNT of a one-side column counts the blank row's BLANK",
+  "model": "sales-orphans",
+  "query": "EVALUATE ROW ( \"r\", DISTINCTCOUNT ( Product[Color] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/distinctcount-function-dax",
+      "quote": "DISTINCTCOUNT function counts the BLANK value",
+      "supports": "DISTINCTCOUNT counts the BLANK value"
+    },
+    {
+      "url": "https://dax.guide/distinctcount/",
+      "quote": "DISTINCTCOUNT considers BLANK as a valid value, whereas",
+      "supports": "BLANK is a valid value for DISTINCTCOUNT"
+    },
+    {
+      "url": "https://dax.guide/distinctcount/",
+      "quote": "COUNTROWS ( DISTINCT ( table[column] ) )",
+      "supports": "but the same page gives DISTINCTCOUNT as COUNTROWS ( DISTINCT ( column ) ), and DISTINCT has no blank row"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Product[Color] holds Red, Blue, Red: 2 distinct stored values. The blank row adds a BLANK value to the column, and DISTINCTCOUNT counts BLANK: 3.",
+  "uncertain": true,
+  "alternative": "If DISTINCTCOUNT is exactly COUNTROWS ( DISTINCT ( Product[Color] ) ), as dax.guide writes it, the blank row is not counted and the result is 2.",
+  "tags": [
+    "distinctcount",
+    "blank-row",
+    "relationship"
+  ],
+  "notes": "The sources settle that a stored BLANK is counted (see distinctcount-counts-stored-blank). They do not say outright whether the blank row of an invalid relationship is."
+}

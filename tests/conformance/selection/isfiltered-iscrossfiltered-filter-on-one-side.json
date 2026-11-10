@@ -1,0 +1,76 @@
+{
+  "title": "A filter on a Product column: Product is filtered, Sales is only cross-filtered",
+  "model": "sales",
+  "query": [
+    "EVALUATE CALCULATETABLE (",
+    "  {",
+    "    ( \"ISFILTERED Product[Color]\", ISFILTERED ( Product[Color] ) ),",
+    "    ( \"ISFILTERED Sales[Quantity]\", ISFILTERED ( Sales[Quantity] ) ),",
+    "    ( \"ISFILTERED Product\", ISFILTERED ( Product ) ),",
+    "    ( \"ISFILTERED Sales\", ISFILTERED ( Sales ) ),",
+    "    ( \"ISCROSSFILTERED Product[Category]\", ISCROSSFILTERED ( Product[Category] ) ),",
+    "    ( \"ISCROSSFILTERED Product\", ISCROSSFILTERED ( Product ) ),",
+    "    ( \"ISCROSSFILTERED Sales\", ISCROSSFILTERED ( Sales ) )",
+    "  },",
+    "  Product[Color] = \"Red\" )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value1]",
+          "type": "string"
+        },
+        {
+          "name": "[Value2]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          "ISFILTERED Product[Color]",
+          true
+        ],
+        [
+          "ISFILTERED Sales[Quantity]",
+          false
+        ],
+        [
+          "ISFILTERED Product",
+          true
+        ],
+        [
+          "ISFILTERED Sales",
+          false
+        ],
+        [
+          "ISCROSSFILTERED Product[Category]",
+          true
+        ],
+        [
+          "ISCROSSFILTERED Product",
+          true
+        ],
+        [
+          "ISCROSSFILTERED Sales",
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/isfiltered/",
+    "quote": "In this example we place the filter on the 1 side of a 1:* relationship",
+    "supports": "the page shows this query, with the same tables and relationship direction, and these seven results"
+  },
+  "confidence": "derived",
+  "derivation": "The only filter is on Product[Color]. That column and its table are filtered directly; Sales has no direct filter. Product[Category] is cross-filtered by the filter on another column of its table, and Sales by the relationship from Product (one side) to Sales (many side).",
+  "tags": [
+    "isfiltered",
+    "iscrossfiltered",
+    "calculatetable",
+    "direct-filter",
+    "cross-filter",
+    "relationship"
+  ]
+}

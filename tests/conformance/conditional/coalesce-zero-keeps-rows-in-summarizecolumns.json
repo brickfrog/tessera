@@ -1,0 +1,47 @@
+{
+  "title": "A measure wrapped in COALESCE ( ..., 0 ) is never BLANK, so SUMMARIZECOLUMNS keeps the groups with no data",
+  "model": "sales",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Amount\", COALESCE ( [Sales Amount], 0 ) ) ORDER BY Product[Color]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]"
+        }
+      ],
+      "rows": [
+        [
+          "Blue",
+          80.0
+        ],
+        [
+          "Green",
+          0.0
+        ],
+        [
+          "Red",
+          460.0
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": {
+    "url": "https://dax.guide/coalesce/",
+    "quote": "Then a report or a SUMMARIZECOLUMNS query shows all the combinations of the grouping columns, including the combinations without data.",
+    "supports": "replacing BLANK with 0 keeps the rows SUMMARIZECOLUMNS would drop"
+  },
+  "confidence": "derived",
+  "derivation": "Blue is rows 4, 6 = 80; Red rows 1, 2, 3, 5, 7 = 460; Green has no sales: [Sales Amount] is BLANK and COALESCE returns 0, so the Green row is not dropped.",
+  "tags": [
+    "coalesce",
+    "blank",
+    "summarizecolumns",
+    "order-by"
+  ],
+  "notes": "The type of [Amount] is left out: the arguments are a fixed decimal and an integer, and no source states the result type of COALESCE for that pair."
+}

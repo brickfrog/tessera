@@ -1,0 +1,41 @@
+{
+  "title": "ALL ( Product ) removes the filters on Product and keeps the filter on Date",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"r\", CALCULATE ( [Sales Amount], ALL ( 'Product' ) ) ), 'Product'[Color] = \"Red\", 'Date'[Year] = 2024 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          330.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/all-function-dax",
+      "quote": "Removes all filters from the specified table.",
+      "supports": "ALL ( Table ) removes the filters from the specified table only"
+    },
+    {
+      "url": "https://dax.guide/all/",
+      "quote": "Sales Amount (ALL Products)",
+      "supports": "in the page's last example ALL ( Product ) under filters on Product and Date gives the year's total, not the grand total"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Removing the Color filter leaves Year = 2024: rows 5, 6, 7 = 200 + 30 + 100 = 330.",
+  "tags": [
+    "calculate",
+    "calculatetable",
+    "all",
+    "filter-removal"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}

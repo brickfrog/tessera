@@ -1,0 +1,70 @@
+{
+  "title": "RELATED over a table evaluated under USERELATIONSHIP follows the relationship that was active when the table was evaluated",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "VAR SalesByDelivery = CALCULATETABLE ( Sales, USERELATIONSHIP ( Sales[DeliveryDate], 'Date'[Date] ) )",
+    "RETURN SELECTCOLUMNS ( SalesByDelivery, \"SalesKey\", Sales[SalesKey], \"Month\", RELATED ( 'Date'[Month] ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[SalesKey]",
+          "type": "int64"
+        },
+        {
+          "name": "[Month]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Feb"
+        ],
+        [
+          2,
+          "Jan"
+        ],
+        [
+          3,
+          "Dec"
+        ],
+        [
+          4,
+          "Jan"
+        ],
+        [
+          5,
+          "Feb"
+        ],
+        [
+          6,
+          "Mar"
+        ],
+        [
+          7,
+          "Mar"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/expanded-tables-in-dax/",
+    "quote": "Date[Month] contained in SalesB is related to Sales[DueDate], not to Sales[Date]",
+    "supports": "the article's SalesB example: the related Date columns of the variable come from the relationship active when it was evaluated"
+  },
+  "confidence": "derived",
+  "derivation": "Each row's Month is the month of its DeliveryDate, although the SELECTCOLUMNS runs when OrderDate is the active relationship: row 1 2023-02-10 Feb, row 2 2023-01-15 Jan, row 3 2023-12-31 Dec, row 4 2024-01-05 Jan, row 5 2024-02-20 Feb, row 6 2024-03-01 Mar, row 7 2024-03-01 Mar.",
+  "tags": [
+    "calculatetable",
+    "userelationship",
+    "related",
+    "selectcolumns",
+    "expanded-table",
+    "inactive-relationship",
+    "variable"
+  ],
+  "notes": "An engine that resolves RELATED with the relationships active at the point of the call would return the OrderDate months: Jan, Jan, Feb, Dec, Jan, Feb, Mar. The article says that reading is wrong."
+}

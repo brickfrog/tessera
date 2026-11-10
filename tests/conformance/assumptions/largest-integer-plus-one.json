@@ -1,0 +1,42 @@
+{
+  "title": "9223372036854775807 + 1 wraps around to -9223372036854775808",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", 9223372036854775807 + 1 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -9223372036854775808
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/rounding-errors-with-different-data-types-in-dax/",
+      "quote": "there is an overflow condition, but there is no overflow error and the result is the least significant representable digits",
+      "supports": "integer sum, subtraction and multiplication wrap around on overflow instead of failing"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/data-types-supported-ssas-tabular",
+      "quote": "The values in the following list are synonyms to the previous mentioned null value",
+      "supports": "9223372036854775807 and -9223372036854775808 are listed as values the engine uses for nulls"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Integer addition has no overflow error and keeps the low 64 bits: 2^63 - 1 plus 1 is 2^63, which wraps to -2^63 = -9223372036854775808.",
+  "uncertain": true,
+  "alternative": "Both the literal and the wrapped result are values Microsoft documents as outside the supported range and as synonyms of null. The engine may reject the literal (an error), read it as a decimal number (result 9.223372036854775808E+18), or return the wrapped value as BLANK.",
+  "tags": [
+    "assumption:integer-overflow",
+    "operator-add",
+    "int64",
+    "overflow"
+  ]
+}

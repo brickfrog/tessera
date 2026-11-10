@@ -1,0 +1,38 @@
+{
+  "title": "CEILING ( 10.2, 1 ) is the integer 11",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", CEILING ( 10.2, 1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          11
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/ceiling/",
+      "quote": "= CEILING ( 10.2, 1 ) -- Returns 11 (Integer)",
+      "supports": "the example states the value and the type"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/ceiling-function-dax",
+      "quote": "The return type is usually of the same type of the significant argument",
+      "supports": "an integer significance gives an integer"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "ceiling",
+    "result-type"
+  ]
+}

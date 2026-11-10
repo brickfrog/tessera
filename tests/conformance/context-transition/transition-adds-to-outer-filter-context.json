@@ -1,0 +1,56 @@
+{
+  "title": "The filter made by the context transition is added to the outer filter context",
+  "model": "sales",
+  "query": "EVALUATE CALCULATETABLE ( ADDCOLUMNS ( VALUES ( 'Product'[Color] ), \"Amount\", [Sales Amount] ), 'Date'[Year] = 2023 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Color]",
+          "type": "string"
+        },
+        {
+          "name": "[Amount]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Red",
+          160.0
+        ],
+        [
+          "Blue",
+          50.0
+        ],
+        [
+          "Green",
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/calculate/",
+      "quote": "CALCULATE makes a copy of the original filter context to prepare the new filter context.",
+      "supports": "the new filter context starts as a copy of the original one (Year = 2023); the transition's filter on Color is applied to that copy"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/row-context-and-filter-context-in-dax/",
+      "quote": "A filter applied on the “one” side of a relationship affects the rows of the table on the “many” side of that relationship, but the filter does not propagate in the opposite direction.",
+      "supports": "the filter on Date reaches Sales but not Product, so VALUES ( Product[Color] ) still has the three colors"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Under Date[Year] = 2023 the Sales rows are 1, 2, 3, 4. Red (Bike, Helmet): rows 1, 2, 3 = 100 + 40 + 20 = 160. Blue (Lock): row 4 = 50. Green: none, BLANK. The filter on Date does not filter Product, so all three colors are iterated.",
+  "tags": [
+    "calculatetable",
+    "addcolumns",
+    "values",
+    "measure",
+    "context-transition",
+    "filter-propagation"
+  ],
+  "notes": "SUM of a fixed decimal (currency) column is taken to be a fixed decimal, as in the seed cases."
+}
