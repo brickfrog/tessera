@@ -79,9 +79,6 @@ conversion/value-of-empty-string	not-supported
 conversion/value-of-iso-date-text	not-supported
 conversion/value-of-text	not-supported
 define/query-measures-reference-later-definitions	fail
-define/start-at-two-values	not-supported
-define/start-at-value-not-in-the-result	not-supported
-define/start-at-with-descending-order	not-supported
 division/divide-function-currency-numerator	not-supported
 grouping/summarize-group-by-extension-column	not-supported
 related/lookupvalue-several-identical-matches	not-supported
@@ -104,7 +101,5 @@ sorting/order-by-boolean-blank-before-false	not-supported
 sorting/order-by-text-blank-before-empty-string	not-supported
 sorting/order-by-variant-numbers-before-text	not-supported
 sorting/topn-ascending-takes-blank-first	not-supported
-topn-rankx/start-at-one-column	not-supported
-topn-rankx/start-at-two-columns	not-supported
 udf/expr-parameter-and-the-row-context-of-the-caller	not-supported
 variables/var-referenced-error-is-raised-even-in-untaken-branch	not-supported

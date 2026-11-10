@@ -742,8 +742,8 @@ let private toResult (t: TableVal) (order: int array) : QueryResult =
 // ---- Queries -----------------------------------------------------------------------------------
 
 let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
-    if not e.StartAt.IsEmpty then
-        Fail.notSupported ctx e.StartAt.Head.Span "START AT"
+    if e.StartAt.Length > e.OrderBy.Length then
+        Fail.invalid ctx e.StartAt.Head.Span "START AT has more values than ORDER BY has keys"
 
     let table = ev.Table(ctx, e.Table)
 
@@ -794,7 +794,55 @@ let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
                 c
 
             // Stable: rows that tie keep the order they were produced in.
-            List.init table.Count id |> List.sortWith compare |> Array.ofList
+            let sorted = List.init table.Count id |> List.sortWith compare |> Array.ofList
+
+            if e.StartAt.IsEmpty then
+                sorted
+            else
+                // "defines the rows to skip before the specified values according to the sort
+                // order specified in the ORDER BY section" (dax.guide/st/start-at); "The second
+                // argument in START AT defines the starting value in column 2 of the ORDER BY
+                // columns within the rows that meet the first value for column 1" (Microsoft
+                // Learn, START AT): the rows whose first keys come before the values, in the
+                // order of the keys and their directions, are skipped.
+                let starts =
+                    e.StartAt
+                    |> List.map (fun v ->
+                        let value = ev.Scalar(ctx, v)
+
+                        if DaxValue.isBlank value then
+                            Fail.notSupported ctx v.Span "a START AT value that is BLANK"
+
+                        v.Span, value)
+
+                let before (row: int) =
+                    let mutable c = 0
+                    let mutable rest = List.zip (List.take starts.Length keys) starts
+
+                    while c = 0 && not rest.IsEmpty do
+                        let (values: DaxValue array, descending), (span, start) = rest.Head
+
+                        // Where BLANK sorts against the value is not settled by `compare`.
+                        if DaxValue.isBlank values.[row] then
+                            Fail.notSupported ctx span "START AT on a key that is BLANK in some row"
+
+                        c <-
+                            match DaxValue.compare ctx.Model.Collation values.[row] start with
+                            | Ok c -> c
+                            | Error _ ->
+                                Fail.notSupported
+                                    ctx
+                                    span
+                                    "a START AT value of a different data type than its ORDER BY key"
+
+                        if descending then
+                            c <- -c
+
+                        rest <- rest.Tail
+
+                    c < 0
+
+                sorted |> Array.filter (fun row -> not (before row))
 
     toResult table order
 

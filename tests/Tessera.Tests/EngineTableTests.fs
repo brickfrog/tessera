@@ -935,8 +935,44 @@ let tests =
                     (p ())
                     "DEFINE VAR t = FILTER ( Customer, Customer[Country] = \"US\" ) EVALUATE ROW ( \"n\", COUNTROWS ( t ) )"
                     [ [ 2 ] ])
+            // "defines the rows to skip before the specified values according to the sort order
+            // specified in the ORDER BY section" (dax.guide/st/start-at); "The second argument in
+            // START AT defines the starting value in column 2 of the ORDER BY columns within the
+            // rows that meet the first value for column 1"; "There can be as many arguments in
+            // START AT as there are in ORDER BY, but not more" (Microsoft Learn, START AT).
+            testCase "START AT" (fun () ->
+                returnsInOrder (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] START AT \"B\"" [
+                    [ "Bob" ]
+                    [ "Cy" ]
+                ]
+                // A value that is not in the result: Bob sorts before "Bz".
+                returnsInOrder (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] START AT \"Bz\"" [
+                    [ "Cy" ]
+                ]
+                // (UK, Bob) and (US, Ann) come before (US, "B").
+                returnsInOrder
+                    (p ())
+                    "EVALUATE ALL ( Customer[Country], Customer[Name] ) ORDER BY Customer[Country], Customer[Name] START AT \"US\", \"B\""
+                    [ [ "US"; "Cy" ] ]
+                // Only the first key: every US row.
+                returnsInOrder
+                    (p ())
+                    "EVALUATE ALL ( Customer[Country], Customer[Name] ) ORDER BY Customer[Country], Customer[Name] START AT \"US\""
+                    [ [ "US"; "Ann" ]; [ "US"; "Cy" ] ]
+                // Descending: Pump, Lock, Helmet, Bike.
+                returnsInOrder
+                    (p ())
+                    "EVALUATE DISTINCT ( Product[Name] ) ORDER BY Product[Name] DESC START AT \"Helmet\""
+                    [ [ "Helmet" ]; [ "Bike" ] ]
+
+                Expect.equal
+                    (queryCode (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] START AT \"A\", 1")
+                    "dax-invalid"
+                    "more values than keys"
+
+                notSupported (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] START AT 1" "data type"
+                notSupported (p ()) "EVALUATE VALUES ( Product[Name] ) ORDER BY Product[Name] START AT \"B\"" "BLANK")
             testCase "what a query can't have yet" (fun () ->
-                notSupported (p ()) "EVALUATE Customer ORDER BY Customer[Name] START AT \"B\"" "START AT"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", @p )" "@p"
                 notSupported (p ()) "EVALUATE DATESYTD ( 'Date'[Date] )" "DATESYTD"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", FORMAT ( 1, \"0\" ) )" "FORMAT"
