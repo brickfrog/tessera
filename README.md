@@ -2107,14 +2107,15 @@ model's culture is read from the model; `FORMAT`'s locale argument overrides it.
 - **`FORMAT` dates.** `General Date`, `Long Date`, `Short Date`, `Long Time`, `Medium Time`, `Short Time`, and custom
   formats: `d dd ddd dddd dddddd w ww m mm mmm mmmm q y yy yyyy h hh n nn s ss`, `AM/PM am/pm A/P a/p AMPM`, `/`, `:`,
   literals. `m` right after `h` (with or without `:`) is minutes.
-- **Upper-case date letters.** `D M Y H N S W Q` are read as the lower-case letters, in any mix of cases (`YYYY`,
-  `MMM DD`, `DDDD`, `HH:NN:SS`, `Hh:Nn`). The pages write the characters in lower case and show only `\QQ yyyy`
+- **Upper-case date letters.** A run of `D M Y H N S W Q` in upper case is read as the lower-case letters
+  (`YYYY`, `MMM DD`, `DDDD`, `HH:NN:SS`). The pages write the characters in lower case and show only `\QQ yyyy`
   (DAX Guide) and `MMMM` (Power BI's own auto date/time table, whose Month column is shown as January). The
   characters are Visual Basic's (OLE Automation), which Microsoft says were not case-sensitive before VB 2005. The
   2010 DAX pages describe .NET's case-sensitive characters instead; where they give an upper-case letter another
   meaning it is refused: `M`/`MM` right after the hour (`hh:MM`: month there, minutes in Visual Basic), `H` with
   AM/PM (always 24-hour there), `Y` alone (the year there, the day of the year in Visual Basic) and the formats `D`,
-  `M` and `Y` on their own. Mixed-case AM/PM (`Am/Pm`) is refused too.
+  `M` and `Y` on their own, and a run in mixed case (`Mmm`: the month then minutes there). Mixed-case AM/PM
+  (`Am/Pm`) is refused too.
 - **BLANK.** `FORMAT ( BLANK (), ... )` is the empty text. A BLANK argument read as text is the empty text
   (`LEN ( BLANK () )` is 0), but a function that returns text refuses a BLANK text: no source says whether the real
   engine returns BLANK or the empty text.

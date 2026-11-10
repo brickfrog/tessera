@@ -35,15 +35,15 @@ exception FormatRefused of string
 /// any Date table in Power BI") whose rows Microsoft Learn shows as January ("Auto date/time in Power
 /// BI Desktop"). The characters are Visual Basic's (OLE Automation), and in those the case doesn't
 /// matter: "Unlike in previous versions of Visual Basic, these format characters are case-sensitive"
-/// (Visual Basic 2005, "User-Defined Date/Time Formats (Format Function)"), and "Format Function for
-/// Visual Basic 6.0 Users" writes the VB6 specifiers "Nn", "N" and "Hh". So an upper-case d, m, y,
-/// h, n, s, w or q is read as the lower-case letter. The 2010 DAX pages ("Custom Date and Time formats
+/// (Visual Basic 2005, "User-Defined Date/Time Formats (Format Function)"). So a run of an upper-case
+/// D, M, Y, H, N, S, W or Q is read as the lower-case letter. The 2010 DAX pages ("Custom Date and Time formats
 /// for the FORMAT Function", for PowerPivot) describe .NET's case-sensitive characters instead; they
 /// no longer describe the engine (their h is the 12-hour clock, while "h:nn:ss" is 13:23:45 today),
 /// but where they give an upper-case letter another meaning it is refused: M or MM right after the
 /// hour (the month there, minutes in Visual Basic), H with AM/PM (always 24-hour there), Y alone
-/// (the year there, the day of the year in Visual Basic), and the formats "D", "M" and "Y" (predefined
-/// there). AM/PM, am/pm, A/P, a/p and AMPM/ampm are as the pages write them; mixed case is refused.
+/// (the year there, the day of the year in Visual Basic), the formats "D", "M" and "Y" (predefined
+/// there), and a run in mixed case ("Mmm": the month then minutes there). AM/PM, am/pm, A/P, a/p and
+/// AMPM/ampm are as the pages write them; mixed case is refused.
 module Formatting =
 
     let private refuse (what: string) : 'a = raise (FormatRefused what)
@@ -755,8 +755,8 @@ module Formatting =
     [<RequireQualifiedAccess>]
     type DateToken =
         | Literal of string
-        /// A run of one of d, m, y, h, n, s, q, w, written in either case: the letter in lower case
-        /// and how many.
+        /// A run of one of d, m, y, h, n, s, q, w, all in lower case or all in upper case: the letter
+        /// in lower case and how many.
         | Field of char * int
         /// An `m` or `mm` that follows the hour: minutes.
         | Minute of int
@@ -845,6 +845,11 @@ module Formatting =
                 // Upper case: see "Upper-case letters" in the module's header. The letter is read
                 // as its lower case, except where the 2010 DAX pages give it another meaning.
                 if hasUpper then
+                    // "Mmm" is the month then minutes in the 2010 DAX pages, "Jun" in Visual Basic.
+                    if text <> String(Char.ToUpperInvariant letter, run) then
+                        refuse
+                            $"the run {text} in a date format, in upper and lower case (the 2010 DAX pages read M and m, H and h as different characters: write it in one case)"
+
                     match letter with
                     | 'y' when run = 1 ->
                         refuse

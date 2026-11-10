@@ -36,11 +36,11 @@
     {
       "url": "https://learn.microsoft.com/en-us/previous-versions/visualstudio/visual-studio-2008/wb216dct(v=vs.90)",
       "quote": "To display a minute as a number with or without leading zeros, you use either the \"Nn\" or the \"N\" format specifier.",
-      "supports": "Microsoft writes the Visual Basic 6.0 specifiers in upper and mixed case"
+      "supports": "Microsoft writes the Visual Basic 6.0 minute specifiers as Nn and N (it may be only the sentence's capitals)"
     }
   ],
   "confidence": "derived",
-  "derivation": "Microsoft Learn: \"hh:nn:ss\" is 13:23:45 for June 25, 2020, 1:23:45 PM. Visual Basic's characters are not case-sensitive, and Microsoft writes the VB6 specifiers \"Nn\", \"N\" and \"Hh\", so HH:NN:SS reads as hh:nn:ss: \"13:23:45\". The 2010 DAX page's HH is the 24-hour clock too.",
+  "derivation": "Microsoft Learn: \"hh:nn:ss\" is 13:23:45 for June 25, 2020, 1:23:45 PM. Visual Basic's characters are not case-sensitive, so HH:NN:SS reads as hh:nn:ss: \"13:23:45\". The 2010 DAX page's HH is the 24-hour clock too.",
   "uncertain": true,
   "alternative": "No DAX page shows upper-case H, N or S. If the engine took them as literal text, the result would be \"HH:NN:SS\".",
   "tags": [
