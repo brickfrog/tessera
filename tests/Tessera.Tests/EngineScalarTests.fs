@@ -192,13 +192,18 @@ let tests =
             // dax.guide/round: decimal places, the nearest integer, left of the decimal point.
             testCase "ROUND" (fun () ->
                 is (p ()) "ROUND ( 2.675, 2 )" 2.68
+                // 1.005 * 100 as a float is 100.49999999999999: the number as written rounds to
+                // 1.01, the scaled float to 1.00, and no page says which is rounded. Refused.
+                isError "not-supported" "ROUND ( 1.005, 2 )"
+                is (p ()) "ROUND ( 2.625, 2 )" 2.63
                 is (p ()) "ROUND ( 2.5, 0 )" 3.0
                 // "rounds 2.15 up, to one decimal place. The expected result is 2.2" (Microsoft Learn).
                 is (p ()) "ROUND ( 2.15, 1 )" 2.2
                 is (p ()) "ROUND ( -2.4, 0 )" -2.0
                 is (p ()) "ROUND ( 21.5, -1 )" 20.0
-                // The pages don't say which way a negative number halfway goes.
-                isError "not-supported" "ROUND ( -2.5, 0 )"
+                // "Ties are broken by rounding half away from zero": ROUND(-1.15, 1) is -1.2.
+                is (p ()) "ROUND ( -2.5, 0 )" -3.0
+                is (p ()) "ROUND ( -1.15, 1 )" -1.2
                 is (p ()) "ROUND ( 1234.5, -2 )" 1200.0)
             // "INT rounds <Number> towards −∞" (dax.guide/int).
             testCase "INT" (fun () ->

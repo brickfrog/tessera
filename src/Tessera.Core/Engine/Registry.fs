@@ -13,6 +13,7 @@ module Registry =
         List.concat [
             Aggregation.functions
             Logical.functions
+            Conversion.functions
             Math.functions
             Text.functions
             Filter.functions
