@@ -127,36 +127,41 @@ module ModelSource =
         | sms, _, bs -> Error(AmbiguousModel(dir, sms @ bs))
 
     let private resolveLocal (input: string) : Result<ModelSource, TessError> =
-        let full = Path.GetFullPath input
-
-        if File.Exists full then
-            let dir = Path.GetDirectoryName full
-
-            if hasExt ".bim" full then
-                bim full
-            elif hasExt ".pbip" full then
-                fromPbip full
-            elif hasExt ".pbism" full then
-                fromSemanticModelFolder dir
-            elif hasExt ".pbir" full then
-                fromReportFolder dir
-            elif hasExt ".tmdl" full || hasExt ".tmd" full then
-                match findTmdlRoot dir with
-                | Some root -> tmdl root
-                | None -> Error(UnrecognizedModel(full, "no database.tmdl or model.tmdl in this or any parent folder"))
-            else
-                Error(UnrecognizedModel(full, "unsupported file type"))
-        elif Directory.Exists full then
-            if Pbip.isSemanticModelFolder full then
-                fromSemanticModelFolder full
-            elif isTmdlRoot full then
-                tmdl full
-            elif File.Exists(Path.Combine(full, Pbip.pbirFileName)) then
-                fromReportFolder full
-            else
-                fromProjectRoot full
+        if String.IsNullOrWhiteSpace input then
+            Error(PathNotFound "\"\" (an empty path)")
         else
-            Error(PathNotFound full)
+
+            let full = Path.GetFullPath input
+
+            if File.Exists full then
+                let dir = Path.GetDirectoryName full
+
+                if hasExt ".bim" full then
+                    bim full
+                elif hasExt ".pbip" full then
+                    fromPbip full
+                elif hasExt ".pbism" full then
+                    fromSemanticModelFolder dir
+                elif hasExt ".pbir" full then
+                    fromReportFolder dir
+                elif hasExt ".tmdl" full || hasExt ".tmd" full then
+                    match findTmdlRoot dir with
+                    | Some root -> tmdl root
+                    | None ->
+                        Error(UnrecognizedModel(full, "no database.tmdl or model.tmdl in this or any parent folder"))
+                else
+                    Error(UnrecognizedModel(full, "unsupported file type"))
+            elif Directory.Exists full then
+                if Pbip.isSemanticModelFolder full then
+                    fromSemanticModelFolder full
+                elif isTmdlRoot full then
+                    tmdl full
+                elif File.Exists(Path.Combine(full, Pbip.pbirFileName)) then
+                    fromReportFolder full
+                else
+                    fromProjectRoot full
+            else
+                Error(PathNotFound full)
 
     /// Work out what model a user-supplied path refers to. Accepts:
     /// a .bim file; a TMDL folder (or any .tmdl file inside one); a PBIP "X.SemanticModel" folder or
