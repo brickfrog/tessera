@@ -39,21 +39,21 @@ module DateText =
     let private options = RegexOptions.CultureInvariant ||| RegexOptions.IgnoreCase
 
     let private time =
-        @"(?<h>\d{1,2}):(?<mi>\d{2})(?::(?<s>\d{2}))?(?:\s*(?<ap>AM|PM))?"
+        @"(?<h>[0-9]{1,2}):(?<mi>[0-9]{2})(?::(?<s>[0-9]{2}))?(?:\s*(?<ap>AM|PM))?"
 
     let private iso =
-        Regex(@"^(?<y>\d{4})-(?<m>\d{2})-(?<d>\d{2})(?:(?:T|\s+)" + time + ")?$", options)
+        Regex(@"^(?<y>[0-9]{4})-(?<m>[0-9]{2})-(?<d>[0-9]{2})(?:(?:T|\s+)" + time + ")?$", options)
 
     let private numeric =
         Regex(
-            @"^(?<a>\d{1,2})(?<sep>[/-])(?<b>\d{1,2})\k<sep>(?<y>\d{4})(?:\s+"
+            @"^(?<a>[0-9]{1,2})(?<sep>[/-])(?<b>[0-9]{1,2})\k<sep>(?<y>[0-9]{4})(?:\s+"
             + time
             + ")?$",
             options
         )
 
     let private named =
-        Regex(@"^(?<mon>[A-Za-z]+)\s+(?<d>\d{1,2}),?\s+(?<y>\d{4})(?:\s+" + time + ")?$", options)
+        Regex(@"^(?<mon>[A-Za-z]+)\s+(?<d>[0-9]{1,2}),?\s+(?<y>[0-9]{4})(?:\s+" + time + ")?$", options)
 
     let private timeOnly = Regex("^" + time + "$", options)
 
@@ -288,11 +288,11 @@ module DateAndTime =
 
         let day = dayOf ms
 
-        if ms - day * msPerDay > 86399000L then
+        if ms - day * msPerDay >= 86399500L then
             Fail.notSupported
                 ctx
                 span
-                $"{name} of a time in the last second of a day (whether it rounds into the next day is not documented)"
+                $"{name} of a time in the last half second of a day (whether it rounds into the next day is not documented)"
 
         dateOfDay day
 
@@ -505,10 +505,6 @@ module DateAndTime =
 
     let private isEndOfFebruary (d: DateTime) =
         d.Month = 2 && d.Day = DateTime.DaysInMonth(d.Year, 2)
-
-    /// Days between two dates on a 30/360 basis, the day numbers already adjusted.
-    let private days360 (a: DateTime) (dayA: int) (b: DateTime) (dayB: int) : int =
-        (b.Year - a.Year) * 360 + (b.Month - a.Month) * 30 + (dayB - dayA)
 
     // ---- NETWORKDAYS --------------------------------------------------------------------------------
 
@@ -804,7 +800,21 @@ module DateAndTime =
             | NoDate, _
             | _, NoDate -> DaxValue.Blank
             | At(a, originA), At(b, originB) ->
-                let boundaries (unit: int64) = floorDiv b unit - floorDiv a unit
+                // The boundaries of a unit of time crossed. A fraction of a second that would put
+                // a time in another unit if it were rounded is refused, as HOUR, MINUTE and SECOND do.
+                let boundaries (unit: int64) =
+                    let index (ms: int64) =
+                        let cut = floorDiv ms unit
+
+                        if floorDiv (floorDiv (ms + 500L) 1000L * 1000L) unit <> cut then
+                            Fail.notSupported
+                                ctx
+                                call.Span
+                                "DATEDIFF of a time with a fraction of a second that rounds across a boundary (whether it is rounded or cut off is not documented)"
+
+                        cut
+
+                    index b - index a
 
                 let calendar (index: DateTime -> int64) =
                     index (calendarDate ctx call.Args.[1].Span "DATEDIFF" b originB)
@@ -812,14 +822,7 @@ module DateAndTime =
 
                 let result =
                     match interval with
-                    | "SECOND" ->
-                        if a % 1000L <> 0L || b % 1000L <> 0L then
-                            Fail.notSupported
-                                ctx
-                                call.Span
-                                "DATEDIFF in seconds of a time with a fraction of a second (whether it is rounded or cut off is not documented)"
-
-                        boundaries 1000L
+                    | "SECOND" -> boundaries 1000L
                     | "MINUTE" -> boundaries 60000L
                     | "HOUR" -> boundaries 3600000L
                     | "DAY" -> boundaries msPerDay
@@ -836,10 +839,11 @@ module DateAndTime =
         // basis 0 US (NASD) 30/360 (the default), 1 actual/actual, 2 actual/360, 3 actual/365, 4
         // European 30/360; "All arguments are truncated to integers"; "If basis < 0 or if basis >
         // 4, YEARFRAC returns an error" (Microsoft Learn, YEARFRAC). The pages name the bases and
-        // don't define them. 30/360 is the public convention: a day 31 counts as 30 (in the US
-        // form the end date's only when the start date's is 30 or 31); the US form's rules for the
-        // last day of February differ between its descriptions, so those dates are refused, and so
-        // is actual/actual, which has no one definition.
+        // don't define them. On the 30/360 bases a month counts as 30 days, which is what dax.guide's
+        // results show (January 1 to December 15, 2011 is 0.9556: 344 / 360, on both). How each
+        // form treats a 31st and the last day of February is the convention's own detail, shown by
+        // no DAX page, so those dates are refused; and so is actual/actual, which has no one
+        // definition (and "a bug": dax.guide).
         Fn.scalar "YEARFRAC" family (2, 3) (Fn.typeIs DaxType.Decimal) (fun ev ctx call ->
             let basis =
                 match List.tryItem 2 call.Args with
@@ -883,19 +887,19 @@ module DateAndTime =
             let actual = float (dayOfDate b - dayOfDate a)
 
             match basis with
-            | 0L ->
-                if isEndOfFebruary a || isEndOfFebruary b then
+            | 2L -> DaxValue.Decimal(actual / 360.0)
+            | 3L -> DaxValue.Decimal(actual / 365.0)
+            | _ ->
+                if a.Day = 31 || b.Day = 31 || isEndOfFebruary a || isEndOfFebruary b then
                     Fail.notSupported
                         ctx
                         call.Span
-                        "YEARFRAC on the US 30/360 basis with a date on the last day of February (the convention's rule for it is not documented)"
+                        "YEARFRAC on a 30/360 basis with a date on the 31st or on the last day of February (how the basis counts it is not documented)"
 
-                let dayA = min a.Day 30
-                let dayB = if b.Day = 31 && dayA = 30 then 30 else b.Day
-                DaxValue.Decimal(float (days360 a dayA b dayB) / 360.0)
-            | 2L -> DaxValue.Decimal(actual / 360.0)
-            | 3L -> DaxValue.Decimal(actual / 365.0)
-            | _ -> DaxValue.Decimal(float (days360 a (min a.Day 30) b (min b.Day 30)) / 360.0))
+                DaxValue.Decimal(
+                    float ((b.Year - a.Year) * 360 + (b.Month - a.Month) * 30 + (b.Day - a.Day))
+                    / 360.0
+                ))
         |> Fn.withCheck (
             firstOf [
                 textCheck "YEARFRAC" [ 0; 1 ]

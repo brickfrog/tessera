@@ -259,6 +259,7 @@ let tests =
                 Expect.equal (read "") None "empty"
                 Expect.equal (read "2024-01-31T07:08:09.5") None "fractions of a second"
                 Expect.equal (read "2024-01-31T07:08:09Z") None "time zones"
+                Expect.equal (read "٢٠٢٤-٠١-٣١") None "digits that are not ASCII"
                 Expect.equal (DateText.read "" "1/8/2009") None "no culture: ISO only"
                 Expect.isSome (DateText.read "EN-us" "1/8/2009") "the culture's case doesn't matter")
         ]
@@ -316,7 +317,8 @@ let tests =
                 refused "MINUTE ( dt\"2024-01-31T10:20:59\" + 0.5 / 86400 )" "fraction of a second"
                 is (p ()) "HOUR ( dt\"2024-01-31T10:20:59\" + 0.5 / 86400 )" 10
                 refused "HOUR ( dt\"2024-01-31T10:59:59\" + 0.5 / 86400 )" "fraction of a second"
-                refused "DAY ( dt\"2024-01-31T23:59:59\" + 0.5 / 86400 )" "last second"
+                refused "DAY ( dt\"2024-01-31T23:59:59\" + 0.5 / 86400 )" "last half second"
+                is (p ()) "DAY ( dt\"2024-01-31T23:59:59\" + 0.25 / 86400 )" 31
                 refused "MONTH ( DATE ( 100, 1, 1 ) - 1 )" "before the year 100")
             testCase "YEAR of a date before the year 100 is an error" (fun () ->
                 isDaxError "YEAR ( DATE ( 100, 1, 1 ) - 1 )")
@@ -507,6 +509,17 @@ let tests =
                 is (p ()) "DATEDIFF ( dt\"2024-02-01T00:00:01\", dt\"2024-01-31T23:59:59\", MINUTE )" -1
                 is (p ()) "DATEDIFF ( BLANK (), DATE ( 2012, 1, 1 ), DAY )" null
                 is (p ()) "DATEDIFF ( DATE ( 2012, 1, 1 ), BLANK (), DAY )" null)
+            // NOW is 14:30:15.250 on March 5, 2024.
+            testCase "fractions of a second" (fun () ->
+                is (p ()) "DATEDIFF ( TODAY (), NOW (), HOUR )" 14
+                is (p ()) "DATEDIFF ( TODAY (), NOW (), MINUTE )" 870
+                is (p ()) "DATEDIFF ( TODAY (), NOW (), SECOND )" 52215
+                is (p ()) "DATEDIFF ( NOW (), DATE ( 2024, 3, 6 ), DAY )" 1
+                let half = "dt\"2024-01-31T10:59:59\" + 0.5 / 86400"
+                refused $"DATEDIFF ( DATE ( 2024, 1, 31 ), {half}, SECOND )" "fraction of a second"
+                refused $"DATEDIFF ( DATE ( 2024, 1, 31 ), {half}, MINUTE )" "fraction of a second"
+                refused $"DATEDIFF ( DATE ( 2024, 1, 31 ), {half}, HOUR )" "fraction of a second"
+                is (p ()) $"DATEDIFF ( DATE ( 2024, 1, 31 ), {half}, DAY )" 0)
             testCase "the interval is a keyword" (fun () ->
                 is (p ()) "DATEDIFF ( DATE ( 2011, 1, 1 ), DATE ( 2012, 1, 1 ), year )" 1
                 Expect.equal (code "DATEDIFF ( DATE ( 2011, 1, 1 ), DATE ( 2012, 1, 1 ), FORTNIGHT )") "dax-invalid" ""
@@ -531,16 +544,18 @@ let tests =
                 is (p ()) "YEARFRAC ( DATE ( 2011, 01, 01 ), DATE ( 2012, 12, 15 ) )" (704.0 / 360.0)
                 // Microsoft Learn's second example: January 1 to March 1 is two 30-day months.
                 is (p ()) "YEARFRAC ( \"Jan 1 2007\", \"Mar 1 2007\" )" (60.0 / 360.0))
-            // The 30/360 conventions: a 31st counts as the 30th; in the US form the end date's only
-            // when the start date's is the 30th or 31st.
-            testCase "the 31st of a month" (fun () ->
-                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 31 ), DATE ( 2011, 3, 31 ), 0 )" (60.0 / 360.0)
-                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 30 ), DATE ( 2011, 3, 31 ), 0 )" (60.0 / 360.0)
-                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 29 ), DATE ( 2011, 3, 31 ), 0 )" (62.0 / 360.0)
-                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 29 ), DATE ( 2011, 3, 31 ), 4 )" (61.0 / 360.0)
-                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 31 ), DATE ( 2011, 3, 30 ), 4 )" (60.0 / 360.0)
-                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 31 ), DATE ( 2011, 2, 28 ), 4 )" (28.0 / 360.0)
-                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 1 ), DATE ( 2011, 1, 1 ) )" 0.0)
+            // A month is 30 days on the 30/360 bases; what a 31st or the end of February counts as
+            // is shown by no DAX page.
+            testCase "30/360" (fun () ->
+                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 30 ), DATE ( 2011, 3, 30 ), 0 )" (60.0 / 360.0)
+                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 29 ), DATE ( 2012, 3, 1 ), 4 )" (392.0 / 360.0)
+                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 1 ), DATE ( 2011, 1, 1 ) )" 0.0
+                refused "YEARFRAC ( DATE ( 2011, 1, 31 ), DATE ( 2011, 3, 30 ), 0 )" "31st"
+                refused "YEARFRAC ( DATE ( 2011, 1, 30 ), DATE ( 2011, 3, 31 ), 4 )" "31st"
+                refused "YEARFRAC ( DATE ( 2011, 1, 30 ), DATE ( 2011, 2, 28 ), 4 )" "last day of February"
+                // The actual bases take any date.
+                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 31 ), DATE ( 2011, 2, 28 ), 2 )" (28.0 / 360.0)
+                is (p ()) "YEARFRAC ( DATE ( 2011, 1, 31 ), DATE ( 2011, 2, 28 ), 3 )" (28.0 / 365.0))
             // "All arguments are truncated to integers" (Microsoft Learn).
             testCase "truncation" (fun () ->
                 is (p ()) "YEARFRAC ( DATE ( 2011, 1, 1 ), DATE ( 2011, 12, 15 ), 3.9 )" (348.0 / 365.0)
@@ -551,6 +566,7 @@ let tests =
                 refused "YEARFRAC ( DATE ( 2011, 1, 1 ), DATE ( 2011, 12, 15 ), 1 )" "actual/actual"
                 refused "YEARFRAC ( DATE ( 2011, 12, 15 ), DATE ( 2011, 1, 1 ) )" "start date after the end date"
                 refused "YEARFRAC ( DATE ( 2011, 2, 28 ), DATE ( 2011, 12, 15 ) )" "last day of February"
+                refused "YEARFRAC ( DATE ( 2011, 1, 1 ), DATE ( 2011, 12, 31 ) )" "31st"
                 refused "YEARFRAC ( DATE ( 2011, 1, 1 ), DATE ( 2012, 2, 29 ), 0 )" "last day of February"
                 refused "YEARFRAC ( BLANK (), DATE ( 2011, 12, 15 ) )" "BLANK date"
                 refused "YEARFRAC ( DATE ( 1899, 1, 1 ), DATE ( 2011, 12, 15 ), 3 )" "before March 1, 1900")
@@ -782,6 +798,49 @@ let tests =
                     [ d 2024 1 2; 2; null ]
                     [ d 2024 1 3; 3; 6 ]
                 ])
+            // What a filter would do through a table that doesn't exist yet can't be told: a
+            // calculated column that filters the fact table, read by the calendar that relates to
+            // both, stays the circular dependency it is.
+            testCase "a calendar that reads a filtered table related to it is circular" (fun () ->
+                for calFirst in [ true; false ] do
+                    let cal =
+                        calculatedTable
+                            "Cal"
+                            [ "Date", DataType.DateTime ]
+                            "CALENDAR ( DATE ( 2024, 1, 1 ), DATE ( 2024, 1, 1 ) + MAX ( T2[X] ) )"
+
+                    let others = [
+                        table "S" [ "D", DataType.DateTime ] [ [ d 2024 1 1 ]; [ d 2024 1 3 ] ]
+                        table "T2" [ "D", DataType.DateTime ] [ [ d 2024 1 1 ]; [ d 2024 1 2 ] ]
+                        |> withCalculated [ "X", DataType.Int64, "CALCULATE ( COUNTROWS ( S ) )" ]
+                    ]
+
+                    let m = {
+                        Tables = (if calFirst then cal :: others else others @ [ cal ])
+                        Rels = [ rel ("S", "D") ("Cal", "Date"); bothWays (rel ("T2", "D") ("Cal", "Date")) ]
+                        Measures = []
+                        Functions = []
+                    }
+
+                    let db, store = build m
+
+                    match
+                        Engine.prepareWith
+                            {
+                                Engine.Options.defaults with
+                                    Clock = Some pinned
+                            }
+                            db
+                            store
+                    with
+                    | Error e -> Expect.stringContains (TessError.message e) "circular" "circular"
+                    | Ok prepared ->
+                        // Not a value, whichever way it is refused.
+                        Expect.isNonEmpty (Engine.failures prepared) $"calFirst = {calFirst}: something failed"
+
+                        match Engine.evaluateScalar prepared "COUNTROWS ( Cal )" with
+                        | Ok v -> failtestf "calFirst = %b: Cal was computed: %A" calFirst v
+                        | Error _ -> ())
             testCase "the usual date table" (fun () ->
                 returns
                     (p ())

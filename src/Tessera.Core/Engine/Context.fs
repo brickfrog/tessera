@@ -468,11 +468,16 @@ module Filters =
 
         // The one-side tables we reach filter us.
         for r in cfg.ManyToOne t do
-            // A calculated table that is being computed has no rows yet and filters nothing: its
-            // expression may read the tables related to it, as a date table usually does
-            // ("CALENDAR (MINX (Sales, [Date]), MAXX (Forecast, [Date]))": Microsoft Learn,
-            // CALENDAR). Asking it for its rows here would be a circular dependency that isn't one.
-            if not (obj.ReferenceEquals(r, via)) && not r.To.Table.Computing then
+            // A calculated table's expression may read the tables related to it, as a date table
+            // usually does ("CALENDAR (MINX (Sales, [Date]), MAXX (Forecast, [Date]))": Microsoft
+            // Learn, CALENDAR). While it is being computed, and nothing at all is filtered, it can't
+            // restrict anything, and asking it for its rows would be a circular dependency that
+            // isn't one. Under any filter the table is asked as before, and that is circular: what
+            // a filter would do through a table that doesn't exist yet can't be told.
+            if
+                not (obj.ReferenceEquals(r, via))
+                && not (r.To.Table.Computing && fc.Filters.IsEmpty)
+            then
                 let d = r.To.Table
                 let dv = vis fc d r
 

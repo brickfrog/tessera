@@ -2083,7 +2083,8 @@ are dates (`dateTime` in results); `YEAR`, `QUARTER`, `MONTH`, `DAY`, `HOUR`, `M
   Excel does, a day later than the zero date gives); `DATE` with a negative year; `HOUR`, `MINUTE` or `SECOND`
   where a fraction of a second would change the answer if it were rounded; `EOMONTH` and `EDATE` of a date with a
   time of day; `EDATE` before March 1900; `YEARFRAC` on the actual/actual basis, with a start after the end, or
-  on the US 30/360 basis with a last day of February; `NETWORKDAYS` with a start after the end, a time of day, or
+  on a 30/360 basis with a date on the 31st or the last day of February; `DATEDIFF` where a fraction of a second
+  would change the answer if it were rounded; `NETWORKDAYS` with a start after the end, a time of day, or
   dates as text; return types and weekend numbers the pages don't list.
 
 #### What it refuses
