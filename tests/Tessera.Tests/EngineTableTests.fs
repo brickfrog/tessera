@@ -453,7 +453,7 @@ let tests =
                 notSupported (p ()) "EVALUATE Customer ORDER BY Customer[Name] START AT \"B\"" "START AT"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", @p )" "@p"
                 notSupported (p ()) "EVALUATE DATESYTD ( 'Date'[Date] )" "DATESYTD"
-                notSupported (p ()) "EVALUATE ROW ( \"v\", FORMAT ( 1, \"0\" ) )" "FORMAT"
+                notSupported (p ()) "EVALUATE ROW ( \"v\", PATHITEM ( 1, 1 ) )" "PATHITEM"
                 notSupported (p ()) "EVALUATE ADDCOLUMNS ( Customer, \"r\", ROWNUMBER () )" "ROWNUMBER")
             testCase "a syntax error in a query" (fun () ->
                 match queryError (p ()) "EVALUATE FILTER ( Sales, " with
@@ -571,7 +571,7 @@ let tests =
                                     if t.Name = "Customer" then
                                         t
                                         |> withCalculated [
-                                            "Label", DataType.String, "FORMAT ( Customer[CustomerKey], \"000\" )"
+                                            "Label", DataType.String, "PATHITEM ( Customer[CustomerKey], 1 )"
                                         ]
                                     else
                                         t)
@@ -580,14 +580,14 @@ let tests =
                 match Engine.failures m with
                 | [ (ref, DaxNotSupported(what, at)) ] ->
                     Expect.equal (ObjectRef.format ref) "column:Customer/Label" "which"
-                    Expect.equal what "the function FORMAT" "what"
+                    Expect.equal what "the function PATHITEM" "what"
                     Expect.equal at "column 'Customer'[Label] 1:1" "where"
                 | other -> failtestf "%A" other
 
                 is m "[Amount]" 625
                 is m "CALCULATE ( [Amount], Customer[Country] = \"US\" )" 485
-                notSupported m "EVALUATE Customer" "FORMAT"
-                notSupported m "EVALUATE VALUES ( Customer[Label] )" "FORMAT")
+                notSupported m "EVALUATE Customer" "PATHITEM"
+                notSupported m "EVALUATE VALUES ( Customer[Label] )" "PATHITEM")
         ]
 
         testList "model shapes that are refused" [
@@ -728,20 +728,23 @@ let tests =
                                 star.Tables
                                 |> List.map (fun t ->
                                     if t.Name = "Customer" then
-                                        t |> withCalculated [ "Label", DataType.String, "UPPER ( Customer[Name] )" ]
+                                        t
+                                        |> withCalculated [
+                                            "Label", DataType.String, "PATHITEM ( Customer[Name], 1 )"
+                                        ]
                                     else
                                         t)
                             Measures =
                                 star.Measures
                                 @ [
-                                    "Sales", "Formatted", "FORMAT ( [Amount], \"0\" )"
+                                    "Sales", "Formatted", "PATHITEM ( [Amount], 1 )"
                                     "Sales", "Uses Formatted", "[Formatted] & \"!\""
                                     "Sales", "Selected", "CALCULATE ( [Amount], ALLSELECTED ( Product ) )"
                                     "Sales", "Rolled", "COUNTROWS ( SUMMARIZE ( Sales, ROLLUP ( Sales[Qty] ) ) )"
                                     "Sales", "By Label", "CALCULATE ( [Amount], Customer[Label] = \"ANN\" )"
                                     "Sales", "Via Function", "Shout ( \"a\" )"
                                 ]
-                            Functions = [ "Shout", "( t : STRING ) => UPPER ( t ) & \"!\"" ]
+                            Functions = [ "Shout", "( t : STRING ) => PATHITEM ( t, 1 ) & \"!\"" ]
                     }
 
                 let coverage =
@@ -750,13 +753,13 @@ let tests =
                     |> Map.ofList
 
                 Expect.equal coverage.["measure:Sales/Amount"] [] "supported"
-                Expect.equal coverage.["measure:Sales/Formatted"] [ "FORMAT" ] "a function"
-                Expect.equal coverage.["measure:Sales/Uses Formatted"] [ "FORMAT" ] "through a measure"
+                Expect.equal coverage.["measure:Sales/Formatted"] [ "PATHITEM" ] "a function"
+                Expect.equal coverage.["measure:Sales/Uses Formatted"] [ "PATHITEM" ] "through a measure"
                 Expect.equal coverage.["measure:Sales/Selected"] [ "ALLSELECTED" ] "an argument form"
                 Expect.equal coverage.["measure:Sales/Rolled"] [ "ROLLUP in SUMMARIZE"; "ROLLUP" ] "a helper"
-                Expect.equal coverage.["measure:Sales/By Label"] [ "UPPER" ] "through a calculated column"
-                Expect.equal coverage.["measure:Sales/Via Function"] [ "UPPER" ] "through a function"
-                Expect.equal coverage.["column:Customer/Label"] [ "UPPER" ] "a calculated column")
+                Expect.equal coverage.["measure:Sales/By Label"] [ "PATHITEM" ] "through a calculated column"
+                Expect.equal coverage.["measure:Sales/Via Function"] [ "PATHITEM" ] "through a function"
+                Expect.equal coverage.["column:Customer/Label"] [ "PATHITEM" ] "a calculated column")
             // What can be told from the arguments alone is told by coverage, with the words the
             // evaluator uses.
             testCase "argument forms that are refused show in coverage, and when evaluated" (fun () ->
@@ -827,7 +830,7 @@ let tests =
                             @ [
                                 "Sales", "Share", "DIVIDE ( [Amount], CALCULATE ( [Amount], ALL ( Product ) ) )"
                                 "Sales", "Best", "MAXX ( VALUES ( Product[Name] ), [Amount] )"
-                                "Sales", "Formatted", "FORMAT ( [Amount], \"0\" )"
+                                "Sales", "Formatted", "PATHITEM ( [Amount], 1 )"
                             ]
                 }
 

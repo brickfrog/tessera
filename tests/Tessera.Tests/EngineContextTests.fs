@@ -482,12 +482,12 @@ let tests =
                 let m =
                     prepare {
                         star with
-                            Measures = star.Measures @ [ "Sales", "Formatted", "1 +\n  FORMAT ( [Amount], \"0\" )" ]
+                            Measures = star.Measures @ [ "Sales", "Formatted", "1 +\n  PATHITEM ( [Amount], 1 )" ]
                     }
 
                 match scalarError m "[Formatted]" with
                 | DaxNotSupported(what, at) ->
-                    Expect.equal what "the function FORMAT" "what"
+                    Expect.equal what "the function PATHITEM" "what"
                     Expect.equal at "measure 'Sales'[Formatted] 2:3" "where"
                 | other -> failtestf "%A" other)
             // "val (eager evaluation): The expression is evaluated once before invoking the

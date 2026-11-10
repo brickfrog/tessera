@@ -708,7 +708,8 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     member val Now: DateTime = DateTime.MinValue with get, set
     /// The same instant in UTC, for UTCTODAY and UTCNOW.
     member val UtcNow: DateTime = DateTime.MinValue with get, set
-    /// The model's culture name ("en-US"), or "" when it has none: how text is read as a date.
+    /// The model's culture name ("en-US"), or "" when it has none: how text is read as a date, and
+    /// what FORMAT and number-to-text follow (see `Culture`).
     member val Culture: string = "" with get, set
 
     member this.Config(active: bool array, both: bool array) : RelConfig =

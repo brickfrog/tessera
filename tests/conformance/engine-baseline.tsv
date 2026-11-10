@@ -33,6 +33,8 @@ assumptions/order-by-desc-blank-after-negative	not-supported
 assumptions/text-with-currency-symbol-plus-number	error
 assumptions/text-with-thousands-separator-plus-number	not-supported
 assumptions/time-concatenated-has-no-date	not-supported
+assumptions/value-of-text-with-thousands-separator	not-supported
+assumptions/value-reads-iso-date-as-number	not-supported
 blank-row/distinctcount-and-blank-row	not-supported
 blank/convert-blank-boolean	not-supported
 blank/convert-blank-integer	not-supported
@@ -40,6 +42,7 @@ blank/if-boolean-branch-blank	fail
 blank/int-of-blank	not-supported
 calculate/boolean-filter-with-measure-is-an-error	not-supported
 conditional/if-eager-evaluates-the-untaken-branch	fail
+conditional/iferror-catches-conversion-error	not-supported
 conditional/iferror-catches-division-by-zero	fail
 conditional/iserror-true-for-infinity-and-nan	fail
 conditional/switch-compares-strictly-blank-is-not-zero	not-supported
@@ -96,6 +99,13 @@ division/iserror-of-division-by-zero	fail
 division/iserror-of-zero-by-zero	fail
 earlier/rank-in-query-calculated-column	not-supported
 earlier/running-total-in-query-calculated-column	not-supported
+format/date-iso-pattern-upper-case-month	not-supported
+format/locale-general-date-en-gb	not-supported
+format/locale-ignored-for-fixed-pattern	not-supported
+format/locale-month-name-pt	not-supported
+format/locale-number-de	not-supported
+format/percent-large-number	not-supported
+format/result-is-text	not-supported
 grouping/groupby-extension-column	error
 grouping/summarize-group-by-extension-column	error
 grouping/summarizecolumns-fact-table-as-filter	not-supported
@@ -131,8 +141,16 @@ sorting/order-by-boolean-blank-before-false	not-supported
 sorting/order-by-text-blank-before-empty-string	not-supported
 sorting/order-by-variant-numbers-before-text	not-supported
 sorting/topn-ascending-takes-blank-first	not-supported
+text-functions/concatenate-number-and-boolean	not-supported
+text-functions/mid-past-the-end	not-supported
+text-functions/rept-non-integer-count	not-supported
+text-functions/rept-zero-times	not-supported
+text-functions/value-converts-text	not-supported
+text-functions/value-decimal-and-scientific	not-supported
+text-functions/value-not-a-number-is-an-error	not-supported
 topn-rankx/start-at-one-column	not-supported
 topn-rankx/start-at-two-columns	not-supported
 udf/expr-parameter-and-the-row-context-of-the-caller	not-supported
+udf/untyped-parameter-type-check-with-isstring	not-supported
 variables/var-named-like-a-table-is-an-error	fail
 variables/var-referenced-error-is-raised-even-in-untaken-branch	fail

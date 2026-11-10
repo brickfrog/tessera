@@ -55,12 +55,14 @@
     <Compile Include="FixtureEmbed.fs" />
     <Compile Include="Engine/Types.fs" />
     <Compile Include="Engine/Context.fs" />
+    <Compile Include="Engine/Culture.fs" />
     <Compile Include="Engine/Typing.fs" />
     <Compile Include="Engine/Functions/Aggregation.fs" />
     <Compile Include="Engine/Functions/Logical.fs" />
     <Compile Include="Engine/Functions/Math.fs" />
     <Compile Include="Engine/Functions/Text.fs" />
     <Compile Include="Engine/Functions/DateTime.fs" />
+    <Compile Include="Engine/Functions/Format.fs" />
     <Compile Include="Engine/Functions/Filter.fs" />
     <Compile Include="Engine/Functions/TableFunctions.fs" />
     <Compile Include="Engine/Eval.fs" />

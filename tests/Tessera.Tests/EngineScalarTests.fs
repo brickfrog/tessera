@@ -175,7 +175,7 @@ let tests =
             testCase "text that isn't a number in arithmetic" (fun () -> isError "dax-error" "1 + \"a\"")
             // Something the engine doesn't implement is never swallowed by IFERROR.
             testCase "IFERROR does not hide a not-supported" (fun () ->
-                isError "not-supported" "IFERROR ( FORMAT ( 1, \"0\" ), 2 )")
+                isError "not-supported" "IFERROR ( PATHITEM ( 1, 1 ), 2 )")
             testCase "a table of several rows where a value is needed" (fun () ->
                 isError "dax-error" "VALUES ( Customer[Name] ) & \"\"")
             testCase "a column outside a row context" (fun () -> isError "dax-invalid" "Sales[Qty] + 1")
