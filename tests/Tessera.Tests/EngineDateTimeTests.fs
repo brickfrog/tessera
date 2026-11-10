@@ -753,6 +753,35 @@ let tests =
                 isDaxError "COUNTROWS ( CALENDAR ( DATE ( 2024, 1, 2 ), DATE ( 2024, 1, 1 ) ) )"
                 refused "COUNTROWS ( CALENDAR ( BLANK (), DATE ( 2024, 1, 1 ) ) )" "BLANK"
                 refused "COUNTROWS ( CALENDAR ( \"2024-01-01\", DATE ( 2024, 1, 1 ) ) )" "not a date or a number")
+            // Microsoft Learn's second CALENDAR example: a date table over the dates of the fact
+            // table it is then related to. Reading the fact table is not a circular dependency.
+            testCase "a calendar over the table that relates to it" (fun () ->
+                let m = {
+                    Tables = [
+                        table "S" [ "D", DataType.DateTime; "N", DataType.Int64 ] [
+                            [ d 2024 1 1; 1 ]
+                            [ d 2024 1 3; 2 ]
+                            [ d 2024 1 3; 4 ]
+                        ]
+                        calculatedTable
+                            "Cal"
+                            [ "Date", DataType.DateTime ]
+                            "CALENDAR ( MIN ( S[D] ), MAXX ( S, S[D] ) )"
+                        |> withCalculated [ "Day", DataType.Int64, "DAY ( Cal[Date] )" ]
+                    ]
+                    Rels = [ rel ("S", "D") ("Cal", "Date") ]
+                    Measures = [ "S", "Total", "SUM ( S[N] )" ]
+                    Functions = []
+                }
+
+                let prepared = prepareAt pinned m
+                Expect.isEmpty (Engine.failures prepared) "nothing failed"
+
+                returns prepared "EVALUATE ADDCOLUMNS ( Cal, \"Total\", [Total] )" [
+                    [ d 2024 1 1; 1; 1 ]
+                    [ d 2024 1 2; 2; null ]
+                    [ d 2024 1 3; 3; 6 ]
+                ])
             testCase "the usual date table" (fun () ->
                 returns
                     (p ())

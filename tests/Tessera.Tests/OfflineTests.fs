@@ -15,9 +15,73 @@ open Tessera.Tests.CliHarness
 /// A use of an outside type: the method doing it, and the type (and member) used.
 type private Usage = { In: string; Uses: string }
 
+/// IL opcodes by their value, for walking a method body one instruction at a time.
+let private opCodes =
+    let codes = Collections.Generic.Dictionary<int, Reflection.Emit.OpCode>()
+
+    for f in
+        typeof<Reflection.Emit.OpCodes>.GetFields(Reflection.BindingFlags.Public ||| Reflection.BindingFlags.Static) do
+        match f.GetValue null with
+        | :? Reflection.Emit.OpCode as code -> codes.[int (uint16 code.Value)] <- code
+        | _ -> ()
+
+    codes
+
+/// The metadata tokens a method body's instructions name (the operands of call, newobj, ldfld,
+/// ldtoken, castclass...). None when the body can't be decoded.
+let private tokensOf (il: byte array) : int list option =
+    let found = Collections.Generic.List<int>()
+    let mutable at = 0
+    let mutable ok = true
+
+    while ok && at < il.Length do
+        let value, size =
+            if il.[at] = 0xFEuy && at + 1 < il.Length then
+                0xFE00 ||| int il.[at + 1], 2
+            else
+                int il.[at], 1
+
+        match opCodes.TryGetValue value with
+        | true, code ->
+            at <- at + size
+
+            let operand =
+                match code.OperandType with
+                | Reflection.Emit.OperandType.InlineNone -> 0
+                | Reflection.Emit.OperandType.ShortInlineBrTarget
+                | Reflection.Emit.OperandType.ShortInlineI
+                | Reflection.Emit.OperandType.ShortInlineVar -> 1
+                | Reflection.Emit.OperandType.InlineVar -> 2
+                | Reflection.Emit.OperandType.InlineI8
+                | Reflection.Emit.OperandType.InlineR -> 8
+                | Reflection.Emit.OperandType.InlineSwitch ->
+                    if at + 4 <= il.Length then
+                        4 + 4 * BitConverter.ToInt32(il, at)
+                    else
+                        Int32.MaxValue
+                | Reflection.Emit.OperandType.InlineField
+                | Reflection.Emit.OperandType.InlineMethod
+                | Reflection.Emit.OperandType.InlineSig
+                | Reflection.Emit.OperandType.InlineTok
+                | Reflection.Emit.OperandType.InlineType ->
+                    if at + 4 <= il.Length then
+                        found.Add(BitConverter.ToInt32(il, at))
+
+                    4
+                | _ -> 4
+
+            if operand < 0 || operand > il.Length - at then
+                ok <- false
+            else
+                at <- at + operand
+        | _ -> ok <- false
+
+    if ok then Some(List.ofSeq found) else None
+
 /// Every method in an assembly whose IL mentions a referenced type (or a member of one) that
-/// `watched` picks out by namespace and name. Tokens are found by scanning method bodies for
-/// their four bytes: that can over-report, never under-report.
+/// `watched` picks out by namespace and name. A method body is read instruction by instruction
+/// for the tokens it names. One that can't be read that way is scanned for a token's four bytes
+/// anywhere, which can over-report and never under-report.
 let private usages (assembly: Reflection.Assembly) (watched: string -> string -> bool) : Usage list =
     use stream = File.OpenRead assembly.Location
     use pe = new PEReader(stream)
@@ -87,8 +151,15 @@ let private usages (assembly: Reflection.Assembly) (watched: string -> string ->
                 if m.RelativeVirtualAddress <> 0 then
                     let il = pe.GetMethodBody(m.RelativeVirtualAddress).GetILBytes()
 
+                    let named = tokensOf il
+
                     for bytes, what in tokens do
-                        if il.AsSpan().IndexOf(ReadOnlySpan bytes) >= 0 then
+                        let mentioned =
+                            match named with
+                            | Some list -> List.contains (BitConverter.ToInt32(bytes, 0)) list
+                            | None -> il.AsSpan().IndexOf(ReadOnlySpan bytes) >= 0
+
+                        if mentioned then
                             {
                                 In = typeDefName typeHandle + "::" + name m.Name
                                 Uses = what
