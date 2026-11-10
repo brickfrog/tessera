@@ -2043,6 +2043,42 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   tables, the blank row as a group, and rows whose expressions are all BLANK dropped; not `ROLLUPADDISSUBTOTAL`,
   `IGNORE` or `NONVISUAL`, and not inside a row context or under an outer filter.
 
+#### Text functions and FORMAT
+
+`LEN`, `LEFT`, `RIGHT`, `MID`, `UPPER`, `LOWER`, `TRIM`, `REPT`, `SUBSTITUTE`, `REPLACE`, `SEARCH`, `FIND`, `EXACT`,
+`CONTAINSSTRING`, `CONTAINSSTRINGEXACT`, `COMBINEVALUES`, `UNICHAR`, `UNICODE`, `CONCATENATE`, `FIXED` and `FORMAT`
+are implemented for **en-US** (this supersedes "`FORMAT` and most text ... functions" in the list below). The
+model's culture is read from the model; `FORMAT`'s locale argument overrides it.
+
+- **Culture.** Any culture other than en-US is refused, for `FORMAT` (model culture or locale argument), `FIXED`,
+  `UPPER`/`LOWER`, and for a number with decimals turned into text by `&` or a text function (the decimal separator
+  is the culture's). A model that names no culture is refused too: a server would use its own language. Nothing is
+  ever formatted by .NET, so the machine's culture changes nothing.
+- **`FORMAT` numbers.** `General Number`, `Currency`, `Fixed`, `Standard`, `Percent`, `Scientific`, `Yes/No`,
+  `True/False`, `On/Off`, and custom formats: `0` `#` `.` `,` (grouping, and scaling by 1000 right before the decimal
+  point), `%`, `E+`/`E-`/`e+`/`e-`, quoted and `\`-escaped literals, one to three `;` sections. A custom format is
+  literal text, digit placeholders, literal text: placeholders in two places (`0-0`) are refused.
+- **`FORMAT` dates.** `General Date`, `Long Date`, `Short Date`, `Long Time`, `Medium Time`, `Short Time`, and custom
+  formats: `d dd ddd dddd dddddd w ww m mm mmm mmmm q y yy yyyy h hh n nn s ss`, `AM/PM am/pm A/P a/p AMPM`, `/`, `:`,
+  literals. `m` right after `h` (with or without `:`) is minutes.
+- **BLANK.** `FORMAT ( BLANK (), ... )` is the empty text. A BLANK argument read as text is the empty text
+  (`LEN ( BLANK () )` is 0), but a function that returns text refuses a BLANK text: no source says whether the real
+  engine returns BLANK or the empty text.
+- **Refused because the sources disagree** (Microsoft Learn against DAX Guide): `REPT` zero times and with a
+  fraction; the formats `c`, `ddddd`, `ttttt` and `Medium Date`; `Percent` of a number that needs a thousand
+  separator; TRUE or FALSE turned into text.
+- **Refused because no source says:** a position or a count that is negative, fractional or past the end of the text
+  (`MID ( "abcde", 4, 10 )`; `LEFT` and `RIGHT` past the end are documented and work); text with surrogate pairs
+  where a position counts (it depends on the model's `UnicodeCharacterBehavior`); letters outside ASCII in `UPPER`,
+  `LOWER` and as the text `SEARCH`/`CONTAINSSTRING` look for; kana, half- and full-width characters and combining
+  marks in `SEARCH`; `SEARCH` in a case-sensitive model; a float whose decimal readings differ at the digits a format
+  shows (`FORMAT ( 2.675, "0.00" )`: the float is just below 2.675); a negative number exactly halfway, one that
+  rounds to zero, a negative `Currency` or `FIXED`, and a negative number through a one-section format that starts
+  with literal text (`"$0.00"`); a number with a date format, a date with a number format, text as the value;
+  `Short Time` before 10:00; a time with a fraction of a second; dates before March 1, 1900; `TOCSV` and `TOJSON`.
+- A measure's format string (`FormatString`, or a format string expression) is **not** applied to query results: the
+  real engine doesn't apply it either.
+
 #### What it refuses
 
 - **Not implemented yet:** time intelligence, `ALLSELECTED`, `FORMAT` and most text, date, math and statistical
