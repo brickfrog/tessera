@@ -91,7 +91,6 @@ relationships/one-to-one-filter-to-first-table	not-supported
 relationships/one-to-one-filter-to-second-table	not-supported
 relationships/one-to-one-related-blank-for-missing-row	not-supported
 relationships/related-across-limited-relationship-error	not-supported
-relationships/userelationship-table-expansion-fixed-when-table-is-evaluated	not-supported
 selection/isfiltered-iscrossfiltered-filter-on-many-side	not-supported
 set-functions/table-constructor-column-names-and-types	not-supported
 set-functions/table-constructor-mixed-types-to-string	not-supported

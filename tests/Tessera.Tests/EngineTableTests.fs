@@ -614,7 +614,8 @@ let tests =
                     "all of Name, Country"
                 // Product has the blank row of Sales' product 9.
                 notSupported (p ()) "EVALUATE ALLEXCEPT ( Product, Product[ProductKey] )" "blank row"
-                notSupported (p ()) "EVALUATE ALLEXCEPT ( Customer, Customer )" "table")
+                notSupported (p ()) "EVALUATE ALLEXCEPT ( Customer, Customer )" "table"
+                notSupported (p ()) "EVALUATE ALLEXCEPT ( Sales, Sales[Id], Product[Color] )" "related")
             // "Returns the first value in the column for which the expression has a non blank
             // value"; a column reference "is replaced by CALCULATETABLE ( DISTINCT ( <ColumnName> )
             // )" (dax.guide/firstnonblank). FIRSTNONBLANKVALUE is "CALCULATE ( <Expression>,

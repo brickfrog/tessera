@@ -142,7 +142,7 @@ module Filter =
     /// in the first argument that are not listed in the following arguments"
     /// (dax.guide/allexcept), with no filter applied. Whether the blank row of an invalid
     /// relationship is among them isn't stated, so a table that has one is refused; so is a table
-    /// as a kept argument, and listing every column.
+    /// as a kept argument, a kept column of a related table, and listing every column.
     let private allExceptTable (ev: IEval) (ctx: Ctx) (call: Call) : TableVal =
         let t =
             match ev.TryModelTable(ctx, call.Args.Head) with
@@ -162,6 +162,14 @@ module Filter =
                         ctx
                         k.Span
                         $"'{kc.Table.Name}'[{kc.Name}] is not a column of '{t.Name}' or of a table related to it"
+
+                // Whether the result then has the columns of the related tables (the expanded
+                // table's) is not documented.
+                if not (obj.ReferenceEquals(kc.Table, t)) then
+                    Fail.notSupported
+                        ctx
+                        k.Span
+                        $"ALLEXCEPT as a table keeping a column of '{kc.Table.Name}', a table related to '{t.Name}'"
 
                 kc)
 
@@ -674,21 +682,20 @@ module Filter =
                 ctx.Rows
                 |> List.tryPick (fun rc ->
                     let t = rc.Table
+                    // The expanded table is fixed when the table is evaluated: "Date[Month] contained
+                    // in SalesB is related to Sales[DueDate], not to Sales[Date]" for a table
+                    // evaluated under USERELATIONSHIP (SQLBI, "Expanded tables in DAX"). So the row
+                    // follows the relationships in force then, not the ones in force now.
+                    let config = if isNull t.Config then ctx.Filter.Config else t.Config
 
-                    if not (isNull t.BaseTable) && ctx.Filter.Config.IsExpanded(t.BaseTable, c.Table) then
+                    if not (isNull t.BaseTable) && config.IsExpanded(t.BaseTable, c.Table) then
                         if not t.IsPureBase then
                             Fail.notSupported
                                 ctx
                                 call.Span
                                 $"RELATED in a row context on a table built on '{t.BaseTable.Name}' with columns added"
 
-                        if not (obj.ReferenceEquals(t.Config, ctx.Filter.Config)) then
-                            Fail.notSupported
-                                ctx
-                                call.Span
-                                "RELATED on a table evaluated under other relationships than the ones now in force"
-
-                        let map = ctx.Filter.Config.RowMap(t.BaseTable, c.Table)
+                        let map = config.RowMap(t.BaseTable, c.Table)
                         Some(c.ValueAt map.[t.BaseRows.[rc.Row]])
                     else
                         None)
