@@ -121,6 +121,10 @@ type Prepared = {
     /// What `Fixture.loadAndCheck` said about the rows (errors make the case invalid; warnings such
     /// as `unmatched-key` are how a case asks for orphan rows).
     Issues: FixtureIssue list
+    /// The rows as the model file gives them, by table, each in the order of the table's data
+    /// columns. Unlike the store's, text here has its own casing and trailing spaces: what a server
+    /// must be given, so that its own storage rules are the ones observed.
+    Rows: Map<string, DaxValue array list>
 }
 
 exception private Bad of string
@@ -561,6 +565,20 @@ let writeFixture (def: ModelDef) (directory: string) : unit =
             UTF8Encoding false
         )
 
+let private rawValue (v: QueryValue) : DaxValue =
+    match v with
+    | QueryValue.Blank -> DaxValue.Blank
+    | QueryValue.String text -> DaxValue.String text
+    | QueryValue.Int64 i -> DaxValue.Integer i
+    | QueryValue.Double d -> DaxValue.Decimal d
+    | QueryValue.Decimal d ->
+        match DaxValue.tryCurrency d with
+        | Some c -> c
+        | None -> bad $"{d} is out of range for a fixed decimal"
+    | QueryValue.DateTime d -> DaxValue.ofDateTime d
+    | QueryValue.Boolean b -> DaxValue.Boolean b
+    | QueryValue.Binary _ -> bad "a model column can't be binary"
+
 let private scratch () =
     Path.Combine(Path.GetTempPath(), "tessera-tests", "conformance-" + Guid.NewGuid().ToString "N")
 
@@ -580,6 +598,10 @@ let prepare (name: string) (def: ModelDef) : Result<Prepared, string> =
                     Database = db
                     Store = loaded.Store
                     Issues = issues
+                    Rows =
+                        def.Tables
+                        |> List.map (fun t -> t.Name, t.Rows |> List.map (Array.map rawValue))
+                        |> Map.ofList
                 }
         with
         | Bad message -> Error message
@@ -589,6 +611,21 @@ let prepare (name: string) (def: ModelDef) : Result<Prepared, string> =
             Directory.Delete(directory, true)
         with _ ->
             ()
+
+/// A model's rows by table name (names are case-insensitive); none for a table it doesn't load.
+let rawRows (p: Prepared) (table: string) : DaxValue array list =
+    p.Rows
+    |> Map.tryPick (fun name rows ->
+        if String.Equals(name, table, StringComparison.OrdinalIgnoreCase) then
+            Some rows
+        else
+            None)
+    |> Option.defaultValue []
+
+/// The model with its rows inside it, for a server: from the rows as written, not from the store
+/// (see `Prepared.Rows`).
+let embedForServer (p: Prepared) : Result<FixtureEmbed.Embedded, TessError> =
+    FixtureEmbed.embedRows p.Database (rawRows p)
 
 // ---- Cases ----------------------------------------------------------------------------------------
 
@@ -962,12 +999,91 @@ let validate (c: Case) : string list = [
             if i.Severity = Validate.Severity.Error then
                 $"model: {ObjectRef.format i.Ref}: {i.Message} [{i.Rule}]"
 
+    // A server refuses to process a column sorted by another unless each of its values has one
+    // sort value. Nothing local checks that.
+    match c.Model.Value with
+    | Error _ -> ()
+    | Ok def ->
+        for t in def.Tables do
+            for i, column in List.indexed t.Columns do
+                match column.SortBy with
+                | None -> ()
+                | Some other ->
+                    match
+                        t.Columns
+                        |> List.tryFindIndex (fun x -> String.Equals(x.Name, other, StringComparison.OrdinalIgnoreCase))
+                    with
+                    | None -> ()
+                    | Some j ->
+                        let key (v: QueryValue) =
+                            (QueryValue.text v).TrimEnd(' ').ToUpperInvariant()
+
+                        let clashes =
+                            t.Rows
+                            |> List.groupBy (fun row -> key row.[i])
+                            |> List.filter (fun (_, rows) ->
+                                rows |> List.map (fun row -> key row.[j]) |> List.distinct |> List.length > 1)
+                            |> List.map fst
+
+                        if not clashes.IsEmpty then
+                            let list = String.concat ", " clashes
+                            $"model: {t.Name}[{column.Name}] is sorted by {other}, but these values have more than one {other}: {list}"
+
     match DaxParser.parseQuery c.Query with
     | Error errors ->
         for e in errors do
             $"query: {e.Line}:{e.Column}: {e.Message}"
     | Ok query ->
         let hasOrderBy = query.Evaluates |> List.exists (fun e -> not e.OrderBy.IsEmpty)
+
+        // An ordered expectation needs an ORDER BY that tells every row apart: rows that tie on its
+        // keys come back in any order. Checked where the keys are columns of the result.
+        match c.Expected with
+        | Expected.Results results when c.Ordered && results.Length = query.Evaluates.Length ->
+            for n, (evaluate, result) in List.indexed (List.zip query.Evaluates results) do
+                let column (key: DaxAst.OrderKey) =
+                    let rec name (e: DaxAst.Expr) =
+                        match e.Kind with
+                        | DaxAst.Paren inner -> name inner
+                        | DaxAst.Qualified(table, column) -> Some(Some table.Name, column)
+                        | DaxAst.Bracketed column -> Some(None, column)
+                        | _ -> None
+
+                    name key.Expr
+                    |> Option.bind (fun (table, column) ->
+                        result.Columns
+                        |> List.tryFindIndex (fun x ->
+                            let matches (candidate: string) =
+                                String.Equals(x.Name, candidate, StringComparison.OrdinalIgnoreCase)
+
+                            match table with
+                            | Some t -> matches $"{t}[{column}]"
+                            | None ->
+                                matches $"[{column}]"
+                                || x.Name.EndsWith($"[{column}]", StringComparison.OrdinalIgnoreCase)))
+
+                let keys = evaluate.OrderBy |> List.map column
+
+                if not keys.IsEmpty && keys |> List.forall Option.isSome then
+                    let indexes = keys |> List.choose id
+
+                    let keyOf (row: QueryValue array) =
+                        indexes
+                        |> List.map (fun i -> QueryValue.text row.[i] + "|" + string (QueryValue.typeOf row.[i]))
+
+                    let whole (row: QueryValue array) =
+                        row
+                        |> Array.map (fun v -> QueryValue.text v + "|" + string (QueryValue.typeOf v))
+                        |> List.ofArray
+
+                    let tied =
+                        result.Rows
+                        |> List.groupBy keyOf
+                        |> List.filter (fun (_, rows) -> rows |> List.map whole |> List.distinct |> List.length > 1)
+
+                    if not tied.IsEmpty then
+                        $"result {n}: \"ordered\" is true, but {tied.Length} group(s) of rows tie on the ORDER BY keys, so their order isn't defined"
+        | _ -> ()
 
         if c.Ordered && not hasOrderBy then
             "\"ordered\" is true but the query has no ORDER BY: its row order isn't defined"

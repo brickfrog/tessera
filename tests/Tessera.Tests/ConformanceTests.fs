@@ -133,7 +133,8 @@ let corpusTests =
 
             Expect.isEmpty clashes "")
 
-        // What the server runner deploys: the model with its rows inside it.
+        // What the server runner deploys: the model with its rows inside it, exactly as written
+        // (not as the store normalises them).
         testList "each model embeds its rows exactly" [
             for c in cases () |> List.distinctBy _.ModelKey ->
                 testCase c.ModelName
@@ -141,11 +142,24 @@ let corpusTests =
                     match prepared c with
                     | Error e -> failtest e
                     | Ok p ->
-                        match FixtureEmbed.embed p.Database p.Store with
+                        match embedForServer p with
                         | Error e -> failtest (TessError.message e)
                         | Ok embedded ->
-                            EmbedTests.expectHoldsStore p.Database p.Store embedded |> ignore
                             Expect.isEmpty embedded.Warnings "a corpus model must embed without loss"
+
+                            for table in Fixture.dataTables p.Database do
+                                let source =
+                                    embedded.Database.Model.Tables.[table.Name].Partitions.[0].Source
+                                    :?> Microsoft.AnalysisServices.Tabular.CalculatedPartitionSource
+
+                                let columns, rows = EmbedTests.readTable source.Expression
+
+                                Expect.equal
+                                    columns
+                                    (Fixture.dataColumns table |> List.map (fun (column, t) -> column.Name, t))
+                                    $"{table.Name}: columns"
+
+                                Expect.equal rows (rawRows p table.Name) $"{table.Name}: rows, value for value"
 
                             let errors (db: Microsoft.AnalysisServices.Tabular.Database) =
                                 Validate.validate db
@@ -336,6 +350,75 @@ let harnessTests =
             Expect.isEmpty
                 (withModel """ "measures": [ { "table": "T", "name": "Good", "expression": "SUM ( F[amount] )" } ] """)
                 ""
+
+        testCase "validate catches an ordered expectation whose ORDER BY leaves rows tied"
+        <| fun () ->
+            let ordered (rows: string) =
+                (caseText """, "ordered": true""")
+                    .Replace("ROW ( \\\"r\\\", 1 )", "T ORDER BY T[s]")
+                    .Replace(
+                        """[ { "columns": [ { "name": "[r]", "type": "int64" } ], "rows": [ [1] ] } ]""",
+                        $$"""[ { "columns": [ { "name": "T[k]", "type": "int64" }, { "name": "T[s]", "type": "string" } ], "rows": {{rows}} } ]"""
+                    )
+
+            let tied = validate (single (ordered """[ [1, "a"], [2, "a"], [3, "b"] ]"""))
+            Expect.exists tied (fun p -> p.Contains "tie on the ORDER BY keys") $"%A{tied}"
+            Expect.isEmpty (validate (single (ordered """[ [1, "a"], [2, "b"], [3, "c"] ]"""))) "no ties"
+            Expect.isEmpty (validate (single (ordered """[ [1, "a"], [1, "a"], [3, "c"] ]"""))) "identical rows may tie"
+
+        testCase "validate catches a sort-by column with two sort values for one value"
+        <| fun () ->
+            let withTable (rows: string) =
+                validate (
+                    single (
+                        (caseText "")
+                            .Replace(
+                                "\"m\"",
+                                $$"""{ "base": "m", "tables": [ { "name": "D", "columns": [ { "name": "Month", "type": "string", "sortBy": "No" }, { "name": "No", "type": "int64" } ], "rows": {{rows}} } ] }"""
+                            )
+                    )
+                )
+
+            Expect.isEmpty (withTable """[ ["Jan", 1], ["Feb", 2], ["Jan", 1] ]""") ""
+
+            Expect.exists
+                (withTable """[ ["Jan", 1], ["Feb", 2], ["Jan", 13] ]""")
+                (fun p -> p.Contains "sorted by No")
+                ""
+
+        testCase "for a server the rows are embedded as written; the store's are folded"
+        <| fun () ->
+            let c =
+                single (
+                    (caseText "")
+                        .Replace("\"m\"", """{ "base": "m", "rows": { "T": [ [1, "a"], [2, "A"], [3, "b  "] ] } }""")
+                )
+
+            match prepared c with
+            | Error e -> failtest e
+            | Ok p ->
+                let stored = p.Store.TryTable("T").Value.TryColumn("s").Value
+
+                Expect.equal
+                    [ stored.[0]; stored.[1]; stored.[2] ]
+                    [ DaxValue.String "a"; DaxValue.String "a"; DaxValue.String "b" ]
+                    "the store folds case and drops trailing spaces"
+
+                Expect.equal
+                    (rawRows p "t" |> List.map (fun row -> row.[1]))
+                    [ DaxValue.String "a"; DaxValue.String "A"; DaxValue.String "b  " ]
+                    ""
+
+                match embedForServer p with
+                | Error e -> failtest (TessError.message e)
+                | Ok embedded ->
+                    let source =
+                        embedded.Database.Model.Tables.["T"].Partitions.[0].Source
+                        :?> Microsoft.AnalysisServices.Tabular.CalculatedPartitionSource
+
+                    Expect.stringContains source.Expression "{ 2, \"A\" }" "the server gets the casing as written"
+                    Expect.stringContains source.Expression "{ 3, \"b  \" }" "and the trailing spaces"
+                    Expect.equal (snd (EmbedTests.readTable source.Expression)) (rawRows p "T") ""
 
         testCase "a case's changes to a shared model make a model of its own"
         <| fun () ->

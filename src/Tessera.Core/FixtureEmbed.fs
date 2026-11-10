@@ -119,31 +119,16 @@ let private literal (table: string) (column: string) (v: DaxValue) : string * st
 [<Literal>]
 let PlaceholderColumn = "_"
 
-/// The DATATABLE expression holding a table's rows, with the warnings for values it can't hold
-/// exactly. `columns` are the columns to write, in order, with their types; a column the store
-/// table doesn't have is BLANK in every row.
-///
-/// A table with no rows is a one-row DATATABLE filtered to nothing, which keeps the columns and
-/// their types. A table with no columns gets one, `PlaceholderColumn`, and no rows.
-let tableExpression
-    (table: string)
-    (rows: StoreTable option)
-    (columns: (string * DaxType) list)
-    : string * string list =
-    let warnings = ResizeArray<string>()
+/// Write DATATABLE ( declarations, { rows } ), or for no rows the same with one BLANK row filtered
+/// to nothing. `cell row column` is the constant to write.
+let private writeExpression (columns: (string * DaxType) list) (rowCount: int) (cell: int -> int -> string) : string =
     let sb = StringBuilder()
-    let rowCount = rows |> Option.map _.RowCount |> Option.defaultValue 0
 
     let declared =
         if columns.IsEmpty then
             [ PlaceholderColumn, DaxType.Integer ]
         else
             columns
-
-    let data =
-        declared
-        |> List.map (fun (name, _) -> rows |> Option.bind (fun t -> t.TryColumn name))
-        |> Array.ofList
 
     let empty = rowCount = 0 || columns.IsEmpty
 
@@ -162,29 +147,14 @@ let tableExpression
         let blanks = declared |> List.map (fun _ -> "BLANK ()") |> String.concat ", "
         sb.Append("        { ").Append(blanks).Append(" }\n") |> ignore
     else
-        // One text per distinct value, as the store holds one value per id.
-        let texts =
-            data
-            |> Array.mapi (fun i column ->
-                match column with
-                | None -> [||]
-                | Some c ->
-                    c.Values
-                    |> Array.map (fun v ->
-                        let text, warning = literal table (fst declared.[i]) v
-                        warning |> Option.iter warnings.Add
-                        text))
-
         for row in 0 .. rowCount - 1 do
             sb.Append("        { ") |> ignore
 
-            for i in 0 .. data.Length - 1 do
+            for i in 0 .. declared.Length - 1 do
                 if i > 0 then
                     sb.Append(", ") |> ignore
 
-                match data.[i] with
-                | Some c -> sb.Append(texts.[i].[c.ValueIds.[row]]) |> ignore
-                | None -> sb.Append("BLANK ()") |> ignore
+                sb.Append(cell row i) |> ignore
 
             sb.Append(if row < rowCount - 1 then " },\n" else " }\n") |> ignore
 
@@ -193,7 +163,64 @@ let tableExpression
     if empty then
         sb.Append(",\n    FALSE ()\n)") |> ignore
 
-    sb.ToString(), List.ofSeq warnings
+    sb.ToString()
+
+/// The DATATABLE expression holding a table's rows, with the warnings for values it can't hold
+/// exactly. `columns` are the columns to write, in order, with their types; a column the store
+/// table doesn't have is BLANK in every row.
+///
+/// A table with no rows is a one-row DATATABLE filtered to nothing, which keeps the columns and
+/// their types. A table with no columns gets one, `PlaceholderColumn`, and no rows.
+let tableExpression
+    (table: string)
+    (rows: StoreTable option)
+    (columns: (string * DaxType) list)
+    : string * string list =
+    let warnings = ResizeArray<string>()
+    let rowCount = rows |> Option.map _.RowCount |> Option.defaultValue 0
+
+    let data =
+        columns
+        |> List.map (fun (name, _) -> rows |> Option.bind (fun t -> t.TryColumn name))
+        |> Array.ofList
+
+    // One text per distinct value, as the store holds one value per id.
+    let texts =
+        data
+        |> Array.mapi (fun i column ->
+            match column with
+            | None -> [||]
+            | Some c ->
+                c.Values
+                |> Array.map (fun v ->
+                    let text, warning = literal table (fst columns.[i]) v
+                    warning |> Option.iter warnings.Add
+                    text))
+
+    let cell (row: int) (i: int) =
+        match data.[i] with
+        | Some c -> texts.[i].[c.ValueIds.[row]]
+        | None -> "BLANK ()"
+
+    writeExpression columns rowCount cell, List.ofSeq warnings
+
+/// `tableExpression` for rows given as values, each row in the order of `columns`. The values are
+/// written as they are: text keeps its casing and its trailing spaces, which a `DataStore` would
+/// have folded and dropped. For checking what a server does with data a store has never touched.
+let rowsExpression
+    (table: string)
+    (columns: (string * DaxType) list)
+    (rows: DaxValue array list)
+    : string * string list =
+    let warnings = ResizeArray<string>()
+    let rows = Array.ofList rows
+
+    let cell (row: int) (i: int) =
+        let text, warning = literal table (fst columns.[i]) rows.[row].[i]
+        warning |> Option.iter warnings.Add
+        text
+
+    writeExpression columns rows.Length cell, List.ofSeq warnings |> List.distinct
 
 let private isKind (kind: Text.Json.JsonValueKind) (node: JsonNode) =
     not (isNull node) && node.GetValueKind() = kind
@@ -204,7 +231,8 @@ let private text (node: JsonNode) =
     else
         ""
 
-/// The model with every loaded table replaced by a calculated table holding the store's rows.
+/// The model with every loaded table replaced by a calculated table holding the rows `expressionOf` gives: for a
+/// table and its data columns, the expression, its warnings and the number of rows.
 ///
 /// - Tables: those a fixture supplies (`Fixture.dataTables`); calculated tables and calculation
 ///   groups are already computed and stay as they are.
@@ -213,7 +241,10 @@ let private text (node: JsonNode) =
 ///   column of a type that holds no values here (binary) is dropped, with a warning.
 /// - What only a refresh needs is removed: partitions, refresh policies, data sources and shared
 ///   (M) expressions.
-let embed (db: Database) (store: DataStore) : Result<Embedded, TessError> =
+let embedWith
+    (db: Database)
+    (expressionOf: string -> (string * DaxType) list -> string * string list * int)
+    : Result<Embedded, TessError> =
     if isNull db.Model then
         Error(LoadFailed(db.Name, "the model is empty"))
     else
@@ -242,7 +273,7 @@ let embed (db: Database) (store: DataStore) : Result<Embedded, TessError> =
                 match fixtureTables.TryGetValue name with
                 | false, _ -> ()
                 | true, columns ->
-                    let expression, tableWarnings = tableExpression name (store.TryTable name) columns
+                    let expression, tableWarnings, rowCount = expressionOf name columns
                     warnings.AddRange tableWarnings
 
                     let columnNodes =
@@ -306,7 +337,7 @@ let embed (db: Database) (store: DataStore) : Result<Embedded, TessError> =
 
                     tables.Add {
                         Table = name
-                        Rows = store.TryTable name |> Option.map _.RowCount |> Option.defaultValue 0
+                        Rows = rowCount
                         Columns = columns.Length
                         Expression = expression
                     }
@@ -343,3 +374,18 @@ let embed (db: Database) (store: DataStore) : Result<Embedded, TessError> =
             }
         with e ->
             Error(LoadFailed(db.Name, $"the model with its data embedded doesn't load: {e.Message}"))
+
+/// The model with every loaded table replaced by a calculated table holding the store's rows.
+let embed (db: Database) (store: DataStore) : Result<Embedded, TessError> =
+    embedWith db (fun name columns ->
+        let rows = store.TryTable name
+        let expression, warnings = tableExpression name rows columns
+        expression, warnings, rows |> Option.map _.RowCount |> Option.defaultValue 0)
+
+/// `embed` from rows that never went through a `DataStore`: `rowsOf table` gives the table's rows,
+/// each in the order of its data columns (`Fixture.dataColumns`). See `rowsExpression`.
+let embedRows (db: Database) (rowsOf: string -> DaxValue array list) : Result<Embedded, TessError> =
+    embedWith db (fun name columns ->
+        let rows = rowsOf name
+        let expression, warnings = rowsExpression name columns rows
+        expression, warnings, rows.Length)

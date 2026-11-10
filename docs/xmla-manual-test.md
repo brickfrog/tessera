@@ -377,7 +377,7 @@ If it stops at the deployment, look at these first (they are the untested parts)
 | Symptom | Likely cause |
 |---|---|
 | the refresh is refused | the script is `{"refresh":{"type":"full","objects":[{"database":"..."}]}}` (`refreshScript` in `ConformanceServer.fs`); try `"calculate"` |
-| "Models that are not what the corpus says" lists a table | `tess data embed` wrote something the server reads differently. The report shows the rows that differ. Known unknowns: whether `""` stays an empty string in a DATATABLE `STRING` column, `dt"..."` literals before 1900-03-01, and a fixed decimal with more than 15 digits |
+| "Models that are not what the corpus says" lists a table | the server holds other rows than the model file gives. Either the embedding wrote something the server reads differently (known unknowns: whether `""` stays an empty string in a DATATABLE `STRING` column, `dt"..."` literals before 1900-03-01, a fixed decimal with more than 15 digits), or the server stored the text its own way. The runner deploys the rows exactly as written, with their casing and trailing spaces (`a2-text` has `apple`/`Apple`-style variants on purpose), so a difference only in casing or trailing spaces is the engine's storage rule showing, and worth recording, not a bug |
 | every case of a model fails with the same error | a calculated table didn't calculate: run `tess query "xmla:$WS;tessera-conformance-<model>" "EVALUATE '<table>'"` and read the error |
 | compatibility level refused | the models are level 1702 (they hold user-defined functions); the workspace must support it |
 
@@ -400,8 +400,9 @@ text; `--tolerance <x>` changes the relative tolerance for doubles (default 1e-9
 `conformance-report/conformance-report.md` is the readable report, `conformance-report.json` the same with each
 case's expected and actual results. Its sections, in the order to act on them:
 
-1. **Models that are not what the corpus says.** Fix these first (they are bugs in `data embed` or the runner),
-   and re-run: a case on such a model proves nothing.
+1. **Models that are not what the corpus says.** Look at these first. A table whose rows differ in more than
+   text casing or trailing spaces is a bug in the embedding or the runner: fix it and re-run, because a case on
+   such a model proves nothing.
 2. **The server disagrees.** The expectation is wrong. Correct the case file: the `expected` result, and its
    `confidence`, `derivation` or `source`. Cases marked uncertain are the ones written to be settled this way;
    their `alternative` says what the other reading predicted.

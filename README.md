@@ -2041,7 +2041,9 @@ yet**; many cases are worked out by hand from documented rules, and some are mar
 - `dotnet test` checks every case file (the model builds, the rows are a valid fixture, the query parses, the
   expectation is well-formed) and that every model embeds its rows exactly. The `conformance (engine)` test list
   is skipped until the engine exists: set `engine` at the top of `ConformanceTests.fs`. `expectedUnsupported`
-  there lists the tags the engine may leave for later.
+  there lists the tags the engine may leave for later. It takes any tag, a function's name included (`round`,
+  `format`): the area tags (`math-functions`...) mark the cases in that area's folder, and cases elsewhere call
+  such functions too, tagged only with the function.
 - `QueryResult.compare` (`Tessera.Core`) is the comparison: columns by name, rows as a multiset unless ordered,
   doubles within a tolerance, int64 and decimal exactly, and differences of type (`1` against `1.0`, a column
   declared `double` instead of `decimal`) reported apart from differences of value. `QueryResult.ofJson` reads

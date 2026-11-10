@@ -67,7 +67,9 @@ let private answer (cases: Case list) (dax: string) : QueryResult list =
         let c = cases |> List.find (fun c -> c.ModelName = "m")
 
         match prepared c with
-        | Ok p -> [ ConformanceServer.tableAsResult p.Database.Model.Tables.[name] p.Store ]
+        | Ok p -> [
+            ConformanceServer.tableAsResult p.Database.Model.Tables.[name] (rawRows p name)
+          ]
         | Error e -> failwith e
 
     match dax with

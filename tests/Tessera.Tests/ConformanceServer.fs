@@ -104,32 +104,18 @@ let private queryType =
     | DaxType.DateTime -> QueryType.DateTime
     | DaxType.Variant -> QueryType.Variant
 
-/// A loaded table as the result `EVALUATE 'Table'` should give: its data columns, as `Table[Column]`.
-let tableAsResult (table: Microsoft.AnalysisServices.Tabular.Table) (store: DataStore) : QueryResult =
-    let columns = Fixture.dataColumns table
-    let rows = store.TryTable table.Name
-
-    {
-        Columns =
-            columns
-            |> List.map (fun (c, t) -> {
-                Name = $"{table.Name}[{c.Name}]"
-                Type = queryType t
-            })
-        Rows =
-            match rows with
-            | None -> []
-            | Some t -> [
-                for row in 0 .. t.RowCount - 1 ->
-                    columns
-                    |> List.map (fun (c, _) ->
-                        match t.TryColumn c.Name with
-                        | Some column -> queryValue column.[row]
-                        | None -> QueryValue.Blank)
-                    |> Array.ofList
-              ]
-        Truncated = false
-    }
+/// A loaded table as the result `EVALUATE 'Table'` should give: its data columns, as
+/// `Table[Column]`, with the rows as the model file gives them (each in the order of those columns).
+let tableAsResult (table: Microsoft.AnalysisServices.Tabular.Table) (rows: DaxValue array list) : QueryResult = {
+    Columns =
+        Fixture.dataColumns table
+        |> List.map (fun (c, t) -> {
+            Name = $"{table.Name}[{c.Name}]"
+            Type = queryType t
+        })
+    Rows = rows |> List.map (Array.map queryValue)
+    Truncated = false
+}
 
 /// Run a query on an open connection; a failure is the server's message, with secrets removed.
 let private query (c: Remote.Connection) (database: string) (dax: string) : Result<QueryResult list, TessError> =
@@ -184,7 +170,7 @@ let private runModel
         match prepared first with
         | Error e -> failed $"the model can't be prepared: {e}" []
         | Ok model ->
-            match FixtureEmbed.embed model.Database model.Store with
+            match embedForServer model with
             | Error e -> failed (TessError.message e) []
             | Ok embedded ->
                 let address = XmlaAddress.withDatabase database server
@@ -219,7 +205,7 @@ let private runModel
                                 let dataProblems = [
                                     for table in Fixture.dataTables model.Database do
                                         if not (Fixture.dataColumns table).IsEmpty then
-                                            let expected = tableAsResult table model.Store
+                                            let expected = tableAsResult table (rawRows model table.Name)
 
                                             match query c database $"EVALUATE {tableReference table.Name}" with
                                             | Error e -> table.Name, [ TessError.message e ]
@@ -500,8 +486,9 @@ let toMarkdown (report: Report) : string =
     if not broken.IsEmpty then
         line "## Models that are not what the corpus says"
         line ""
-        line "Fix these first: they are about `tess data embed` or the deployment, not about DAX, and the cases on"
-        line "such a model prove nothing either way."
+        line "Look at these first. The rows were deployed exactly as the model files give them, so a table that"
+        line "differs only in text casing or trailing spaces shows the server's own storage rules. Anything else is"
+        line "about the embedding or the deployment, not about DAX, and the cases on such a model prove nothing."
         line ""
 
         for m in broken do
