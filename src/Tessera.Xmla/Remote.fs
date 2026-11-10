@@ -110,6 +110,19 @@ let loadModel (access: Access) (address: XmlaAddress) : Result<ModelSource * Dat
             readDatabase c d.Name
             |> Result.map (fun db -> ModelSource.remote (XmlaAddress.withDatabase d.Name address), db)))
 
+/// Run a DAX query on an open connection, against a database by its exact name.
+let queryOn
+    (c: Connection)
+    (database: string)
+    (dax: string)
+    (maxRows: int option)
+    : Result<QueryResult list, TessError> =
+    try
+        Ok(c.Session.Query(database, dax, maxRows))
+    with
+    | XmlaQueryError message -> Error(QueryFailed(Secrets.scrub c.Secrets message))
+    | e -> Error(Failures.classify c.Address c.Secrets e)
+
 /// Run a DAX query against the database an address means.
 let query
     (access: Access)
@@ -120,11 +133,8 @@ let query
     withConnection access address (fun c ->
         resolveDatabase c
         |> Result.bind (fun d ->
-            try
-                Ok(XmlaAddress.withDatabase d.Name address, c.Session.Query(d.Name, dax, maxRows))
-            with
-            | XmlaQueryError message -> Error(QueryFailed(Secrets.scrub c.Secrets message))
-            | e -> Error(Failures.classify c.Address c.Secrets e)))
+            queryOn c d.Name dax maxRows
+            |> Result.map (fun results -> XmlaAddress.withDatabase d.Name address, results)))
 
 /// Run a deployment script. Fails if the server reports any error; otherwise returns its warnings.
 let execute (c: Connection) (database: string) (tmsl: string) : Result<string list, TessError> =

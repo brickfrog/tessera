@@ -78,6 +78,7 @@ module ExitCode =
         | DaxInvalid _
         | DaxEvaluation _
         | FixtureHasErrors _ -> input
+        | NoTestSuites _ -> input
 
 let version () =
     let asm = Assembly.GetExecutingAssembly()

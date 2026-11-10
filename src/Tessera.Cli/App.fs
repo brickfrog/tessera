@@ -76,6 +76,7 @@ let runWithConnector
                 | Some(Deploy args) -> DeployCommand.run ctx args
                 | Some(Data args) -> DataCommand.run ctx args
                 | Some(Refresh args) -> RefreshCommand.run ctx args
+                | Some(Test args) -> TestCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with
