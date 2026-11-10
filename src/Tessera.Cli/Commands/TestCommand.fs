@@ -1231,7 +1231,7 @@ let private scaffold
     else
         line "# Each test is pending: set what the measure must be in `expect`, then remove `pending`."
 
-    line "# The format: https://github.com/justinvc/tessera#testing-a-model-test (README, \"Testing a model\")."
+    line "# The format is described in tessera's README, under \"Testing a model\"."
     line ("suite: " + yamlText (db.Name + " measures"))
 
     match data with
