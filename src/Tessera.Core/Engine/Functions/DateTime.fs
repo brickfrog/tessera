@@ -38,13 +38,19 @@ module DateText =
 
     let private options = RegexOptions.CultureInvariant ||| RegexOptions.IgnoreCase
 
-    let private time = @"(?<h>\d{1,2}):(?<mi>\d{2})(?::(?<s>\d{2}))?(?:\s*(?<ap>AM|PM))?"
+    let private time =
+        @"(?<h>\d{1,2}):(?<mi>\d{2})(?::(?<s>\d{2}))?(?:\s*(?<ap>AM|PM))?"
 
     let private iso =
         Regex(@"^(?<y>\d{4})-(?<m>\d{2})-(?<d>\d{2})(?:(?:T|\s+)" + time + ")?$", options)
 
     let private numeric =
-        Regex(@"^(?<a>\d{1,2})(?<sep>[/-])(?<b>\d{1,2})\k<sep>(?<y>\d{4})(?:\s+" + time + ")?$", options)
+        Regex(
+            @"^(?<a>\d{1,2})(?<sep>[/-])(?<b>\d{1,2})\k<sep>(?<y>\d{4})(?:\s+"
+            + time
+            + ")?$",
+            options
+        )
 
     let private named =
         Regex(@"^(?<mon>[A-Za-z]+)\s+(?<d>\d{1,2}),?\s+(?<y>\d{4})(?:\s+" + time + ")?$", options)
@@ -95,7 +101,12 @@ module DateText =
         else
             let hour = int m.Groups.["h"].Value
             let minute = int m.Groups.["mi"].Value
-            let second = if m.Groups.["s"].Success then int m.Groups.["s"].Value else 0
+
+            let second =
+                if m.Groups.["s"].Success then
+                    int m.Groups.["s"].Value
+                else
+                    0
 
             let hour =
                 if not m.Groups.["ap"].Success then
@@ -217,8 +228,7 @@ module DateAndTime =
     let private dateValue (day: int64) : DaxValue = DaxValue.DateTime(float day)
 
     /// Sunday is 0, Saturday 6. Day 0 (December 30, 1899) was a Saturday.
-    let private dayOfWeek (day: int64) : int =
-        int (((day + 6L) % 7L + 7L) % 7L)
+    let private dayOfWeek (day: int64) : int = int (((day + 6L) % 7L + 7L) % 7L)
 
     // ---- Arguments ----------------------------------------------------------------------------------
 
@@ -286,21 +296,32 @@ module DateAndTime =
 
         dateOfDay day
 
-    /// The second of the day of a date argument, for HOUR, MINUTE and SECOND.
-    let private secondOfDay (ctx: Ctx) (span: Span) (name: string) (ms: int64) (origin: Origin) : int =
+    /// A part of the time of day of a date argument, for HOUR, MINUTE and SECOND: `pick` takes it
+    /// from the second of the day. NOW has fractions of a second, and no page says whether these
+    /// functions round them or cut them off, so a time for which the two readings differ is refused.
+    let private timeOfDayPart
+        (ctx: Ctx)
+        (span: Span)
+        (name: string)
+        (pick: int -> int)
+        (ms: int64)
+        (origin: Origin)
+        : int =
         match origin with
         | Origin.Number when ms < 0L -> Fail.notSupported ctx span $"{name} of a negative number read as a time"
         | _ -> ()
 
         let inDay = ms - dayOf ms * msPerDay
+        let cut = pick (int (inDay / 1000L))
+        let rounded = pick (int ((inDay + 500L) / 1000L % 86400L))
 
-        if inDay % 1000L <> 0L then
+        if cut <> rounded then
             Fail.notSupported
                 ctx
                 span
-                $"{name} of a time with a fraction of a second (whether it is rounded or cut off is not documented)"
+                $"{name} of a time with a fraction of a second that rounds into the next {name.ToLowerInvariant()} (whether it is rounded or cut off is not documented)"
 
-        int (inDay / 1000L)
+        cut
 
     [<RequireQualifiedAccess>]
     type private Num =
@@ -397,7 +418,7 @@ module DateAndTime =
 
             match dateArg ev ctx name e with
             | NoDate -> Fail.notSupported ctx e.Span $"{name} of BLANK"
-            | At(ms, origin) -> DaxValue.Integer(int64 (pick (secondOfDay ctx e.Span name ms origin))))
+            | At(ms, origin) -> DaxValue.Integer(int64 (timeOfDayPart ctx e.Span name pick ms origin)))
         |> Fn.withCheck (textCheck name [ 0 ])
 
     /// The day a week begins on (Sunday 0) for a return type of WEEKDAY (other than 3) or of
@@ -415,8 +436,8 @@ module DateAndTime =
         | 16L -> ValueSome 6
         | _ -> ValueNone
 
-    let private weekdayTypes = set ([ 1L; 2L; 3L ] @ [ 11L..17L ])
-    let private weeknumTypes = set ([ 1L; 2L; 21L ] @ [ 11L..17L ])
+    let private weekdayTypes = set ([ 1L; 2L; 3L ] @ [ 11L .. 17L ])
+    let private weeknumTypes = set ([ 1L; 2L; 21L ] @ [ 11L .. 17L ])
 
     let private returnTypeRefusal (name: string) (returnType: int64) =
         $"{name} with return type {returnType} (not one of the documented ones)"
@@ -558,8 +579,7 @@ module DateAndTime =
             let part (i: int) (what: string) =
                 let e = call.Args.[i]
 
-                nearest ctx e.Span what (numArg ev ctx what e)
-                |> ValueOption.defaultValue 0L
+                nearest ctx e.Span what (numArg ev ctx what e) |> ValueOption.defaultValue 0L
 
             let year = part 0 "a DATE year"
             let month = part 1 "a DATE month"
@@ -594,8 +614,7 @@ module DateAndTime =
 
             // Day 1 is the first of the month, 2 the day after; -15 is "the magnitude of Day plus
             // one day" back from it ("DATE ( 2008, 1, -15 ) returns December 16, 2007").
-            let result =
-                dayOfDate (DateTime(int y, int (index - y * 12L) + 1, 1)) + day - 1L
+            let result = dayOfDate (DateTime(int y, int (index - y * 12L) + 1, 1)) + day - 1L
 
             if result > maxDay then
                 outOfRange ctx call.Span
@@ -724,8 +743,7 @@ module DateAndTime =
 
             let year, month = addMonths ctx call.Span d months
 
-            let result =
-                dayOfDate (DateTime(year, month, DateTime.DaysInMonth(year, month)))
+            let result = dayOfDate (DateTime(year, month, DateTime.DaysInMonth(year, month)))
 
             if result < march1900 then
                 invalid ()

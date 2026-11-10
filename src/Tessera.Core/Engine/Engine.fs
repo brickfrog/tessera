@@ -36,8 +36,13 @@ module Clock =
     /// The machine's clock, read once: local time and UTC, to the millisecond.
     let system () : Clock =
         let utc = DateTime.UtcNow
-        let utc = DateTime(utc.Ticks - utc.Ticks % TimeSpan.TicksPerMillisecond, DateTimeKind.Unspecified)
-        let local = utc + TimeZoneInfo.Local.GetUtcOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc))
+
+        let utc =
+            DateTime(utc.Ticks - utc.Ticks % TimeSpan.TicksPerMillisecond, DateTimeKind.Unspecified)
+
+        let local =
+            utc
+            + TimeZoneInfo.Local.GetUtcOffset(DateTime.SpecifyKind(utc, DateTimeKind.Utc))
 
         { Now = local; UtcNow = utc }
 
@@ -101,7 +106,10 @@ module Clock =
 
         match local body, offset with
         | Some now, Some offset ->
-            if now.Ticks - offset.Ticks < 0L || now.Ticks - offset.Ticks > DateTime.MaxValue.Ticks then
+            if
+                now.Ticks - offset.Ticks < 0L
+                || now.Ticks - offset.Ticks > DateTime.MaxValue.Ticks
+            then
                 invalid ()
             else
                 Ok { Now = now; UtcNow = now - offset }
@@ -635,11 +643,13 @@ let prepareWith (options: Options) (db: Database) (store: DataStore) : Result<Pr
             | None -> Ok { Model = model; Failures = failures })
 
 /// `prepareWith` with the defaults: the date functions see the machine's clock, read once here.
-let prepare (db: Database) (store: DataStore) : Result<Prepared, TessError> =
-    prepareWith Options.defaults db store
+let prepare (db: Database) (store: DataStore) : Result<Prepared, TessError> = prepareWith Options.defaults db store
 
 /// The instant the prepared model's date functions see.
-let clock (p: Prepared) : Clock = { Now = p.Model.Now; UtcNow = p.Model.UtcNow }
+let clock (p: Prepared) : Clock = {
+    Now = p.Model.Now
+    UtcNow = p.Model.UtcNow
+}
 
 /// What `prepare` could not compute, with why.
 let failures (p: Prepared) : (ObjectRef * TessError) list = p.Failures

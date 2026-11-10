@@ -25,6 +25,7 @@ type Args =
     | Max_Rows of rows: int
     | Data of directory: string
     | Coverage
+    | Now of datetime: string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -42,6 +43,10 @@ type Args =
             | Coverage ->
                 "instead of running a query: list which measures, calculated columns and calculated tables of "
                 + "the model files the local engine can evaluate, and what the others use that it doesn't support."
+            | Now _ ->
+                "with --data: the date and time TODAY and NOW return, as ISO 8601 (2024-03-05T14:30:00), in "
+                + "the query and in calculated tables and columns. With a UTC offset (...+02:00, ...Z), UTCTODAY "
+                + "and UTCNOW return that instant in UTC; without one, the same as NOW. Default: the machine's clock."
 
 let private queryJson (source: string) (results: QueryResult list) (elapsed: TimeSpan) =
     obj [
@@ -197,6 +202,7 @@ let private local
     (directory: string)
     (dax: string)
     (maxRows: int)
+    (now: Engine.Clock option)
     =
     let clock = Stopwatch.StartNew()
 
@@ -215,7 +221,13 @@ let private local
                 Failed(FixtureHasErrors(loaded.Directory, errors))
             else
                 match
-                    Engine.prepare db loaded.Store
+                    Engine.prepareWith
+                        {
+                            Engine.Options.defaults with
+                                Clock = now
+                        }
+                        db
+                        loaded.Store
                     |> Result.bind (fun p -> Engine.evaluateQuery p dax)
                 with
                 | Error e -> Failed e
@@ -226,6 +238,7 @@ let private local
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let maxRows = args.TryGetResult Args.Max_Rows |> Option.defaultValue defaultMaxRows
     let data = args.TryGetResult Args.Data
+    let now = args.TryGetResult Args.Now |> Option.map Engine.Clock.parse
 
     // The model and the query may have options between them (`query <model> --data <dir> "<DAX>"`).
     match args.GetResults Args.Target |> List.concat with
@@ -234,6 +247,16 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | _ when ctx.Json && args.Contains Args.Csv -> UsageError "--json and --csv can't be combined"
     | source :: _ when XmlaAddress.isRemote source && (data.IsSome || args.Contains Args.Coverage) ->
         UsageError "--data and --coverage are for model files: a server model is queried on the server"
+    | _ when now.IsSome && (data.IsNone || args.Contains Args.Coverage) ->
+        UsageError "--now sets the clock of the local engine: it goes with --data and a query"
+    | _ when
+        (match now with
+         | Some(Error _) -> true
+         | _ -> false)
+        ->
+        match now with
+        | Some(Error message) -> UsageError $"--now: {message}"
+        | _ -> UsageError "--now: not a date and time"
     | source :: rest when args.Contains Args.Coverage ->
         if not rest.IsEmpty || args.Contains Args.File then
             UsageError "--coverage takes the model only, not a query"
@@ -246,7 +269,13 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         match readDax args rest with
         | Error outcome -> outcome
         | Ok dax when String.IsNullOrWhiteSpace dax -> UsageError "the DAX query is empty"
-        | Ok dax -> local ctx args source data.Value dax maxRows
+        | Ok dax ->
+            let now =
+                match now with
+                | Some(Ok clock) -> Some clock
+                | _ -> None
+
+            local ctx args source data.Value dax maxRows now
     | source :: rest ->
         match readDax args rest with
         | Error outcome -> outcome
