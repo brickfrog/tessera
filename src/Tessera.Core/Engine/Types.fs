@@ -703,6 +703,13 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     member val ForceColumn: BColumn -> unit = ignore with get, set
     member val ForceTable: BTable -> unit = ignore with get, set
     member val ForceBlankRow: BTable -> unit = ignore with get, set
+    /// The instant TODAY and NOW see (local time), fixed when the model is prepared: every
+    /// calculated table and column and every query sees the same one.
+    member val Now: DateTime = DateTime.MinValue with get, set
+    /// The same instant in UTC, for UTCTODAY and UTCNOW.
+    member val UtcNow: DateTime = DateTime.MinValue with get, set
+    /// The model's culture name ("en-US"), or "" when it has none: how text is read as a date.
+    member val Culture: string = "" with get, set
 
     member this.Config(active: bool array, both: bool array) : RelConfig =
         let c = RelConfig(this, active, both)

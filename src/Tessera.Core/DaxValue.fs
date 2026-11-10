@@ -375,6 +375,10 @@ module DaxValue =
     let private dateText (serial: float) =
         // ASSUMPTION: the engine formats dates with the model's culture ("General Date"); this is
         // the en-US form, with the time left out at midnight and the date left out for a time alone.
+        // Two published results agree with the en-US form: FORMAT ( UTCTODAY (), "General Date" )
+        // is "2/2/2018" and FORMAT ( UTCNOW (), "General Date" ) is "2/2/2018 4:48:08 AM"
+        // (Microsoft Learn, UTCTODAY and UTCNOW). What another culture gives is still open, so
+        // the local engine refuses a date turned into text (`Convert.toText`).
         match dateTimeOfSerial serial with
         | None -> floatText serial
         | Some dt ->
@@ -500,6 +504,12 @@ module DaxValue =
 
     /// A date written as text. ASSUMPTION: the engine reads the model culture's date formats; this
     /// reads ISO 8601 and then whatever .NET's invariant culture reads ("1/31/2024", "Jan 1 2009").
+    /// The first half is documented: "DATEVALUE uses the locale and date/time settings of the model
+    /// ... If conversion using the locale and date/time settings of the model fails, DATEVALUE will
+    /// attempt to use other date formats" (Microsoft Learn, DATEVALUE). Which other formats is not,
+    /// so the second half stays a guess: the local engine doesn't use this for its date functions
+    /// (they read only the forms a source shows a result for: `DateText` in
+    /// Engine/Functions/DateTime.fs) and refuses text read as a date in arithmetic.
     let private parseDate (s: string) : DaxValue option =
         match parseIsoDateTime s with
         | Some v -> Some v
