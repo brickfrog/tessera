@@ -138,6 +138,38 @@ let tests =
             let remote = tess [ "query"; "xmla:localhost;db"; "--data"; dir; "EVALUATE Sales" ]
             Expect.equal remote.Code ExitCode.usage remote.Out)
 
+        testCase "USERNAME and the others are refused unless an identity option gives them" (fun () ->
+            let t, model, dir = setup star
+            use _ = t
+            let q = "EVALUATE { ( USERNAME (), USERCULTURE (), ISBLANK ( CUSTOMDATA () ) ) }"
+            let refused = tess [ "query"; model; "--data"; dir; q; "--json" ]
+            Expect.notEqual refused.Code ExitCode.ok refused.Out
+            use doc = json refused
+
+            Expect.equal (doc.RootElement.GetProperty("error").GetProperty("code").GetString()) "not-supported" "code"
+
+            let r =
+                tess [
+                    "query"
+                    model
+                    "--data"
+                    dir
+                    q
+                    "--csv"
+                    "--user-name"
+                    "ann"
+                    "--user-culture"
+                    "en-US"
+                ]
+
+            Expect.equal r.Code ExitCode.ok r.Err
+            Expect.equal (lines r.Out |> List.tail) [ "ann,en-US,TRUE" ] "csv"
+
+            let remote =
+                tess [ "query"; "xmla:localhost;db"; "--user-name"; "ann"; "EVALUATE { 1 }" ]
+
+            Expect.equal remote.Code ExitCode.usage remote.Out)
+
         testCase "a fixture with errors is refused" (fun () ->
             let t, model, dir = setup star
             use _ = t

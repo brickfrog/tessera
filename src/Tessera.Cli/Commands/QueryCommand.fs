@@ -25,6 +25,11 @@ type Args =
     | Max_Rows of rows: int
     | Data of directory: string
     | Coverage
+    | User_Name of name: string
+    | User_Principal_Name of upn: string
+    | User_Object_Id of id: string
+    | User_Culture of culture: string
+    | Custom_Data of text: string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -42,6 +47,24 @@ type Args =
             | Coverage ->
                 "instead of running a query: list which measures, calculated columns and calculated tables of "
                 + "the model files the local engine can evaluate, and what the others use that it doesn't support."
+            | User_Name _ -> "with --data: what USERNAME () returns (refused unless given)."
+            | User_Principal_Name _ -> "with --data: what USERPRINCIPALNAME () returns (refused unless given)."
+            | User_Object_Id _ -> "with --data: what USEROBJECTID () returns (refused unless given)."
+            | User_Culture _ -> "with --data: what USERCULTURE () returns (refused unless given)."
+            | Custom_Data _ ->
+                "with --data: what CUSTOMDATA () returns (BLANK if another identity option is given, else refused)."
+
+/// The identity options given, if any: who the local engine says is asking.
+let private identity (args: ParseResults<Args>) : DaxEngine.Identity option =
+    let id: DaxEngine.Identity = {
+        UserName = args.TryGetResult Args.User_Name
+        UserPrincipalName = args.TryGetResult Args.User_Principal_Name
+        UserObjectId = args.TryGetResult Args.User_Object_Id
+        UserCulture = args.TryGetResult Args.User_Culture
+        CustomData = args.TryGetResult Args.Custom_Data
+    }
+
+    if id = DaxEngine.Identity.none then None else Some id
 
 let private queryJson (source: string) (results: QueryResult list) (elapsed: TimeSpan) =
     obj [
@@ -216,6 +239,10 @@ let private local
             else
                 match
                     Engine.prepare db loaded.Store
+                    |> Result.map (fun p ->
+                        match identity args with
+                        | Some id -> Engine.withIdentity id p
+                        | None -> p)
                     |> Result.bind (fun p -> Engine.evaluateQuery p dax)
                 with
                 | Error e -> Failed e
@@ -234,6 +261,12 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | _ when ctx.Json && args.Contains Args.Csv -> UsageError "--json and --csv can't be combined"
     | source :: _ when XmlaAddress.isRemote source && (data.IsSome || args.Contains Args.Coverage) ->
         UsageError "--data and --coverage are for model files: a server model is queried on the server"
+    | source :: _ when
+        (identity args).IsSome
+        && (XmlaAddress.isRemote source || args.Contains Args.Coverage)
+        ->
+        UsageError
+            "--user-name, --user-principal-name, --user-object-id, --user-culture and --custom-data are for --data: a server takes them from the connection"
     | source :: rest when args.Contains Args.Coverage ->
         if not rest.IsEmpty || args.Contains Args.File then
             UsageError "--coverage takes the model only, not a query"

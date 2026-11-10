@@ -2074,7 +2074,14 @@ Engine.withIdentity : Identity -> Engine.Prepared -> Engine.Prepared
 ```
 
 A field left `None` stays refused (`CUSTOMDATA` is then BLANK, as for a connection without it). The original
-`Prepared` is unchanged; calculated columns and tables never see the identity. There is no CLI flag for it yet.
+`Prepared` is unchanged; calculated columns and tables never see the identity. On the command line:
+
+```sh
+tess query model.bim --data fixture "EVALUATE { USERNAME () }" --user-name 'CONTOSO\ann'
+```
+
+with `--user-name`, `--user-principal-name`, `--user-object-id`, `--user-culture` and `--custom-data` (for `--data`
+only: a server takes them from the connection).
 
 #### What it refuses
 
