@@ -28,7 +28,7 @@ module Aggregate =
             | DaxValue.Blank -> ()
             | DaxValue.Integer _
             | DaxValue.Decimal _
-            | DaxValue.Currency _ -> total <- Fail.dax ctx span (DaxValue.add total v)
+            | DaxValue.Currency _ -> total <- Fail.dax ctx span (DaxValue.addToTotal total v)
             | _ -> Fail.notSupported ctx span $"{name} of {typeName v} values"
 
         total
@@ -51,7 +51,7 @@ module Aggregate =
                  | DaxValue.Currency _ -> ()
                  | _ -> currency <- false)
 
-                total <- Fail.dax ctx span (DaxValue.add total v)
+                total <- Fail.dax ctx span (DaxValue.addToTotal total v)
                 n <- n + 1L
             | _ -> Fail.notSupported ctx span $"{name} of {typeName v} values"
 
@@ -209,7 +209,11 @@ module Aggregation =
                 total > Int128.op_Implicit Int64.MaxValue
                 || total < Int128.op_Implicit Int64.MinValue
             then
-                Fail.runtime ctx call.Span (DaxError.message (Overflow("SUM", c.Data.DataType)))
+                // The + operator wraps around; nothing says what a SUM beyond the range does.
+                Fail.notSupported
+                    ctx
+                    call.Span
+                    $"SUM of a {DaxType.name c.Data.DataType} column beyond the range of a 64-bit number"
             elif c.Data.DataType = DaxType.Integer then
                 DaxValue.Integer(Int128.op_Explicit total: int64)
             else

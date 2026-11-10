@@ -347,8 +347,20 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
             match DaxValue.typeOf value with
             | Some t when t <> d.DataType && d.DataType <> DaxType.Variant && DaxType.isNumeric t ->
                 if DaxType.isNumeric d.DataType then
+                    // A comparison made as floats can match several large column values at once.
+                    if not (DaxValue.comparesOneToOne d.DataType value) then
+                        raise (
+                            EngineException(
+                                DaxNotSupported(
+                                    $"a comparison of '{table.Name}'[{name}] with a decimal number too large for the column's values to stay distinct as decimal numbers",
+                                    ""
+                                )
+                            )
+                        )
+
                     match DaxValue.convertTo d.DataType value with
                     | Ok converted when DaxValue.compare d.Collation converted value = Ok 0 -> d.TryFindId converted
+                    | Error(Unsettled what) -> raise (EngineException(DaxNotSupported(what, "")))
                     | _ -> -1
                 else
                     -1
@@ -491,6 +503,8 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
             else
                 match DaxValue.convertTo target.DataType v with
                 | Ok c -> target.TryFindId c
+                | Error(Unsettled what) ->
+                    raise (EngineException(DaxNotSupported($"relationship '{name}': {what}", "")))
                 | Error _ -> -1
 
         let toIdOfFromId = f.Values |> Array.map (convert f t)
@@ -917,6 +931,8 @@ module Fail =
     let dax (ctx: Ctx) (span: Span) (r: Result<'a, DaxError>) : 'a =
         match r with
         | Ok v -> v
+        // What the sources leave open is refused, not raised as an error IFERROR could catch.
+        | Error(Unsettled what) -> notSupported ctx span what
         | Error e -> runtime ctx span (DaxError.message e)
 
 module Fn =
