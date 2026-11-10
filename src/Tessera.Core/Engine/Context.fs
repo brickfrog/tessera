@@ -694,6 +694,7 @@ module Context =
         Measures = []
         Functions = []
         Group = null
+        CallerRows = false
     }
 
     /// A row context on top of the others.
@@ -740,6 +741,12 @@ module Context =
     /// Context transition: every row context becomes filters, outermost first, each replacing the
     /// filters on its columns; no row context is left (dax.guide/calculate, steps 2 and 3).
     let transition (ctx: Ctx) (span: Span) : Ctx =
+        if ctx.CallerRows then
+            Fail.notSupported
+                ctx
+                span
+                "a context transition (CALCULATE, a measure) inside a function that was called from a row context (whether the function sees the caller's row context is not documented)"
+
         match ctx.Rows with
         | [] -> ctx
         | rows ->

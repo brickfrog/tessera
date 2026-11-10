@@ -728,14 +728,8 @@ let evaluateScalar (p: Prepared) (dax: string) : Result<QueryValue, TessError> =
 
 // ---- coverage ----------------------------------------------------------------------------------
 
-/// For every measure, calculated column and calculated table of a model: what it uses that the
-/// engine doesn't support (nothing: the engine can evaluate it, as far as can be told without
-/// data). Follows references to measures and functions. Each item is a function name, or a
-/// sentence about an argument form or a model feature.
-///
-/// Static: it can't see what depends on the data (a relationship whose keys repeat, a column of
-/// mixed types), so an expression it clears can still be refused when evaluated.
-let coverage (db: Database) : (ObjectRef * string list) list =
+/// `coverage`, on the calling thread.
+let private coverageOf (db: Database) : (ObjectRef * string list) list =
     if isNull db.Model then
         []
     else
@@ -963,3 +957,18 @@ let coverage (db: Database) : (ObjectRef * string list) list =
                 | Some text -> yield ObjectRef.table t.Name, ofText t.Name text
                 | None -> ()
         ]
+
+
+/// For every measure, calculated column and calculated table of a model: what it uses that the
+/// engine doesn't support (an empty list: nothing, as far as can be told without data). Follows
+/// references to measures, functions and calculated objects, and through relationships to the
+/// calculated tables and columns a table's rows depend on. Each item is a function name, or a
+/// sentence about an argument form or a model feature.
+///
+/// Static: it runs each function's check of its argument forms, the same one the evaluator runs.
+/// What depends on the context or on the data (a relationship whose keys repeat, a blank row that
+/// can't be decided, values of mixed types, where a function is used) only shows when evaluating.
+let coverage (db: Database) : (ObjectRef * string list) list =
+    match run (fun () -> coverageOf db) with
+    | Ok items -> items
+    | Error e -> raise (InvalidOperationException(TessError.message e))

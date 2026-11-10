@@ -119,6 +119,13 @@ module TableFunctions =
                 Some $"{name.Name.ToUpperInvariant()} in {fn}"
             | _ -> None)
 
+    /// SUMMARIZE and GROUPBY need a group-by column after the table.
+    let private checkGrouped (fn: string) (args: Expr list) : string option =
+        match args with
+        | [ _ ] -> Some $"{fn} without a group-by column"
+        | _ :: second :: _ when isName second -> Some $"{fn} without a group-by column"
+        | _ -> None
+
     /// See `Sorting.check`.
     let checkSortable (ctx: Ctx) (span: Span) (what: string) (values: DaxValue seq) = Sorting.check ctx span what values
 
@@ -499,7 +506,7 @@ module TableFunctions =
                 |> Array.ofList
 
             Tables.addColumns header (extensions |> Array.map fst) (extensions |> Array.map snd))
-        |> Fn.withCheck (checkHelpers "SUMMARIZE")
+        |> Fn.withCheck (fun args -> checkHelpers "SUMMARIZE" args |> Option.orElse (checkGrouped "SUMMARIZE" args))
 
         // SUMMARIZECOLUMNS ( group-by column, ..., filter table, ..., name, expression, ... ), as a
         // query's own table (no outer filters, no row context). See the README for what is
@@ -740,18 +747,21 @@ module TableFunctions =
                 |> List.skip (min 1 args.Length)
                 |> List.skipWhile (fun a -> not (isName a))
 
-            rest
-            |> List.chunkBySize 2
-            |> List.tryPick (fun p ->
-                match p with
-                | [ _; expr ] ->
-                    match (Fn.unparen expr).Kind with
-                    | Call(fn, first :: _) when allowed |> List.contains (fn.Name.ToUpperInvariant()) ->
-                        match (Fn.unparen first).Kind with
-                        | Call(g, []) when g.Name.ToUpperInvariant() = "CURRENTGROUP" -> None
+            let columns () =
+                rest
+                |> List.chunkBySize 2
+                |> List.tryPick (fun p ->
+                    match p with
+                    | [ _; expr ] ->
+                        match (Fn.unparen expr).Kind with
+                        | Call(fn, first :: _) when allowed |> List.contains (fn.Name.ToUpperInvariant()) ->
+                            match (Fn.unparen first).Kind with
+                            | Call(g, []) when g.Name.ToUpperInvariant() = "CURRENTGROUP" -> None
+                            | _ -> Some "a GROUPBY column that is not an X aggregation over CURRENTGROUP ()"
                         | _ -> Some "a GROUPBY column that is not an X aggregation over CURRENTGROUP ()"
-                    | _ -> Some "a GROUPBY column that is not an X aggregation over CURRENTGROUP ()"
-                | _ -> None))
+                    | _ -> None)
+
+            checkGrouped "GROUPBY" args |> Option.orElseWith columns)
 
         Fn.table "CURRENTGROUP" "Table manipulation" (0, 0) (fun _ ctx call ->
             if isNull ctx.Group then

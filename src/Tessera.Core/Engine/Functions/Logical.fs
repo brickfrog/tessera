@@ -231,8 +231,9 @@ module Math =
             | v -> v)
 
         // "A single decimal value"; digits > 0 are decimal places, 0 the nearest integer, < 0 to
-        // the left of the decimal point (dax.guide/round). Halves round away from zero, as in
-        // Excel, on the number as it reads in decimal (2.675 is 2.68).
+        // the left of the decimal point (dax.guide/round). The number is rounded as it reads in
+        // decimal: Microsoft Learn's example rounds 2.15 to 2.2, though the float 2.15 is just
+        // below it.
         Fn.scalar "ROUND" "Math" (2, 2) (Fn.typeIs DaxType.Decimal) (fun ev ctx call ->
             let v = number ctx call.Args.[0] "ROUND" (ev.Scalar(ctx, call.Args.[0]))
 
@@ -252,6 +253,18 @@ module Math =
                 | DaxValue.Currency c -> DaxValue.currencyValue c
                 | DaxValue.Integer i -> decimal i
                 | _ -> decimal x
+
+            // A positive number exactly halfway rounds up ("rounds 2.15 up, to one decimal place.
+            // The expected result is 2.2": Microsoft Learn, ROUND). The pages say nothing of a
+            // negative number halfway.
+            let scaled =
+                if digits >= 0 then
+                    d * pown 10m digits
+                else
+                    d / pown 10m (-digits)
+
+            if d < 0m && abs (scaled - Math.Truncate scaled) = 0.5m then
+                Fail.notSupported ctx call.Span "ROUND of a negative number exactly halfway between two results"
 
             let rounded =
                 if digits >= 0 then
@@ -287,8 +300,9 @@ module Math =
                     DaxValue.Currency(whole * 10000L)
                 | v -> v)
 
-        // Whole numbers only: the remainder with the sign of the divisor, n - d * INT ( n / d ), as
-        // in Excel. Other types are refused (the page gives no result type for them).
+        // "The result always has the same sign as the divisor"; "MOD(n, d) = n - d*INT(n/d)"; "If
+        // the divisor is 0 (zero), MOD returns an error" (Microsoft Learn, MOD). Whole numbers
+        // only: the pages give no result type for the others.
         Fn.scalar "MOD" "Math" (2, 2) (Fn.typeIs DaxType.Integer) (fun ev ctx call ->
             match ev.Scalar(ctx, call.Args.[0]), ev.Scalar(ctx, call.Args.[1]) with
             | DaxValue.Integer _, DaxValue.Integer 0L -> Fail.runtime ctx call.Span "MOD: division by zero."

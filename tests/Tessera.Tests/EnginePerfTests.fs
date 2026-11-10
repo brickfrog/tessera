@@ -52,7 +52,11 @@ let private big =
              Functions = []
          })
 
-let private timed (name: string) (limitMs: int64) (work: unit -> unit) =
+/// Generous, so a slow CI machine doesn't fail it: the scenarios take 5 to 400 ms on a laptop, and
+/// the limit is there to catch an accidental quadratic, not to benchmark.
+let private limitMs = 20000L
+
+let private timed (name: string) (work: unit -> unit) =
     testCase name (fun () ->
         big.Value |> ignore
         work () // once to warm up (JIT, indexes)
@@ -66,32 +70,32 @@ let private timed (name: string) (limitMs: int64) (work: unit -> unit) =
 let tests =
     testSequenced (
         testList "Engine performance" [
-            timed "SUMX over 100k rows" 1000L (fun () -> scalar big.Value "[Amount]" |> ignore)
-            timed "CALCULATE with two filters" 1000L (fun () ->
+            timed "SUMX over 100k rows" (fun () -> scalar big.Value "[Amount]" |> ignore)
+            timed "CALCULATE with two filters" (fun () ->
                 scalar big.Value "CALCULATE ( [Amount], Product[Color] = \"Colour 5\", 'Date'[Year] = 2024 )"
                 |> ignore)
-            timed "SUMMARIZECOLUMNS by a dimension column (20 groups)" 1000L (fun () ->
+            timed "SUMMARIZECOLUMNS by a dimension column (20 groups)" (fun () ->
                 rows big.Value "EVALUATE SUMMARIZECOLUMNS ( Product[Color], \"Amount\", [Amount] )"
                 |> ignore)
-            timed "SUMMARIZECOLUMNS by a key (2000 groups)" 2000L (fun () ->
+            timed "SUMMARIZECOLUMNS by a key (2000 groups)" (fun () ->
                 rows big.Value "EVALUATE SUMMARIZECOLUMNS ( Customer[CustomerKey], \"Amount\", [Amount] )"
                 |> ignore)
-            timed "SUMMARIZECOLUMNS by two dimensions, with a filter" 2000L (fun () ->
+            timed "SUMMARIZECOLUMNS by two dimensions, with a filter" (fun () ->
                 rows
                     big.Value
                     "EVALUATE SUMMARIZECOLUMNS ( Product[Color], Customer[Country], TREATAS ( { 2024 }, 'Date'[Year] ), \"Amount\", [Amount] )"
                 |> ignore)
-            timed "SUMMARIZE with a measure per group (2000 groups)" 3000L (fun () ->
+            timed "SUMMARIZE with a measure per group (2000 groups)" (fun () ->
                 rows big.Value "EVALUATE SUMMARIZE ( Sales, Customer[CustomerKey], \"Amount\", [Amount] )"
                 |> ignore)
-            timed "ADDCOLUMNS over SUMMARIZE (2000 groups)" 2000L (fun () ->
+            timed "ADDCOLUMNS over SUMMARIZE (2000 groups)" (fun () ->
                 rows
                     big.Value
                     "EVALUATE ADDCOLUMNS ( SUMMARIZE ( Sales, Customer[CustomerKey] ), \"Amount\", [Amount] )"
                 |> ignore)
-            timed "a measure per row of the fact table (100k context transitions)" 5000L (fun () ->
+            timed "a measure per row of the fact table (100k context transitions)" (fun () ->
                 scalar big.Value "SUMX ( Sales, [Amount] )" |> ignore)
-            timed "context transition per row of a dimension" 2000L (fun () ->
+            timed "context transition per row of a dimension" (fun () ->
                 scalar big.Value "SUMX ( Product, [Amount] )" |> ignore)
         ]
     )

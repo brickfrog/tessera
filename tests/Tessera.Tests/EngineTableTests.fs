@@ -757,6 +757,45 @@ let tests =
                 Expect.equal coverage.["measure:Sales/By Label"] [ "UPPER" ] "through a calculated column"
                 Expect.equal coverage.["measure:Sales/Via Function"] [ "UPPER" ] "through a function"
                 Expect.equal coverage.["column:Customer/Label"] [ "UPPER" ] "a calculated column")
+            // What can be told from the arguments alone is told by coverage, with the words the
+            // evaluator uses.
+            testCase "argument forms that are refused show in coverage, and when evaluated" (fun () ->
+                let forms = [
+                    "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name], \", \" )",
+                    "CONCATENATEX without an order-by"
+                    "COUNTROWS ( SUMMARIZE ( Sales, \"x\", 1 ) )", "SUMMARIZE without a group-by column"
+                    "COUNTROWS ( GROUPBY ( Sales ) )", "GROUPBY without a group-by column"
+                    "CALCULATE ( [Amount], CROSSFILTER ( Sales[ProductKey], Product[ProductKey], ONEWAY_LEFTFILTERSRIGHT ) )",
+                    "CROSSFILTER direction"
+                    "CALCULATE ( [Amount], ALLSELECTED () )", "ALLSELECTED"
+                    "COUNTROWS ( SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Color], \"s\" ) ) )",
+                    "ROLLUPADDISSUBTOTAL"
+                ]
+
+                let model = {
+                    star with
+                        Measures = star.Measures @ (forms |> List.mapi (fun i (dax, _) -> "Sales", $"F{i}", dax))
+                }
+
+                let db, store = build model
+
+                let coverage =
+                    Engine.coverage db
+                    |> List.map (fun (r, u) -> ObjectRef.format r, u)
+                    |> Map.ofList
+
+                match Engine.prepare db store with
+                | Error e -> failtestf "%A" e
+                | Ok m ->
+                    forms
+                    |> List.iteri (fun i (dax, mentions) ->
+                        match coverage.[$"measure:Sales/F{i}"] with
+                        | why :: _ -> Expect.stringContains why mentions dax
+                        | [] -> failtestf "coverage cleared %s" dax
+
+                        match Engine.evaluateScalar m $"[F{i}]" with
+                        | Error(DaxNotSupported(what, _)) -> Expect.stringContains what mentions dax
+                        | other -> failtestf "%s: %A" dax other))
             testCase "reports the relationships the engine doesn't do" (fun () ->
                 let db, _ =
                     build {

@@ -1943,6 +1943,10 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   - a filter that crosses a both-directions relationship while keeping every row of the many side;
   - `TOPN` without an order-by on more rows than asked for, and `CONCATENATEX` without one (the engine defines no
     order), and sorting where BLANK meets zero or negative values, or values of different types;
+  - a date or TRUE/FALSE turned into text by `&` (the format depends on the model's culture), text read as a date
+    in arithmetic, a date multiplied, `ROUND` of a negative number exactly halfway;
+  - a context transition, or a column read, inside a user-defined function that was called from a row context
+    (the documentation says what the function's parameters see of the caller's row context, not its body);
   - a name that is both a column of the row context and a measure (except in `ORDER BY`, where it is the result's
     column);
   - a table built on a model table with columns added, used as a filter or iterated with a measure, when that table
@@ -1962,8 +1966,10 @@ functions arrive). `--json` writes `{"command": "query coverage", "source", "sum
 calculatedTables: {total, supported}}, "objects": [{ref, kind, supported, unsupported: [...]}], "unsupported":
 [{reason, objects}]}`.
 
-Coverage and the evaluator run the same checks, so what coverage clears the engine evaluates, except for what
-depends on the data (a key that repeats, a blank row it can't decide, a column of mixed types).
+Coverage runs each function's static check of its argument forms, the same one the evaluator runs before a call. A
+refusal that depends on where a function is used (`KEEPFILTERS` on an iterator's table), on the evaluation context (a
+function called from a row context) or on the data (a key that repeats, a blank row that can't be decided, values
+of mixed types) only shows when evaluating: coverage is a lower bound on what is refused, not a guarantee.
 
 #### For developers
 

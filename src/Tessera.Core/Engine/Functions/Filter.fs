@@ -403,6 +403,14 @@ module Filter =
         }
         Fn.modifier "USERELATIONSHIP" "Filter" (2, 2)
         Fn.modifier "CROSSFILTER" "Filter" (3, 3)
+        |> Fn.withCheck (fun args ->
+            match List.tryItem 2 args with
+            | Some direction ->
+                match Fn.keyword direction, (Fn.unparen direction).Kind with
+                | Some("NONE" | "ONEWAY" | "BOTH"), _
+                | None, IntegerLiteral((0L | 1L | 2L), _) -> None
+                | _ -> Some "a CROSSFILTER direction other than NONE, ONEWAY or BOTH"
+            | None -> None)
         Fn.modifier "REMOVEFILTERS" "Filter" (0, -1)
         Fn.modifier "ALLCROSSFILTERED" "Filter" (1, 1)
 
@@ -616,6 +624,9 @@ module Filter =
             match fromBase with
             | Some v -> v
             | None ->
+                if ctx.CallerRows then
+                    Fail.notSupported ctx call.Span "RELATED inside a function that was called from a row context"
+
                 Fail.invalid
                     ctx
                     call.Span
@@ -628,6 +639,9 @@ module Filter =
             | Some _ -> ev.Table(Context.transition ctx call.Span, call.Args.[0])
             | None -> Fail.invalid ctx call.Args.[0].Span "RELATEDTABLE takes a table name")
 
+        // "If no match satisfies all the search values, the function returns BLANK or alternateResult
+        // (if specified)"; "if result_columnName returns different values, the function returns an
+        // error or alternateResult (if specified)" (Microsoft Learn, LOOKUPVALUE).
         // dax.guide/lookupvalue gives the expansion this follows: the search values first, then
         // CALCULATE ( DISTINCT ( result ), FILTER ( ALLNOBLANKROW ( search ), search == value ), ...,
         // ALL ( table of result ) ), with its context transition. One distinct value is the
@@ -712,6 +726,9 @@ module Filter =
             match Context.tryColumnValue ctx c n with
             | ValueSome v -> v
             | ValueNone ->
+                if ctx.CallerRows then
+                    Fail.notSupported ctx call.Span "EARLIER inside a function that was called from a row context"
+
                 Fail.invalid
                     ctx
                     call.Span

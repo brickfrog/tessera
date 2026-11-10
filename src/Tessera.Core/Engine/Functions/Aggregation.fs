@@ -434,11 +434,6 @@ module Aggregation =
 
             if table.Count = 0 then
                 DaxValue.Blank
-            elif keys.IsEmpty && table.Count > 1 then
-                Fail.notSupported
-                    ctx
-                    call.Span
-                    "CONCATENATEX without an order-by expression over more than one row (the engine doesn't define the order)"
             else
                 let rows =
                     Array.init table.Count (fun row ->
@@ -482,6 +477,11 @@ module Aggregation =
                         "CONCATENATEX over rows that tie on the order-by expressions with different texts"
 
                 DaxValue.String(String.Join(delimiter, sorted |> List.map fst)))
+        |> Fn.withCheck (fun args ->
+            if args.Length < 4 then
+                Some "CONCATENATEX without an order-by expression (the engine doesn't define the order of the texts)"
+            else
+                None)
 
         // dax.guide/rankx and Microsoft Learn RANKX: the expression is evaluated for each row of
         // the table; the value (the expression again when omitted) in the context of the call;

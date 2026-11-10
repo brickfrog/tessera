@@ -43,27 +43,239 @@ let private same (seed: int) (a: string) (b: string) =
     Expect.equal (scalar p a) (scalar p b) $"seed {seed}:\n{a}\n{b}"
 
 // ---- The filter context against its definition ---------------------------------------------------
+//
+// Random small models and random filters, and for each table the number of rows the DEFINITION of
+// a filter context gives (the header of Engine/Context.fs, from SQLBI's "Expanded tables in DAX"):
+//
+//   - a filter is a set of columns with the combinations of values allowed in them;
+//   - a table's EXPANDED rows are its rows joined to the rows they relate to over many-to-one
+//     relationships, with BLANK where a key has no match (that table then has a blank row);
+//   - a row is visible when, for every filter, its expanded row has an allowed combination in the
+//     filter's columns that the expanded table has;
+//   - a table used as a filter is a filter on every column of its expanded table;
+//   - removing a column from a filter leaves the combinations of its other columns;
+//   - a relationship that filters both ways shows, on the one side, only the rows that visible
+//     many-side rows refer to, once something filters the many side.
+//
+// The oracle below is that and nothing else: no indexes, no propagation order, no shortcuts.
 
-/// A random model F -> D1, F -> D2 (optionally filtering both ways), random filters, and the
-/// counts the DEFINITION gives: a row of F is visible when its expanded row (F joined to D1 and D2,
-/// BLANK where there is no match) satisfies every filter; a row of D1 when it satisfies every
-/// filter's columns that D1 has, a table filter on F counting as a filter on the D1 rows its rows
-/// refer to; with a both-directions relationship, a row of D2 also only when a visible row of F
-/// refers to it.
-type private Scenario = {
-    D1: (int * string * int) list
-    D2: (int * string) list
-    F: (int * int option * int * int) list
-    Both: bool
-    Filters: Filter list
+/// A value: None is BLANK.
+type private V = string option
+
+type private Tab = {
+    Name: string
+    Cols: string list
+    Rows: V list list
 }
 
-and private Filter =
-    | OnA of string option list
-    | OnAC of (string * string) list
-    | OnX of int list
+type private Link = {
+    From: string * string
+    To: string * string
+}
+
+type private World = {
+    Tables: Tab list
+    Links: Link list
+    /// F[K2] <-> D2[K] filters both ways.
+    Both: bool
+}
+
+/// A filter: columns (table, column) and the allowed combinations.
+type private Def = {
+    Cols: (string * string) list
+    Tuples: Set<V list>
+}
+
+type private Spec =
+    | Treatas of (string * string) list * V list list
     | Above of int
-    | OnAB of (string * int) list
+
+type private Inner =
+    | Nothing
+    | RemoveA
+    | ReplaceA of string
+    | KeepA of string
+    | AllD1
+    | AllF
+
+type private Scenario = {
+    World: World
+    Outer: Spec list
+    Inner: Inner
+}
+
+module private Oracle =
+    let tab (w: World) (name: string) =
+        w.Tables |> List.find (fun t -> t.Name = name)
+
+    let has (w: World) (name: string) =
+        w.Tables |> List.exists (fun t -> t.Name = name)
+
+    let cell (t: Tab) (col: string) (row: V list) : V = row.[List.findIndex ((=) col) t.Cols]
+
+    let linksFrom (w: World) (name: string) =
+        w.Links |> List.filter (fun l -> fst l.From = name)
+
+    /// The stored row of the To table a key relates to, if any.
+    let related (w: World) (l: Link) (key: V) : V list option =
+        let target = tab w (fst l.To)
+
+        match key with
+        | None -> None
+        | Some _ -> target.Rows |> List.tryFind (fun r -> cell target (snd l.To) r = key)
+
+    /// A table has the blank row when a stored row of a table that relates to it has no match.
+    let blankRow (w: World) (name: string) : bool =
+        w.Links
+        |> List.exists (fun l ->
+            fst l.To = name
+            && (let source = tab w (fst l.From)
+
+                source.Rows
+                |> List.exists (fun r -> (related w l (cell source (snd l.From) r)).IsNone)))
+
+    let blank (t: Tab) : V list = t.Cols |> List.map (fun _ -> None)
+
+    /// The rows of a table, the blank row last when it has one.
+    let rows (w: World) (name: string) : V list list =
+        let t = tab w name
+        t.Rows @ (if blankRow w name then [ blank t ] else [])
+
+    /// The tables of a table's expanded table.
+    let rec expandedTables (w: World) (name: string) : string list =
+        name
+        :: (linksFrom w name |> List.collect (fun l -> expandedTables w (fst l.To)))
+
+    /// A row with the rows it relates to: every column of the expanded table.
+    let rec expand (w: World) (name: string) (row: V list) : Map<string * string, V> =
+        let t = tab w name
+        let own = t.Cols |> List.map (fun c -> (name, c), cell t c row)
+
+        let reached =
+            linksFrom w name
+            |> List.collect (fun l ->
+                let target = tab w (fst l.To)
+
+                let next =
+                    match related w l (cell t (snd l.From) row) with
+                    | Some r -> r
+                    | None -> blank target
+
+                expand w target.Name next |> Map.toList)
+
+        Map.ofList (own @ reached)
+
+    /// The rows of a table that every filter lets through.
+    let passing (w: World) (filters: Def list) (name: string) : V list list =
+        let tables = expandedTables w name
+
+        rows w name
+        |> List.filter (fun row ->
+            let e = expand w name row
+
+            filters
+            |> List.forall (fun f ->
+                let here = [
+                    for i, (t, _) in List.indexed f.Cols do
+                        if List.contains t tables then
+                            i
+                ]
+
+                here.IsEmpty
+                || (let mine = here |> List.map (fun i -> e.[f.Cols.[i]])
+
+                    f.Tuples
+                    |> Set.exists (fun tuple -> (here |> List.map (fun i -> tuple.[i])) = mine))))
+
+    /// `passing`, and for D2 under a both-directions relationship: only the rows a visible row of F
+    /// refers to, once a filter is on something of F's that is not D2's.
+    let visible (w: World) (filters: Def list) (name: string) : V list list =
+        let own = passing w filters name
+
+        let reachesF =
+            filters
+            |> List.exists (fun f ->
+                f.Cols
+                |> List.exists (fun (t, _) -> t <> "D2" && List.contains t (expandedTables w "F")))
+
+        if name = "D2" && w.Both && reachesF then
+            let d2 = tab w "D2"
+
+            let referred =
+                passing w filters "F"
+                |> List.map (fun r -> let e = expand w "F" r in d2.Cols |> List.map (fun c -> e.[("D2", c)]))
+
+            own |> List.filter (fun r -> List.contains r referred)
+        else
+            own
+
+    let present (w: World) ((t, c): string * string) (v: V) =
+        rows w t |> List.exists (fun r -> cell (tab w t) c r = v)
+
+    /// An outer filter as its definition.
+    let define (w: World) (spec: Spec) : Def =
+        match spec with
+        | Treatas(cols, tuples) ->
+            // TREATAS "filters out any values that are not present in its respective output column".
+            {
+                Cols = cols
+                Tuples =
+                    tuples
+                    |> List.filter (fun tuple -> List.forall2 (present w) cols tuple)
+                    |> Set.ofList
+            }
+        | Above threshold ->
+            // FILTER ( F, F[X] > n ): rows of F, so a filter on every column of F's expanded table.
+            let f = tab w "F"
+
+            let cols =
+                expandedTables w "F"
+                |> List.collect (fun t -> (tab w t).Cols |> List.map (fun c -> t, c))
+
+            {
+                Cols = cols
+                Tuples =
+                    f.Rows
+                    |> List.filter (fun r -> int (cell f "X" r).Value > threshold)
+                    |> List.map (fun r -> let e = expand w "F" r in cols |> List.map (fun c -> e.[c]))
+                    |> Set.ofList
+            }
+
+    let without (drop: string * string -> bool) (filters: Def list) : Def list =
+        filters
+        |> List.choose (fun f ->
+            let keep = [
+                for i, c in List.indexed f.Cols do
+                    if not (drop c) then
+                        i
+            ]
+
+            if keep.IsEmpty then
+                None
+            else
+                Some {
+                    Cols = keep |> List.map (fun i -> f.Cols.[i])
+                    Tuples = f.Tuples |> Set.map (fun t -> keep |> List.map (fun i -> t.[i]))
+                })
+
+    /// The filters in force inside CALCULATE ( CALCULATE ( ..., inner ), outer ... ).
+    let filters (s: Scenario) : Def list =
+        let w = s.World
+        let outer = s.Outer |> List.map (define w)
+        let a = "D1", "A"
+
+        let only (v: string) = {
+            Cols = [ a ]
+            Tuples = set [ [ Some v ] ]
+        }
+
+        match s.Inner with
+        | Nothing -> outer
+        | RemoveA -> without ((=) a) outer
+        | ReplaceA v -> without ((=) a) outer @ [ only v ]
+        | KeepA v -> outer @ [ only v ]
+        | AllD1 -> let tables = expandedTables w "D1" in without (fun (t, _) -> List.contains t tables) outer
+        | AllF -> let tables = expandedTables w "F" in without (fun (t, _) -> List.contains t tables) outer
 
 let private scenario (seed: int) : Scenario =
     let r = Random(seed)
@@ -74,189 +286,163 @@ let private scenario (seed: int) : Scenario =
 
     let letters = [| "a"; "b"; "c" |]
     let marks = [| "x"; "y" |]
+    let kinds = [| "p"; "q" |]
+    let v (x: obj) : V = Some(string x)
+    // 0: one fact; 1: a second fact sharing both dimensions; 2: D1 relates on to G.
+    let shape = r.Next 3
+    let n1 = 1 + r.Next 4
+    let nG = 1 + r.Next 2
 
-    {
-        D1 = [ for k in 1 .. 1 + r.Next 4 -> k, pick letters, 1 + r.Next 2 ]
-        D2 = [ for k in 1 .. 1 + r.Next 3 -> k, pick marks ]
-        F = [
-            for id in 1 .. r.Next 9 -> id, (if r.Next 6 = 0 then None else Some(1 + r.Next 5)), 1 + r.Next 3, r.Next 4
-        ]
-        Both = r.Next 2 = 0
-        Filters = [
-            for _ in 1 .. r.Next 4 ->
-                match r.Next 5 with
-                | 0 -> OnA(some 2 (fun () -> if r.Next 4 = 0 then None else Some(pick letters)))
-                | 1 -> OnAC(some 3 (fun () -> pick letters, pick marks))
-                | 2 -> OnX(some 2 (fun () -> r.Next 4))
-                | 3 -> Above(r.Next 3)
-                | _ -> OnAB(some 3 (fun () -> pick letters, 1 + r.Next 2))
+    let d1 = {
+        Name = "D1"
+        Cols = [ "K"; "A"; "B" ] @ (if shape = 2 then [ "GK" ] else [])
+        Rows = [
+            for k in 1..n1 ->
+                [ v k; v (pick letters); v (1 + r.Next 2) ]
+                @ (if shape = 2 then [ v (1 + r.Next nG) ] else [])
         ]
     }
 
-let private text (s: string) = "\"" + s + "\""
+    let d2 = {
+        Name = "D2"
+        Cols = [ "K"; "C" ]
+        Rows = [ for k in 1 .. 1 + r.Next 3 -> [ v k; v (pick marks) ] ]
+    }
 
-let private dax (f: Filter) : string =
-    let rows (items: string list) = "{ " + String.concat ", " items + " }"
+    let key1 () : V =
+        // With G behind D1, every key matches: a blank row at the start of a chain is refused.
+        if shape = 2 then v (1 + r.Next n1)
+        elif r.Next 6 = 0 then None
+        else v (1 + r.Next 5)
 
-    match f with
-    | OnA values ->
-        let items =
-            values
-            |> List.map (fun v ->
-                match v with
-                | Some s -> text s
-                | None -> "BLANK ()")
+    let f = {
+        Name = "F"
+        Cols = [ "Id"; "K1"; "K2"; "X" ]
+        Rows = [
+            for id in 1 .. (if shape = 1 then 3 + r.Next 6 else r.Next 9) ->
+                [ v id; key1 (); v (1 + r.Next 3); v (r.Next 4) ]
+        ]
+    }
 
-        $"TREATAS ( {rows items}, D1[A] )"
-    | OnAC pairs ->
-        let items = pairs |> List.map (fun (a, c) -> $"( {text a}, {text c} )")
-        $"TREATAS ( {rows items}, D1[A], D2[C] )"
-    | OnX values -> $"TREATAS ( {rows (values |> List.map string)}, F[X] )"
+    let f2 = {
+        Name = "F2"
+        Cols = [ "Id"; "K1"; "K2"; "Y" ]
+        Rows = [
+            for id in 1 .. 3 + r.Next 6 -> [ v id; key1 (); v (1 + r.Next 3); v (r.Next 4) ]
+        ]
+    }
+
+    let g = {
+        Name = "G"
+        Cols = [ "K"; "E" ]
+        Rows = [ for k in 1..nG -> [ v k; v (pick kinds) ] ]
+    }
+
+    let world = {
+        Tables =
+            [ d1; d2; f ]
+            @ (if shape = 1 then [ f2 ] else [])
+            @ (if shape = 2 then [ g ] else [])
+        Links =
+            [ { From = "F", "K1"; To = "D1", "K" }; { From = "F", "K2"; To = "D2", "K" } ]
+            @ (if shape = 1 then
+                   [ { From = "F2", "K1"; To = "D1", "K" }; { From = "F2", "K2"; To = "D2", "K" } ]
+               else
+                   [])
+            @ (if shape = 2 then
+                   [ { From = "D1", "GK"; To = "G", "K" } ]
+               else
+                   [])
+        // Two facts over two dimensions with a both-directions relationship give two filter paths.
+        Both = shape <> 1 && r.Next 2 = 0
+    }
+
+    {
+        World = world
+        Outer =
+            // With two facts, always a table filter on the first: what it does to the second is the
+            // case where the PAIRS of dimension rows matter.
+            (if shape = 1 then [ Above(r.Next 3) ] else [])
+            @ [
+                for _ in 1 .. r.Next 4 ->
+                    match r.Next(if shape = 2 then 6 else 5) with
+                    | 0 ->
+                        Treatas([ "D1", "A" ], some 2 (fun () -> [ (if r.Next 4 = 0 then None else v (pick letters)) ]))
+                    | 1 -> Treatas([ "D1", "A"; "D2", "C" ], some 3 (fun () -> [ v (pick letters); v (pick marks) ]))
+                    | 2 -> Treatas([ "F", "X" ], some 2 (fun () -> [ v (r.Next 4) ]))
+                    | 3 -> Above(r.Next 3)
+                    | 4 -> Treatas([ "D1", "A"; "D1", "B" ], some 3 (fun () -> [ v (pick letters); v (1 + r.Next 2) ]))
+                    | _ -> Treatas([ "G", "E" ], some 2 (fun () -> [ v (pick kinds) ]))
+            ]
+        Inner =
+            match r.Next 8 with
+            | 0 -> RemoveA
+            | 1 -> ReplaceA(pick letters)
+            | 2 -> KeepA(pick letters)
+            | 3 -> AllD1
+            | 4 -> AllF
+            | _ -> Nothing
+    }
+
+/// Columns whose values are whole numbers; the others are text.
+let private whole = set [ "K"; "B"; "GK"; "Id"; "K1"; "K2"; "X"; "Y" ]
+
+let private literal (col: string) (value: V) : string =
+    match value with
+    | None -> "BLANK ()"
+    | Some s -> if whole.Contains col then s else "\"" + s + "\""
+
+let private outerDax (spec: Spec) : string =
+    match spec with
     | Above t -> $"FILTER ( F, F[X] > {t} )"
-    | OnAB pairs ->
-        let items = pairs |> List.map (fun (a, b) -> $"( {text a}, {b} )")
-        $"TREATAS ( {rows items}, D1[A], D1[B] )"
+    | Treatas(cols, tuples) ->
+        let row (tuple: V list) =
+            match List.map2 (fun (_, c) value -> literal c value) cols tuple with
+            | [ one ] -> one
+            | several -> "( " + String.concat ", " several + " )"
 
-let private model (s: Scenario) : TestModel = {
+        let targets = cols |> List.map (fun (t, c) -> $"{t}[{c}]") |> String.concat ", "
+
+        "TREATAS ( { "
+        + (tuples |> List.map row |> String.concat ", ")
+        + " }, "
+        + targets
+        + " )"
+
+let private innerDax (inner: Inner) : string =
+    match inner with
+    | Nothing -> ""
+    | RemoveA -> ", ALL ( D1[A] )"
+    | ReplaceA v -> $", D1[A] = \"{v}\""
+    | KeepA v -> $", KEEPFILTERS ( D1[A] = \"{v}\" )"
+    | AllD1 -> ", ALL ( D1 )"
+    | AllF -> ", ALL ( F )"
+
+let private model (w: World) : TestModel = {
     Tables = [
-        table "D1" [ "K", DataType.Int64; "A", DataType.String; "B", DataType.Int64 ] [
-            for (k, a, b) in s.D1 -> [ k; a; b ]
-        ]
-        table "D2" [ "K", DataType.Int64; "C", DataType.String ] [ for (k, c) in s.D2 -> [ k; c ] ]
-        table "F" [
-            "Id", DataType.Int64
-            "K1", DataType.Int64
-            "K2", DataType.Int64
-            "X", DataType.Int64
-        ] [
-            for (id, k1, k2, x) in s.F ->
-                [
-                    box id
-                    (match k1 with
-                     | Some k -> box k
-                     | None -> null)
-                    box k2
-                    box x
-                ]
-        ]
+        for t in w.Tables ->
+            table t.Name [
+                for c in t.Cols -> c, (if whole.Contains c then DataType.Int64 else DataType.String)
+            ] [
+                for row in t.Rows ->
+                    [
+                        for c, value in List.zip t.Cols row ->
+                            match value with
+                            | None -> null
+                            | Some s -> if whole.Contains c then box (int s) else box s
+                    ]
+            ]
     ]
     Rels = [
-        rel ("F", "K1") ("D1", "K")
-        (if s.Both then
-             bothWays (rel ("F", "K2") ("D2", "K"))
-         else
-             rel ("F", "K2") ("D2", "K"))
+        for l in w.Links ->
+            if w.Both && l.From = ("F", "K2") then
+                bothWays (rel l.From l.To)
+            else
+                rel l.From l.To
     ]
     Measures = []
     Functions = []
 }
-
-/// The counts by definition: COUNTROWS ( F ), COUNTROWS ( VALUES ( D1 ) ), COUNTROWS ( VALUES ( D2 ) ).
-let private byDefinition (s: Scenario) : int * int * int =
-    // The expanded F: each row with its D1 row's A and B and its D2 row's C (None: no match).
-    let expanded = [
-        for (id, k1, k2, x) in s.F ->
-            let d1 =
-                k1 |> Option.bind (fun k -> s.D1 |> List.tryFind (fun (key, _, _) -> key = k))
-
-            let d2 = s.D2 |> List.tryFind (fun (key, _) -> key = k2)
-            id, d1, d2, x
-    ]
-
-    // TREATAS "filters out any values that are not present in its respective output column"
-    // (dax.guide/treatas): a row with a value its column doesn't have is not part of the filter.
-    let hasA (v: string) =
-        s.D1 |> List.exists (fun (_, a, _) -> a = v)
-
-    let hasB (v: int) =
-        s.D1 |> List.exists (fun (_, _, b) -> b = v)
-
-    let hasC (v: string) =
-        s.D2 |> List.exists (fun (_, c) -> c = v)
-
-    let d1BlankRow = expanded |> List.exists (fun (_, d1, _, _) -> d1.IsNone)
-
-    let filters =
-        s.Filters
-        |> List.map (fun f ->
-            match f with
-            | OnA values ->
-                OnA(
-                    values
-                    |> List.filter (fun v ->
-                        match v with
-                        | Some a -> hasA a
-                        | None -> d1BlankRow)
-                )
-            | OnAC pairs -> OnAC(pairs |> List.filter (fun (a, c) -> hasA a && hasC c))
-            | OnAB pairs -> OnAB(pairs |> List.filter (fun (a, b) -> hasA a && hasB b))
-            | f -> f)
-
-    let s = { s with Filters = filters }
-    let a (d1: (int * string * int) option) = d1 |> Option.map (fun (_, a, _) -> a)
-    let b (d1: (int * string * int) option) = d1 |> Option.map (fun (_, _, b) -> b)
-    let c (d2: (int * string) option) = d2 |> Option.map snd
-
-    let visibleF =
-        expanded
-        |> List.filter (fun (_, d1, d2, x) ->
-            s.Filters
-            |> List.forall (fun f ->
-                match f with
-                | OnA values -> values |> List.contains (a d1)
-                | OnAC pairs -> pairs |> List.exists (fun (pa, pc) -> Some pa = a d1 && Some pc = c d2)
-                | OnX values -> values |> List.contains x
-                | Above t -> x > t
-                | OnAB pairs -> pairs |> List.exists (fun (pa, pb) -> Some pa = a d1 && Some pb = b d1)))
-
-    // D1's rows, the blank row (None) among them when some row of F has no match.
-    let d1Rows =
-        (s.D1 |> List.map Some)
-        @ (if expanded |> List.exists (fun (_, d1, _, _) -> d1.IsNone) then
-               [ None ]
-           else
-               [])
-
-    let visibleD1 =
-        d1Rows
-        |> List.filter (fun row ->
-            s.Filters
-            |> List.forall (fun f ->
-                match f with
-                | OnA values -> values |> List.contains (a row)
-                | OnAC pairs -> pairs |> List.exists (fun (pa, _) -> Some pa = a row)
-                | OnX _ -> true
-                // A table filter on F is a filter on its expanded table: the D1 rows its rows have.
-                | Above t -> expanded |> List.exists (fun (_, d1, _, x) -> x > t && d1 = row)
-                | OnAB pairs -> pairs |> List.exists (fun (pa, pb) -> Some pa = a row && Some pb = b row)))
-
-    let d2Rows =
-        (s.D2 |> List.map Some)
-        @ (if expanded |> List.exists (fun (_, _, d2, _) -> d2.IsNone) then
-               [ None ]
-           else
-               [])
-
-    let visibleD2 =
-        d2Rows
-        |> List.filter (fun row ->
-            let own =
-                s.Filters
-                |> List.forall (fun f ->
-                    match f with
-                    | OnAC pairs -> pairs |> List.exists (fun (_, pc) -> Some pc = c row)
-                    | Above t -> expanded |> List.exists (fun (_, _, d2, x) -> x > t && d2 = row)
-                    | _ -> true)
-
-            // Both directions: only the D2 rows a visible F row refers to, once anything filters F.
-            let referred =
-                not s.Both
-                || s.Filters.IsEmpty
-                || visibleF |> List.exists (fun (_, _, d2, _) -> d2 = row)
-
-            own && referred)
-
-    visibleF.Length, visibleD1.Length, visibleD2.Length
 
 let private count (n: int) : QueryValue =
     if n = 0 then
@@ -327,24 +513,104 @@ let tests =
                 $"CALCULATE ( [Amount]{f} )"
 
         testPropertyWithConfig
-            { config with maxTest = 400 }
+            { config with maxTest = 1500 }
             "the rows a filter context shows are the rows its definition gives"
         <| fun (seed: int) ->
             let s = scenario seed
-            let p = prepare (model s)
-            let args = s.Filters |> List.map (fun f -> ", " + dax f) |> String.concat ""
-            let expectedF, expectedD1, expectedD2 = byDefinition s
+            let w = s.World
+            let p = prepare (model w)
+            let filters = Oracle.filters s
+            let outer = s.Outer |> List.map (fun f -> ", " + outerDax f) |> String.concat ""
 
-            let check (name: string) (expression: string) (expected: int) =
-                let query = $"CALCULATE ( {expression}{args} )"
+            for t in w.Tables do
+                // A fact table by its stored rows, a dimension with its blank row.
+                let expression, expected =
+                    if t.Name.StartsWith "F" then
+                        $"COUNTROWS ( {t.Name} )",
+                        (Oracle.visible w filters t.Name |> List.filter (fun r -> List.contains r t.Rows)).Length
+                    else
+                        $"COUNTROWS ( VALUES ( {t.Name} ) )", (Oracle.visible w filters t.Name).Length
+
+                let query = $"CALCULATE ( CALCULATE ( {expression}{innerDax s.Inner} ){outer} )"
 
                 match Engine.evaluateScalar p query with
-                | Ok v -> Expect.equal v (count expected) $"seed {seed}: {name}\n{query}\n%A{s}"
+                | Ok v -> Expect.equal v (count expected) $"seed {seed}: {t.Name}\n{query}\n%A{s}"
                 // The one shape the engine refuses here: a both-directions filter that keeps all rows.
-                | Error(DaxNotSupported(what, _)) when s.Both && what.Contains "keeps all of its rows" -> ()
-                | Error e -> failtestf "seed %d: %s: %s\n%s" seed name (TessError.message e) query
+                | Error(DaxNotSupported(what, _)) when w.Both && what.Contains "keeps all of its rows" -> ()
+                | Error e -> failtestf "seed %d: %s: %s\n%s\n%A" seed t.Name (TessError.message e) query s
 
-            check "F" "COUNTROWS ( F )" expectedF
-            check "D1" "COUNTROWS ( VALUES ( D1 ) )" expectedD1
-            check "D2" "COUNTROWS ( VALUES ( D2 ) )" expectedD2
+        // The property above is only worth what its scenarios reach: check that they do reach the
+        // cases they are for, with results that the filters actually decide.
+        testCase "the scenarios cover two facts, a chain, both directions and inner CALCULATEs"
+        <| fun () ->
+            let scenarios = [ for seed in 0..1499 -> scenario seed ]
+
+            /// How many scenarios satisfy `kind` and show some, but not all, rows of `table`.
+            let decided (kind: Scenario -> bool) (table: string) =
+                scenarios
+                |> List.filter (fun s ->
+                    kind s
+                    && Oracle.has s.World table
+                    && (let all = (Oracle.rows s.World table).Length
+                        let shown = (Oracle.visible s.World (Oracle.filters s) table).Length
+                        shown > 0 && shown < all))
+                |> List.length
+
+            let tableFilter (s: Scenario) =
+                s.Outer
+                |> List.exists (fun f ->
+                    match f with
+                    | Above _ -> true
+                    | _ -> false)
+
+            let inner (s: Scenario) = s.Inner <> Nothing
+
+            Expect.isGreaterThan (decided tableFilter "F2") 100 "a table filter on F deciding the rows of F2"
+
+            // ... and in some of them only the pairs of dimension rows give the answer: filtering
+            // each dimension on its own would show more rows of F2.
+            let pairsMatter =
+                scenarios
+                |> List.filter (fun s ->
+                    Oracle.has s.World "F2"
+                    && (let w = s.World
+                        let filters = Oracle.filters s
+
+                        let part (table: string) (row: V list) =
+                            let e = Oracle.expand w "F2" row
+                            (Oracle.tab w table).Cols |> List.map (fun c -> e.[(table, c)])
+
+                        let d1 = Oracle.visible w filters "D1"
+                        let d2 = Oracle.visible w filters "D2"
+
+                        let separately =
+                            (Oracle.tab w "F2").Rows
+                            |> List.filter (fun r -> List.contains (part "D1" r) d1 && List.contains (part "D2" r) d2)
+
+                        (Oracle.visible w filters "F2").Length < separately.Length))
+                |> List.length
+
+            Expect.isGreaterThan pairsMatter 25 "scenarios where the pairs matter"
+            Expect.isGreaterThan (decided (fun _ -> true) "G") 30 "the far end of a chain"
+            Expect.isGreaterThan (decided (fun s -> s.World.Both) "D2") 30 "a both-directions relationship"
+            Expect.isGreaterThan (decided inner "D1") 60 "an inner CALCULATE"
+            Expect.isGreaterThan (decided inner "F") 60 "an inner CALCULATE, on the fact"
+
+            // And the engine answers nearly all of them rather than refusing.
+            let refused =
+                scenarios
+                |> List.filter (fun s ->
+                    let p = prepare (model s.World)
+                    let outer = s.Outer |> List.map (fun f -> ", " + outerDax f) |> String.concat ""
+
+                    match
+                        Engine.evaluateScalar
+                            p
+                            $"CALCULATE ( CALCULATE ( COUNTROWS ( VALUES ( D2 ) ){innerDax s.Inner} ){outer} )"
+                    with
+                    | Error _ -> true
+                    | Ok _ -> false)
+                |> List.length
+
+            Expect.isLessThan refused 150 "refused scenarios, of 1500"
     ]

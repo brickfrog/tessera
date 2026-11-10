@@ -296,6 +296,21 @@ let tests =
                     null
 
                 isError "dax-invalid" "CALCULATE ( [Amount], USERELATIONSHIP ( Sales[Qty], 'Date'[Date] ) )")
+            // "USERELATIONSHIP, by itself, does not introduce a filter ... context transition happens
+            // with the old relationship in place"; "ALL on Date is required in order to get rid of
+            // the filter moved to Date by the context transition" (SQLBI, "Expanded tables in DAX").
+            // A Sales row filters its ORDER date; under the ship-date relationship the row is only
+            // still visible when it shipped on the day it was ordered: rows 3, 4, 5 and 7.
+            testCase "USERELATIONSHIP after a context transition" (fun () ->
+                is
+                    (p ())
+                    "SUMX ( Sales, CALCULATE ( COUNTROWS ( Sales ), USERELATIONSHIP ( Sales[ShipDate], 'Date'[Date] ) ) )"
+                    4
+
+                is
+                    (p ())
+                    "SUMX ( Sales, CALCULATE ( COUNTROWS ( Sales ), ALL ( 'Date' ), USERELATIONSHIP ( Sales[ShipDate], 'Date'[Date] ) ) )"
+                    7)
             // "follows a chain of one or more many-to-one relationships to fetch the value"
             // (dax.guide/related). Red rows: 1, 2, 3, 6, 7 with Qty 2 + 1 + 3 + 5 + 1.
             testCase "RELATED" (fun () ->
@@ -471,5 +486,54 @@ let tests =
                 // five" (SQLBI, "Introducing user-defined functions in DAX"): 3.4 and 2.4.
                 is m "Whole ( 3.4, 2.4 )" 5
                 Expect.equal (TessError.code (scalarError m "AddTax ()")) "dax-invalid" "a missing argument")
+            // The documentation says an EXPR parameter "inherits only the filter context" and a VAL
+            // parameter "both the row context and the filter context of the caller", but not what
+            // the function's own body sees of the caller's row context: what would depend on it
+            // is refused.
+            testCase "a function called from a row context" (fun () ->
+                let m =
+                    prepare {
+                        star with
+                            Functions = [
+                                "Total", "() => [Amount]"
+                                "Double", "( x ) => x * 2"
+                                "Lazy", "( x : ANYVAL EXPR ) => x * 2"
+                                "Units", "() => SUM ( Sales[Qty] )"
+                                "Qty", "() => Sales[Qty]"
+                            ]
+                    }
+
+                // No row context: the function is the measure.
+                is m "Total ()" 625
+                // A VAL argument is evaluated by the caller, in its row context: twice 585.
+                is m "SUMX ( Product, Double ( [Amount] ) )" 1170
+                // An aggregation doesn't look at a row context: 4 products, 17 units each.
+                is m "SUMX ( Product, Units () )" 68
+
+                for dax in
+                    [
+                        "SUMX ( Product, Total () )"
+                        "SUMX ( Product, Lazy ( [Amount] ) )"
+                        "SUMX ( Sales, Qty () )"
+                        "SUMX ( Sales, Lazy ( Sales[Qty] ) )"
+                    ] do
+                    match scalarError m dax with
+                    | DaxNotSupported(what, _) -> Expect.stringContains what "called from a row context" dax
+                    | other -> failtestf "%s: %A" dax other)
+            // A VAL argument is evaluated when the function is called, not when the engine merely
+            // needs to know what the call returns.
+            testCase "a call in a variable that is never used is never made" (fun () ->
+                let m =
+                    prepare {
+                        star with
+                            Functions = [ "Id", "( x ) => x" ]
+                    }
+
+                is m "VAR unused = Id ( ERROR ( \"no\" ) ) RETURN 1" 1
+
+                Expect.equal
+                    (TessError.code (scalarError m "VAR used = Id ( ERROR ( \"yes\" ) ) RETURN used"))
+                    "dax-error"
+                    "used")
         ]
     ]

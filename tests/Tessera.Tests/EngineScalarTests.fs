@@ -44,6 +44,10 @@ let tests =
                 is (p ()) "ISBLANK ( \"\" )" false)
             testCase "as text and as a condition" (fun () ->
                 is (p ()) "BLANK () & \"x\"" "x"
+                // "With two arguments it works as the CONCATENATE function", for which "If both
+                // arguments are BLANK, the result is BLANK" (dax.guide, & and CONCATENATE).
+                is (p ()) "BLANK () & BLANK ()" null
+                is (p ()) "ISBLANK ( BLANK () & \"\" )" false
                 is (p ()) "IF ( BLANK (), 1, 2 )" 2
                 is (p ()) "NOT BLANK ()" true)
         ]
@@ -189,7 +193,12 @@ let tests =
             testCase "ROUND" (fun () ->
                 is (p ()) "ROUND ( 2.675, 2 )" 2.68
                 is (p ()) "ROUND ( 2.5, 0 )" 3.0
-                is (p ()) "ROUND ( -2.5, 0 )" -3.0
+                // "rounds 2.15 up, to one decimal place. The expected result is 2.2" (Microsoft Learn).
+                is (p ()) "ROUND ( 2.15, 1 )" 2.2
+                is (p ()) "ROUND ( -2.4, 0 )" -2.0
+                is (p ()) "ROUND ( 21.5, -1 )" 20.0
+                // The pages don't say which way a negative number halfway goes.
+                isError "not-supported" "ROUND ( -2.5, 0 )"
                 is (p ()) "ROUND ( 1234.5, -2 )" 1200.0)
             // "INT rounds <Number> towards −∞" (dax.guide/int).
             testCase "INT" (fun () ->
@@ -270,7 +279,7 @@ let tests =
                     "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name], \"|\", Customer[Name], DESC )"
                     "Cy|Bob|Ann"
 
-                is (p ()) "CONCATENATEX ( FILTER ( Customer, FALSE ), Customer[Name], \",\" )" null
+                is (p ()) "CONCATENATEX ( FILTER ( Customer, FALSE ), Customer[Name], \",\", Customer[Name] )" null
                 is (p ()) "CONCATENATEX ( { 1, 2 }, IF ( [Value] = 1, \"a\" ), \"-\", [Value] )" "a-")
             testCase "CONCATENATEX without an order is refused: the engine doesn't define one" (fun () ->
                 isError "not-supported" "CONCATENATEX ( VALUES ( Customer[Name] ), Customer[Name] )")

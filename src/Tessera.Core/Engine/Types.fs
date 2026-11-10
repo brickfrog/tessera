@@ -834,6 +834,10 @@ type Ctx = {
     Functions: BFunction list
     /// The rows of the current group, inside GROUPBY; null elsewhere.
     Group: TableVal
+    /// Inside a user-defined function that was called from a row context. The function's body is
+    /// evaluated without that row context; whether the engine would let it be seen is not
+    /// documented, so anything that would depend on it is refused (see `Context.transition`).
+    CallerRows: bool
 }
 
 type Call = {

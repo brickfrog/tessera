@@ -180,7 +180,8 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
         | _ -> v
 
     /// The context a function's body runs in, with its parameters bound.
-    let bindCall (ctx: Ctx) (call: Call) (f: BFunction) : Ctx * Expr =
+    /// `evaluate`: false to learn about the call without evaluating its VAL arguments.
+    let bindCallWith (evaluate: bool) (ctx: Ctx) (call: Call) (f: BFunction) : Ctx * Expr =
         if ctx.Functions |> List.exists (fun x -> obj.ReferenceEquals(x, f)) then
             Fail.invalid ctx call.Span $"function {f.Name} calls itself: DAX functions can't be recursive"
 
@@ -219,23 +220,31 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                 | ParameterMode.Val ->
                     // "evaluated once before invoking the function", in the caller's context.
                     let at = { ctx with Scope = scope }
-                    let v = castArgument at expr.Span p (ev.Value(at, expr))
 
                     let isTable =
-                        match v with
-                        | Value.Table _ -> true
-                        | _ -> false
+                        match Parameter.effectiveType p with
+                        | ParameterType.Table -> true
+                        | ParameterType.Scalar -> false
+                        | _ -> ev.IsTable(at, expr)
+
+                    let value = lazy (castArgument at expr.Span p (ev.Value(at, expr)))
+
+                    if evaluate then
+                        value.Force() |> ignore
 
                     let staticType =
                         lazy
-                            (match v with
-                             | Value.Scalar s ->
-                                 match DaxValue.typeOf s with
-                                 | Some t -> StaticType.Known t
-                                 | None -> StaticType.Blank
-                             | _ -> StaticType.Unknown)
+                            (if not value.IsValueCreated then
+                                 StaticType.Unknown
+                             else
+                                 match value.Value with
+                                 | Value.Scalar s ->
+                                     match DaxValue.typeOf s with
+                                     | Some t -> StaticType.Known t
+                                     | None -> StaticType.Blank
+                                 | _ -> StaticType.Unknown)
 
-                    Val(Lazy<Value>.CreateFromValue v, isTable, staticType)
+                    Val(value, isTable, staticType)
 
             vars <- vars.Add(upper p.Name.Name, binding))
 
@@ -248,9 +257,12 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                 Scope = { definedIn with Vars = vars }
                 Functions = f :: ctx.Functions
                 Group = null
+                CallerRows = ctx.CallerRows || not ctx.Rows.IsEmpty
         }
 
         body, def.Body
+
+    let bindCall (ctx: Ctx) (call: Call) (f: BFunction) : Ctx * Expr = bindCallWith true ctx call f
 
     let checkCall (ctx: Ctx) (call: Call) (fn: DaxFunction) =
         let n = call.Args.Length
@@ -405,7 +417,13 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
             | BinaryOp.Multiply -> Fail.dax ctx span (DaxValue.multiply l r)
             | BinaryOp.Divide -> Fail.dax ctx span (DaxValue.divide l r)
             | BinaryOp.Power -> Fail.dax ctx span (DaxValue.power l r)
-            | BinaryOp.Concat -> DaxValue.String(Convert.toText ctx span l + Convert.toText ctx span r)
+            | BinaryOp.Concat ->
+                // "With two arguments it works as the CONCATENATE function" (dax.guide, & operator),
+                // and for CONCATENATE "If both arguments are BLANK, the result is BLANK".
+                if DaxValue.isBlank l && DaxValue.isBlank r then
+                    DaxValue.Blank
+                else
+                    DaxValue.String(Convert.toText ctx span l + Convert.toText ctx span r)
             | BinaryOp.Equal -> DaxValue.Boolean(Fail.dax ctx span (DaxValue.equals coll l r))
             | BinaryOp.StrictEqual -> DaxValue.Boolean(Fail.dax ctx span (DaxValue.strictEquals coll l r))
             | BinaryOp.NotEqual -> DaxValue.Boolean(not (Fail.dax ctx span (DaxValue.equals coll l r)))
@@ -462,6 +480,12 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                     match Context.tryColumnValue ctx c 0 with
                     | ValueSome v -> v
                     | ValueNone ->
+                        if ctx.CallerRows then
+                            Fail.notSupported
+                                ctx
+                                e.Span
+                                $"column '{c.Table.Name}'[{c.Name}] inside a function that was called from a row context (whether the function sees the caller's row context is not documented)"
+
                         Fail.invalid
                             ctx
                             e.Span
@@ -473,7 +497,14 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                     Fail.notSupported ctx e.Span $"[{name}], which is both a column of the row context and a measure"
                 | Some(v, _), None -> v
                 | None, Some m -> evalMeasure ctx e.Span m
-                | None, None -> Fail.invalid ctx e.Span $"there is no measure or column [{name}] here"
+                | None, None ->
+                    if ctx.CallerRows then
+                        Fail.notSupported
+                            ctx
+                            e.Span
+                            $"[{name}] inside a function that was called from a row context (whether the function sees the caller's row context is not documented)"
+
+                    Fail.invalid ctx e.Span $"there is no measure or column [{name}] here"
             | QueryParameter name -> Fail.notSupported ctx e.Span $"the query parameter @{name}"
             | Omitted -> Fail.invalid ctx e.Span "an argument is missing"
             | Words _ -> Fail.invalid ctx e.Span "keywords where a value is needed"
@@ -577,7 +608,8 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                     match tryFunction ctx name.Name with
                     | Some f ->
                         let body, expr =
-                            bindCall
+                            bindCallWith
+                                false
                                 ctx
                                 {
                                     Name = name
