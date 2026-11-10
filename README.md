@@ -2092,8 +2092,10 @@ Refused, because the sources don't settle them (each error says which):
   (unless it is a month end), or from a BLANK start;
 - the date-table rule where it is not documented and would change the result: a context transition that filters
   the date column while other filters on the date table hide that date (a measure iterated over
-  `ALL ( 'Date'[Date] )` under a filter on the year; over `VALUES ( 'Date'[Date] )` or `SUMMARIZE` by date it is
-  fine), `KEEPFILTERS` on a date filter, a filter that pairs the date column with other columns, a key column of
+  `ALL ( 'Date'[Date] )` under a filter on the year), or while a filter the rule would remove also restricts another
+  table (a snowflaked table, a filter pairing a Date column with another table's, `SUMMARIZE`'s own extension
+  columns). Over `VALUES ( 'Date'[Date] )`, or `ADDCOLUMNS ( SUMMARIZE ( … ) )` by date under a filter on the
+  year it is fine, as is `SUMMARIZECOLUMNS` by date with the year as its filter argument; `KEEPFILTERS` on a date filter, a filter that pairs the date column with other columns, a key column of
   a table that is not marked, the key of a relationship that is not active.
 
 On a date column that is not unique or has gaps (a fact table's), `DATEADD` and `SAMEPERIODLASTYEAR` of a selection

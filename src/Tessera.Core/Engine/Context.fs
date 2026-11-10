@@ -699,8 +699,8 @@ module Filters =
 /// What the sources settle is a filter argument of CALCULATE on that one column. Where they are
 /// silent (a context transition that filters the date column, KEEPFILTERS, a filter that pairs the
 /// date column with others, a key that only an inactive relationship uses) the engine refuses,
-/// but only when the rule would change the context: when no other column of the table is filtered,
-/// both readings give the same context.
+/// but only when the rule could change the result: when no other column of the table is filtered,
+/// both readings give the same context (and, for a context transition, see `onTransition`).
 module DateTable =
 
     type Standing =
@@ -802,17 +802,36 @@ module DateTable =
         result
 
     /// A context transition is about to add these filters (one row context's). One on the date
-    /// column of a date table is refused when the rule could change anything. It can't when the
-    /// row's date is visible once the filters are added without the rule: the date column is a key,
-    /// so the table is then that one row either way (the other filters on it all keep that row),
-    /// as when grouping by Date[Date] under a filter on the year.
+    /// column of a date table is refused when the rule could change anything. It can't when every
+    /// filter the rule would remove is on the date table's own columns alone, and the row's date is
+    /// visible once the filters are added without the rule: the date column is a key, so the table
+    /// is then that one row either way (the other filters on it all keep that row), and nothing
+    /// else was filtered by what the rule removes. That is grouping by Date[Date] under a filter
+    /// on the year. A filter that also restricts another table (a table the date table expands to,
+    /// a filter pairing a Date column with another table's) is still refused.
     let onTransition (ctx: Ctx) (span: Span) (fc: FilterCtx) (filters: Filter list) : unit =
         let tests = filters |> List.map covers
         let replaced (x: BColumn) = tests |> List.exists (fun t -> t x)
         let after = lazy (Filters.add fc filters false)
 
+        // Every filter on the expanded date table is on that table's own columns only.
+        let confined (t: BTable) =
+            let cfg = fc.Config
+            let own (x: BColumn) = obj.ReferenceEquals(x.Table, t)
+            let touches (x: BColumn) = cfg.IsExpanded(t, x.Table)
+
+            fc.Filters
+            |> List.forall (fun f ->
+                match f with
+                | OnColumn(x, _) -> not (touches x) || own x
+                | Tuples(cols, _) -> not (Array.exists touches cols) || Array.forall own cols
+                | Rows(r, _, cfg) ->
+                    let cols = Filters.expandedColumns cfg r
+                    not (Array.exists touches cols) || Array.forall own cols)
+
         let keepsRow (c: BColumn) (values: RowSet) =
             values.Count = 1
+            && confined c.Table
             && (let id = values.Rows.[0]
 
                 Filters.idsIn c (Filters.visible after.Value c.Table) false |> Array.contains id)

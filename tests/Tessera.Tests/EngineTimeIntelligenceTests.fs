@@ -797,10 +797,18 @@ let dateTableTests =
                 "CALCULATE ( SUMX ( ADDCOLUMNS ( SUMMARIZE ( Sales, 'Date'[Date] ), \"s\", [Sales] ), [s] ), 'Date'[Year] = 2024 )"
                 3600M
 
+            // SUMMARIZE's own extension columns are computed under a filter on the group's Sales
+            // rows, which reaches the Date table through the relationship: still refused.
+            refused
+                p
+                "EVALUATE CALCULATETABLE ( SUMMARIZE ( Sales, 'Date'[Date], \"s\", [Sales] ), 'Date'[Year] = 2024 )"
+                "context transition on the date column"
+
+            // SUMMARIZECOLUMNS with the year as its own filter argument groups by date fine.
             match
                 Engine.evaluateQuery
                     p
-                    "EVALUATE CALCULATETABLE ( SUMMARIZE ( Sales, 'Date'[Date], \"s\", [Sales] ), 'Date'[Year] = 2024 )"
+                    "EVALUATE SUMMARIZECOLUMNS ( 'Date'[Date], TREATAS ( { 2024 }, 'Date'[Year] ), \"s\", [Sales] )"
             with
             | Ok [ r ] -> Expect.equal r.Rows.Length 8 "the 2024 dates with sales"
             | other -> failtestf "expected one result, got %A" other
@@ -810,6 +818,37 @@ let dateTableTests =
             refused
                 p
                 "EVALUATE ROW ( \"r\", CALCULATE ( SUMX ( ALL ( 'Date'[Date] ), [Sales] ), 'Date'[Year] = 2024 ) )"
+                "context transition on the date column"
+
+            // A filter that pairs a Date column with a column of Sales: removing the Year half
+            // would widen the amounts, keeping it doesn't.
+            refused
+                p
+                "EVALUATE ROW ( \"r\", CALCULATE ( SUMX ( VALUES ( 'Date'[Date] ), [Sales] ), FILTER ( CROSSJOIN ( VALUES ( 'Date'[Year] ), VALUES ( Sales[Amount] ) ), 'Date'[Year] = 2024 && Sales[Amount] > 50 ) ) )"
+                "context transition on the date column"
+
+            // A snowflake, Date -> Month: the rule would also remove the filter on Month, which the
+            // date row keeps either way. Per date, 24 months with the rule, 12 without.
+            let snowflake =
+                prepare {
+                    calendarModel smallFirst smallLast with
+                        Tables =
+                            (calendarModel smallFirst smallLast).Tables
+                            @ [
+                                table "Month" [ "YearMonth", DataType.Int64; "Quarter", DataType.Int64 ] [
+                                    for y in [ 2023; 2024 ] do
+                                        for m in 1..12 -> [ box (y * 100 + m); box ((m - 1) / 3 + 1) ]
+                                ]
+                            ]
+                        Rels = [
+                            rel ("Sales", "Date") ("Date", "Date")
+                            rel ("Date", "YearMonth") ("Month", "YearMonth")
+                        ]
+                }
+
+            refused
+                snowflake
+                "EVALUATE ROW ( \"r\", CALCULATE ( SUMX ( VALUES ( 'Date'[Date] ), CALCULATE ( COUNTROWS ( 'Month' ) ) ), 'Month'[Quarter] IN { 1, 2 } ) )"
                 "context transition on the date column"
 
         // The star model's Date[Date] is the key of an active and an inactive date relationship.
