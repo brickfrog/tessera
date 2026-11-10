@@ -290,6 +290,8 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     member val Computing = false with get, set
     /// For a column of a calculated table: the column of the expression's result it holds.
     member val SourceName: string = null with get, set
+    /// The expression of a query column (DEFINE COLUMN), already parsed: its spans are the query's.
+    member val Parsed: Expr option = None with get, set
     member _.IsReady = not (obj.ReferenceEquals(store, null))
 
     member this.SetData(column: StoreColumn) =
@@ -372,6 +374,8 @@ and [<Sealed; AllowNullLiteral>] BTable(id: int, model: Model, name: string) =
     member val ColumnByName = Dictionary<string, BColumn>(StringComparer.OrdinalIgnoreCase) with get
     /// The DAX expression of a calculated table; None for a table that has data.
     member val Expression: SourceText option = None with get, set
+    /// The expression of a query table (DEFINE TABLE), already parsed: its spans are the query's.
+    member val Parsed: Expr option = None with get, set
     member val Failure: TessError option = None with get, set
     member val Computing = false with get, set
     /// Why queries can't use this table (a relationship or model feature the engine doesn't do).

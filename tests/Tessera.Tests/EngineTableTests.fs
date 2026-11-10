@@ -636,6 +636,163 @@ let tests =
         ]
 
         testList "queries" [
+            // "The syntax after COLUMN defines a query column, which has a data lineage and it is
+            // populated in an empty filter context before the query is executed"
+            // (dax.guide/st/column). Units: Bike rows 1, 2, 7 (2 + 1 + 1), Helmet rows 3, 6 (3 + 5),
+            // Lock row 4, Pump none.
+            testCase "DEFINE COLUMN" (fun () ->
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Sold] = [Units]
+                     EVALUATE SELECTCOLUMNS ( Product, \"n\", Product[Name], \"u\", Product[Sold] )"
+                    [ [ "Bike"; 4 ]; [ "Helmet"; 8 ]; [ "Lock"; 1 ]; [ "Pump"; null ] ]
+
+                // Computed before the query's filters exist.
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Sold] = [Units]
+                     EVALUATE CALCULATETABLE ( SELECTCOLUMNS ( Product, \"n\", Product[Name], \"u\", Product[Sold] ), Customer[Country] = \"UK\" )"
+                    [ [ "Bike"; 4 ]; [ "Helmet"; 8 ]; [ "Lock"; 1 ]; [ "Pump"; null ] ]
+
+                // No context transition without CALCULATE: the grand total in every row.
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[All] = SUM ( Sales[Qty] )
+                     EVALUATE SELECTCOLUMNS ( Product, \"n\", Product[Name], \"u\", Product[All] )"
+                    [ [ "Bike"; 17 ]; [ "Helmet"; 17 ]; [ "Lock"; 17 ]; [ "Pump"; 17 ] ]
+
+                // A column like any other: grouped by, filtered on. The Bike is 410, the Helmet and
+                // the Lock 175, and row 5 has no product.
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Kind] = IF ( Product[Name] = \"Bike\", \"B\", \"S\" )
+                     EVALUATE SUMMARIZECOLUMNS ( Product[Kind], \"A\", [Amount] )"
+                    [ [ "B"; 410 ]; [ "S"; 175 ]; [ null; 40 ] ]
+
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Kind] = IF ( Product[Name] = \"Bike\", \"B\", \"S\" )
+                            MEASURE Sales[Small] = CALCULATE ( [Amount], Product[Kind] = \"S\" )
+                     EVALUATE ROW ( \"x\", [Small] )"
+                    [ [ 175 ] ])
+            // "Definitions can reference other definitions that appear before or after the current
+            // definition" (Microsoft Learn, "DAX queries").
+            testCase "a query column uses a query measure defined after it, and another query column" (fun () ->
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Twice] = [Q2] + Product[One]
+                            COLUMN Product[One] = 1
+                            MEASURE Sales[Q2] = SUM ( Sales[Qty] ) * 2
+                     EVALUATE SELECTCOLUMNS ( Product, \"n\", Product[Name], \"u\", Product[Twice] )"
+                    [ [ "Bike"; 9 ]; [ "Helmet"; 17 ]; [ "Lock"; 3 ]; [ "Pump"; 1 ] ])
+            // "The syntax after TABLE defines a query table, which has a data lineage" of its own
+            // (dax.guide/st/table): it doesn't filter Product unless TREATAS says so.
+            testCase "DEFINE TABLE" (fun () ->
+                let result =
+                    query (p ()) "DEFINE TABLE Colors = DISTINCT ( Product[Color] ) EVALUATE Colors"
+
+                Expect.equal (result.Columns |> List.map _.Name) [ "Colors[Color]" ] "its columns are its own"
+
+                returns (p ()) "DEFINE TABLE Colors = DISTINCT ( Product[Color] ) EVALUATE Colors" [
+                    [ "Red" ]
+                    [ "Black" ]
+                    [ "Blue" ]
+                ]
+
+                returns
+                    (p ())
+                    "DEFINE TABLE Colors = DISTINCT ( Product[Color] )
+                     EVALUATE ADDCOLUMNS ( Colors, \"A\", [Amount] )"
+                    [ [ "Red"; 625 ]; [ "Black"; 625 ]; [ "Blue"; 625 ] ]
+
+                returns
+                    (p ())
+                    "DEFINE TABLE Colors = DISTINCT ( Product[Color] )
+                     EVALUATE ADDCOLUMNS ( Colors, \"A\", CALCULATE ( [Amount], TREATAS ( { Colors[Color] }, Product[Color] ) ) )"
+                    [ [ "Red"; 570 ]; [ "Black"; 15 ]; [ "Blue"; null ] ]
+
+                // A measure on the query table; the table uses a model measure. Only the Pump has
+                // no order.
+                returns
+                    (p ())
+                    "DEFINE TABLE Unsold = FILTER ( Product, [Orders] + 0 = 0 )
+                            MEASURE Unsold[N] = COUNTROWS ( Unsold )
+                     EVALUATE { [N] }"
+                    [ [ 1 ] ])
+            testCase "what a query defines is the query's own: the prepared model doesn't change" (fun () ->
+                let prepared = p ()
+
+                returns prepared "DEFINE COLUMN Product[One] = 1 EVALUATE ROW ( \"x\", SUM ( Product[One] ) )" [
+                    [ 4 ]
+                ]
+
+                Expect.equal (queryCode prepared "EVALUATE ROW ( \"x\", SUM ( Product[One] ) )") "dax-invalid" "gone"
+
+                returns prepared "DEFINE TABLE T2 = Product EVALUATE ROW ( \"x\", COUNTROWS ( T2 ) )" [ [ 4 ] ]
+                Expect.equal (queryCode prepared "EVALUATE T2") "dax-invalid" "gone"
+                Expect.equal (rows prepared "EVALUATE Product").Head.Length 4 "Product has its four columns")
+            testCase "DEFINE COLUMN and DEFINE TABLE: errors and refusals" (fun () ->
+                notSupported (p ()) "DEFINE COLUMN Product[Name] = 1 EVALUATE Product" "already has a column"
+                notSupported (p ()) "DEFINE TABLE Product = Customer EVALUATE Product" "already has a table"
+
+                Expect.equal
+                    (queryCode (p ()) "DEFINE COLUMN Nope[x] = 1 EVALUATE Product")
+                    "dax-invalid"
+                    "no such table"
+
+                match
+                    queryError
+                        (p ())
+                        "DEFINE COLUMN Product[A] = Product[B] + 1 COLUMN Product[B] = Product[A] + 1 EVALUATE Product"
+                with
+                | DaxInvalid(message, _) -> Expect.stringContains message "circular" ""
+                | other -> failtestf "%A" other
+
+                // A query column that fails is an error only for the queries that read it.
+                returns
+                    (p ())
+                    "DEFINE COLUMN Product[Bad] = ERROR ( \"no\" ) EVALUATE ROW ( \"x\", COUNTROWS ( Customer ) )"
+                    [ [ 3 ] ]
+
+                Expect.equal
+                    (queryCode (p ()) "DEFINE COLUMN Product[Bad] = ERROR ( \"no\" ) EVALUATE VALUES ( Product[Bad] )")
+                    "dax-error"
+                    ""
+
+                notSupported (p ()) "DEFINE VAR v = 1 COLUMN Product[C] = v EVALUATE Product" "uses the query variable")
+            // The model's own calculated column and table are taken as `prepare` computed them.
+            testCase "DEFINE COLUMN in a model with calculated columns and tables" (fun () ->
+                let prepared =
+                    prepare {
+                        star with
+                            Tables =
+                                (star.Tables
+                                 |> List.map (fun t ->
+                                     if t.Name = "Product" then
+                                         t |> withCalculated [ "Double", DataType.Int64, "Product[ProductKey] * 2" ]
+                                     else
+                                         t))
+                                @ [
+                                    calculatedTable
+                                        "Colours"
+                                        [ "Color", DataType.String ]
+                                        "DISTINCT ( Product[Color] )"
+                                ]
+                    }
+
+                returns
+                    prepared
+                    "DEFINE COLUMN Product[Triple] = Product[Double] + Product[ProductKey]
+                     EVALUATE SELECTCOLUMNS ( Product, \"t\", Product[Triple] )"
+                    [ [ 3 ]; [ 6 ]; [ 9 ]; [ 12 ] ]
+
+                returns prepared "DEFINE COLUMN Product[Z] = 1 EVALUATE Colours" [ [ "Red" ]; [ "Black" ]; [ "Blue" ] ]
+
+                returns prepared "DEFINE COLUMN Colours[Len] = IF ( Colours[Color] = \"Red\", 3, 0 ) EVALUATE Colours" [
+                    [ "Red"; 3 ]
+                    [ "Black"; 0 ]
+                    [ "Blue"; 0 ]
+                ])
             testCase "ORDER BY" (fun () ->
                 returnsInOrder (p ()) "EVALUATE VALUES ( Customer[Name] ) ORDER BY Customer[Name] DESC" [
                     [ "Cy" ]
@@ -695,8 +852,6 @@ let tests =
                     "DEFINE VAR t = FILTER ( Customer, Customer[Country] = \"US\" ) EVALUATE ROW ( \"n\", COUNTROWS ( t ) )"
                     [ [ 2 ] ])
             testCase "what a query can't have yet" (fun () ->
-                notSupported (p ()) "DEFINE TABLE T = { 1 } EVALUATE T" "DEFINE TABLE"
-                notSupported (p ()) "DEFINE COLUMN Sales[X] = 1 EVALUATE Sales" "DEFINE COLUMN"
                 notSupported (p ()) "EVALUATE Customer ORDER BY Customer[Name] START AT \"B\"" "START AT"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", @p )" "@p"
                 notSupported (p ()) "EVALUATE DATESYTD ( 'Date'[Date] )" "DATESYTD"
