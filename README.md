@@ -1970,6 +1970,7 @@ refresh, no network.
 tess query ./Sales.pbip --data ./fixtures "EVALUATE SUMMARIZECOLUMNS ( 'Date'[Year], \"Sales\", [Total] )"
 tess query ./Sales.pbip --data ./fixtures -f totals.dax --json      # or - for standard input; --csv; --max-rows
 tess query ./Sales.pbip --coverage                                  # what the engine can evaluate of this model
+tess query ./Sales.pbip --data ./fixtures --now 2024-03-05T14:30:00 "EVALUATE ROW ( \"d\", TODAY () )"   # a fixed clock
 ```
 
 The options, the output and the JSON are those of [`query` on a server](#query): the same `QueryResult`, with
@@ -2020,7 +2021,9 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   `DEFINE FUNCTION`, several `EVALUATE` statements, `ORDER BY` by result columns or expressions.
 - **User-defined functions,** the model's and the query's, with `VAL` parameters (evaluated once, in the caller's
   context, and converted to the parameter's type) and `EXPR` parameters (evaluated where the body uses them).
-- **Calculated columns and calculated tables,** computed in dependency order when the model is loaded. A circular
+- **Calculated columns and calculated tables,** computed in dependency order when the model is loaded. A
+  calculated table may read the tables related to it, as a date table does
+  (`CALENDAR ( MIN ( Sales[Date] ), MAX ( Sales[Date] ) )`). A circular
   dependency is an error, including the classic one: two calculated columns that each use `CALCULATE` in a table
   with no unique column. A calculated column or table that uses something unsupported doesn't stop the rest: only
   the queries that read it fail, with its error.
@@ -2028,6 +2031,7 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 
 | Family | Functions |
 |---|---|
+| Date and time | `CALENDAR` `CALENDARAUTO` `DATE` `DATEDIFF` `DATEVALUE` `DAY` `EDATE` `EOMONTH` `HOUR` `MINUTE` `MONTH` `NETWORKDAYS` `NOW` `QUARTER` `SECOND` `TIME` `TIMEVALUE` `TODAY` `UTCNOW` `UTCTODAY` `WEEKDAY` `WEEKNUM` `YEAR` `YEARFRAC` |
 | Aggregation | `AVERAGE` `AVERAGEX` `CONCATENATEX` `COUNT` `COUNTA` `COUNTAX` `COUNTBLANK` `COUNTROWS` `COUNTX` `DISTINCTCOUNT` `DISTINCTCOUNTNOBLANK` `MAX` `MAXX` `MIN` `MINX` `PRODUCTX` `RANKX` `SUM` `SUMX` |
 | Filter | `ALL` `ALLCROSSFILTERED` `ALLEXCEPT` `ALLNOBLANKROW` `CALCULATE` `CALCULATETABLE` `CROSSFILTER` `DISTINCT` `EARLIER` `EARLIEST` `FILTER` `HASONEFILTER` `HASONEVALUE` `ISCROSSFILTERED` `ISFILTERED` `KEEPFILTERS` `REMOVEFILTERS` `SELECTEDVALUE` `TREATAS` `USERELATIONSHIP` `VALUES` |
 | Information | `CONTAINSROW` `ISBLANK` `ISERROR` |
@@ -2043,9 +2047,48 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   tables, the blank row as a group, and rows whose expressions are all BLANK dropped; not `ROLLUPADDISSUBTOTAL`,
   `IGNORE` or `NONVISUAL`, and not inside a row context or under an outer filter.
 
+#### Dates, times and the clock
+
+A date is a number of days since December 30, 1899, with the time of day as its fraction, on the real calendar
+on both sides of 1900: DAX is not Excel, and February 1900 has 28 days. `DATE`, `TIME`, `DATEVALUE`, `TIMEVALUE`,
+`EOMONTH`, `EDATE`, `TODAY`, `NOW`, `UTCTODAY`, `UTCNOW` and the `[Date]` column of `CALENDAR` and `CALENDARAUTO`
+are dates (`dateTime` in results); `YEAR`, `QUARTER`, `MONTH`, `DAY`, `HOUR`, `MINUTE`, `SECOND`, `WEEKDAY`,
+`WEEKNUM`, `DATEDIFF` and `NETWORKDAYS` are whole numbers; `YEARFRAC` is a decimal number.
+
+- **The clock.** `TODAY`, `NOW`, `UTCTODAY` and `UTCNOW` return one instant, read once when the model is loaded:
+  the calculated tables and columns and the query all see the same one. By default it is the machine's clock
+  (local time for `TODAY` and `NOW`, UTC for the other two). `--now <ISO 8601>` sets it: `--now 2024-03-05`,
+  `--now 2024-03-05T14:30:00`. The date and time as written is what `NOW` returns. With a UTC offset
+  (`2024-03-05T14:30:00+02:00`, `...Z`) the UTC functions return that instant in UTC; without one they return the
+  same as `NOW`. The machine's time zone is never used with `--now`, so a result is the same everywhere. In code:
+  `Engine.prepareWith { Engine.Options.defaults with Clock = Some clock } db store`.
+- **`DATE`** follows dax.guide's rules, each of which it shows a result for: a year from 0 to 49 has 2000 added and
+  from 50 to 99 has 1900; months above 12 and at or below 0 move the year (`DATE ( 2008, 0, 2 )` is December 2,
+  2007); days past the month's end and negative days move the month; day 0 and a year above 9999 are errors;
+  decimals round; BLANK is 0. **`TIME`** wraps at 24 hours and takes 0 to 32767 in each argument.
+- **`WEEKDAY`** takes return types 1, 2, 3 and 11 to 17; **`WEEKNUM`** 1, 2, 11 to 17 (the week with January 1 is
+  week 1) and 21 (ISO 8601). **`DATEDIFF`** counts boundaries crossed, not whole intervals, with weeks from Sunday,
+  and is negative when the first date is the later one. **`EOMONTH`** rounds its months and **`EDATE`** truncates
+  them, as their pages say. **`NETWORKDAYS`** takes the weekend numbers 1 to 7 and 11 to 17 and a table of
+  holidays. **`CALENDARAUTO`** scans every date column that is not a calculated column or in a calculated table,
+  and takes the month a fiscal year ends in.
+- **Text as a date.** The engine reads text by the model's culture and then tries other formats, most of which is
+  written down nowhere. The local engine reads ISO 8601 text under any culture (`"2024-01-31"`,
+  `"2024-01-31T13:45:00"`, `"13:45"`), and under an `en-US` model also the forms the documentation shows results
+  for: `"10/15/2020"` and `"10-15-2020"` (day first when month first is no date: `"28/02/2020"`),
+  `"March 3, 2008 3:00 PM"`, `"Feb 14, 2010"`. Any other text is refused.
+- **Refused, because the sources leave it open or disagree:** `YEAR`, `MONTH`, `DAY`, `HOUR`, `MINUTE`, `SECOND`,
+  `WEEKDAY`, `WEEKNUM`, `EOMONTH`, `EDATE` and `YEARFRAC` of BLANK (only `QUARTER`, `DATEDIFF` and `NETWORKDAYS`
+  say what BLANK gives); the calendar parts of a plain number below 61 (Microsoft Learn dates such a number as
+  Excel does, a day later than the zero date gives); `DATE` with a negative year; `HOUR`, `MINUTE` or `SECOND`
+  where a fraction of a second would change the answer if it were rounded; `EOMONTH` and `EDATE` of a date with a
+  time of day; `EDATE` before March 1900; `YEARFRAC` on the actual/actual basis, with a start after the end, or
+  on the US 30/360 basis with a last day of February; `NETWORKDAYS` with a start after the end, a time of day, or
+  dates as text; return types and weekend numbers the pages don't list.
+
 #### What it refuses
 
-- **Not implemented yet:** time intelligence, `ALLSELECTED`, `FORMAT` and most text, date, math and statistical
+- **Not implemented yet:** time intelligence, `ALLSELECTED`, `FORMAT` and most text, math and statistical
   functions, window functions (`OFFSET`, `INDEX`, `WINDOW`, `RANK`, `ROWNUMBER`), visual calculations,
   `DEFINE TABLE` / `DEFINE COLUMN`, `START AT`, query parameters, detail rows, KPIs. Row-level and object-level
   security are not applied (a query runs as an administrator's would).
