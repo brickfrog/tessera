@@ -14,6 +14,7 @@ module Registry =
             Aggregation.functions
             Logical.functions
             Math.functions
+            Text.functions
             Filter.functions
             TableFunctions.functions
         ]

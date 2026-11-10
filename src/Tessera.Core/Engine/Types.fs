@@ -43,9 +43,17 @@ namespace Tessera.DaxEngine
 //   - A DAX error (the kind IFERROR catches: a failed conversion, ERROR()) is `Fail.runtime`; DAX
 //     that is wrong (wrong argument kind, unknown name) is `Fail.invalid`. Results of `DaxValue`
 //     operations go through `Fail.dax`.
-//   - `Check` is the static twin of the implementation: given the argument trees alone it says
-//     which forms are not supported. `Engine.coverage` runs it without data, and the evaluator
-//     runs it before every call, so the two cannot disagree. Keep form checks there.
+//   - `Check` says, from the argument trees alone, which forms are not supported. `Engine.coverage`
+//     runs it without data and the evaluator runs it before every call. Put every refusal that
+//     can be told from the arguments there, so coverage reports it; a refusal that needs values
+//     or the context stays in the implementation (and coverage can't see it).
+//   - Text and order have open questions the engine refuses rather than guesses: turn a value
+//     into text with `Convert.toText` (never `DaxValue.toText`: a date's text depends on the
+//     model's culture), check operands of arithmetic with `Convert.checkOperand`, and before
+//     sorting by values call `Sorting.check` (where BLANK sorts against zero and negatives is
+//     not documented).
+//   - Names are registered once: `Registry.byName` throws if two entries share a name. Before
+//     adding a family, see which of its functions another file already has (`Engine.functions`).
 //   - `Type` is the static result type where the function has one whatever its data (COUNTROWS is
 //     always an Integer). It types result columns that are BLANK in every row.
 
@@ -248,6 +256,20 @@ type ValueArrayComparer(comparer: IEqualityComparer<DaxValue>) =
                 h <- h * 31 + comparer.GetHashCode x
 
             h
+
+/// The static type of a scalar expression: what can be said of its type without evaluating it.
+[<RequireQualifiedAccess>]
+type StaticType =
+    /// Always BLANK (BLANK (), an omitted argument): no type of its own; it takes the type of
+    /// whatever it is combined with.
+    | Blank
+    /// Always a value of this type, or BLANK.
+    | Known of DaxType
+    /// Known to be of different types in different cases (an IF with a text and a number branch):
+    /// the engine declares such a column Variant.
+    | Variant
+    /// Not known without evaluating: the values decide.
+    | Unknown
 
 // ---- The bound model ---------------------------------------------------------------------------
 
@@ -674,6 +696,8 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     member val Rels: BRel array = [||] with get, set
     member val Measures = Dictionary<string, BMeasure>(StringComparer.OrdinalIgnoreCase) with get
     member val Functions = Dictionary<string, BFunction>(StringComparer.OrdinalIgnoreCase) with get
+    /// The static type of each measure, once worked out (a measure's type is its own business).
+    member val MeasureTypes = ConcurrentDictionary<BMeasure, StaticType>(HashIdentity.Reference) with get
     member val ColumnCount = 0 with get, set
     /// Set by `prepare`: compute a pending calculated column or table, or raise.
     member val ForceColumn: BColumn -> unit = ignore with get, set
@@ -787,20 +811,6 @@ type FilterCtx(filters: Filter list, config: RelConfig) =
 /// One level of row context: a row of a table.
 type RowCtx = { Table: TableVal; Row: int }
 
-/// The static type of a scalar expression: what can be said of its type without evaluating it.
-[<RequireQualifiedAccess>]
-type StaticType =
-    /// Always BLANK (BLANK (), an omitted argument): no type of its own; it takes the type of
-    /// whatever it is combined with.
-    | Blank
-    /// Always a value of this type, or BLANK.
-    | Known of DaxType
-    /// Known to be of different types in different cases (an IF with a text and a number branch):
-    /// the engine declares such a column Variant.
-    | Variant
-    /// Not known without evaluating: the values decide.
-    | Unknown
-
 /// What a name is bound to: a VAR or a VAL parameter (a value, computed once, on first use), or an
 /// EXPR parameter (an expression evaluated wherever it is used).
 type Binding =
@@ -819,6 +829,7 @@ and Scope = {
 [<Sealed; AllowNullLiteral>]
 type QueryDefs() =
     member val Measures = Dictionary<string, BMeasure>(StringComparer.OrdinalIgnoreCase) with get
+    member val MeasureTypes = Dictionary<BMeasure, StaticType>(HashIdentity.Reference) with get
     member val Functions = Dictionary<string, BFunction>(StringComparer.OrdinalIgnoreCase) with get
 
 /// The evaluation context.

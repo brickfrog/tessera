@@ -305,6 +305,31 @@ let tests =
                 is (p ()) "RANKX ( { 10, 10, 5 }, [Value], 5, , DENSE )" 2)
         ]
 
+        testList "decimal sums" [
+            // "SUM ( table[column] ) corresponds to SUMX ( table, table[column] )" (dax.guide/sum):
+            // also in the last digit, where a floating-point sum depends on its order. Ten times
+            // 0.1 added one by one is 0.9999999999999999, not 1.
+            testCase "SUM adds in row order, as SUMX does" (fun () ->
+                let m =
+                    prepare {
+                        Tables = [
+                            table "T" [ "V", Microsoft.AnalysisServices.Tabular.DataType.Double ] [
+                                for i in 1..12 -> [ box (if i > 10 then 0.7 else 0.1) ]
+                            ]
+                        ]
+                        Rels = []
+                        Measures = []
+                        Functions = []
+                    }
+
+                let expected = List.replicate 10 0.1 @ [ 0.7; 0.7 ] |> List.fold (+) 0.0
+                is m "SUM ( T[V] )" expected
+                is m "SUMX ( T, T[V] )" expected
+                is m "SUM ( T[V] ) = SUMX ( T, T[V] )" true
+                is m "CALCULATE ( SUM ( T[V] ), T[V] < 0.5 )" 0.9999999999999999
+                is m "AVERAGE ( T[V] ) = AVERAGEX ( T, T[V] )" true)
+        ]
+
         testList "evaluateScalar" [
             testCase "returns typed values" (fun () ->
                 Expect.equal (scalar (p ()) "1") (QueryValue.Int64 1L) "integer"

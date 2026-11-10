@@ -730,25 +730,48 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
             | _ -> unknown
 
     member private this.TypeOfMeasure(ctx: Ctx, m: BMeasure) : StaticType =
-        if
-            ctx.Measures |> List.exists (fun x -> obj.ReferenceEquals(x, m))
-            || ctx.Measures.Length > 32
-        then
+        // Worked out once per measure: a measure that refers to others several times would
+        // otherwise be walked again for each reference, and again inside each of those.
+        let fromQuery = isQueryMeasure ctx m
+
+        let cached =
+            if fromQuery then
+                match ctx.Query.MeasureTypes.TryGetValue m with
+                | true, t -> Some t
+                | _ -> None
+            else
+                match ctx.Model.MeasureTypes.TryGetValue m with
+                | true, t -> Some t
+                | _ -> None
+
+        match cached with
+        | Some t -> t
+        | None when ctx.Measures |> List.exists (fun x -> obj.ReferenceEquals(x, m)) ->
+            // A measure that refers to itself: evaluating it is the error.
             StaticType.Unknown
-        else
+        | None ->
             let inner = {
                 ctx with
                     Rows = []
                     Scope = {
                         Vars = Map.empty
                         Source = m.Source
-                        InQuery = isQueryMeasure ctx m
+                        InQuery = fromQuery
                     }
                     Measures = m :: ctx.Measures
                     Group = null
+                    CallerRows = false
             }
 
-            try
-                ev.TypeOf(inner, m.Expr)
-            with EngineException _ ->
-                StaticType.Unknown
+            let t =
+                try
+                    ev.TypeOf(inner, m.Expr)
+                with EngineException _ ->
+                    StaticType.Unknown
+
+            if fromQuery then
+                ctx.Query.MeasureTypes.[m] <- t
+            else
+                ctx.Model.MeasureTypes.[m] <- t
+
+            t

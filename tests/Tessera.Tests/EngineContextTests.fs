@@ -359,9 +359,16 @@ let tests =
                 is (p ()) "COUNTROWS ( ALL ( Product ) )" 5
                 is (p ()) "COUNTROWS ( ALLNOBLANKROW ( Product ) )" 4
                 is (p ()) "COUNTROWS ( Product )" 4
-                is (p ()) "COUNTROWS ( DISTINCT ( Product ) )" 4
-                // "DISTINCTCOUNT ( table[column] ) corresponds to COUNTROWS ( DISTINCT ( table[column] ) )".
-                is (p ()) "DISTINCTCOUNT ( Product[Color] )" 3)
+                is (p ()) "COUNTROWS ( DISTINCT ( Product ) )" 4)
+            // "DISTINCTCOUNT ( table[column] ) corresponds to COUNTROWS ( DISTINCT ( table[column] ) )"
+            // (dax.guide/distinctcount) leaves the blank row out, while the same pages say it "counts the
+            // BLANK value": with the blank row visible the engine refuses rather than pick one.
+            testCase "DISTINCTCOUNT while the blank row is visible" (fun () ->
+                isError "not-supported" "DISTINCTCOUNT ( Product[Color] )"
+                // Hidden by a filter, or on a table without one, there is nothing to decide.
+                is (p ()) "CALCULATE ( DISTINCTCOUNT ( Product[Color] ), Product[Category] = \"Safety\" )" 2
+                is (p ()) "DISTINCTCOUNT ( Customer[Country] )" 2
+                is (p ()) "DISTINCTCOUNTNOBLANK ( Product[Color] )" 3)
             testCase "a table whose relationships are all valid has none" (fun () ->
                 is (p ()) "COUNTROWS ( VALUES ( Customer ) )" 3
                 is (p ()) "COUNTROWS ( ALL ( Customer[Country] ) )" 2)
@@ -438,6 +445,26 @@ let tests =
                     }
 
                 Expect.equal (TessError.code (scalarError m "[Loop]")) "dax-invalid" "circular")
+            // Each measure refers to the one before it twice, forty deep: 2^39 if every reference
+            // were evaluated or typed again, so values and types are worked out once per measure.
+            testCase "a diamond of measures" (fun () ->
+                let chain = [
+                    for i in 1..40 ->
+                        "Sales",
+                        $"D{i}",
+                        (if i = 1 then
+                             "1"
+                         else
+                             $"IF ( TRUE, [D{i - 1}] + [D{i - 1}], 0 )")
+                ]
+
+                let m =
+                    prepare {
+                        star with
+                            Measures = star.Measures @ chain
+                    }
+
+                is m "[D40]" 549755813888L)
             // Measures that call measures, 300 deep: no stack overflow.
             testCase "a deep chain of measures" (fun () ->
                 let chain = [

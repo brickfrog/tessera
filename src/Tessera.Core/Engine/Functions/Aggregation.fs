@@ -175,17 +175,18 @@ module Aggregation =
 
         match c.Data.DataType with
         | DaxType.Decimal ->
-            // Row order doesn't matter to the engine either; summing per value keeps it fast.
+            // Row by row, as SUMX does ("SUM ( table[column] ) corresponds to SUMX ( table,
+            // table[column] )"): a sum of floating-point numbers depends on its order.
+            let ids = c.Data.ValueIds
             let mutable total = 0.0
             let mutable any = false
 
-            for id in 0 .. counts.Length - 1 do
-                if counts.[id] > 0 then
-                    match values.[id] with
-                    | DaxValue.Decimal d ->
-                        total <- total + d * float counts.[id]
-                        any <- true
-                    | _ -> ()
+            for row in Filters.visibleStored ctx.Filter c.Table do
+                match values.[ids.[row]] with
+                | DaxValue.Decimal d ->
+                    total <- total + d
+                    any <- true
+                | _ -> ()
 
             if any then DaxValue.Decimal total else DaxValue.Blank
         | DaxType.Integer
@@ -345,7 +346,23 @@ module Aggregation =
         // "DISTINCTCOUNT ( table[column] ) corresponds to COUNTROWS ( DISTINCT ( table[column] ) )"
         // and "counts the BLANK value" (dax.guide/distinctcount, Microsoft Learn DISTINCTCOUNT).
         Fn.scalar "DISTINCTCOUNT" "Aggregation" (1, 1) (Fn.typeIs DaxType.Integer) (fun ev ctx call ->
-            let _, counts = columnCounts ev ctx call
+            let c, counts = columnCounts ev ctx call
+            let t = c.Table
+
+            // The page's equivalence leaves the blank row out (DISTINCT never returns it), yet the
+            // same pages say DISTINCTCOUNT "counts the BLANK value": whether the blank row's BLANK
+            // is one of the values is not settled, so that case is refused.
+            let blankRowShown =
+                t.HasBlankRow && (Filters.visible ctx.Filter t).Contains t.RowCount
+
+            let storedBlankShown = c.Data.BlankId >= 0 && counts.[c.Data.BlankId] > 0
+
+            if blankRowShown && not storedBlankShown then
+                Fail.notSupported
+                    ctx
+                    call.Span
+                    $"DISTINCTCOUNT of '{t.Name}'[{c.Name}] while the blank row of '{t.Name}' is visible (whether its BLANK is counted is not documented; COUNTROWS ( DISTINCT ( ... ) ) and COUNTROWS ( VALUES ( ... ) ) say which is meant)"
+
             let n = counts |> Array.sumBy (fun k -> if k > 0 then 1L else 0L)
             if n = 0L then DaxValue.Blank else DaxValue.Integer n)
         |> Fn.withCheck (columnOnly "DISTINCTCOUNT")

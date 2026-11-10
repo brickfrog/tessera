@@ -472,14 +472,34 @@ let tests =
         <| fun (seed: int) ->
             let f = filters seed
 
+            // Where the table has no blank row, or it is hidden, DISTINCTCOUNT is COUNTROWS ( DISTINCT ).
             same
                 seed
-                $"CALCULATE ( COUNTROWS ( DISTINCT ( Product[Color] ) ){f} )"
-                $"CALCULATE ( DISTINCTCOUNT ( Product[Color] ){f} )"
+                $"CALCULATE ( COUNTROWS ( DISTINCT ( Customer[Name] ) ){f} )"
+                $"CALCULATE ( DISTINCTCOUNT ( Customer[Name] ){f} )"
 
             same
                 seed
-                $"CALCULATE ( COUNTROWS ( VALUES ( Product[Color] ) ) - DISTINCTCOUNT ( Product[Color] ) + 0{f} )"
+                $"CALCULATE ( COUNTROWS ( DISTINCT ( Sales[ProductKey] ) ){f} )"
+                $"CALCULATE ( DISTINCTCOUNT ( Sales[ProductKey] ){f} )"
+
+            // On Product it is that too, or refused: exactly when the blank row is visible.
+            let p = starPrepared.Value
+
+            let blankRowShown =
+                scalar p $"CALCULATE ( COUNTROWS ( VALUES ( Product ) ) - COUNTROWS ( Product ) + 0{f} )"
+
+            match Engine.evaluateScalar p $"CALCULATE ( DISTINCTCOUNT ( Product[Color] ){f} )" with
+            | Ok v ->
+                Expect.equal blankRowShown (QueryValue.Int64 0L) $"seed {seed}: answered, so the blank row is hidden"
+                Expect.equal v (scalar p $"CALCULATE ( COUNTROWS ( DISTINCT ( Product[Color] ) ){f} )") $"seed {seed}"
+            | Error(DaxNotSupported _) ->
+                Expect.equal blankRowShown (QueryValue.Int64 1L) $"seed {seed}: refused, so the blank row is visible"
+            | Error e -> failtestf "seed %d: %s" seed (TessError.message e)
+
+            same
+                seed
+                $"CALCULATE ( COUNTROWS ( VALUES ( Product[Color] ) ) - COUNTROWS ( DISTINCT ( Product[Color] ) ) + 0{f} )"
                 $"CALCULATE ( COUNTROWS ( VALUES ( Product ) ) - COUNTROWS ( Product ) + 0{f} )"
 
             same

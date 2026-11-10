@@ -1945,6 +1945,8 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
     order), and sorting where BLANK meets zero or negative values, or values of different types;
   - a date or TRUE/FALSE turned into text by `&` (the format depends on the model's culture), text read as a date
     in arithmetic, a date multiplied, `ROUND` of a negative number exactly halfway;
+  - `DISTINCTCOUNT` of a column while its table's blank row is visible (whether that BLANK is counted: write
+    `COUNTROWS ( DISTINCT ( ... ) )` or `COUNTROWS ( VALUES ( ... ) )` to say which);
   - a context transition, or a column read, inside a user-defined function that was called from a row context
     (the documentation says what the function's parameters see of the caller's row context, not its body);
   - a name that is both a column of the row context and a measure (except in `ORDER BY`, where it is the result's
@@ -1990,9 +1992,10 @@ evaluation context, so iterators and `CALCULATE` are ordinary entries. Adding a 
 line and a line in `Registry.fs`; the header of `Engine/Types.fs` documents the API with examples. Each entry also
 carries a static check of its argument forms, which is what `coverage` runs.
 
-Performance, on a 100,000-row fact table with three dimensions (see `EnginePerfTests`): `SUMX` over the fact about
-0.13 s, `CALCULATE` with two filters under 0.01 s, `SUMMARIZECOLUMNS` by a dimension column with a measure about
-0.1 to 0.2 s.
+Performance, on a 100,000-row fact table with three dimensions (see `EnginePerfTests`, on a laptop): `SUMX` over
+the fact about 0.15 s, `CALCULATE` with two filters under 0.01 s, `SUMMARIZECOLUMNS` by a dimension column with a
+measure 0.1 to 0.2 s (by two dimensions with a filter 0.35 s), a measure per row of the fact (100,000 context
+transitions) 0.35 s.
 
 ### Findings JSON and CI annotations
 
