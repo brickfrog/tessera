@@ -324,6 +324,32 @@ let tests =
                     (File.ReadAllText((save BimFile SaveOptions.defaults false original (t.Combine "m.bim") |> ok).Path))
                     ""
 
+            testCase "with PrefixFilenames, more than 1000 objects keep their order"
+            <| fun () ->
+                use t = new TempDir()
+                let db = sampleDatabase ()
+                let sales = db.Model.Tables.["Sales"]
+
+                for i in 1..1005 do
+                    sales.Measures.Add(new Measure(Name = $"m{1005 - i}", Expression = "1"))
+
+                let original =
+                    db
+                    |> withOptions {
+                        FolderOptions.defaultFolder with
+                            PrefixFilenames = true
+                    }
+
+                let back = reload (sampleFolder t original)
+                Expect.equal (bimText back) (bimText original) ""
+                Expect.isTrue (File.Exists(t.Combine("folder", "tables", "000 Sales", "measures", "1006 m0.json"))) ""
+
+            testCase "file order: number prefixes by number, then the rest ordinally"
+            <| fun () ->
+                let names = [ "b"; "101 x"; "1000 y"; "a"; "002 z"; "9x"; "B" ]
+
+                Expect.equal (names |> List.sortWith fileOrder) [ "002 z"; "101 x"; "1000 y"; "9x"; "B"; "a"; "b" ] ""
+
             testCase "every level, and back"
             <| fun () ->
                 use t = new TempDir()
@@ -602,6 +628,22 @@ let tests =
 
                 Expect.isLessThan (file.Text.IndexOf "\"Admins\"") (file.Text.IndexOf "\"Readers\"") ""
 
+            testCase "IgnorePrivacySettings drops credentials' privacy settings"
+            <| fun () ->
+                let bim =
+                    "{\n  \"name\": \"Db\",\n  \"model\": {\n    \"dataSources\": [\n      {\n        \"type\": \"structured\",\n        \"name\": \"Sql\",\n        \"credential\": {\n          \"AuthenticationKind\": \"ServiceAccount\",\n          \"PrivacySetting\": \"Organizational\"\n        }\n      }\n    ]\n  }\n}"
+
+                let o = {
+                    FolderOptions.empty with
+                        IgnorePrivacySettings = true
+                }
+
+                let file = split o "\n" bim |> okText |> List.exactlyOne
+                Expect.isFalse (file.Text.Contains "PrivacySetting") ""
+                Expect.stringContains file.Text "AuthenticationKind" ""
+                let kept = split FolderOptions.empty "\n" bim |> okText |> List.exactlyOne
+                Expect.equal kept.Text bim "without the option, the text is as it was"
+
             testCase "IgnoreLineageTags drops lineage tags"
             <| fun () ->
                 let db = sampleDatabase ()
@@ -752,6 +794,37 @@ let tests =
                 TmdlSerializer.SerializeDatabaseToFolder(db, tomDir)
 
                 Expect.equal (relativeFiles tomDir) written "TOM's own names"
+
+            testCase "the same bytes as TOM's folder serializer, for every TMDL option"
+            <| fun () ->
+                for opts in
+                    [
+                        SaveOptions.defaults
+                        { SaveOptions.defaults with Eol = CrLf }
+                        {
+                            SaveOptions.defaults with
+                                IndentSpaces = Some 4
+                        }
+                        {
+                            SaveOptions.defaults with
+                                IncludeSensitive = true
+                        }
+                    ] do
+                    use t = new TempDir()
+                    let db = sampleDatabase ()
+                    TmdlSerializer.SerializeDatabaseToFolder(db, t.Path, tmdlOptions opts)
+
+                    let tom =
+                        relativeFiles t.Path |> List.map (fun f -> f, File.ReadAllBytes(t.Combine f))
+
+                    let mine =
+                        tmdlFiles opts db
+                        |> List.sortWith (fun (a, _) (b, _) -> String.CompareOrdinal(a, b))
+
+                    Expect.equal (List.map fst mine) (List.map fst tom) (sprintf "%A" opts)
+
+                    for (f, a), (_, b) in List.zip mine tom do
+                        Expect.isTrue ((a: byte array) = b) f
 
             testCase "device names and name clashes get portable names; everything loads back"
             <| fun () ->

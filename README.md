@@ -198,7 +198,8 @@ three `Local*` options loads and saves back byte for byte.
 
 Where tess departs from TE2:
 - **File names** are portable on every OS (see above). TE2 escapes only what the running OS refuses.
-- **Reading order** is ordinal by file name. TE2 uses the current culture's order and, for table
+- **Reading order**: names with a number prefix (`000 `, `1000 `) are sorted by that number, the rest
+  ordinally. TE2 uses the current culture's order (so `1000 x` comes before `101 x`) and, for table
   folders, the file system's. Without `PrefixFilenames`, split collections come back in file-name order;
   this format stores no order. The model is otherwise the same.
 - **Relationship names** are kept under `LocalRelationships`. TE2 drops them all, so Power BI Desktop's

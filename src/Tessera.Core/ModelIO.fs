@@ -354,7 +354,8 @@ let toBimText (opts: SaveOptions) (db: Database) =
     | Lf -> json
     | CrLf -> json.Replace("\n", "\r\n")
 
-let private tmdlOptions (opts: SaveOptions) =
+/// TOM's TMDL options for a save.
+let tmdlOptions (opts: SaveOptions) =
     let formatting =
         MetadataFormattingOptionsBuilder(MetadataSerializationStyle.Tmdl)
             .WithBaseIndentationLevel(0)

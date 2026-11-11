@@ -796,9 +796,35 @@ let split (o: FolderOptions) (eol: string) (bimJson: string) : Result<FolderFile
 
 // ---- Reading ----------------------------------------------------------------------------------------
 
+/// The order files are read in: names with a number prefix ("000 Sales", as PrefixFilenames writes)
+/// by that number, then the rest, ordinally. TE2 sorts by the current culture, which puts "1000 x"
+/// before "101 x" and so loses the order of a folder with more than 1000 objects.
+let fileOrder (a: string) (b: string) =
+    let key (name: string) =
+        let digits = name |> Seq.takeWhile Char.IsAsciiDigit |> Seq.length
+
+        if digits > 0 && digits < name.Length && name.[digits] = ' ' then
+            let number = name.Substring(0, digits).TrimStart '0'
+            0, number.Length, number, name
+        else
+            1, 0, "", name
+
+    let ga, la, na, ra = key a
+    let gb, lb, nb, rb = key b
+
+    match compare ga gb with
+    | 0 ->
+        match compare la lb with
+        | 0 ->
+            match String.CompareOrdinal(na, nb) with
+            | 0 -> String.CompareOrdinal(ra, rb)
+            | n -> n
+        | n -> n
+    | n -> n
+
 let private ordinal (paths: string array) =
     paths
-    |> Array.sortWith (fun a b -> String.CompareOrdinal(Path.GetFileName a, Path.GetFileName b))
+    |> Array.sortWith (fun a b -> fileOrder (Path.GetFileName a) (Path.GetFileName b))
 
 let private jsonFiles (dir: string) =
     Directory.GetFiles dir
@@ -1076,8 +1102,8 @@ let rec private clearObjectAnnotations (o: JsonObject) =
         | :? JsonObject as child -> clearObjectAnnotations child
         | _ -> ()
 
-/// Read a folder back into one TOM JSON (.bim) text. Files are read in ordinal file-name order (TE2
-/// uses the current culture's order, and the file system's order for table folders).
+/// Read a folder back into one TOM JSON (.bim) text. Files are read in fileOrder (TE2 uses the
+/// current culture's order, and the file system's order for table folders).
 let combine (dir: string) : Result<string, string> =
     try
         let databaseJson = Path.Combine(dir, databaseJsonFileName)
