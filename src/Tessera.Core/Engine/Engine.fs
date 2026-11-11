@@ -571,6 +571,128 @@ type private QueryObjects = {
     Prepared: Tessera.DaxEngine.Model
 }
 
+/// The model's calendars (calendar-based time intelligence: CalendarModel.fs, Calendars.fs).
+let private bindCalendars (db: Database) (model: Tessera.DaxEngine.Model) =
+    let set = CalendarSet()
+    let sortBy = Dictionary<BColumn, BColumn>(HashIdentity.Reference)
+
+    let categoryOf (u: TimeUnit) : Category option =
+        match u with
+        | TimeUnit.Year -> Some Category.Year
+        | TimeUnit.Quarter -> Some Category.Quarter
+        | TimeUnit.QuarterOfYear -> Some Category.QuarterOfYear
+        | TimeUnit.Month -> Some Category.Month
+        | TimeUnit.MonthOfYear -> Some Category.MonthOfYear
+        | TimeUnit.MonthOfQuarter -> Some Category.MonthOfQuarter
+        | TimeUnit.Week -> Some Category.Week
+        | TimeUnit.WeekOfYear -> Some Category.WeekOfYear
+        | TimeUnit.WeekOfQuarter -> Some Category.WeekOfQuarter
+        | TimeUnit.WeekOfMonth -> Some Category.WeekOfMonth
+        | TimeUnit.Date -> Some Category.Date
+        | TimeUnit.DayOfYear -> Some Category.DayOfYear
+        | TimeUnit.DayOfQuarter -> Some Category.DayOfQuarter
+        | TimeUnit.DayOfMonth -> Some Category.DayOfMonth
+        | TimeUnit.DayOfWeek -> Some Category.DayOfWeek
+        | _ -> None
+
+    for t in db.Model.Tables do
+        match model.TableByName.TryGetValue t.Name with
+        | true, bt when t.Calendars.Count > 0 ->
+            let column (c: Column) : BColumn option =
+                if isNull c then
+                    None
+                else
+                    match bt.ColumnByName.TryGetValue c.Name with
+                    | true, b -> Some b
+                    | _ -> None
+
+            for c in t.Columns do
+                match column c, column c.SortByColumn with
+                | Some a, Some b -> sortBy.[a] <- b
+                | _ -> ()
+
+            // "The columns specified in the sort-by-column property are automatically considered
+            // as associated columns" (SQLBI, "Introducing calendar-based time intelligence in DAX").
+            let withSortBy (cols: BColumn list) =
+                cols
+                @ (cols
+                   |> List.choose (fun c ->
+                       match sortBy.TryGetValue c with
+                       | true, s -> Some s
+                       | _ -> None))
+                |> List.distinctBy (fun c -> c.Id)
+
+            let calendars = ResizeArray<BCalendar>()
+
+            for cal in t.Calendars do
+                let groups = ResizeArray<CalendarGroup>()
+                let related = ResizeArray<BColumn>()
+                let mutable problem = None
+
+                for g in cal.CalendarColumnGroups do
+                    match g with
+                    | :? TimeUnitColumnAssociation as a ->
+                        match categoryOf a.TimeUnit, column a.PrimaryColumn with
+                        | None, _ ->
+                            problem <-
+                                Some
+                                    $"the calendar '{cal.Name}' uses the category {a.TimeUnit}, which no source describes"
+                        | _, None -> problem <- Some $"the calendar '{cal.Name}' has a category with no primary column"
+                        | Some cat, Some p ->
+                            if groups.Exists(fun x -> x.Category = cat) then
+                                problem <- Some $"the calendar '{cal.Name}' has the category {Category.name cat} twice"
+
+                            let associated =
+                                withSortBy (p :: ([ for c in a.AssociatedColumns -> column c ] |> List.choose id))
+                                |> List.filter (fun c -> not (obj.ReferenceEquals(c, p)))
+
+                            groups.Add {
+                                Category = cat
+                                Primary = p
+                                Associated = associated
+                            }
+                    | :? TimeRelatedColumnGroup as r ->
+                        for c in withSortBy ([ for c in r.Columns -> column c ] |> List.choose id) do
+                            related.Add c
+                    | _ -> problem <- Some $"the calendar '{cal.Name}' has a kind of column group no source describes"
+
+                let bc =
+                    BCalendar(cal.Name, bt, List.ofSeq groups, related |> Seq.distinctBy (fun c -> c.Id) |> List.ofSeq)
+
+                bc.Problem <- problem
+                calendars.Add bc
+                set.ByName.[cal.Name] <- bc
+
+            set.ByTable.[bt] <- List.ofSeq calendars
+
+            for bc in calendars do
+                match bc.Problem with
+                | Some why -> set.TableProblem.[bt] <- why
+                | None -> ()
+
+                for g in bc.Groups do
+                    for c in g.Primary :: g.Associated do
+                        match set.CategoryOf.TryGetValue c with
+                        | true, other when other <> g.Category ->
+                            // "Columns must have a consistent category across calendars" (Learn).
+                            set.TableProblem.[bt] <-
+                                $"its calendars give the column '{bt.Name}'[{c.Name}] two categories"
+                        | _ -> set.CategoryOf.[c] <- g.Category
+
+                for c in bc.TimeRelated do
+                    set.TimeRelated.Add c |> ignore
+
+            for c in set.TimeRelated do
+                if obj.ReferenceEquals(c.Table, bt) && set.CategoryOf.ContainsKey c then
+                    set.TableProblem.[bt] <-
+                        $"its calendars have the column '{bt.Name}'[{c.Name}] both in a category and as time-related"
+        | _ -> ()
+
+    if set.ByName.Count > 0 then
+        CalendarRegistry.register model set
+        Calendars.registerSortBy model sortBy
+        Calendars.install ()
+
 let private bindWith
     (clock: Clock)
     (db: Database)
@@ -755,6 +877,7 @@ let private bindWith
 
     model.Tables <- tables.ToArray()
     bindCalculationGroups db store model
+    bindCalendars db model
 
     // Relationships the engine does: single column, many-to-one (either way round), one-to-one and
     // many-to-many.

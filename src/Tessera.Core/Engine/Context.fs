@@ -414,6 +414,9 @@ module Filters =
         if filters.IsEmpty then
             fc
         else
+            // A filter on a column a calendar tags clears others first (Calendars.fs).
+            let fc = CalendarHooks.beforeAdd fc filters keep
+
             let old, scope =
                 if keep then
                     fc.Filters, fc.Scope
@@ -1132,6 +1135,7 @@ module Context =
                 fc <- Filters.mark fc (Shadow rc.Table)
                 let filters = rowFilters ctx span rc
                 DateTable.onTransition ctx span fc filters
+                CalendarHooks.onTransition fc filters
                 fc <- Filters.add fc filters false
                 let t = rc.Table
 

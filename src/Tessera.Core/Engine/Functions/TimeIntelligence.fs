@@ -1,7 +1,8 @@
 namespace Tessera.DaxEngine.Functions
 
-// Time intelligence over a date column (the "classic" functions; calendar-based time intelligence
-// is refused). Each function is implemented to the definition DAX Guide publishes for it:
+// Time intelligence over a date column (the "classic" functions) and over a calendar
+// (calendar-based time intelligence: see "Calendars" below, and Calendars.fs for the filter
+// clearing). Each classic function is implemented to the definition DAX Guide publishes for it:
 //
 //   - The dates argument. "A reference to a date/time column. Only in this case a context
 //     transition applies because the <Dates> column reference is replaced by CALCULATETABLE (
@@ -177,6 +178,12 @@ module TimeIntelligence =
     }
 
     let private read (ev: IEval) (ctx: Ctx) (name: string) (arg: Expr) : Dates =
+        if (Calendars.tryResolve ctx arg).IsSome then
+            Fail.notSupported
+                ctx
+                arg.Span
+                $"{name} over a calendar (calendar-based time intelligence: not implemented for {name})"
+
         match ev.TryColumn(ctx, arg) with
         | Some c ->
             let u = universeOf ctx arg.Span name c
@@ -400,6 +407,12 @@ module TimeIntelligence =
     // ---- DATESBETWEEN, DATESINPERIOD -------------------------------------------------------------
 
     let private columnOnly (ev: IEval) (ctx: Ctx) (name: string) (arg: Expr) : BColumn * Universe =
+        if (Calendars.tryResolve ctx arg).IsSome then
+            Fail.notSupported
+                ctx
+                arg.Span
+                $"{name} over a calendar (calendar-based time intelligence: not implemented for {name})"
+
         match ev.TryColumn(ctx, arg) with
         | Some c -> c, universeOf ctx arg.Span name c
         | None ->
@@ -706,6 +719,371 @@ module TimeIntelligence =
             ))
         |> Fn.withCheck (checkBalance withYearEnd)
 
+    // ---- Calendars (calendar-based time intelligence) ----------------------------------------
+    //
+    // With a calendar the functions work on the rows of the calendar's table, in the order of the
+    // dates the calendar tags as Date, and on the periods its categories define (`Calendars.Data`).
+    // "With a calendar, the result has the primary column of each calendar category and the
+    // time-related columns of the calendar. Also in this case, a context transition applies"
+    // (dax.guide/datesmtd). The result is of the whole table: "Calendar-based time intelligence
+    // functions don't have such a requirement [a complete date column]. Instead, they operate on
+    // the dates as-is" (Microsoft Learn, Sparse dates). Refused: a calendar without the Date
+    // category, FIRSTDATE, LASTDATE, DATEADD, SAMEPERIODLASTYEAR, PARALLELPERIOD and DATESINPERIOD
+    // over a calendar (the "same distance from parent" shifts and their Extension, Truncation and
+    // EndBehavior arguments).
+
+    /// What a calendar function sees of its calendar's table.
+    type private Seen = {
+        D: Calendars.Data
+        /// The visible positions (see `Calendars.Data`), ascending.
+        Positions: int array
+        /// The categories of the filtered columns some calendar tags.
+        Filtered: Set<Category>
+        /// A filter is on the column tagged as Date, or on the whole table.
+        DateFiltered: bool
+        /// A time-related column is filtered.
+        TimeRelatedFiltered: bool
+    }
+
+    let private calendarSet (ctx: Ctx) : CalendarSet =
+        match CalendarRegistry.tryGet ctx.Model with
+        | Some s -> s
+        | None -> invalidOp "a calendar was resolved in a model without calendars"
+
+    /// The rows of the calendar's table visible after context transition.
+    let private seen (ctx: Ctx) (span: Span) (name: string) (cal: BCalendar) : Seen =
+        let d = Calendars.data ctx span name cal
+        let set = calendarSet ctx
+        let fc = (Context.transition ctx span).Filter
+        let t = cal.Table
+        let visible = Filters.visible fc t
+
+        let onTable (f: Filter) =
+            match f with
+            | OnColumn(c, _) -> obj.ReferenceEquals(c.Table, t)
+            | Tuples(cols, _) -> cols |> Array.exists (fun c -> obj.ReferenceEquals(c.Table, t))
+            | Rows(r, _, cfg) -> cfg.IsExpanded(r, t)
+
+        let own = fc.Filters |> List.filter onTable
+
+        if (Filters.visible (Filters.build fc.Config own) t).Rows <> visible.Rows then
+            // Which columns count as filtered when other tables cross-filter the calendar's table
+            // is not documented.
+            Fail.notSupported
+                ctx
+                span
+                $"{name} over the calendar '{cal.Name}' while filters on other tables cross-filter '{t.Name}'"
+
+        let mutable filtered = Set.empty
+        let mutable dateFiltered = false
+        let mutable timeRelated = false
+
+        let column (c: BColumn) =
+            if obj.ReferenceEquals(c, d.DateColumn) then
+                dateFiltered <- true
+
+            match set.CategoryOf.TryGetValue c with
+            | true, Category.Date -> dateFiltered <- true
+            | true, cat -> filtered <- filtered.Add cat
+            | _ ->
+                if set.TimeRelated.Contains c then
+                    timeRelated <- true
+
+        for f in own do
+            match f with
+            | OnColumn(c, _) -> column c
+            | Tuples(cols, _) -> cols |> Array.iter column
+            | Rows _ -> dateFiltered <- true
+
+        {
+            D = d
+            Positions =
+                visible.Rows
+                |> Array.choose (fun r ->
+                    let p = if r < d.PositionOf.Length then d.PositionOf.[r] else -1
+                    if p >= 0 then Some p else None)
+                |> Array.sort
+            Filtered = filtered
+            DateFiltered = dateFiltered
+            TimeRelatedFiltered = timeRelated
+        }
+
+    /// Each position's period. "TOTALWTD expects specific categories to be present in the
+    /// calendar. If they aren't, an error is returned" (Microsoft Learn, "Work with calendars");
+    /// "Power BI needs to be able to "walk-up" from the level the calculation is performed on all
+    /// the way to an individual year" (the same page).
+    let private periodsOf (ctx: Ctx) (span: Span) (name: string) (d: Calendars.Data) (p: CalendarPeriod) : int array =
+        let cal = d.Calendar
+
+        if not (Category.routes p |> List.exists (List.forall cal.Has)) then
+            Fail.invalid
+                ctx
+                span
+                $"{name}: the calendar '{cal.Name}' doesn't tag the categories that define a {Category.periodName p}"
+
+        match d.Periods.[p] with
+        | Ok index -> index
+        | Error why -> Fail.notSupported ctx span $"{name} over {why}"
+
+    /// The first and the last position of the period of a position.
+    let private extent (index: int array) (pos: int) : int * int =
+        let mutable lo = pos
+        let mutable hi = pos
+
+        while lo > 0 && index.[lo - 1] = index.[pos] do
+            lo <- lo - 1
+
+        while hi < index.Length - 1 && index.[hi + 1] = index.[pos] do
+            hi <- hi + 1
+
+        lo, hi
+
+    /// The positions of a period by its number (empty when there is none).
+    let private periodNumbered (index: int array) (n: int) : int * int =
+        match Array.tryFindIndex (fun i -> i = n) index with
+        | Some pos -> extent index pos
+        | None -> 0, -1
+
+    /// The calendar's columns for the rows at these positions.
+    let private calendarTable (d: Calendars.Data) (lo: int) (hi: int) : TableVal =
+        let cols = d.Calendar.ResultColumns
+        let count = max 0 (hi - lo + 1)
+
+        Tables.ofColumns
+            (cols |> Array.map Tables.modelColumn)
+            (cols
+             |> Array.map (fun c -> Array.init count (fun i -> c.ValueAt d.Rows.[lo + i])))
+            count
+
+    let private noYearEnd (ctx: Ctx) (name: string) (call: Call) =
+        if call.Args.Length > 1 then
+            // "YearEndDate is valid only with a date column. With a calendar, DATESYTD returns an
+            // error if you use YearEndDate. The calendar defines the year" (dax.guide/datesytd).
+            Fail.invalid ctx call.Args.[1].Span $"{name}: a year end date can't be given with a calendar"
+
+    /// DATESWTD / MTD / QTD / YTD over a calendar (dax.guide/datesmtd, datesqtd, datesytd,
+    /// dateswtd): from the first date of the period of the last visible date to
+    ///
+    ///   - "If the filter context filters the column tagged as Day, the result ends with the last
+    ///     visible day.
+    ///   - If the filter context filters a column of another category, for example a week or a
+    ///     month column, the result ends with the last day of the last visible period of that
+    ///     category. The result does not go past the end of the month.
+    ///   - If the filter context filters only columns that no calendar tags, for example the day
+    ///     of the week, the result has all the days of the month that includes the last visible
+    ///     date."
+    ///   - "If the filter context filters a column that another calendar tags as Week, a calendar
+    ///     without the Week category returns an error."
+    ///
+    /// With columns of several periods filtered, the period is the one inside all the others (a
+    /// month and its year: the month); periods that don't nest (weeks across months) are refused,
+    /// as are filters on the day categories other than Date (which no example shows) and on
+    /// time-related columns (which no calendar tags with a category).
+    let private toDateCalendar (p: CalendarPeriod) (name: string) (ctx: Ctx) (call: Call) (cal: BCalendar) : TableVal =
+        noYearEnd ctx name call
+        let span = call.Span
+        let s = seen ctx span name cal
+        let d = s.D
+        let index = periodsOf ctx span name d p
+
+        if s.Positions.Length = 0 then
+            Fail.notSupported ctx span $"{name} over a calendar when no date is visible (not documented)"
+
+        let last = s.Positions.[s.Positions.Length - 1]
+        let first, periodEnd = extent index last
+
+        if
+            s.Filtered.Contains Category.Week
+            && not (Category.routes CalendarPeriod.Week |> List.exists (List.forall cal.Has))
+        then
+            Fail.runtime
+                ctx
+                span
+                $"{name}: a column another calendar tags as Week is filtered, and the calendar '{cal.Name}' has no Week category."
+
+        let finish =
+            if s.DateFiltered then
+                last
+            else
+                let days = s.Filtered |> Set.filter (fun c -> (Category.periodOf c).IsNone)
+
+                if not days.IsEmpty then
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"{name} over a calendar while a column of the category {Category.name days.MinimumElement} is filtered (where the result ends is not documented)"
+
+                if s.TimeRelatedFiltered then
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"{name} over a calendar while a time-related column is filtered (where the result ends is not documented)"
+
+                let kinds = s.Filtered |> Seq.choose Category.periodOf |> Seq.distinct |> List.ofSeq
+
+                for k in kinds do
+                    if not (Category.routes k |> List.exists (List.forall cal.Has)) then
+                        Fail.notSupported
+                            ctx
+                            span
+                            $"{name} over the calendar '{cal.Name}' while a column of a {Category.periodName k} it doesn't define is filtered (not documented)"
+
+                match kinds with
+                | [] -> periodEnd
+                | _ ->
+                    let indexes = kinds |> List.map (fun k -> k, periodsOf ctx span name d k)
+
+                    // g nests in k when two positions in one g-period are always in one k-period.
+                    let nests (g: int array) (k: int array) =
+                        seq { 1 .. g.Length - 1 }
+                        |> Seq.forall (fun i -> g.[i] <> g.[i - 1] || k.[i] = k.[i - 1])
+
+                    match
+                        indexes
+                        |> List.tryFind (fun (_, g) -> indexes |> List.forall (fun (_, k) -> nests g k))
+                    with
+                    | Some(_, g) -> min periodEnd (snd (extent g last))
+                    | None ->
+                        Fail.notSupported
+                            ctx
+                            span
+                            $"{name} over a calendar while columns of periods that don't nest are filtered (where the result ends is not documented)"
+
+        calendarTable d first finish
+
+    /// STARTOF* / ENDOF* over a calendar: the first date of the period of the first visible date,
+    /// or the last date of the period of the last one ("CLOSINGBALANCEWEEK uses the last date of
+    /// the week that contains the last date in the filter context": dax.guide/closingbalanceweek).
+    /// With nothing visible the table is empty: "If there is no date before the current year ...
+    /// OPENINGBALANCEYEAR evaluates Expression with an empty filter on the dates"
+    /// (dax.guide/openingbalanceyear), whose definition ends in ENDOFYEAR of nothing.
+    let private edgeCalendar (isEnd: bool) (p: CalendarPeriod) (name: string) (ctx: Ctx) (call: Call) (cal: BCalendar) =
+        noYearEnd ctx name call
+        let s = seen ctx call.Span name cal
+        let index = periodsOf ctx call.Span name s.D p
+
+        if s.Positions.Length = 0 then
+            calendarTable s.D 0 -1
+        else
+            let anchor =
+                if isEnd then
+                    s.Positions.[s.Positions.Length - 1]
+                else
+                    s.Positions.[0]
+
+            let lo, hi = extent index anchor
+            let at = if isEnd then hi else lo
+            calendarTable s.D at at
+
+    /// PREVIOUS* / NEXT* over a calendar: "all dates from the previous week, based on the first
+    /// date in the current context" (Microsoft Learn, PREVIOUSWEEK), and the period after the one
+    /// of the last date for NEXT*. "OPENINGBALANCEWEEK uses the last date of the week before the
+    /// week that contains the first date in the filter context" (dax.guide/openingbalanceweek).
+    let private neighbourCalendar
+        (isNext: bool)
+        (p: CalendarPeriod)
+        (name: string)
+        (ctx: Ctx)
+        (call: Call)
+        (cal: BCalendar)
+        : TableVal =
+        noYearEnd ctx name call
+        let s = seen ctx call.Span name cal
+        let index = periodsOf ctx call.Span name s.D p
+
+        if s.Positions.Length = 0 then
+            calendarTable s.D 0 -1
+        else
+            let anchor =
+                if isNext then
+                    s.Positions.[s.Positions.Length - 1]
+                else
+                    s.Positions.[0]
+
+            let lo, hi = periodNumbered index (index.[anchor] + (if isNext then 1 else -1))
+            calendarTable s.D lo hi
+
+    /// PREVIOUSDAY / NEXTDAY over a calendar: the date before the first visible date, or after the
+    /// last, among the calendar's dates: "you can now use PREVIOUSDAY with a calendar based on a
+    /// table that doesn't have entries for the weekend to jump from Monday straight to Friday"
+    /// (Microsoft Learn, Sparse dates).
+    let private dayCalendar (isNext: bool) (name: string) (ctx: Ctx) (call: Call) (cal: BCalendar) : TableVal =
+        let s = seen ctx call.Span name cal
+
+        if s.Positions.Length = 0 then
+            calendarTable s.D 0 -1
+        else
+            let at =
+                if isNext then
+                    s.Positions.[s.Positions.Length - 1] + 1
+                else
+                    s.Positions.[0] - 1
+
+            if at < 0 || at >= s.D.Rows.Length then
+                calendarTable s.D 0 -1
+            else
+                calendarTable s.D at at
+
+    /// The implementation of a table function over a calendar, by the function's name.
+    let private overCalendar (name: string) : (Ctx -> Call -> BCalendar -> TableVal) option =
+        match name with
+        | "DATESWTD" -> Some(toDateCalendar CalendarPeriod.Week name)
+        | "DATESMTD" -> Some(toDateCalendar CalendarPeriod.Month name)
+        | "DATESQTD" -> Some(toDateCalendar CalendarPeriod.Quarter name)
+        | "DATESYTD" -> Some(toDateCalendar CalendarPeriod.Year name)
+        | "STARTOFWEEK" -> Some(edgeCalendar false CalendarPeriod.Week name)
+        | "STARTOFMONTH" -> Some(edgeCalendar false CalendarPeriod.Month name)
+        | "STARTOFQUARTER" -> Some(edgeCalendar false CalendarPeriod.Quarter name)
+        | "STARTOFYEAR" -> Some(edgeCalendar false CalendarPeriod.Year name)
+        | "ENDOFWEEK" -> Some(edgeCalendar true CalendarPeriod.Week name)
+        | "ENDOFMONTH" -> Some(edgeCalendar true CalendarPeriod.Month name)
+        | "ENDOFQUARTER" -> Some(edgeCalendar true CalendarPeriod.Quarter name)
+        | "ENDOFYEAR" -> Some(edgeCalendar true CalendarPeriod.Year name)
+        | "PREVIOUSWEEK" -> Some(neighbourCalendar false CalendarPeriod.Week name)
+        | "PREVIOUSMONTH" -> Some(neighbourCalendar false CalendarPeriod.Month name)
+        | "PREVIOUSQUARTER" -> Some(neighbourCalendar false CalendarPeriod.Quarter name)
+        | "PREVIOUSYEAR" -> Some(neighbourCalendar false CalendarPeriod.Year name)
+        | "NEXTWEEK" -> Some(neighbourCalendar true CalendarPeriod.Week name)
+        | "NEXTMONTH" -> Some(neighbourCalendar true CalendarPeriod.Month name)
+        | "NEXTQUARTER" -> Some(neighbourCalendar true CalendarPeriod.Quarter name)
+        | "NEXTYEAR" -> Some(neighbourCalendar true CalendarPeriod.Year name)
+        | "PREVIOUSDAY" -> Some(dayCalendar false name)
+        | "NEXTDAY" -> Some(dayCalendar true name)
+        | _ -> None
+
+    /// DATESBETWEEN over a calendar: "If StartDate is BLANK ... With a calendar, it starts from the
+    /// first value in the column tagged as Day"; "With a calendar, StartDate and EndDate must have
+    /// the same data type and the same format as the column tagged as Day. If a value does not
+    /// exist in that column, DATESBETWEEN uses it as BLANK" (dax.guide/datesbetween).
+    let private datesBetweenCalendar (ev: IEval) (ctx: Ctx) (call: Call) (cal: BCalendar) : TableVal =
+        let d = Calendars.data ctx call.Span "DATESBETWEEN" cal
+
+        let position (e: Expr) (whenMissing: int) =
+            match ev.Scalar(ctx, e) with
+            | DaxValue.Blank -> whenMissing
+            | DaxValue.DateTime s ->
+                match Array.BinarySearch(d.Days, s) with
+                | i when i >= 0 -> i
+                | _ -> whenMissing
+            | _ ->
+                Fail.notSupported
+                    ctx
+                    e.Span
+                    "a boundary of DATESBETWEEN over a calendar that is not a date (it must have the type of the Date column)"
+
+        let lo = position call.Args.[1] 0
+        let hi = position call.Args.[2] (d.Rows.Length - 1)
+        calendarTable d lo hi
+
+    /// A week function given a date column: "Week functions only work with calendar based time
+    /// intelligence" (Microsoft Learn, TOTALWTD and the others); "A date column is not valid and
+    /// returns an error" (dax.guide/closingbalanceweek).
+    let private weekNeedsCalendar (ctx: Ctx) (call: Call) : 'a =
+        Fail.invalid
+            ctx
+            call.Args.[0].Span
+            $"{call.Name.Name.ToUpperInvariant()} works only with a calendar (calendar-based time intelligence)"
+
     // ---- Registration ----------------------------------------------------------------------------
 
     let private datesTable
@@ -715,8 +1093,11 @@ module TimeIntelligence =
         (impl: IEval -> Ctx -> Call -> Dates -> int array)
         : DaxFunction =
         Fn.table name family (1, maxArgs) (fun ev ctx call ->
-            let d = read ev ctx name call.Args.[0]
-            tableOf d.Column (impl ev ctx call d))
+            match Calendars.tryResolve ctx call.Args.[0], overCalendar name with
+            | Some cal, Some over -> over ctx call cal
+            | _ ->
+                let d = read ev ctx name call.Args.[0]
+                tableOf d.Column (impl ev ctx call d))
         |> Fn.withCheck (checks [ checkDates 0; check ])
 
     let private none: Expr list -> string option = fun _ -> None
@@ -816,21 +1197,24 @@ module TimeIntelligence =
         // until June 30, 2020" (Microsoft Learn, of DATESBETWEEN ( 'Date'[Date], BLANK (), MAX (
         // 'Date'[Date] ) )).
         Fn.table "DATESBETWEEN" family (3, 3) (fun ev ctx call ->
-            let c, u = columnOnly ev ctx "DATESBETWEEN" call.Args.[0]
+            match Calendars.tryResolve ctx call.Args.[0] with
+            | Some cal -> datesBetweenCalendar ev ctx call cal
+            | None ->
+                let c, u = columnOnly ev ctx "DATESBETWEEN" call.Args.[0]
 
-            let boundary (e: Expr) (whenBlank: float) =
-                match ev.Scalar(ctx, e) with
-                | DaxValue.Blank -> whenBlank
-                | DaxValue.DateTime s -> s
-                | _ ->
-                    Fail.notSupported
-                        ctx
-                        e.Span
-                        "a boundary of DATESBETWEEN that is not a date (how a number or a text is read as one is not implemented)"
+                let boundary (e: Expr) (whenBlank: float) =
+                    match ev.Scalar(ctx, e) with
+                    | DaxValue.Blank -> whenBlank
+                    | DaxValue.DateTime s -> s
+                    | _ ->
+                        Fail.notSupported
+                            ctx
+                            e.Span
+                            "a boundary of DATESBETWEEN that is not a date (how a number or a text is read as one is not implemented)"
 
-            let lo = boundary call.Args.[1] Double.NegativeInfinity
-            let hi = boundary call.Args.[2] Double.PositiveInfinity
-            tableOf c (u.Days |> Array.filter (fun day -> float day >= lo && float day <= hi)))
+                let lo = boundary call.Args.[1] Double.NegativeInfinity
+                let hi = boundary call.Args.[2] Double.PositiveInfinity
+                tableOf c (u.Days |> Array.filter (fun day -> float day >= lo && float day <= hi)))
         |> Fn.withCheck (checkDates 0)
 
         Fn.table "DATESINPERIOD" family (4, 5) (fun ev ctx call ->
@@ -900,6 +1284,29 @@ module TimeIntelligence =
         datesTable "NEXTMONTH" 1 none (fun _ _ _ d -> neighbour true Period.Month d)
         datesTable "NEXTQUARTER" 1 none (fun _ _ _ d -> neighbour true Period.Quarter d)
         datesTable "NEXTYEAR" 2 (checkYearEnd 1) (fun _ ctx call d -> neighbour true (yearEndAt 1 call ctx) d)
+
+        // The week functions, which take only a calendar (see `weekNeedsCalendar`).
+        datesTable "DATESWTD" 1 none (fun _ ctx call _ -> weekNeedsCalendar ctx call)
+        datesTable "STARTOFWEEK" 1 none (fun _ ctx call _ -> weekNeedsCalendar ctx call)
+        datesTable "ENDOFWEEK" 1 none (fun _ ctx call _ -> weekNeedsCalendar ctx call)
+        datesTable "PREVIOUSWEEK" 1 none (fun _ ctx call _ -> weekNeedsCalendar ctx call)
+        datesTable "NEXTWEEK" 1 none (fun _ ctx call _ -> weekNeedsCalendar ctx call)
+
+        // "TOTALWTD(<expression>,<calendar>[,<filter>])": "the expression evaluated for the dates in
+        // the current week-to-date" (Microsoft Learn, TOTALWTD), as TOTALMTD is with DATESMTD.
+        asCalculate "TOTALWTD" false (fun span dates _ -> callOf "DATESWTD" span [ dates ])
+
+        // "The syntax CLOSINGBALANCEWEEK ( <Expression>, <Calendar> [, <Filter>] ) corresponds to
+        // CALCULATE ( <Expression>, ENDOFWEEK ( <Calendar> ) [, <Filter>] )"
+        // (dax.guide/closingbalanceweek).
+        asCalculate "CLOSINGBALANCEWEEK" false (fun span dates _ -> callOf "ENDOFWEEK" span [ dates ])
+
+        // "OPENINGBALANCEWEEK evaluates Expression at the last date of the previous week"
+        // (dax.guide/openingbalanceweek): CALCULATETABLE ( ENDOFWEEK, PREVIOUSWEEK ), as for the
+        // month ("With a calendar reference ... CALCULATETABLE ( ENDOFMONTH ( <Calendar> ),
+        // PREVIOUSMONTH ( <Calendar> ) )": dax.guide/openingbalancemonth).
+        asCalculate "OPENINGBALANCEWEEK" false (fun span dates _ ->
+            callOf "CALCULATETABLE" span [ callOf "ENDOFWEEK" span [ dates ]; callOf "PREVIOUSWEEK" span [ dates ] ])
 
         // "CALCULATE ( <Expression>, DATESYTD ( <Dates> [, <YearEndDate>] ) [, <Filter>] )"
         // (dax.guide/totalytd), and the same for the month and the quarter.

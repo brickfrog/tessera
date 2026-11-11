@@ -914,8 +914,13 @@ let refusalTests =
             refused p "EVALUATE DATESINPERIOD ( 'Date'[Date], dt\"2024-03-10\", -1, MONTH, ENDALIGNED )" "EndBehavior"
             refused p "EVALUATE DATESINPERIOD ( 'Date'[Date], dt\"2024-03-10\", -1, WEEK )" "WEEK"
             refused p "EVALUATE PARALLELPERIOD ( 'Date'[Date], -1, WEEK )" "WEEK"
-            refused p "EVALUATE DATESWTD ( 'Date'[Date] )" "DATESWTD"
-            refused p "EVALUATE STARTOFWEEK ( 'Date'[Date] )" "STARTOFWEEK"
+
+            // "Week functions only work with calendar based time intelligence" (Microsoft Learn):
+            // with a date column they are an error.
+            for f in [ "DATESWTD"; "STARTOFWEEK" ] do
+                match Engine.evaluateQuery p $"EVALUATE {f} ( 'Date'[Date] )" with
+                | Error e -> Expect.equal (TessError.code e) "dax-invalid" f
+                | Ok _ -> failtestf "%s of a date column should be an error" f
 
         testCase "dates arguments that are not a date column or a table of one"
         <| fun () ->
