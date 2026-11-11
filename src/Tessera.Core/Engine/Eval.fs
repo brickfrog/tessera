@@ -396,9 +396,6 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
         Variables.settle ctx (bound |> List.mapi (fun i (name, value) -> name, value, used.[i]))
         result
 
-    let toBool (ctx: Ctx) (span: Span) (v: DaxValue) : bool =
-        Fail.dax ctx span (DaxValue.toBoolean v)
-
     let tableConstructor (ctx: Ctx) (span: Span) (rows: Expr list) : TableVal =
         let rows =
             rows
