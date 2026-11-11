@@ -2075,8 +2075,11 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   measure. Existing combinations for columns of one table; group-by tables that a filter table spans together are
   grouped by the combinations it has, the others cross joined; the blank row is a group; rows whose expressions are
   all BLANK (except `IGNORE`d ones) are dropped. `ROLLUPADDISSUBTOTAL` (with `ROLLUPGROUP` and its flag columns) adds
-  the subtotal rows, and `ISINSCOPE` tells them apart. Not `ROLLUP`, `ROLLUPISSUBTOTAL`, `NONVISUAL`, nor a rollup
-  with a group-level filter. `NATURALINNERJOIN` and `NATURALLEFTOUTERJOIN` join tables with no model columns
+  the subtotal rows, and `ISINSCOPE` tells them apart. `NONVISUAL ( filter )` on group-by columns of the same call:
+  it picks the groups, and `ALLSELECTED` in a row doesn't restore it ("NONVISUAL marks a SUMMARIZECOLUMNS filter so
+  that it does not affect measures using ALLSELECTED": dax.guide). Not `ROLLUP`, `ROLLUPISSUBTOTAL`, nor a rollup
+  with a group-level filter; nor `NONVISUAL` on other columns (whether it then changes the measures' values isn't
+  documented), with `ROLLUPADDISSUBTOTAL` or `KEEPFILTERS`, or on a column the outer context already filters. `NATURALINNERJOIN` and `NATURALLEFTOUTERJOIN` join tables with no model columns
   (`DATATABLE`, table constructors, computed columns) on their columns of the same name. `FIRSTNONBLANK` and its
   relatives go through the column's values in ascending order.
 
@@ -2328,7 +2331,8 @@ It refuses what the sources leave open:
 - row contexts that aren't an iterator's: a calculated column, `ORDER BY`, a True/False filter argument, a wider
   `SUMMARIZE`, `GROUPBY`, a function called from a row context.
 
-`NONVISUAL` stays refused.
+A `NONVISUAL` filter argument of `SUMMARIZECOLUMNS` is not restored (see `SUMMARIZECOLUMNS` above for the shapes
+implemented).
 
 
 #### Window functions

@@ -533,7 +533,7 @@ let tests =
 
                 notSupported
                     (p ())
-                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ), \"A\", [Amount] )"
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Customer[Country] ) ), \"A\", [Amount] )"
                     "NONVISUAL"
 
                 notSupported
@@ -1405,8 +1405,6 @@ let tests =
                     "CALCULATE ( [Amount], CROSSFILTER ( Sales[ProductKey], Product[ProductKey], ONEWAY_LEFTFILTERSRIGHT ) )",
                     "CROSSFILTER direction"
                     "CALCULATE ( [Amount], ALLSELECTED (), ALL ( Product ) )", "ALLSELECTED together with"
-                    "COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ) ) )",
-                    "NONVISUAL"
                 ]
 
                 let model = {

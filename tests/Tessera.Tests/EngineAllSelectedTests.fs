@@ -262,6 +262,44 @@ let tests =
                     p.Value
                     "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Brand], \"Pct\", DIVIDE ( [Qty], CALCULATE ( [Qty], ALLSELECTED ( Product[Brand] ) ) ) ), TREATAS ( { \"Contoso\", \"Fabrikam\" }, Product[Brand] ) )"
                     expected)
+            // "NONVISUAL marks a SUMMARIZECOLUMNS filter so that it does not affect measures using
+            // ALLSELECTED as part of their calculation" (dax.guide/nonvisual); "Returns the result
+            // where [Visual Total Sales] is the total across all years" (Learn, SUMMARIZECOLUMNS,
+            // "With NONVISUAL"). The same query as above: the total is every brand's, 450.
+            testCase "NONVISUAL: the filter picks the groups, ALLSELECTED doesn't restore it" (fun () ->
+                returns
+                    p.Value
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], NONVISUAL ( TREATAS ( { \"Contoso\", \"Fabrikam\" }, Product[Brand] ) ), \"Qty\", [Qty], \"Visual Total\", CALCULATE ( [Qty], ALLSELECTED ( Product[Brand] ) ), \"Sel\", [TotalSel] )"
+                    [ [ "Contoso"; 110; 450; 450 ]; [ "Fabrikam"; 220; 450; 450 ] ]
+
+                // A visual filter next to it is still restored: Contoso and Fabrikam's red products.
+                returns
+                    p.Value
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], NONVISUAL ( TREATAS ( { \"Contoso\", \"Fabrikam\" }, Product[Brand] ) ), TREATAS ( { \"Red\" }, Product[Color] ), \"Qty\", [Qty], \"Visual Total\", CALCULATE ( [Qty], ALLSELECTED ( Product[Brand] ) ) )"
+                    [ [ "Contoso"; 60; 120 ]; [ "Fabrikam"; 50; 120 ] ]
+
+                // What the sources don't show is refused.
+                let refused (dax: string) (what: string) = notSupported p.Value dax what
+
+                refused
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], NONVISUAL ( TREATAS ( { \"Red\" }, Product[Color] ) ), \"Qty\", [Qty] )"
+                    "not a group-by column"
+
+                refused
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], NONVISUAL ( FILTER ( Product, Product[Color] <> \"Red\" ) ), \"Qty\", [Qty] )"
+                    "NONVISUAL"
+
+                refused
+                    "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Brand], \"T\" ), NONVISUAL ( TREATAS ( { \"Contoso\" }, Product[Brand] ) ), \"Qty\", [Qty] )"
+                    "ROLLUPADDISSUBTOTAL"
+
+                refused
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], KEEPFILTERS ( NONVISUAL ( TREATAS ( { \"Contoso\" }, Product[Brand] ) ) ), \"Qty\", [Qty] )"
+                    "KEEPFILTERS"
+
+                refused
+                    "EVALUATE CALCULATETABLE ( SUMMARIZECOLUMNS ( Product[Brand], NONVISUAL ( TREATAS ( { \"Contoso\" }, Product[Brand] ) ), \"Qty\", [Qty] ), Product[Brand] <> \"Litware\" )"
+                    "filters already")
             // A group-by column the argument doesn't name keeps its group: per brand, all colors.
             testCase "only the named group-by column is released" (fun () ->
                 returns
