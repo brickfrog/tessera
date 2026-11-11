@@ -3051,6 +3051,11 @@ jobs:
 
 `--json` (or `-j`) writes one JSON document to stdout, errors included (`{"error": {"code", "message"}}`).
 
+**Plain output:** tess writes plain text only: no colour, no spinner, no line redrawn in place. Progress (`refresh
+--progress`) is one line per event on stderr, so logs read the same in CI as in a terminal. Should tess ever
+decorate output, it does so only on a terminal, and never when `CI` or `NO_COLOR` is set or `TERM` is `dumb`
+(`Output.plainOutput`).
+
 **"Did you mean":** when something isn't found or recognised, the error names the closest matches (within about a
 third of the length in edits, ignoring case; swapped letters count as one edit), at most three, and JSON lists them
 as the error's `suggestions`. That covers an object reference (any form: `measure:Sales/Totl`, `'Sales'[Totl]`,

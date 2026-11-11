@@ -43,6 +43,33 @@ let objWithNulls (props: (string * JsonNode) list) : JsonNode =
 
 let arr (items: JsonNode seq) : JsonNode = JsonArray(Array.ofSeq items)
 
+// ---- plain output ------------------------------------------------------------------------------
+
+/// Whether output must stay plain: no colour (ANSI escapes), no spinner, no line redrawn with \r.
+/// tess writes only plain text today; anything that decorates output must ask this first.
+/// Plain when CI is set (any non-empty value: GitHub Actions, Azure DevOps, GitLab... set it), when
+/// NO_COLOR is set (https://no-color.org), when TERM is "dumb", or when the stream isn't a terminal
+/// (redirected to a file or a pipe).
+let plainOutput (getEnv: string -> string option) (isTerminal: bool) =
+    let set name =
+        getEnv name |> Option.exists (fun v -> v <> "")
+
+    not isTerminal
+    || set "CI"
+    || set "NO_COLOR"
+    || getEnv "TERM"
+       |> Option.exists (fun t -> t.Equals("dumb", System.StringComparison.OrdinalIgnoreCase))
+
+/// plainOutput for the process's stderr (where progress goes) or stdout.
+let plainProcessOutput (getEnv: string -> string option) (stderr: bool) =
+    let redirected =
+        if stderr then
+            System.Console.IsErrorRedirected
+        else
+            System.Console.IsOutputRedirected
+
+    plainOutput getEnv (not redirected)
+
 let writeJson (out: TextWriter) (node: JsonNode) =
     out.WriteLine(node.ToJsonString jsonOptions)
 
