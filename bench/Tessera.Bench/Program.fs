@@ -106,7 +106,9 @@ let private load (model: string) =
     | Error e -> failwith (TessError.message e)
 
 /// The child: prepare once, then run the queries from `start` on, one line per result.
-let child (model: string) (dir: string) (start: int) (filter: Regex) =
+let child (model: string) (dir: string) (start: int) (filter: Regex) (check: bool) =
+    let incremental = DaxEngine.IncrementalStats.Global
+    incremental.Check <- check
     let db = load model
     let all = queries db
 
@@ -143,9 +145,17 @@ let child (model: string) (dir: string) (start: int) (filter: Regex) =
         if i >= start && filter.IsMatch q.Name then
             Console.Out.WriteLine($"START\t{i}")
             Console.Out.Flush()
+
+            let applied, checkedBefore, mismatched =
+                incremental.Applied, incremental.Checked, incremental.Mismatched
+
             let sw = Stopwatch.StartNew()
             let r = Engine.evaluateQuery prepared q.Dax
             let ms = sw.Elapsed.TotalMilliseconds
+
+            Console.Out.WriteLine(
+                $"STATS\t{i}\t{incremental.Applied - applied}\t{incremental.Checked - checkedBefore}\t{incremental.Mismatched - mismatched}"
+            )
 
             let status, print =
                 match r with
@@ -172,6 +182,7 @@ let parent
     (filter: string)
     (out: string option)
     (compare: string option)
+    (check: bool)
     =
     let db = load model
     let all = queries db |> Array.ofList
@@ -180,6 +191,9 @@ let parent
     let mutable peak = 0L
     let mutable start = 0
     let mutable finished = false
+    let mutable applied = 0L
+    let mutable checkedCount = 0L
+    let mutable mismatched = 0L
     let exe = Environment.ProcessPath
     let dll = typeof<Query>.Assembly.Location
 
@@ -187,7 +201,15 @@ let parent
         let psi =
             ProcessStartInfo(
                 exe,
-                [ dll; "--child"; model; dir; string start; filter ],
+                [
+                    dll
+                    "--child"
+                    model
+                    dir
+                    string start
+                    filter
+                    (if check then "check" else "")
+                ],
                 RedirectStandardOutput = true,
                 UseShellExecute = false
             )
@@ -240,6 +262,10 @@ let parent
                     rows.Add row
                     eprintfn "%10.1f ms  %-14s %s" (float f.[3]) f.[4] f.[2]
                     current <- -1
+                | "STATS" ->
+                    applied <- applied + int64 f.[2]
+                    checkedCount <- checkedCount + int64 f.[3]
+                    mismatched <- mismatched + int64 f.[4]
                 | "PREPARE" -> prepare <- float f.[1] :: prepare
                 | "PEAK" -> peak <- max peak (int64 f.[1])
                 | "DONE" ->
@@ -313,6 +339,11 @@ let parent
         (float peak / 1048576.0)
         total
 
+    // Of the queries that finished.
+    eprintfn "incremental filter contexts: %d applied, %d checked, %d mismatched" applied checkedCount mismatched
+
+    let failed = if check && mismatched > 0L then 1 else 0
+
     match compare with
     | Some path ->
         let before =
@@ -334,14 +365,14 @@ let parent
             | _ -> ()
 
         eprintfn "%d changed answers" changed
-        if changed > 0 then 1 else 0
-    | None -> 0
+        if changed > 0 then 1 else failed
+    | None -> failed
 
 [<EntryPoint>]
 let main argv =
     match List.ofArray argv with
-    | "--child" :: model :: dir :: start :: filter :: _ ->
-        child model dir (int start) (Regex filter)
+    | "--child" :: model :: dir :: start :: filter :: check :: _ ->
+        child model dir (int start) (Regex filter) (check = "check")
         0
     | model :: dir :: rest ->
         let rec opt name (xs: string list) =
@@ -357,8 +388,9 @@ let main argv =
             (opt "--filter" rest |> Option.defaultValue ".")
             (opt "--out" rest)
             (opt "--compare" rest)
+            (List.contains "--check" rest)
     | _ ->
         eprintfn
-            "usage: Tessera.Bench <model> <fixture dir> [--timeout s] [--filter regex] [--out file] [--compare file]"
+            "usage: Tessera.Bench <model> <fixture dir> [--timeout s] [--filter regex] [--out file] [--compare file] [--check]"
 
         2
