@@ -77,7 +77,6 @@ let private results (sarif: string) =
                 Path = loc.GetProperty("logicalLocations").[0].GetProperty("fullyQualifiedName").GetString()
                 Physical = physical
                 Exact = r.GetProperty("properties").GetProperty("exactLocation").GetBoolean()
-                Suppressed = r.TryGetProperty("suppressions") |> fst
             |}
     ]
 
@@ -203,7 +202,7 @@ let tests =
             Expect.equal r.Code ExitCode.usage r.Err
             Expect.isFalse (File.Exists(t.Combine "x.sarif")) ""
 
-        testCase "bpa --sarif: helpUri only from a rule's LearnMoreUrl; ignored findings are suppressed"
+        testCase "bpa --sarif: helpUri only from a rule's LearnMoreUrl"
         <| fun () ->
             let t, dir = repo ()
             use _ = t
@@ -255,7 +254,7 @@ let tests =
             Expect.equal table.Level "note" "BPA severity 1 is a note"
             Expect.stringContains (lineAt t.Path table.Physical.Value) "table 'Sales Targets'" ""
 
-        testCase "bpa --sarif: a finding ignored by annotation is a suppressed result"
+        testCase "bpa --sarif: a finding ignored by annotation is left out, as from the findings"
         <| fun () ->
             use t = new TempDir()
             Directory.CreateDirectory(t.Combine ".git") |> ignore
@@ -290,8 +289,8 @@ let tests =
             let sarif = File.ReadAllText out
             expectValid sarif
             let rs = results sarif
-            Expect.isTrue (rs |> List.find (fun x -> x.Path = "table:Date")).Suppressed ""
-            Expect.isFalse (rs |> List.find (fun x -> x.Path = "table:Sales")).Suppressed ""
+            Expect.isFalse (rs |> List.exists (fun x -> x.Path = "table:Date")) "ignored"
+            Expect.isTrue (rs |> List.exists (fun x -> x.Path = "table:Sales")) "not ignored"
 
         testCase "a clean run still writes a log, with no results; and the same input gives the same bytes"
         <| fun () ->
@@ -378,6 +377,35 @@ let tests =
             match SourceLocations.locate index (ObjectRef.table "Nothing") with
             | Some(loc, false) -> Expect.equal (Path.GetFileName loc.File) "model.tmdl" ""
             | other -> failtestf "expected the model file, got %A" other
+
+        testCase "source locations: every object of the sample model, in TMDL and in a .bim"
+        <| fun () ->
+            use t = new TempDir()
+            let db = sampleDatabase ()
+            let tmdl = t.Combine "tmdl"
+            TmdlSerializer.SerializeDatabaseToFolder(db, tmdl)
+            let bim = t.Combine "model.bim"
+            File.WriteAllText(bim, JsonSerializer.SerializeDatabase db)
+
+            for format, path in [ ModelFormat.Tmdl, tmdl; ModelFormat.Bim, bim ] do
+                let index =
+                    SourceLocations.build {
+                        Format = format
+                        Path = path
+                        SemanticModelFolder = None
+                    }
+
+                for e in Inventory.objects db do
+                    match SourceLocations.tryFind index e.Ref with
+                    | Some { File = file; Line = Some line } ->
+                        let text = (File.ReadAllLines file).[line - 1]
+                        let name = ObjectRef.name e.Ref
+
+                        if e.Ref.Kind <> ObjectKind.Model then
+                            Expect.isTrue
+                                (text.Contains name || text.Contains(name.Replace("\\", "\\\\")))
+                                $"{format} {ObjectRef.format e.Ref}: line {line} is '{text}'"
+                    | other -> failtestf "%A %s: not placed (%A)" format (ObjectRef.format e.Ref) other
 
         testCase "source locations: a name declared twice is not placed, and a remote model has none"
         <| fun () ->

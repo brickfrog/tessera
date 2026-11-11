@@ -138,11 +138,14 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     let options =
         selected
         |> Result.bind (fun selected ->
-            ValidateCommand.severityArg "--min-severity" (args.TryGetResult Args.Min_Severity) Validate.Severity.Info
+            ValidateCommand.severityArgWith
+                "--min-severity"
+                (args.TryGetResult Args.Min_Severity)
+                Validate.Severity.Info
             |> Result.bind (fun minimum ->
-                ValidateCommand.severityArg "--fail-on" (args.TryGetResult Args.Fail_On) Validate.Severity.Error
+                ValidateCommand.severityArgWith "--fail-on" (args.TryGetResult Args.Fail_On) Validate.Severity.Error
                 |> Result.bind (fun failOn ->
-                    ValidateCommand.ciArg (args.TryGetResult Args.Ci)
+                    ValidateCommand.ciArgWith (args.TryGetResult Args.Ci)
                     |> Result.map (fun ci -> selected, minimum, failOn, ci))))
 
     let isSelected (selected: Set<string>) (f: Lint.Finding) =

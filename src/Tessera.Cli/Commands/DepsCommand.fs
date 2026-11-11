@@ -183,7 +183,7 @@ let unusedText (out: TextWriter) (unused: Unused.UnusedObject list) =
 
 let private runUnused (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
     let kinds =
-        parseKinds (args.GetResults Args.Kind)
+        parseKindsWith (args.GetResults Args.Kind)
         |> Result.bind (fun kinds ->
             match kinds |> List.tryFind (fun k -> not (List.contains k Unused.kinds)) with
             | Some k ->

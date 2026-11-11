@@ -3018,12 +3018,12 @@ results). It doesn't change the command's own output or exit code.
 - **Paths** are relative to the repository root (the nearest folder above the model that holds `.git`, else the
   current folder), with `/` and percent-encoding, under `uriBaseId` `SRCROOT`; a file outside that folder gets an
   absolute `file:` URI. No machine-specific paths otherwise.
-- **Deterministic:** no timestamps or machine names; the same model gives the same bytes. Each result's
-  `partialFingerprints["tesseraFinding/v1"]` is a hash of the rule, the object and the property (not the line), so
-  an alert keeps its identity when lines move.
-- `bpa`: findings an object's ignore annotation hides are results with an `inSource` suppression; rules that
-  couldn't run are `toolConfigurationNotifications`. `properties` on a result carry `objectType`, `fixable` and,
-  where known, `expressionPosition`.
+- **Deterministic:** no timestamps or machine names; the same model gives the same bytes. tess writes no
+  `partialFingerprints`: GitHub's upload action computes its own.
+- `bpa`: findings an object's ignore annotation hides are left out, as they are from `findings` (GitHub doesn't
+  document SARIF suppressions, so they could show as open alerts); rules that couldn't run are
+  `toolConfigurationNotifications`. `properties` on a result carry `objectType`, `fixable`, `exactLocation` and,
+  where known, `expressionPosition` (the line within the expression; the region is the declaration's line).
 
 tess only writes the file; uploading it is your CI's job. With GitHub Actions (tess exits 1 on errors, so the upload
 step runs `if: always()`):
@@ -3038,7 +3038,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - run: dotnet tool install --global tessera
+      - name: Install tess (a release binary, see Install)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo brickfrog/tessera --pattern 'tess-*-linux-x64.tar.gz'
+          tar -xzf tess-*-linux-x64.tar.gz
+          echo "$PWD/$(ls -d tess-*-linux-x64/)" >> "$GITHUB_PATH"
       - run: tess bpa "Sales.SemanticModel" --sarif bpa.sarif
       - uses: github/codeql-action/upload-sarif@v4
         if: always()

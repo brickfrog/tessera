@@ -13,7 +13,6 @@ module Tessera.Cli.Sarif
 
 open System
 open System.IO
-open System.Security.Cryptography
 open System.Text
 open System.Text.Encodings.Web
 open System.Text.Json
@@ -52,8 +51,6 @@ module Rule =
 type Item = {
     Finding: Findings.Finding
     Location: (SourceLocations.SourceLocation * bool) option
-    /// Suppressed (e.g. a BPA finding ignored by the object's annotation): the justification.
-    Suppressed: string option
 }
 
 /// What the run reports about its own configuration (e.g. a BPA rule that couldn't be compiled).
@@ -136,9 +133,6 @@ let private ruleJson (r: Rule) : JsonNode =
         | _ -> ()
     ]
 
-let private sha256 (s: string) =
-    Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes s)).ToLowerInvariant()
-
 /// A BPA rule's URL is a help URI only if it is an absolute http(s) URL.
 let helpUri (url: string option) =
     url
@@ -164,29 +158,7 @@ let log (root: string) (rules: Rule list) (items: Item list) (notifications: Not
 
     let ruleIndex = rules |> List.mapi (fun i r -> r.Id, i) |> Map.ofList
 
-    // Stable identity for a finding across runs: rule, object, property, and which occurrence of
-    // those it is. Not the message (it may carry positions) nor the line (it moves).
-    let fingerprints =
-        items
-        |> List.mapFold
-            (fun (seen: Map<string, int>) item ->
-                let f = item.Finding
-
-                let key =
-                    String.concat "\u0000" [
-                        f.Code
-                        f.ObjectType
-                        f.Object
-                        f.ObjectPath |> Option.defaultValue ""
-                        f.Position |> Option.map _.Property |> Option.defaultValue ""
-                    ]
-
-                let n = seen |> Map.tryFind key |> Option.defaultValue 0
-                sha256 $"{key}\u0000{n}", Map.add key (n + 1) seen)
-            Map.empty
-        |> fst
-
-    let resultJson (item: Item) (fingerprint: string) : JsonNode =
+    let resultJson (item: Item) : JsonNode =
         let f = item.Finding
 
         let message =
@@ -226,12 +198,6 @@ let log (root: string) (rules: Rule list) (items: Item list) (notifications: Not
                         yield "logicalLocations", arr [ logical ]
                     ]
                 ]
-            yield "partialFingerprints", obj [ "tesseraFinding/v1", str fingerprint ]
-
-            match item.Suppressed with
-            | Some why -> yield "suppressions", arr [ obj [ "kind", str "inSource"; "justification", str why ] ]
-            | None -> ()
-
             yield
                 "properties",
                 obj [
@@ -301,7 +267,7 @@ let log (root: string) (rules: Rule list) (items: Item list) (notifications: Not
                     ]
                 ]
                 "invocations", arr [ invocation ]
-                "results", arr (List.map2 resultJson items fingerprints)
+                "results", arr (List.map resultJson items)
             ]
         ]
     ]
@@ -325,11 +291,7 @@ let modelItems (index: SourceLocations.Index) (findings: Findings.Finding list) 
                     false)
             )
 
-        {
-            Finding = f
-            Location = location
-            Suppressed = None
-        }
+        { Finding = f; Location = location }
 ]
 
 let private options =
@@ -350,9 +312,8 @@ let write (path: string) (node: JsonNode) : Result<unit, TessError> =
     try
         File.WriteAllText(path, render node, UTF8Encoding false)
         Ok()
-    with
-    | :? IOException
-    | :? UnauthorizedAccessException as e -> Error(SaveFailed(path, e.Message))
+    with e ->
+        Error(SaveFailed(path, e.Message))
 
 /// The usage line every command's --sarif shares.
 let usage =

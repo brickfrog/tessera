@@ -266,7 +266,6 @@ let private checkSarif (model: string) (source: ModelSource) (selected: string l
                         },
                         i.Line.IsSome
                     )
-                Sarif.Item.Suppressed = None
               }
             | None -> List.head (Sarif.modelItems index [ finding ])
     ]
@@ -288,12 +287,12 @@ let private check (ctx: Ctx) (args: ParseResults<CheckArgs>) =
         match selected |> List.tryFind (fun r -> not (List.contains r known)) with
         | Some bad -> Error(unknownValue "--rule" "rule" bad known)
         | None ->
-            ValidateCommand.severityArg "--min-severity" (args.TryGetResult CheckArgs.Min_Severity) Severity.Info
+            ValidateCommand.severityArgWith "--min-severity" (args.TryGetResult CheckArgs.Min_Severity) Severity.Info
             |> Result.bind (fun minimum ->
-                ValidateCommand.severityArg "--fail-on" (args.TryGetResult CheckArgs.Fail_On) Severity.Error
+                ValidateCommand.severityArgWith "--fail-on" (args.TryGetResult CheckArgs.Fail_On) Severity.Error
                 |> Result.map (fun failOn -> minimum, failOn))
 
-    match options, ValidateCommand.ciArg (args.TryGetResult CheckArgs.Ci) with
+    match options, ValidateCommand.ciArgWith (args.TryGetResult CheckArgs.Ci) with
     | Error problem, _
     | _, Error problem -> usage problem
     | Ok(minimum, failOn), Ok ci ->

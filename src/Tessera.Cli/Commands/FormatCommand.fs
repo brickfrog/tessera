@@ -255,7 +255,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         | Ok(name, dax) -> loose ctx opts checking name dax
     | model :: selectors ->
         let selection =
-            parseKinds (args.GetResults Args.Kind)
+            parseKindsWith (args.GetResults Args.Kind)
             |> Result.map (fun kinds -> {
                 Format.Selection.Selectors = selectors
                 Format.Selection.Kinds = kinds

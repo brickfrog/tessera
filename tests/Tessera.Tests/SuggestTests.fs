@@ -55,6 +55,7 @@ let tests =
             <| fun () ->
                 Expect.equal (Suggest.closest [ "warning"; "error"; "info" ] "eror") [ "error" ] ""
                 Expect.equal (Suggest.closest [ "warning"; "error"; "info" ] "fatal") [] "nothing close"
+                Expect.equal (Suggest.closest [ "a"; "b"; "ab" ] "c") [] "a one-letter name suggests nothing"
 
                 Expect.equal
                     (Suggest.closest [ "abcd"; "abc"; "abd"; "abe"; "abf" ] "abx")
@@ -151,6 +152,7 @@ let tests =
             Expect.equal r.Code ExitCode.usage ""
             Expect.stringStarts r.Err "ERROR: unrecognized argument: '--fial-on' (did you mean '--fail-on'?)." ""
             Expect.equal (suggestions (tess [ "lint"; "x"; "--fixx"; "--json" ])) [ "--fix" ] ""
+            Expect.equal (suggestions (tess [ "bpa"; "x"; "-x"; "--json" ])) [] "a one-letter option suggests nothing"
 
         testCase "option values: --ci, --fail-on, --min-severity, --kind"
         <| fun () ->

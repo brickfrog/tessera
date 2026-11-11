@@ -386,8 +386,9 @@ let trx (modelPath: string) (started: DateTime) (results: Bpa.RuleResult list) =
 
     doc.Declaration.ToString() + "\n" + doc.ToString()
 
-/// The results as SARIF: the rules that ran, every finding, the findings ignored by annotations
-/// as suppressed results, and the rules that couldn't run as notifications.
+/// The results as SARIF: the rules that ran, every finding, and the rules that couldn't run as
+/// notifications. Findings ignored by annotations are left out, as they are from "findings" (code
+/// scanning doesn't document SARIF suppressions, so they could show up as open alerts).
 let sarif (modelPath: string) (source: ModelSource) (results: Bpa.RuleResult list) =
     let index = SourceLocations.build source
 
@@ -407,16 +408,6 @@ let sarif (modelPath: string) (source: ModelSource) (results: Bpa.RuleResult lis
 
     let findings = (summarize results).Findings |> List.map toFinding
 
-    let ignored =
-        results
-        |> List.collect (fun r -> r.Ignored)
-        |> List.map toFinding
-        |> Sarif.modelItems index
-        |> List.map (fun i -> {
-            i with
-                Suppressed = Some "ignored by the object's BestPracticeAnalyzer_IgnoreRules annotation"
-        })
-
     let notifications = [
         for rule, stage, error in problems results ->
             {
@@ -430,7 +421,7 @@ let sarif (modelPath: string) (source: ModelSource) (results: Bpa.RuleResult lis
             }
     ]
 
-    Sarif.log (Sarif.rootFor modelPath) rules (Sarif.modelItems index findings @ ignored) notifications
+    Sarif.log (Sarif.rootFor modelPath) rules (Sarif.modelItems index findings) notifications
 
 /// A --path pattern: a glob (* and ?) over the whole reference, or else a prefix of it.
 /// Case-insensitive, like names in Tabular.

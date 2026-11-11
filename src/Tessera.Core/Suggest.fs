@@ -29,8 +29,9 @@ let distance (a: string) (b: string) =
 /// How many edits still count as a typo of a name this long: about a third of it, from 1 to 3.
 let threshold (length: int) = max 1 (min 3 (length / 3))
 
-/// The candidates within `threshold` edits of `input` (case-insensitive), closest first (ties in
-/// the candidates' order), at most three. A candidate equal to the input is not a suggestion.
+/// The candidates within `threshold` edits of `input` (case-insensitive), and fewer edits than it
+/// has characters (so a one-letter name suggests nothing), closest first (ties in the candidates'
+/// order), at most three. A candidate equal to the input is not a suggestion.
 let closest (candidates: string seq) (input: string) : string list =
     let limit = threshold input.Length
 
@@ -38,7 +39,7 @@ let closest (candidates: string seq) (input: string) : string list =
     |> Seq.distinct
     |> Seq.filter (fun c -> not (String.Equals(c, input, StringComparison.Ordinal)))
     |> Seq.mapi (fun i c -> c, distance c input, i)
-    |> Seq.filter (fun (_, d, _) -> d <= limit)
+    |> Seq.filter (fun (_, d, _) -> d <= limit && d < input.Length)
     |> Seq.sortBy (fun (_, d, i) -> d, i)
     |> Seq.truncate 3
     |> Seq.map (fun (c, _, _) -> c)

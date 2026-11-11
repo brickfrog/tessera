@@ -71,6 +71,27 @@ let tests =
             let pbip = t.Combine "pbip"
             let semanticModel = writePbipProject pbip "Sales"
             let data = t.Combine "data"
+            let script = t.Combine "script.dax"
+            File.WriteAllText(script, "MEASURE Sales[Scripted] = 1\n")
+
+            write
+                (t.Combine(".tess-tests", "s.test.yaml"))
+                (String.concat "\n" [
+                    "suite: S"
+                    "data: ../data"
+                    "tests:"
+                    "  - name: blank"
+                    "    expression: BLANK()"
+                    "    expect: null"
+                    "  - name: wrong"
+                    "    expression: BLANK()"
+                    "    expect: 12345"
+                    "  - name: later"
+                    "    expression: 1"
+                    "    expect: 1"
+                    "    skip: not yet"
+                    ""
+                ])
 
             let local = [
                 [ "info"; model ]
@@ -108,6 +129,14 @@ let tests =
                     "--formatted"
                     "EVALUATE ROW(\"x\", BLANK())"
                 ]
+                [ "test"; "run"; model ]
+                [ "test"; "snapshot"; model ]
+                [ "perspective"; "list"; model; "Sales View" ]
+                [ "translations"; "list"; model ]
+                [ "bpa"; "rules"; "show"; model; "TESS_DIVIDE" ]
+                [ "script"; "apply"; model; script ]
+                [ "get"; model; "column:Sales/Amount"; "-p"; "sortByColumn" ]
+                [ "get"; model; "column:Sales/Amount"; "-p"; "description" ]
             ]
 
             let failures = [
@@ -128,6 +157,8 @@ let tests =
                 [ "connect"; workspace ]
                 [ "refresh"; $"xmla:{workspace};Sales" ]
                 [ "info"; $"xmla:{workspace};Sales" ]
+                [ "deploy"; model; workspace; "Sales" ]
+                [ "deploy"; model; workspace; "New" ]
             ]
 
             let remoteFailures = [

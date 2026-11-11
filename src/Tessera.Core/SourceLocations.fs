@@ -72,6 +72,8 @@ let private tmdlKeywords =
         "relationship", ObjectKind.Relationship
         "role", ObjectKind.Role
         "perspective", ObjectKind.Perspective
+        // TOM writes a culture as `cultureInfo da-DK` (cultures/da-DK.tmdl).
+        "cultureInfo", ObjectKind.Culture
         "culture", ObjectKind.Culture
         "expression", ObjectKind.Expression
         "function", ObjectKind.Function

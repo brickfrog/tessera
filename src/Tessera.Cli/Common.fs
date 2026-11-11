@@ -135,9 +135,13 @@ let unknownValue (option: string) (what: string) (value: string) (known: string 
     (if option = "" then message else $"{option}: {message}"), suggestions
 
 /// Kind tokens (repeatable and/or comma-separated) to ObjectKinds. The error carries suggestions.
-let parseKinds (tokens: string list) =
+let parseKindsWith (tokens: string list) =
     let kinds = parseList tokens |> List.map (fun t -> t, ObjectKind.tryParse t)
 
     match kinds |> List.tryFind (fun (_, k) -> k.IsNone) with
     | Some(bad, _) -> Error(unknownValue "" "kind" bad (ObjectKind.all |> List.map ObjectKind.token))
     | None -> Ok(kinds |> List.choose snd)
+
+/// parseKindsWith, with just the message.
+let parseKinds (tokens: string list) =
+    parseKindsWith tokens |> Result.mapError fst

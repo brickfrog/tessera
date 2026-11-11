@@ -66,7 +66,7 @@ let findText (out: TextWriter) (hits: Find.Hit list) =
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let modelPath, text = args.GetResult Args.Target
 
-    match parseKinds (args.GetResults Args.Kind) with
+    match parseKindsWith (args.GetResults Args.Kind) with
     | Error e -> usage e
     | Ok kinds ->
         let opts: Find.Options = {

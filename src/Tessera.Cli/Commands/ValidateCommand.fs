@@ -189,7 +189,7 @@ let private groupedAnnotations (grouped: (Issue * Grouping) list) = [
 ]
 
 /// A --min-severity / --fail-on value (shared with `lint`).
-let severityArg (name: string) (value: string option) (fallback: Severity) =
+let severityArgWith (name: string) (value: string option) (fallback: Severity) =
     match value with
     | None -> Ok fallback
     | Some v ->
@@ -205,13 +205,20 @@ let ciUnknown (value: string) =
     $"--ci: unknown CI system '{value}'{Suggest.hint suggestions} (known: {Findings.Ci.names})", suggestions
 
 /// A --ci value (shared with `lint`).
-let ciArg (value: string option) =
+let ciArgWith (value: string option) =
     match value with
     | None -> Ok Findings.NoCi
     | Some c ->
         Findings.Ci.tryParse c
         |> Option.map Ok
         |> Option.defaultValue (Error(ciUnknown c))
+
+/// severityArgWith, with just the message.
+let severityArg (name: string) (value: string option) (fallback: Severity) =
+    severityArgWith name value fallback |> Result.mapError fst
+
+/// ciArgWith, with just the message.
+let ciArg (value: string option) = ciArgWith value |> Result.mapError fst
 
 /// The validate rules, for SARIF.
 let sarifRules: Sarif.Rule list = [ for id, description in rules -> Sarif.Rule.simple id description ]
@@ -236,12 +243,12 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         match selected |> List.tryFind (fun r -> not (List.contains r known)) with
         | Some bad -> Error(unknownValue "--rule" "rule" bad known)
         | None ->
-            severityArg "--min-severity" (args.TryGetResult Args.Min_Severity) Severity.Info
+            severityArgWith "--min-severity" (args.TryGetResult Args.Min_Severity) Severity.Info
             |> Result.bind (fun minimum ->
-                severityArg "--fail-on" (args.TryGetResult Args.Fail_On) Severity.Error
+                severityArgWith "--fail-on" (args.TryGetResult Args.Fail_On) Severity.Error
                 |> Result.map (fun failOn -> minimum, failOn))
 
-    let ci = ciArg (args.TryGetResult Args.Ci)
+    let ci = ciArgWith (args.TryGetResult Args.Ci)
 
     match options, ci with
     | Error problem, _

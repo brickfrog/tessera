@@ -52,7 +52,11 @@ let private argumentSuggestions (argv: string array) (message: string) =
             else
                 subcommands p |> List.collect fst
 
-        Suggest.closest candidates bad
+        // Options are compared without their dashes: "-x" is one letter, not two.
+        let bare (s: string) = s.TrimStart '-'
+
+        Suggest.closest (candidates |> List.map bare) (bare bad)
+        |> List.map (fun b -> candidates |> List.find (fun c -> bare c = b))
 
 /// Argu's message with the hint added to its first line ("ERROR: unrecognized argument: 'x'.").
 let private withHint (message: string) (suggestions: string list) =
