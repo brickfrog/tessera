@@ -1,0 +1,39 @@
+{
+  "title": "COTH ( 2 ) is 1.03731472072755",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COTH ( 2 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          1.03731472072755
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-12,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/coth-function-dax",
+      "quote": "EVALUATE { COTH(2) }",
+      "supports": "the example query returns 1.03731472072755"
+    },
+    {
+      "url": "https://dax.guide/coth/",
+      "quote": "A single decimal value.",
+      "supports": "the result is a decimal number"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "coth",
+    "trigonometric"
+  ]
+}

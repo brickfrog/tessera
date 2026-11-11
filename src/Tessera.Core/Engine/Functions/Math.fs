@@ -266,6 +266,88 @@ module Math =
     let private unseeded (name: string) =
         Fn.withCheck (fun _ -> Some $"{name}: its result is random, so no answer of this engine could be the server's")
 
+    /// How a trigonometric or hyperbolic function treats an argument outside its domain.
+    [<RequireQualifiedAccess>]
+    type private Domain =
+        | Any
+        /// The page states the domain and that anything else is an error.
+        | ErrorOutside of (float -> bool)
+        /// The page says what the argument must be, but not what happens otherwise.
+        | RefusedOutside of (float -> bool) * what: string
+
+    /// A trigonometric or hyperbolic function of one number: "A single decimal value" (dax.guide,
+    /// every one of them). `blankIsZero`: the page says BLANK is read as 0.
+    let private trig (name: string) (blankIsZero: bool) (domain: Domain) (f: float -> float) : DaxFunction =
+        Fn.scalar name "Math" (1, 1) (Fn.typeIs DaxType.Decimal) (fun ev ctx call ->
+            let x =
+                match Coerce.number ctx call.Args.[0].Span name (ev.Scalar(ctx, call.Args.[0])) with
+                | DaxValue.Blank when blankIsZero -> 0.0
+                | DaxValue.Blank -> Fail.notSupported ctx call.Args.[0].Span $"{name} of BLANK"
+                | v -> Coerce.toFloat v
+
+            if Double.IsNaN x || Double.IsInfinity x then
+                Fail.notSupported ctx call.Args.[0].Span $"{name} of a number that is not finite"
+
+            match domain with
+            | Domain.Any -> ()
+            | Domain.ErrorOutside inside ->
+                if not (inside x) then
+                    Fail.runtime
+                        ctx
+                        call.Span
+                        $"An argument of function '{name}' has the wrong data type or has an invalid value."
+            | Domain.RefusedOutside(inside, what) ->
+                if not (inside x) then
+                    Fail.notSupported
+                        ctx
+                        call.Span
+                        $"{name} of a number that is not {what} (the result is not documented)"
+
+            finite ctx call (f x))
+
+    let private trigonometric: DaxFunction list = [
+        // "Returns the sine of the given angle"; SIN ( PI () / 2 ) is 1 (Microsoft Learn, SIN).
+        trig "SIN" false Domain.Any Math.Sin
+        trig "COS" false Domain.Any Math.Cos
+        trig "TAN" false Domain.Any Math.Tan
+        // "COT ( Number ) returns the same value as 1 / TAN ( Number ). COT returns an error in
+        // these conditions: Number is 0. The absolute value of Number is 2^27 (134,217,728) or
+        // more" (dax.guide/cot); "The absolute value of number must be less than 2^27 and cannot
+        // be 0" (Microsoft Learn, COT).
+        trig "COT" true (Domain.ErrorOutside(fun x -> x <> 0.0 && abs x < 134217728.0)) (fun x -> 1.0 / Math.Tan x)
+        // "The sine of the angle you want and must be from -1 to 1"; "The returned angle is given
+        // in radians in the range -pi/2 to pi/2" (dax.guide/asin).
+        trig "ASIN" false (Domain.RefusedOutside((fun x -> x >= -1.0 && x <= 1.0), "from -1 to 1")) Math.Asin
+        // "in the range 0 (zero) to pi" (dax.guide/acos).
+        trig "ACOS" false (Domain.RefusedOutside((fun x -> x >= -1.0 && x <= 1.0), "from -1 to 1")) Math.Acos
+        trig "ATAN" false Domain.Any Math.Atan
+        // "Returns the principal value of the arccotangent" (dax.guide/acot); its example table
+        // gives ACOT ( COT ( -2.25 * PI () ) ), the arccotangent of -1, as 2.36: the range is 0 to
+        // pi, so ACOT ( x ) is pi / 2 - ATAN ( x ).
+        trig "ACOT" false Domain.Any (fun x -> Math.PI / 2.0 - Math.Atan x)
+        // "SINH(z) = (e^z - e^-z) / 2" (Microsoft Learn, SINH); a result too large for a float is
+        // refused.
+        trig "SINH" false Domain.Any Math.Sinh
+        trig "COSH" false Domain.Any Math.Cosh
+        trig "TANH" false Domain.Any Math.Tanh
+        // "COTH returns an error in these conditions: Number is 0" (dax.guide/coth); "The number
+        // cannot be 0. If number is 0, an error is returned" (Microsoft Learn, COTH).
+        trig "COTH" true (Domain.ErrorOutside(fun x -> x <> 0.0)) (fun x -> 1.0 / Math.Tanh x)
+        trig "ASINH" false Domain.Any Math.Asinh
+        // "Any real number equal to or greater than 1" (Microsoft Learn, ACOSH).
+        trig "ACOSH" false (Domain.RefusedOutside((fun x -> x >= 1.0), "1 or more")) Math.Acosh
+        // "Number must be greater than -1 and less than 1. If Number is -1, 1, or outside this
+        // range, ATANH returns an error" (dax.guide/atanh).
+        trig "ATANH" false (Domain.ErrorOutside(fun x -> x > -1.0 && x < 1.0)) Math.Atanh
+        // "The absolute value of Number must be greater than 1" (dax.guide/acoth).
+        trig "ACOTH" false (Domain.RefusedOutside((fun x -> abs x > 1.0), "above 1 or below -1")) (fun x ->
+            0.5 * Math.Log((x + 1.0) / (x - 1.0)))
+        // "Converts radians into degrees"; DEGREES ( PI () ) is 180 (Microsoft Learn, DEGREES).
+        trig "DEGREES" false Domain.Any (fun x -> x / Math.PI * 180.0)
+        // RADIANS ( 270 ) is 4.712389 (Microsoft Learn, RADIANS).
+        trig "RADIANS" false Domain.Any (fun x -> x * Math.PI / 180.0)
+    ]
+
     let functions: DaxFunction list = [
         // "The absolute value of a number with the same data type and without its sign"; a result
         // of "one these types: currency, decimal, integer" (dax.guide/abs). Microsoft Learn says
@@ -761,4 +843,6 @@ module Math =
         Fn.scalar "RANDBETWEEN" "Math" (2, 2) (Fn.typeIs DaxType.Integer) (fun _ ctx call ->
             Fail.notSupported ctx call.Span "RANDBETWEEN: its result is random")
         |> unseeded "RANDBETWEEN"
+
+        yield! trigonometric
     ]

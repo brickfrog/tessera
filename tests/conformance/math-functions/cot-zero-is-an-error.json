@@ -1,0 +1,27 @@
+{
+  "title": "COT ( 0 ) is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COT ( 0 ) )",
+  "expected": {
+    "error": "COT of 0"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/cot-function-dax",
+      "quote": "The absolute value of number must be less than 2^27 and cannot be 0.",
+      "supports": "0 is outside the constraints"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/cot-function-dax",
+      "quote": "If number is outside its constraints, an error is returned.",
+      "supports": "so COT ( 0 ) is an error"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "cot",
+    "trigonometric",
+    "error"
+  ]
+}
