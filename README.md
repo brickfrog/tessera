@@ -2088,7 +2088,7 @@ Refused, as the sources leave them open: an item selected again by a filter whil
 cycle, `KEEPFILTERS` over its own filter: "Other types of recursion aren't supported"); `multipleOrEmptySelectionExpression`
 and `noSelectionExpression`; several or no items under `selectionExpressionBehavior` Automatic above compatibility level
 1702 (Learn says Automatic becomes Visual "above a future compatibility level") or no items under Visual; two groups
-with the same precedence; `ROLLUPADDISSUBTOTAL` over a group's column (its subtotals depend on the selection
+with the same precedence; a group with an Ordinal column and items left at ordinal -1; `ROLLUPADDISSUBTOTAL` over a group's column (its subtotals depend on the selection
 behaviour); an item applied in a calculated column or table; these functions outside an item's expression or in a
 function it calls; `SELECTEDMEASUREFORMATSTRING` for a measure with no format string or a dynamic one, or after an item
 with a format string expression was applied to the same measure. Format string expressions are read but not
