@@ -11,9 +11,27 @@ open Tessera.Tests.Conformance
 
 // ---- The engine under test ------------------------------------------------------------------------
 
-/// The local engine.
-let private engine: Evaluate option =
-    Some(fun db store dax -> Engine.prepare db store |> Result.bind (fun e -> Engine.evaluateQuery e dax))
+/// The local engine, as members of the case's roles when it says (`"as"`).
+let private engine: EvaluateAs option =
+    Some(fun runAs db store dax ->
+        Engine.prepare db store
+        |> Result.bind (fun e ->
+            match runAs with
+            | None -> Ok e
+            | Some a ->
+                let e =
+                    match a.CustomData with
+                    | Some text ->
+                        Engine.withIdentity
+                            {
+                                DaxEngine.Identity.none with
+                                    CustomData = Some text
+                            }
+                            e
+                    | None -> e
+
+                Engine.asRoles a.Roles e)
+        |> Result.bind (fun e -> Engine.evaluateQuery e dax))
 
 /// Tags the engine isn't expected to handle yet. A case with one of them is reported as skipped
 /// unless it passes; remove a tag here when its area is implemented.
@@ -28,6 +46,7 @@ let private expectedUnsupported: Set<string> =
         "allselected"
         "calculation-groups"
         "window-functions"
+        "security"
     ]
 
 /// Which of the engine's errors mean "not implemented" (see `RunConfig.defaults`).
@@ -270,7 +289,7 @@ let engineTests =
                 testCase c.Id
                 <| fun () ->
                     let later = c.Tags |> List.exists expectedUnsupported.Contains
-                    let outcome = runWith engineConfig evaluate c
+                    let outcome = runAsWith engineConfig evaluate c
 
                     let kind, lines =
                         match outcome with
@@ -703,4 +722,70 @@ let harnessTests =
             | other -> failtestf "%A" other
 
             Expect.exists (validate c) (fun p -> p.StartsWith "model:") ""
+
+        testCase "a case can run as members of the model's roles, and only an engine that takes them runs it"
+        <| fun () ->
+            let roles =
+                """{ "base": "m", "roles": [ { "name": "One", "filters": { "T": "T[k] = 1" } },
+                                             { "name": "Admins", "permission": "administrator" } ],
+                     "relationships": [ { "from": "F[k]", "to": "T[k]", "securityFilter": "both", "crossFilter": "both" } ] }"""
+
+            let c =
+                single (
+                    (caseText ", \"as\": { \"roles\": [ \"One\" ], \"customData\": \"x\" }")
+                        .Replace("\"m\"", roles)
+                )
+
+            Expect.equal c.As (Some { Roles = [ "One" ]; CustomData = Some "x" }) "as"
+            Expect.isEmpty (validate c) ""
+
+            match prepared c with
+            | Ok p ->
+                let r = p.Database.Model.Roles.["One"]
+                Expect.equal r.ModelPermission Microsoft.AnalysisServices.Tabular.ModelPermission.Read "read by default"
+                Expect.equal r.TablePermissions.["T"].FilterExpression "T[k] = 1" "the filter"
+
+                Expect.equal
+                    p.Database.Model.Roles.["Admins"].ModelPermission
+                    Microsoft.AnalysisServices.Tabular.ModelPermission.Administrator
+                    "administrator"
+
+                let rel =
+                    p.Database.Model.Relationships.[0] :?> Microsoft.AnalysisServices.Tabular.SingleColumnRelationship
+
+                Expect.equal
+                    rel.SecurityFilteringBehavior
+                    Microsoft.AnalysisServices.Tabular.SecurityFilteringBehavior.BothDirections
+                    "securityFilter"
+            | Error e -> failtest e
+
+            match run (answering [ int64Result "[r]" 1L ]) c with
+            | Outcome.Error message -> Expect.stringContains message "runAsWith" ""
+            | other -> failtestf "%A" other
+
+            let mutable seen = None
+
+            let evaluate: EvaluateAs =
+                fun runAs _ _ _ ->
+                    seen <- runAs
+                    Ok [ int64Result "[r]" 1L ]
+
+            Expect.equal (runAsWith RunConfig.defaults evaluate c) Outcome.Pass ""
+            Expect.equal seen c.As "the engine is told the roles"
+
+        testCase "a role's permission and filters are checked"
+        <| fun () ->
+            let t, corpus =
+                corpusOf [
+                    "area/bad.json",
+                    (caseText "").Replace("\"m\"", """{ "base": "m", "roles": [ { "name": "R", "permission": "owner" } ] }""")
+                ]
+
+            use _ = t
+
+            let c = corpus.Cases.Head
+
+            match c.Model.Value with
+            | Error message -> Expect.stringContains message "owner" ""
+            | Ok _ -> failtest "an unknown permission"
     ]

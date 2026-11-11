@@ -1,0 +1,37 @@
+{
+  "title": "A role's filters on two dimensions both apply to the fact table",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Amount\", [Sales Amount] )",
+  "as": {
+    "roles": [
+      "EuropeBikes"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          100
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+    "quote": "Row filters will be intersected with other row filers defined for related tables",
+    "supports": "a Sales row must pass the filters on Customer and on Product"
+  },
+  "confidence": "derived",
+  "derivation": "EuropeBikes keeps Ann and Bob, and the Bikes category. The sales that are both: 1 (Ann, Bike, 100). Sale 3 is a bike sold to Cy; sales 2 and 5 are caps.",
+  "tags": [
+    "security",
+    "role",
+    "relationship"
+  ]
+}

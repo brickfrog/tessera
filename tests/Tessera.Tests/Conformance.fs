@@ -87,6 +87,8 @@ type RelationshipDef = {
     ToMany: bool
     Both: bool
     Active: bool
+    /// The relationship's security filter goes both ways (`"securityFilter": "both"`).
+    SecurityBoth: bool
 }
 
 type FunctionDef = { Name: string; Expression: string }
@@ -104,6 +106,14 @@ type CalculationGroupDef = {
     Items: CalculationItemDef list
 }
 
+/// A role: its permission (`read`, the default, `readRefresh`, `administrator`, `none`, `refresh`)
+/// and its row filters, by table.
+type RoleDef = {
+    Name: string
+    Permission: string
+    Filters: (string * string) list
+}
+
 type ModelDef = {
     Culture: string
     Collation: string option
@@ -112,6 +122,7 @@ type ModelDef = {
     Relationships: RelationshipDef list
     Functions: FunctionDef list
     CalculationGroups: CalculationGroupDef list
+    Roles: RoleDef list
 }
 
 /// A model with its data loaded, ready for an engine.
@@ -303,7 +314,7 @@ let private relationshipDef (node: JsonNode) : RelationshipDef =
     let from = reqString "a relationship" o "from"
     let towards = reqString "a relationship" o "to"
     let what = $"relationship {from} -> {towards}"
-    known what o [ "from"; "to"; "cardinality"; "crossFilter"; "active" ]
+    known what o [ "from"; "to"; "cardinality"; "crossFilter"; "active"; "securityFilter" ]
     let fromTable, fromColumn = columnRef what from
     let toTable, toColumn = columnRef what towards
 
@@ -331,6 +342,37 @@ let private relationshipDef (node: JsonNode) : RelationshipDef =
         ToMany = toMany
         Both = both
         Active = optBool what o "active" true
+        SecurityBoth =
+            match optString what o "securityFilter" |> Option.defaultValue "single" with
+            | "single" -> false
+            | "both" -> true
+            | other -> bad $"{what}: securityFilter '{other}' is not single or both"
+    }
+
+let private roleDef (node: JsonNode) : RoleDef =
+    let o = asObject "a role" node
+    let name = reqString "a role" o "name"
+    let what = $"role {name}"
+    known what o [ "name"; "permission"; "filters" ]
+
+    let permission = optString what o "permission" |> Option.defaultValue "read"
+
+    if not (List.contains permission [ "read"; "readRefresh"; "administrator"; "none"; "refresh" ]) then
+        bad $"{what}: permission '{permission}' is not read, readRefresh, administrator, none or refresh"
+
+    {
+        Name = name
+        Permission = permission
+        Filters =
+            match o.["filters"] with
+            | null -> []
+            | n when kindOf n = JsonValueKind.Object -> [
+                for p in n.AsObject() ->
+                    match p.Value with
+                    | v when kindOf v = JsonValueKind.String -> p.Key, v.GetValue<string>()
+                    | _ -> bad $"{what}: the filter on {p.Key} must be a DAX expression (a string)"
+              ]
+            | _ -> bad $"{what}: \"filters\" must be an object: table name to DAX expression"
     }
 
 let private functionDef (node: JsonNode) : FunctionDef =
@@ -380,6 +422,7 @@ let private modelKeys = [
     "relationships"
     "functions"
     "calculationGroups"
+    "roles"
 ]
 
 let private modelDef (node: JsonNode) : ModelDef =
@@ -394,6 +437,7 @@ let private modelDef (node: JsonNode) : ModelDef =
         Relationships = items "the model" o "relationships" |> List.map relationshipDef
         Functions = items "the model" o "functions" |> List.map functionDef
         CalculationGroups = items "the model" o "calculationGroups" |> List.map calculationGroupDef
+        Roles = items "the model" o "roles" |> List.map roleDef
     }
 
 let private tomType =
@@ -529,9 +573,33 @@ let buildDatabase (name: string) (def: ModelDef) : Database =
                          CrossFilteringBehavior.BothDirections
                      else
                          CrossFilteringBehavior.OneDirection),
+                SecurityFilteringBehavior =
+                    (if r.SecurityBoth then
+                         SecurityFilteringBehavior.BothDirections
+                     else
+                         SecurityFilteringBehavior.OneDirection),
                 IsActive = r.Active
             )
         )
+
+    for r in def.Roles do
+        let permission =
+            match r.Permission with
+            | "readRefresh" -> ModelPermission.ReadRefresh
+            | "administrator" -> ModelPermission.Administrator
+            | "none" -> ModelPermission.None
+            | "refresh" -> ModelPermission.Refresh
+            | _ -> ModelPermission.Read
+
+        let role = new ModelRole(Name = r.Name, ModelPermission = permission)
+
+        for (table, dax) in r.Filters do
+            if not (model.Tables.ContainsName table) then
+                bad $"role {r.Name}: a filter on a table the model doesn't have: {table}"
+
+            role.TablePermissions.Add(new TablePermission(Table = model.Tables.[table], FilterExpression = dax))
+
+        model.Roles.Add role
 
     for f in def.Functions do
         model.Functions.Add(new Function(Name = f.Name, Expression = f.Expression))
@@ -651,6 +719,13 @@ type Expected =
     /// The query must fail; the text says why (it is not matched against the engine's message).
     | Error of reason: string
 
+/// Who a case's query runs as (`"as"`): members of these roles, with this CUSTOMDATA. On a
+/// server they are the connection's Roles= and CustomData=.
+type RunAs = {
+    Roles: string list
+    CustomData: string option
+}
+
 type Case = {
     /// The file's path under the corpus, without `.json`, with `/`: `blank/add-number`.
     Id: string
@@ -680,6 +755,8 @@ type Case = {
     Alternative: string option
     Tags: string list
     Notes: string option
+    /// The query runs as members of roles of the model (`"as"`); None: as an administrator.
+    As: RunAs option
 }
 
 type Corpus = {
@@ -704,6 +781,7 @@ let private caseKeys = [
     "alternative"
     "tags"
     "notes"
+    "as"
 ]
 
 let private overlayKeys = [
@@ -719,6 +797,7 @@ let private overlayKeys = [
     "calculationGroups"
     "culture"
     "collation"
+    "roles"
 ]
 
 let private appendTo (target: JsonObject) (key: string) (nodes: JsonNode list) =
@@ -760,7 +839,7 @@ let private applyOverlay (baseModel: JsonNode) (overlay: JsonObject) : JsonNode 
     appendTo model "calculationGroups" (items "the case's model" overlay "calculationGroups")
     appendTo model "relationships" (items "the case's model" overlay "addRelationships")
 
-    for key in [ "relationships"; "culture"; "collation" ] do
+    for key in [ "relationships"; "culture"; "collation"; "roles" ] do
         match overlay.[key] with
         | null -> ()
         | n -> model.[key] <- n.DeepClone()
@@ -896,6 +975,23 @@ let private parseCase (models: Map<string, JsonNode>) (id: string) (file: string
                 else
                     bad "\"tags\" must be strings")
         Notes = optString "the case" o "notes"
+        As =
+            match o.["as"] with
+            | null -> None
+            | n ->
+                let a = asObject "\"as\"" n
+                known "\"as\"" a [ "roles"; "customData" ]
+
+                Some {
+                    Roles =
+                        items "\"as\"" a "roles"
+                        |> List.map (fun r ->
+                            if kindOf r = JsonValueKind.String then
+                                r.GetValue<string>()
+                            else
+                                bad "\"as\": \"roles\" must be role names")
+                    CustomData = optString "\"as\"" a "customData"
+                }
     }
 
 /// Read every model (models/*.json) and case (<area>/**/*.json) under a corpus directory. A file
@@ -984,6 +1080,7 @@ let laterAreas = [
     "math-functions"
     "calculation-groups"
     "window-functions"
+    "security"
 ]
 
 /// Everything wrong with a case as a case (not with any engine): empty when it is sound.
@@ -1152,6 +1249,9 @@ let validate (c: Case) : string list = [
 /// An engine: a model, its data, a DAX query; one result per EVALUATE.
 type Evaluate = Database -> DataStore -> string -> Result<QueryResult list, TessError>
 
+/// An engine that can run a query as members of roles (a case's `"as"`).
+type EvaluateAs = RunAs option -> Evaluate
+
 [<RequireQualifiedAccess>]
 type Mismatch =
     /// The results differ: (index of the result, how).
@@ -1233,20 +1333,26 @@ let judge (config: RunConfig) (c: Case) (answer: Result<QueryResult list, TessEr
             | [] -> Outcome.Pass
             | different -> Outcome.Fail(Mismatch.Differences different)
 
-/// Run an engine on a case.
-let runWith (config: RunConfig) (evaluate: Evaluate) (c: Case) : Outcome =
+/// Run an engine that takes roles on a case.
+let runAsWith (config: RunConfig) (evaluate: EvaluateAs) (c: Case) : Outcome =
     match prepared c with
     | Error e -> Outcome.Error $"the case's model can't be prepared: {e}"
     | Ok p ->
         let answer =
             try
-                Ok(evaluate p.Database p.Store c.Query)
+                Ok(evaluate c.As p.Database p.Store c.Query)
             with e ->
                 Error $"the engine threw {e.GetType().Name}: {e.Message}"
 
         match answer with
         | Error thrown -> Outcome.Error thrown
         | Ok answer -> judge config c answer
+
+/// Run an engine on a case. A case that runs as members of roles needs `runAsWith`.
+let runWith (config: RunConfig) (evaluate: Evaluate) (c: Case) : Outcome =
+    match c.As with
+    | Some _ -> Outcome.Error "the case runs as members of roles (\"as\"): run it with an engine that takes them (runAsWith)"
+    | None -> runAsWith config (fun _ -> evaluate) c
 
 /// Run an engine on a case, with the default configuration.
 let run (evaluate: Evaluate) (c: Case) : Outcome = runWith RunConfig.defaults evaluate c

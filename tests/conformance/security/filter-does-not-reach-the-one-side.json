@@ -1,0 +1,42 @@
+{
+  "title": "A role's filter on the many side doesn't hide rows of the one side",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Customers\", COUNTROWS ( Customer ), \"Amount\", [Sales Amount] )",
+  "as": {
+    "roles": [
+      "BigSales"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Customers]",
+          "type": "int64"
+        },
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4,
+          150
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+    "quote": "Row filters use DAX expressions to define the rows in a table, and any related rows in the many direction, that a user can query.",
+    "supports": "a filter reaches related rows in the many direction only"
+  },
+  "confidence": "derived",
+  "derivation": "BigSales keeps the sales of 50 or more: 1 (100) and 3 (50), 150. Customer is on the one side of Sales, so its four rows stay.",
+  "tags": [
+    "security",
+    "role",
+    "relationship"
+  ]
+}

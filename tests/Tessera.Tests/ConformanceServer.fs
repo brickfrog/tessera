@@ -227,7 +227,27 @@ let private runModel
                                     cases
                                     |> List.map (fun case ->
                                         let clock = Stopwatch.StartNew()
-                                        let answer = query c database case.Query
+                                        let answer =
+                                            match case.As with
+                                            | None -> query c database case.Query
+                                            // As members of roles: a connection of its own, with
+                                            // Roles= (and CustomData=).
+                                            | Some a ->
+                                                let extra = [
+                                                    "Roles", String.concat "," a.Roles
+
+                                                    match a.CustomData with
+                                                    | Some text -> "CustomData", text
+                                                    | None -> ()
+                                                ]
+
+                                                Remote.withConnection
+                                                    access
+                                                    {
+                                                        address with
+                                                            Properties = address.Properties @ extra
+                                                    }
+                                                    (fun own -> query own database case.Query)
 
                                         {
                                             Case = case

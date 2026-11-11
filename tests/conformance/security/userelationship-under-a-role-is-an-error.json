@@ -1,0 +1,31 @@
+{
+  "title": "USERELATIONSHIP is an error where row-level security filters the table",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"x\", CALCULATE ( [Sales Amount], USERELATIONSHIP ( Sales[BillToKey], Customer[CustomerKey] ) ) )",
+  "as": {
+    "roles": [
+      "Europe"
+    ]
+  },
+  "expected": {
+    "error": "USERELATIONSHIP can't be used where row-level security is defined for the table"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/userelationship-function-dax",
+      "quote": "USERELATIONSHIP cannot be used when row level security is defined for the table in which the measure is included.",
+      "supports": "the documentation says the query returns an error"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/dax-limitations-with-inactive-relationships-and-row-level-security-rls/",
+      "quote": "if a relationship transfers a security filter, then the relationship cannot be overridden through USERELATIONSHIP",
+      "supports": "the relationship from Customer to Sales carries the role's filter"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "security",
+    "role",
+    "userelationship"
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "title": "With security filtering in both directions, a role's filter on the many side reaches the one side",
+  "model": {
+    "base": "security",
+    "relationships": [
+      {
+        "from": "Sales[CustomerKey]",
+        "to": "Customer[CustomerKey]",
+        "crossFilter": "both",
+        "securityFilter": "both"
+      },
+      {
+        "from": "Sales[ProductKey]",
+        "to": "Product[ProductKey]"
+      },
+      {
+        "from": "Sales[BillToKey]",
+        "to": "Customer[CustomerKey]",
+        "active": false
+      }
+    ]
+  },
+  "query": "EVALUATE VALUES ( Customer[Customer] )",
+  "as": {
+    "roles": [
+      "BigSales"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Customer]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Ann"
+        ],
+        [
+          "Cy"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dotnet/api/microsoft.analysisservices.tabular.securityfilteringbehavior",
+      "quote": "Filters on either end of the relationship will automatically filter the other table.",
+      "supports": "BothDirections security filtering carries the filter from Sales to Customer"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/fabric/security/service-admin-row-level-security",
+      "quote": "You can manually enable bi-directional cross-filtering with row-level security by selecting the relationship and checking the Apply security filter in both directions checkbox.",
+      "supports": "the setting that makes a security filter cross a relationship both ways"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "BigSales keeps sales 1 (Ann, 100) and 3 (Cy, 50). With the security filter crossing Sales -> Customer both ways, Customer keeps the customers those sales refer to: Ann and Cy.",
+  "tags": [
+    "security",
+    "role",
+    "bidirectional",
+    "values"
+  ]
+}

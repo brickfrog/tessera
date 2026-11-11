@@ -1,0 +1,37 @@
+{
+  "title": "A role with permission None adds nothing to a role that can read",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Amount\", [Sales Amount] )",
+  "as": {
+    "roles": [
+      "NoAccess",
+      "Europe"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          130
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+    "quote": "For example, if a user is a member of a role with the Read permission, and also a member of a role with None permission, that user has Read permissions.",
+    "supports": "the user has Europe's Read permission, with its row filter"
+  },
+  "confidence": "derived",
+  "derivation": "NoAccess has the None permission; Europe has Read, with its filter: the user sees Europe's sales, 130.",
+  "tags": [
+    "security",
+    "role"
+  ]
+}

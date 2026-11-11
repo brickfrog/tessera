@@ -1,0 +1,37 @@
+{
+  "title": "A calculated table holds what was computed at refresh, when no role applies",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Total\", MAX ( GrandTotalSales[Grand Total Sales] ) )",
+  "as": {
+    "roles": [
+      "Europe"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Total]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          210
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/computing-accurate-percentages-with-row-level-security-in-power-bi/",
+    "quote": "The calculated table is computed during the data refresh, when security is not active yet.",
+    "supports": "GrandTotalSales = ROW ( \"Grand Total Sales\", [Sales Amount] ) holds the total of all sales"
+  },
+  "confidence": "derived",
+  "derivation": "GrandTotalSales was computed over all five sales: 210. The role doesn't change it (it filters Customer, which GrandTotalSales isn't related to).",
+  "tags": [
+    "security",
+    "role",
+    "calculated-table"
+  ]
+}

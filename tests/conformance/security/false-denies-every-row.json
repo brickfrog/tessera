@@ -1,0 +1,54 @@
+{
+  "title": "A role's filter of FALSE () hides every row of its table, and the related rows",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Customers\", COUNTROWS ( Customer ), \"Amount\", [Sales Amount], \"Products\", COUNTROWS ( Product ) )",
+  "as": {
+    "roles": [
+      "Denied"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Customers]",
+          "type": "int64"
+        },
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        },
+        {
+          "name": "[Products]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          null,
+          null,
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+      "quote": "You can use the filter, =FALSE(), to deny access to all rows for an entire table.",
+      "supports": "no row of Customer is visible"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+      "quote": "Row filters apply to the specified rows as well as related rows.",
+      "supports": "so no row of Sales is either"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Denied filters Customer with FALSE (): no customer is visible, and none of their sales. COUNTROWS of an empty table and SUM over no rows are BLANK. Product is on the one side of Sales: its two rows stay.",
+  "tags": [
+    "security",
+    "role",
+    "countrows"
+  ]
+}

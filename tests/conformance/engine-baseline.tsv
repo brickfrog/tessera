@@ -37,6 +37,8 @@ format/percent-large-number	not-supported
 format/time-upper-case-hour-with-am-pm	not-supported
 format/time-upper-case-month-after-hour	not-supported
 grouping/summarize-group-by-extension-column	not-supported
+security/roles-filtering-different-tables	not-supported
+security/userelationship-under-a-role-is-an-error	not-supported
 selection/isfiltered-iscrossfiltered-filter-on-many-side	not-supported
 set-functions/table-constructor-mixed-types-to-string	not-supported
 sorting/maxx-variant-true-ranks-text-above-numbers	not-supported
