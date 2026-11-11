@@ -895,6 +895,9 @@ module TableFunctions =
                 match ev.Scalar(ctx, call.Args.[0]) with
                 | DaxValue.Integer i -> i
                 | DaxValue.Blank -> 0L
+                // A decimal or fixed decimal number that is whole is that many rows.
+                | DaxValue.Decimal f when Double.IsFinite f && System.Math.Floor f = f && abs f < 1e15 -> int64 f
+                | DaxValue.Currency c when c % 10000L = 0L -> c / 10000L
                 | _ -> Fail.notSupported ctx call.Args.[0].Span "a TOPN row count that is not a whole number"
 
             let table = ev.Table(ctx, call.Args.[1])

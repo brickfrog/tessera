@@ -443,6 +443,13 @@ let tests =
             testCase "an omitted ORDERBY over several columns, where it doesn't" (fun () ->
                 // Either order of (Color, Category) puts Black, Cycling first.
                 returns (p ()) "EVALUATE INDEX ( 1, ALL ( P[Color], P[Category] ) )" [ [ "Black"; "Cycling" ] ])
+            // Learn: RANK's current row is found from "orderBy, partitionBy, and matchBy" columns;
+            // SQLBI: from every model column of the relation. With only expressions in ORDERBY the
+            // two give different current rows.
+            testCase "RANK ordered by expressions only" (fun () ->
+                refused
+                    "EVALUATE SELECTCOLUMNS ( P, \"r\", RANK ( SKIP, P, ORDERBY ( LEN ( P[Color] ) ) ) )"
+                    "the sources disagree")
             testCase "BLANK next to zero or negative numbers" (fun () ->
                 refused "EVALUATE INDEX ( 1, { 0, BLANK (), 1 }, ORDERBY ( [Value] ) )" "BLANK")
             testCase "ORDERBY outside a window function is an error" (fun () ->
@@ -467,6 +474,30 @@ let tests =
 
                 Expect.stringContains (String.concat "; " coverage.["measure:P/First"]) "ALLSELECTED" "refused"
                 Expect.equal coverage.["measure:P/Fine"] [] "supported")
+        ]
+
+        testList "TOPN and RANKX" [
+            // "N_Value: The number of rows to return" (Learn, TOPN): a whole decimal number is that
+            // many rows; "If there is a tie, in Order_By values, at the N-th row of the table, then
+            // all tied rows are returned."
+            testCase "TOPN takes a whole decimal count, and returns the ties at the last row" (fun () ->
+                is (p ()) "COUNTROWS ( TOPN ( 2.0, P, P[Price] ) )" 2
+                is (p ()) "COUNTROWS ( TOPN ( CURRENCY ( 2 ), P, P[Price] ) )" 2
+                // Colors ascending: Black, Black, Blue, Red, Red: the first three are Black, Black, Blue.
+                is (p ()) "COUNTROWS ( TOPN ( 1, P, P[Color], ASC ) )" 2
+                refused "EVALUATE TOPN ( 1.5, P, P[Price] )" "whole number")
+            // RANKX: "Skip ... the next value will receive a rank of 16 (11 + 5)"; "Dense ... the next
+            // value will receive a rank of 12" (Learn).
+            testCase "RANKX ties agree with RANK" (fun () ->
+                let ranks (dax: string) = sortedRows (p ()) dax
+
+                for ties in [ "SKIP"; "DENSE" ] do
+                    Expect.equal
+                        (ranks
+                            $"EVALUATE SELECTCOLUMNS ( P, \"n\", P[Name], \"r\", RANKX ( P, P[Color], , ASC, {ties} ) )")
+                        (ranks
+                            $"EVALUATE SELECTCOLUMNS ( P, \"n\", P[Name], \"r\", RANK ( {ties}, P, ORDERBY ( P[Color], ASC ) ) )")
+                        ties)
         ]
 
         testList "properties" [

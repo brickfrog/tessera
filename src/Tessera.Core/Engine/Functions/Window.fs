@@ -357,7 +357,7 @@ module Window =
         match v with
         | DaxValue.Blank -> None
         | DaxValue.Integer i -> Some i
-        | DaxValue.Decimal f when Double.IsFinite f && Math.Floor f = f && abs f < 1e15 -> Some(int64 f)
+        | DaxValue.Decimal f when Double.IsFinite f && System.Math.Floor f = f && abs f < 1e15 -> Some(int64 f)
         | DaxValue.Currency c when c % 10000L = 0L -> Some(c / 10000L)
         | DaxValue.Decimal _
         | DaxValue.Currency _ -> fractional ()
