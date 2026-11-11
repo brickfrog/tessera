@@ -2474,6 +2474,7 @@ Suite keys:
 | `data` | *(tess)* the fixture directory the tests evaluate over, relative to the suite file. `--data` replaces it |
 | `tables` | *(tess)* inline rows, for every test of the suite: see below |
 | `defaults` | `tolerance`, `tolerance_abs`, `tags`, and *(tess)* `filters`, for every test |
+| `now` | *(tess)* the instant `TODAY`, `NOW`, `UTCTODAY` and `UTCNOW` return, as `tess query --now` takes it: `2024-03-05`, `2024-03-05T14:30:00`, `2024-03-05T14:30:00+02:00` (the offset only moves the UTC functions). Without it, the machine's clock |
 | `tests` | the list of tests |
 | `connection` | te's; read and not used (a note on stderr says so): the model is the one on the command line |
 
@@ -2493,6 +2494,7 @@ Test keys:
 | `data`, `tables` | *(tess)* the test's own fixture directory, and its own inline rows |
 | `tolerance`, `tolerance_abs` | for this test's numbers |
 | `pending: true`, `skip: <reason>` | *(tess)* don't run it (it is reported as skipped) |
+| `now` | *(tess)* the test's own clock, replacing the suite's. A test with one is skipped on a server, whose clock can't be set |
 | `compare` | te's; read and not used |
 
 A test has exactly one of `query`, `query_file`, `measure`, `expression`, `assert`. An unknown key is an error, with
@@ -2635,7 +2637,7 @@ and the exit codes are those of `run`; a test either side's local engine refuses
 - **BLANK is not 0.** `expect: 0` fails for a BLANK result (`COUNTROWS` of no rows is BLANK, not 0): write
   `expect: null`, or `COUNTROWS ( ... ) + 0` in the query. te's own example suite expects `0` from such a query, so
   te may be laxer here; tess stays strict because a measure that went BLANK is the regression a test is for.
-- Not there: `te test spec` and the JSON Schema for editors, `test use`, and a `now:` setting to pin the clock.
+- Not there: `te test spec` and the JSON Schema for editors, and `test use`.
 - The suite format was matched to te's published reference, not to its binary: `matrix` (both shapes are accepted
   here) and `compare` (read and ignored) are the parts that reference doesn't spell out.
 

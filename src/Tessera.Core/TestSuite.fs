@@ -264,6 +264,9 @@ type TestCase = {
     Skip: string option
     /// The matrix values this test was expanded with.
     Matrix: (string * SuiteValue) list
+    /// *(tess)* `now:`, the test's or else the suite's: the instant TODAY, NOW, UTCTODAY and UTCNOW
+    /// return. None: the machine's clock when the fixture is prepared.
+    Now: Tessera.Engine.Clock option
 }
 
 type TestSuiteFile = {
@@ -725,6 +728,7 @@ module TestSuite =
         Filters: TestFilter list
         Tables: InlineTable list
         Directory: string
+        Now: Tessera.Engine.Clock option
     }
 
     let private noBounds = {
@@ -1049,7 +1053,14 @@ module TestSuite =
         "pending"
         "skip"
         "compare"
+        "now"
     ]
+
+    /// `now: 2024-03-05T14:30:00`, an ISO 8601 date and time (the syntax of `tess query --now`).
+    let private clock (n: Node) : Tessera.Engine.Clock =
+        match Tessera.Engine.Clock.parse (asText "now" n) with
+        | Ok c -> c
+        | Error message -> fail n $"now: {message}"
 
     /// A measure's name as a reference to it: `Total` is `[Total]`, `Margin [%]` is `[Margin [%]]]`.
     let private measureReference (name: string) = "[" + name.Replace("]", "]]") + "]"
@@ -1138,6 +1149,7 @@ module TestSuite =
             Tolerance = testTolerance
             Skip = skip
             Matrix = matrix
+            Now = get "now" |> Option.map clock |> Option.orElse d.Now
         }
 
     /// A test node as the tests it stands for: itself, or one per matrix combination.
@@ -1183,7 +1195,16 @@ module TestSuite =
                             Name = $"{test.Name} [{suffix}]"
                     })
 
-    let private suiteKeys = [ "suite"; "description"; "connection"; "data"; "tables"; "defaults"; "tests" ]
+    let private suiteKeys = [
+        "suite"
+        "description"
+        "connection"
+        "data"
+        "tables"
+        "defaults"
+        "tests"
+        "now"
+    ]
 
     let private defaultsKeys = [ "tolerance"; "tolerance_abs"; "tags"; "filters" ]
 
@@ -1260,6 +1281,7 @@ module TestSuite =
                     |> Option.defaultValue []
                 Tables = field "tables" inlineTables |> Option.defaultValue []
                 Directory = directory
+                Now = field "now" clock
             }
 
             let tests =
