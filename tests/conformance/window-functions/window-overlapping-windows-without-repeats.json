@@ -17,11 +17,18 @@
       ]
     }
   ],
-  "source": {
-    "url": "https://www.sqlbi.com/articles/understanding-apply-semantics-for-window-functions-in-dax/",
-    "quote": "DISTINCT (",
-    "supports": "the article's pseudo-DAX of apply semantics takes the DISTINCT of the rows of all the windows, over all the columns of the source table"
-  },
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-apply-semantics-for-window-functions-in-dax/",
+      "quote": "DISTINCT (",
+      "supports": "the article's pseudo-DAX of apply semantics takes the DISTINCT of the rows of all the windows, over all the columns of the source table"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/window-function-dax",
+      "quote": "WINDOW's final output is a union of these rows.",
+      "supports": "the results for the current rows are put together; whether repeats are kept is not said"
+    }
+  ],
   "confidence": "derived",
   "derivation": "Every product is a current row (no row context, no filter). The windows are {Bike}, {Bike, Helmet}, {Helmet, Lock}, {Lock, Scooter}: four distinct rows.",
   "tags": [
@@ -31,5 +38,7 @@
     "all",
     "countrows",
     "apply-semantics"
-  ]
+  ],
+  "uncertain": true,
+  "alternative": "Learn's WINDOW page says the final output \"is a union of these rows\"; if that union keeps repeats (as UNION does), the windows {Bike}, {Bike, Helmet}, {Helmet, Lock}, {Lock, Scooter} give 7 rows."
 }

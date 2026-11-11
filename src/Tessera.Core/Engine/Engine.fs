@@ -373,6 +373,8 @@ let private bindWith
                 if c.IsKey && declared = DaxType.DateTime then
                     column.DateKey <- (if t.DataCategory = "Time" then 2 else 1)
 
+                column.IsDeclaredUnique <- c.IsKey || c.IsUnique
+
                 columns.Add column
                 table.ColumnByName.[c.Name] <- column
 

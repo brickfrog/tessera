@@ -318,6 +318,9 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     /// 1 when the column is a date column and the table's key but the table isn't marked, else 0.
     /// See `DateTable` in Context.fs.
     member val DateKey = 0 with get, set
+    /// Whether the model declares the column the table's key or unique (TOM's IsKey or IsUnique):
+    /// what the window functions need to tell a model table's rows apart.
+    member val IsDeclaredUnique = false with get, set
     member _.IsReady = not (obj.ReferenceEquals(store, null))
 
     member this.SetData(column: StoreColumn) =

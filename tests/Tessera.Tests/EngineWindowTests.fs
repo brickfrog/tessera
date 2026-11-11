@@ -71,7 +71,18 @@ let private model = {
     Functions = []
 }
 
-let private prepared = lazy (prepare model)
+/// Prepares a model, with these columns declared their table's key (TOM's IsKey).
+let private prepareWithKeys (keys: (string * string) list) (m: TestModel) : Engine.Prepared =
+    let db, store = build m
+
+    for t, c in keys do
+        db.Model.Tables.[t].Columns.[c].IsKey <- true
+
+    match Engine.prepare db store with
+    | Ok p -> p
+    | Error e -> failtestf "prepare failed: %s" (TessError.message e)
+
+let private prepared = lazy (prepareWithKeys [ "P", "Key" ] model)
 let private p () = prepared.Value
 
 let private code (dax: string) = TessError.code (queryError (p ()) dax)
@@ -90,8 +101,8 @@ let private config = {
 }
 
 /// A model with one table T(K, G): K the whole numbers given (distinct), G their group.
-let private generated (rows: (int * int) list) =
-    prepare {
+let private generatedWith (keyed: bool) (rows: (int * int) list) =
+    prepareWithKeys (if keyed then [ "T", "K" ] else []) {
         Tables = [
             table "T" [ "K", DataType.Int64; "G", DataType.Int64 ] [ for k, g in rows -> [ box k; box g ] ]
         ]
@@ -99,6 +110,9 @@ let private generated (rows: (int * int) list) =
         Measures = []
         Functions = []
     }
+
+/// T with K declared its key.
+let private generated = generatedWith true
 
 /// Distinct keys from FsCheck's numbers, each with a group of 0, 1 or 2.
 let private distinctRows (xs: int list) : (int * int) list =
@@ -206,6 +220,23 @@ let tests =
                     // Cycling has no previous category: its value is BLANK, and SUMMARIZECOLUMNS
                     // leaves out a row whose every value is BLANK.
                     [ [ "Safety"; 135 ] ])
+            // Learn, "Understanding ORDERBY, PARTITIONBY, and MATCHBY", the final expression:
+            // ADDCOLUMNS ( vRelation, ..., SELECTCOLUMNS ( OFFSET ( -1, vRelation, ORDERBY (
+            // [CalendarYear] ), PARTITIONBY ( [Color] ) ), [CurrentYearSales] ) ), with the columns by
+            // their names alone and a column SUMMARIZECOLUMNS added.
+            testCase "Learn's pattern over a SUMMARIZECOLUMNS variable" (fun () ->
+                // Totals by color and category: Red Cycling 100, Red Safety 20, Black Safety 15,
+                // Blue Cycling 30, Black Cycling 5. By color, categories ascending.
+                returns
+                    (p ())
+                    "DEFINE VAR vRelation = SUMMARIZECOLUMNS ( P[Color], P[Category], \"Total\", [Total Price] ) EVALUATE ADDCOLUMNS ( vRelation, \"Prev\", SELECTCOLUMNS ( OFFSET ( -1, vRelation, ORDERBY ( [Category] ), PARTITIONBY ( [Color] ) ), \"p\", [Total] ) )"
+                    [
+                        [ "Red"; "Cycling"; 100; null ]
+                        [ "Red"; "Safety"; 20; 100 ]
+                        [ "Black"; "Safety"; 15; 5 ]
+                        [ "Blue"; "Cycling"; 30; null ]
+                        [ "Black"; "Cycling"; 5; null ]
+                    ])
             testCase "OFFSET 0 is the current row" (fun () ->
                 returns
                     (p ())
@@ -393,6 +424,15 @@ let tests =
                     (p ())
                     "EVALUATE SUMMARIZECOLUMNS ( P[Name], \"r\", RANK ( DENSE, ALL ( P[Name] ), ORDERBY ( [Total Price], DESC, P[Name], ASC ) ) )"
                     [ [ "Bike"; 1 ]; [ "Pump"; 2 ]; [ "Helmet"; 3 ]; [ "Lock"; 4 ]; [ "Bell"; 5 ] ])
+            // SQLBI, "Introducing the RANK window function in DAX": RANK ( DENSE, SourceTable, ORDERBY
+            // ( [@Amt] ) ) over ALLSELECTED ( 'Date'[Month], 'Date'[Month Number] ) ranks each month:
+            // with no model column in ORDERBY, the relation's columns identify the current row.
+            testCase "ordered by an expression only" (fun () ->
+                // LEN of the color: Red 3 (Bike, Helmet), Blue 4 (Pump), Black 5 (Lock, Bell).
+                returns
+                    (p ())
+                    "EVALUATE SELECTCOLUMNS ( P, \"n\", P[Name], \"r\", RANK ( SKIP, P, ORDERBY ( LEN ( P[Color] ) ) ) )"
+                    [ [ "Bike"; 1 ]; [ "Helmet"; 1 ]; [ "Lock"; 4 ]; [ "Pump"; 3 ]; [ "Bell"; 4 ] ])
             testCase "RANK is a whole number" (fun () ->
                 Expect.equal
                     ((query (p ()) "EVALUATE ROW ( \"r\", RANK ( DENSE, ALL ( P[Name] ), ORDERBY ( P[Name] ) ) )")
@@ -418,6 +458,56 @@ let tests =
                     null)
             testCase "a tie at the current row is refused" (fun () ->
                 refused "EVALUATE SELECTCOLUMNS ( P, \"r\", ROWNUMBER ( P, ORDERBY ( P[Color] ) ) )" "tie")
+        ]
+
+        testList "calculated columns" [
+            // Learn lists "Calculated column" under "Applies to" for every window function; "If OFFSET
+            // is used within a calculated column defined on the same table as relation, and orderBy is
+            // omitted, an error is returned."
+            testCase "ROWNUMBER in a calculated column of the relation's table" (fun () ->
+                let m = {
+                    model with
+                        Tables =
+                            model.Tables
+                            |> List.map (fun t ->
+                                if t.Name = "P" then
+                                    t
+                                    |> withCalculated [
+                                        "RN", DataType.Int64, "ROWNUMBER ( P, ORDERBY ( P[Price] ) )"
+                                        "Next",
+                                        DataType.String,
+                                        "MAXX ( OFFSET ( 1, P, ORDERBY ( P[Price] ) ), P[Name] )"
+                                    ]
+                                else
+                                    t)
+                }
+
+                // Prices ascending: Bell 5, Lock 15, Helmet 20, Pump 30, Bike 100.
+                returns
+                    (prepareWithKeys [ "P", "Key" ] m)
+                    "EVALUATE SELECTCOLUMNS ( P, \"n\", P[Name], \"rn\", P[RN], \"next\", P[Next] )"
+                    [
+                        [ "Bike"; 5; null ]
+                        [ "Helmet"; 3; "Pump" ]
+                        [ "Lock"; 2; "Helmet" ]
+                        [ "Pump"; 4; "Bike" ]
+                        [ "Bell"; 1; "Lock" ]
+                    ])
+            testCase "without ORDERBY it is an error" (fun () ->
+                let m = {
+                    model with
+                        Tables =
+                            model.Tables
+                            |> List.map (fun t ->
+                                if t.Name = "P" then
+                                    t |> withCalculated [ "RN", DataType.Int64, "ROWNUMBER ( P )" ]
+                                else
+                                    t)
+                }
+
+                match queryError (prepareWithKeys [ "P", "Key" ] m) "EVALUATE SELECTCOLUMNS ( P, \"rn\", P[RN] )" with
+                | DaxNotSupported(what, _) -> failtestf "refused: %s" what
+                | e -> Expect.stringContains (TessError.message e) "without ORDERBY" "error")
         ]
 
         testList "what is refused" [
@@ -446,10 +536,9 @@ let tests =
             // Learn: RANK's current row is found from "orderBy, partitionBy, and matchBy" columns;
             // SQLBI: from every model column of the relation. With only expressions in ORDERBY the
             // two give different current rows.
-            testCase "RANK ordered by expressions only" (fun () ->
-                refused
-                    "EVALUATE SELECTCOLUMNS ( P, \"r\", RANK ( SKIP, P, ORDERBY ( LEN ( P[Color] ) ) ) )"
-                    "the sources disagree")
+            testCase "a model table whose unique column is not declared, where the order ties" (fun () ->
+                let p = generatedWith false [ 1, 0; 2, 0; 3, 1 ]
+                notSupported p "EVALUATE SELECTCOLUMNS ( T, \"n\", ROWNUMBER ( T, ORDERBY ( T[G] ) ) )" "not declared")
             testCase "BLANK next to zero or negative numbers" (fun () ->
                 refused "EVALUATE INDEX ( 1, { 0, BLANK (), 1 }, ORDERBY ( [Value] ) )" "BLANK")
             testCase "ORDERBY outside a window function is an error" (fun () ->

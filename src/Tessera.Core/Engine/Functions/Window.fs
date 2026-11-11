@@ -322,7 +322,10 @@ module Window =
     let private omittedRelation (name: string) =
         $"{name} without its relation argument (it defaults to ALLSELECTED of the ORDERBY and PARTITIONBY columns, which this engine doesn't evaluate here)"
 
-    let private defaultRelation (ctx: Ctx) (span: Span) (name: string) : TableVal =
+    /// `columns`: the ORDERBY and PARTITIONBY arguments (each a fully qualified column). The other
+    /// place to change when this is implemented is `check`, which refuses an omitted relation.
+    let private defaultRelation (ctx: Ctx) (span: Span) (name: string) (columns: Expr list) : TableVal =
+        ignore columns
         Fail.notSupported ctx span (omittedRelation name)
 
     /// What `Check` refuses from the arguments alone.
@@ -392,7 +395,16 @@ module Window =
                 |> Array.filter (fun (_, c) -> String.Equals(c.Name, n, StringComparison.OrdinalIgnoreCase))
             with
             | [| i, _ |] -> Some i
-            | [||] -> None
+            | [||] ->
+                // Not the relation's: a measure, or a column of an outer row context (which every row
+                // of the relation would share).
+                match ev.TryColumn(ctx, e) with
+                | Some _ ->
+                    Fail.notSupported
+                        ctx
+                        e.Span
+                        $"a {what} [{n}] that is not a column of the relation but of an outer row context"
+                | None -> None
             | _ -> Fail.invalid ctx e.Span $"[{n}] names more than one column of the relation"
         | _ -> None
 
@@ -487,7 +499,19 @@ module Window =
         let r =
             match c.Relation with
             | Some rel -> ev.Table(ctx, rel)
-            | None -> defaultRelation ctx call.Span name
+            | None ->
+                if c.OrderBy.IsNone then
+                    Fail.invalid ctx call.Span $"{name} needs ORDERBY when its relation is left out"
+
+                let keyExprs =
+                    match c.OrderBy with
+                    | Some args ->
+                        match keys args with
+                        | Ok k -> k |> List.map _.Expr
+                        | Error m -> Fail.invalid ctx call.Span m
+                    | None -> []
+
+                defaultRelation ctx call.Span name (keyExprs @ c.PartitionBy)
 
         let n = r.Count
         let partition = columnsOf ev ctx r "PARTITIONBY" c.PartitionBy
@@ -508,6 +532,28 @@ module Window =
                 if not (isNull r.Cols.[i].Lineage) then
                     i
         |]
+
+        // In a calculated column of the relation's table, the columns not computed yet (the one
+        // being computed among them) can't be read. They are left out of matching and of telling
+        // rows apart when a computed unique column still identifies every row.
+        let pending = lineage |> Array.filter (fun i -> not r.Cols.[i].Lineage.IsReady)
+
+        if pending.Length > 0 then
+            let identified =
+                lineage
+                |> Array.exists (fun i ->
+                    let col = r.Cols.[i].Lineage
+
+                    col.IsReady
+                    && (col.IsDeclaredUnique || (col.Data.IsUnique && col.Data.BlankId < 0)))
+
+            if not identified then
+                Fail.notSupported
+                    ctx
+                    call.Span
+                    $"{name} in a calculated column of the table of its relation, where no computed column identifies the rows"
+
+        let readable (i: int) = not (Array.contains i pending)
 
         match p.Kind with
         | Offset
@@ -669,7 +715,7 @@ module Window =
             cols
             |> Array.forall (fun i -> DaxValue.groupEquals coll (r.Get(i, a)) (r.Get(i, b)))
 
-        let allCols = Array.init r.Cols.Length id
+        let allCols = Array.init r.Cols.Length id |> Array.filter readable
         let firstOrder = List.head orders
 
         let sortedOnce =
@@ -708,11 +754,21 @@ module Window =
                    |> Array.forall (fun col ->
                        isNull col.Lineage || obj.ReferenceEquals(col.Lineage.Table, r.BaseTable))
 
-            // A model table's rows are told apart by a key or a unique column (Learn).
-            let unique =
+            // A model table's rows are told apart by "explicit keys or unique columns" (Learn);
+            // "When the source table is a reference to a model table, unique rows must be guaranteed
+            // through a primary key" (SQLBI). A column the model declares the key or unique does;
+            // one whose values just happen to be unique may or may not.
+            let has (test: BColumn -> bool) =
                 isModelTable
-                && r.BaseTable.UniqueColumn
-                   |> Option.exists (fun u -> r.Cols |> Array.exists (fun col -> obj.ReferenceEquals(col.Lineage, u)))
+                && r.Cols |> Array.exists (fun col -> not (isNull col.Lineage) && test col.Lineage)
+
+            let unique = has _.IsDeclaredUnique
+
+            let uniqueByData =
+                has (fun col ->
+                    match r.BaseTable.UniqueColumn with
+                    | Some u -> obj.ReferenceEquals(u, col)
+                    | None -> false)
 
             match p.Kind with
             | Rank _ -> ()
@@ -728,12 +784,18 @@ module Window =
             | _ ->
                 if isModelTable then
                     if not unique then
-                        duplicate ()
+                        if uniqueByData then
+                            Fail.notSupported
+                                ctx
+                                call.Span
+                                $"{name} over a model table whose only unique column is not declared its key or unique (whether the engine uses it to tell rows apart is not documented)"
+                        else
+                            duplicate ()
                 else
                     for (a, b) in tiedPairs do
                         if sameRow allCols a b then
                             duplicate ()
-                        elif sameRow lineage a b then
+                        elif sameRow (lineage |> Array.filter readable) a b then
                             Fail.notSupported
                                 ctx
                                 call.Span
@@ -799,7 +861,7 @@ module Window =
 
         let withLineage (cols: int array) =
             cols
-            |> Array.filter (fun i -> not (isNull r.Cols.[i].Lineage))
+            |> Array.filter (fun i -> not (isNull r.Cols.[i].Lineage) && readable i)
             |> Array.distinct
             |> Array.sort
 
@@ -807,16 +869,29 @@ module Window =
         let readings =
             let all = withLineage allCols
 
+            // dax.guide's reading for OFFSET and Learn's for RANK and ROWNUMBER take the ORDERBY and
+            // PARTITIONBY columns; where those are no model column at all, SQLBI's examples rule it
+            // out: OFFSET ( -1, SourceTable, ORDERBY ( [PrevAmount] ) ) finds one current row from
+            // the row context ("apply semantics", example 2), and RANK ( DENSE, SourceTable, ORDERBY
+            // ( [@Amt] ) ) ranks each month ("Introducing the RANK window function").
+            let orderAndPartition = withLineage (Array.append orderColumns partition)
+
+            let named =
+                if orderAndPartition.Length = 0 then
+                    all
+                else
+                    orderAndPartition
+
             match matchBy with
             | Some m -> [ withLineage m; withLineage (Array.append m partition) ]
             | None ->
                 match p.Kind with
-                | Offset -> [ all; withLineage (Array.append orderColumns partition) ]
+                | Offset -> [ all; named ]
                 | Window(true, true) -> [ all; withLineage partition ]
                 | Window _ -> [ all ]
                 | Index -> [ all; withLineage partition ]
                 | Rank _
-                | RowNumber -> [ all; withLineage (Array.append orderColumns partition) ]
+                | RowNumber -> [ all; named ]
             |> List.distinct
 
         let applyRows (cols: int array) : int array =
