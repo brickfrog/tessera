@@ -266,9 +266,42 @@ let private withTarget
             Remote.withConnection (Source.access ctx) address (fun c ->
                 Remote.resolveDatabase c
                 |> Result.bind (fun d ->
-                    f (XmlaAddress.display (XmlaAddress.withDatabase d.Name address)) {
-                        Refuses = fun _ t -> remoteRefusal t
-                        Execute = fun _ _ dax -> Remote.queryOn c d.Name dax None
+                    let database = XmlaAddress.withDatabase d.Name address
+
+                    f (XmlaAddress.display database) {
+                        Refuses =
+                            fun _ t ->
+                                match remoteRefusal t with
+                                | Some refusal -> Some refusal
+                                | None ->
+                                    let given = TestRun.remoteProperties t |> List.map fst
+
+                                    match
+                                        address.Properties
+                                        |> List.tryFind (fun (k, _) ->
+                                            given |> List.exists (fun g -> String.Equals(g, k, StringComparison.OrdinalIgnoreCase)))
+                                    with
+                                    | Some(key, _) ->
+                                        Some(
+                                            Refusal.Error(
+                                                "duplicate-property",
+                                                $"the address already sets {key}=, and the test's roles or identity set it too"
+                                            )
+                                        )
+                                    | None -> None
+                        // A test with roles or an identity has a connection of its own, with them.
+                        Execute =
+                            fun _ t dax ->
+                                match TestRun.remoteProperties t with
+                                | [] -> Remote.queryOn c d.Name dax None
+                                | extra ->
+                                    Remote.withConnection
+                                        (Source.access ctx)
+                                        {
+                                            database with
+                                                Properties = database.Properties @ extra
+                                        }
+                                        (fun own -> Remote.queryOn own d.Name dax None)
                     })))
     else
         ModelIO.loadPath model

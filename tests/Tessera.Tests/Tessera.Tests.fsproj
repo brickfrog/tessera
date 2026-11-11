@@ -99,6 +99,7 @@
     <Compile Include="EngineModelShapeTests.fs" />
     <Compile Include="EngineCalcGroupTests.fs" />
     <Compile Include="EngineSecurityTests.fs" />
+    <Compile Include="SecurityCommandTests.fs" />
     <Compile Include="EngineSampleTests.fs" />
     <Compile Include="EnginePerfTests.fs" />
     <Compile Include="TestSuiteTests.fs" />

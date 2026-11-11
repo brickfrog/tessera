@@ -166,7 +166,7 @@ let tests =
             Expect.equal (lines r.Out |> List.tail) [ "ann,en-US,TRUE" ] "csv"
 
             let remote =
-                tess [ "query"; "xmla:localhost;db"; "--user-name"; "ann"; "EVALUATE { 1 }" ]
+                tess [ "query"; "xmla:localhost;db"; "--user-culture"; "en-US"; "EVALUATE { 1 }" ]
 
             Expect.equal remote.Code ExitCode.usage remote.Out)
 

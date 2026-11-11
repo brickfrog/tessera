@@ -267,6 +267,11 @@ type TestCase = {
     /// *(tess)* `now:`, the test's or else the suite's: the instant TODAY, NOW, UTCTODAY and UTCNOW
     /// return. None: the machine's clock when the fixture is prepared.
     Now: Tessera.Engine.Clock option
+    /// *(tess)* `roles:`, the test's or else the suite's: the model's roles the test queries as
+    /// (empty: none, all the data).
+    Roles: string list
+    /// *(tess)* `identity:`, the test's or else the suite's: who is asking (USERNAME, CUSTOMDATA...).
+    Identity: Tessera.DaxEngine.Identity option
 }
 
 type TestSuiteFile = {
@@ -729,6 +734,8 @@ module TestSuite =
         Tables: InlineTable list
         Directory: string
         Now: Tessera.Engine.Clock option
+        Roles: string list
+        Identity: Tessera.DaxEngine.Identity option
     }
 
     let private noBounds = {
@@ -1054,6 +1061,8 @@ module TestSuite =
         "skip"
         "compare"
         "now"
+        "roles"
+        "identity"
     ]
 
     /// `now: 2024-03-05T14:30:00`, an ISO 8601 date and time (the syntax of `tess query --now`).
@@ -1061,6 +1070,42 @@ module TestSuite =
         match Tessera.Engine.Clock.parse (asText "now" n) with
         | Ok c -> c
         | Error message -> fail n $"now: {message}"
+
+    /// `roles: Sales` or `roles: [ Sales, Marketing ]`: the model's roles a test queries as.
+    let private roles (n: Node) : string list =
+        let names =
+            match n.Kind with
+            | Sequence items -> items |> List.map (asText "a role")
+            | Scalar _ -> [ asText "roles" n ]
+            | Mapping _ -> fail n "roles must be a role's name or a list of them"
+
+        match names |> List.tryFind String.IsNullOrWhiteSpace with
+        | Some _ -> fail n "a role's name can't be empty"
+        | None -> names
+
+    /// `identity: { user_name: ..., user_principal_name: ..., user_object_id: ..., user_culture: ...,
+    /// custom_data: ... }`: what USERNAME and the others return (the options of `tess query`).
+    let private identity (n: Node) : Tessera.DaxEngine.Identity =
+        let pairs = asMap "identity" n
+
+        let keys = [
+            "user_name"
+            "user_principal_name"
+            "user_object_id"
+            "user_culture"
+            "custom_data"
+        ]
+
+        checkKeys "identity" keys pairs
+        let get key = tryKey key pairs |> Option.map (asText key)
+
+        {
+            UserName = get "user_name"
+            UserPrincipalName = get "user_principal_name"
+            UserObjectId = get "user_object_id"
+            UserCulture = get "user_culture"
+            CustomData = get "custom_data"
+        }
 
     /// A measure's name as a reference to it: `Total` is `[Total]`, `Margin [%]` is `[Margin [%]]]`.
     let private measureReference (name: string) = "[" + name.Replace("]", "]]") + "]"
@@ -1150,6 +1195,8 @@ module TestSuite =
             Skip = skip
             Matrix = matrix
             Now = get "now" |> Option.map clock |> Option.orElse d.Now
+            Roles = get "roles" |> Option.map roles |> Option.defaultValue d.Roles
+            Identity = get "identity" |> Option.map identity |> Option.orElse d.Identity
         }
 
     /// A test node as the tests it stands for: itself, or one per matrix combination.
@@ -1204,6 +1251,8 @@ module TestSuite =
         "defaults"
         "tests"
         "now"
+        "roles"
+        "identity"
     ]
 
     let private defaultsKeys = [ "tolerance"; "tolerance_abs"; "tags"; "filters" ]
@@ -1282,6 +1331,8 @@ module TestSuite =
                 Tables = field "tables" inlineTables |> Option.defaultValue []
                 Directory = directory
                 Now = field "now" clock
+                Roles = field "roles" roles |> Option.defaultValue []
+                Identity = field "identity" identity
             }
 
             let tests =

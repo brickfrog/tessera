@@ -746,6 +746,12 @@ let localTarget (db: Database) (cliData: string option) : Target =
             + (match t.Now with
                | Some c -> $"{c.Now.Ticks}\u0001{c.UtcNow.Ticks}"
                | None -> "")
+            + "\u0000"
+            + (t.Roles |> List.map (fun r -> r.ToUpperInvariant()) |> String.concat "\u0001")
+            + "\u0000"
+            + (match t.Identity with
+               | Some i -> sprintf "%A" i
+               | None -> "")
 
         match prepared.TryGetValue key with
         | true, p -> p
@@ -753,6 +759,11 @@ let localTarget (db: Database) (cliData: string option) : Target =
             let p =
                 loadFixture db suite directory tables
                 |> Result.bind (Engine.prepareWith { Clock = t.Now } db)
+                |> Result.map (fun p ->
+                    match t.Identity with
+                    | Some id -> Engine.withIdentity id p
+                    | None -> p)
+                |> Result.bind (Engine.asRoles t.Roles)
 
             prepared.[key] <- p
             p
@@ -782,7 +793,39 @@ let remoteRefusal (t: TestCase) : Refusal option =
     elif t.Now.IsSome then
         Some(Refusal.Skip "it sets `now:`; a server's clock can't be set")
     else
-        None
+        match t.Identity with
+        | Some i when i.UserObjectId.IsSome || i.UserCulture.IsSome ->
+            Some(
+                Refusal.Skip
+                    "it sets `identity: user_object_id` or `user_culture`; a server has no connection property for them"
+            )
+        | _ when t.Roles |> List.exists (fun r -> r.Contains ',') ->
+            Some(Refusal.Skip "a role's name has a comma; a server takes the roles as a comma-separated list")
+        | Some i when i.UserName.IsSome && i.UserPrincipalName.IsSome ->
+            Some(
+                Refusal.Skip
+                    "it sets both `identity: user_name` and `user_principal_name`; on a server both are EffectiveUserName"
+            )
+        | _ -> None
+
+/// The connection-string properties a test's `roles:` and `identity:` become on a server: Roles=,
+/// EffectiveUserName= and CustomData= (Microsoft Learn, "Connection string properties (Analysis
+/// Services)"). Empty: the test runs on the connection already open.
+let remoteProperties (t: TestCase) : (string * string) list = [
+    if not t.Roles.IsEmpty then
+        "Roles", String.concat "," t.Roles
+
+    match t.Identity with
+    | Some i ->
+        match i.UserName |> Option.orElse i.UserPrincipalName with
+        | Some name -> "EffectiveUserName", name
+        | None -> ()
+
+        match i.CustomData with
+        | Some text -> "CustomData", text
+        | None -> ()
+    | None -> ()
+]
 
 // ---- Running ---------------------------------------------------------------------------------------
 
