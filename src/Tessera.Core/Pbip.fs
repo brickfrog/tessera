@@ -214,13 +214,12 @@ let pbismText (eol: string) = jsonText (newPbism ()) eol
 
 /// Make sure a semantic model folder has its PBIP support files: what's missing is added, what's
 /// there is kept ("merge, never clobber": a .platform keeps its displayName, description and
-/// logicalId). The one change to an existing file: with a TMDL definition (`tmdl`), a
-/// definition.pbism whose version predates TMDL is bumped (Power BI can't open it otherwise),
-/// keeping its other settings. A new .platform describes `item` (by default, the folder's name).
+/// logicalId). The one change to an existing file: a definition.pbism whose version predates TMDL
+/// is bumped (Power BI can't open the TMDL otherwise), keeping its other settings. A new .platform
+/// describes `item` (by default, the folder's name).
 let ensureSupportFilesFor
     (semanticModelDir: string)
     (item: Item option)
-    (tmdl: bool)
     (eol: string)
     (newId: unit -> Guid)
     : Result<unit, TessError> =
@@ -242,7 +241,7 @@ let ensureSupportFilesFor
                         | _ -> false
 
                     match json with
-                    | :? JsonObject as o when tooOld && tmdl ->
+                    | :? JsonObject as o when tooOld ->
                         o.["version"] <- JsonValue.Create pbismVersion
                         writeJson pbism o eol
                     | _ -> ()
@@ -266,4 +265,4 @@ let ensureSupportFilesFor
 
 /// ensureSupportFilesFor a TMDL definition, naming a new .platform's item after the folder.
 let ensureSupportFiles (semanticModelDir: string) (eol: string) (newId: unit -> Guid) : Result<unit, TessError> =
-    ensureSupportFilesFor semanticModelDir None true eol newId
+    ensureSupportFilesFor semanticModelDir None eol newId

@@ -1,0 +1,21 @@
+=== .platform
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "Ventes été",
+    "description": "Desktop's \"model\""
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "00000000-0000-0000-0000-000000000001"
+  }
+}
+
+=== definition.pbism
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/semanticModel/definitionProperties/1.0.0/schema.json",
+  "version": "4.2",
+  "settings": {}
+}
+

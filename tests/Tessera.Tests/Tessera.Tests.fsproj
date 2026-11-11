@@ -107,6 +107,9 @@
     <Compile Include="EngineCacheTests.fs" />
     <Compile Include="TestSuiteTests.fs" />
     <Compile Include="TestCommandTests.fs" />
+    <Compile Include="Te2Fixture.fs" />
+    <Compile Include="FolderFormatTests.fs" />
+    <Compile Include="FolderFormatCommandTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

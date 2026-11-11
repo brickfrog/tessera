@@ -1,0 +1,52 @@
+cultures/da-DK.json
+database.json
+expressions/ServerName.json
+functions/Double.json
+perspectives/Sales View.json
+relationships/Sales-Date.json
+roles/Readers.json
+tables/%5FCON/%5FCON.json
+tables/%5FCON/columns/c.json
+tables/%5FCON/partitions/_CON p.json
+tables/Café/Café.json
+tables/Café/columns/c.json
+tables/Café/partitions/Café p.json
+tables/Date/Date.json
+tables/Date/columns/DateKey.json
+tables/Date/columns/Month.json
+tables/Date/columns/Year.json
+tables/Date/hierarchies/Calendar.json
+tables/Date/partitions/Date.json
+tables/Sales/Sales.json
+tables/Sales/columns/Amount.json
+tables/Sales/columns/DateKey.json
+tables/Sales/columns/Path%2fWith%5cSlashes.json
+tables/Sales/measures/Total (hidden).json
+tables/Sales/measures/Total.json
+tables/Sales/partitions/Sales.json
+tables/Time Intelligence/Time Intelligence.json
+tables/Time Intelligence/calculationItems/Current.json
+tables/Time Intelligence/calculationItems/YTD.json
+tables/Time Intelligence/columns/Period.json
+tables/Time Intelligence/partitions/Time Intelligence.json
+tables/Trailing%20/Trailing .json
+tables/Trailing%20/columns/c.json
+tables/Trailing%20/partitions/Trailing  p.json
+tables/Trailing%2e/Trailing..json
+tables/Trailing%2e/columns/c.json
+tables/Trailing%2e/partitions/Trailing. p.json
+tables/_CON/_CON.json
+tables/_CON/columns/c.json
+tables/_CON/measures/Growth %2520.json
+tables/_CON/measures/_AUX.json
+tables/_CON/measures/x%2fy.json
+tables/_CON/partitions/CON p.json
+tables/_nul.txt/_nul.txt.json
+tables/_nul.txt/columns/c.json
+tables/_nul.txt/partitions/_nul.txt p.json
+tables/a%3ab/a%3ab.json
+tables/a%3ab/columns/c.json
+tables/a%3ab/partitions/a%3ab p.json
+tables/a%3ab~2/a%3ab.json
+tables/a%3ab~2/columns/c.json
+tables/a%3ab~2/partitions/a%3ab p.json

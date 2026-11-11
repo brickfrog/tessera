@@ -1,0 +1,173 @@
+{
+  "name": "Sample",
+  "compatibilityLevel": 1702,
+  "model": {
+    "culture": "en-US",
+    "discourageImplicitMeasures": true,
+    "tables": [
+      {
+        "name": "Sales",
+        "description": [
+          "  Fact table.",
+          "",
+          "   Indented second paragraph.  "
+        ],
+        "columns": [
+          {
+            "name": "Amount",
+            "dataType": "decimal",
+            "sourceColumn": "Amount"
+          },
+          {
+            "name": "DateKey",
+            "dataType": "int64",
+            "isHidden": true,
+            "sourceColumn": "DateKey"
+          },
+          {
+            "name": "Path/With\\Slashes",
+            "dataType": "string",
+            "sourceColumn": "P"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Sales",
+            "source": {
+              "type": "m",
+              "expression": "let x = 1 in x"
+            }
+          }
+        ],
+        "measures": [
+          {
+            "name": "Total",
+            "expression": "SUM(Sales[Amount])",
+            "formatString": "#,0"
+          },
+          {
+            "name": "Total (hidden)",
+            "expression": "[Total]",
+            "isHidden": true
+          }
+        ]
+      },
+      {
+        "name": "Date",
+        "columns": [
+          {
+            "name": "DateKey",
+            "dataType": "int64",
+            "sourceColumn": "DateKey"
+          },
+          {
+            "name": "Year",
+            "dataType": "int64",
+            "sourceColumn": "Year"
+          },
+          {
+            "name": "Month",
+            "dataType": "string",
+            "sourceColumn": "Month"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Date",
+            "source": {
+              "type": "m",
+              "expression": "let x = 1 in x"
+            }
+          }
+        ],
+        "hierarchies": [
+          {
+            "name": "Calendar",
+            "levels": [
+              {
+                "name": "Year",
+                "ordinal": 0,
+                "column": "Year"
+              },
+              {
+                "name": "Month",
+                "ordinal": 1,
+                "column": "Month"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Time Intelligence",
+        "calculationGroup": {
+          "calculationItems": [
+            {
+              "name": "Current",
+              "expression": "SELECTEDMEASURE()",
+              "ordinal": 0
+            },
+            {
+              "name": "YTD",
+              "expression": "TOTALYTD(SELECTEDMEASURE(), 'Date'[DateKey])",
+              "ordinal": 1
+            }
+          ]
+        },
+        "columns": [
+          {
+            "name": "Period",
+            "dataType": "string",
+            "sourceColumn": "Name"
+          }
+        ],
+        "partitions": [
+          {
+            "name": "Time Intelligence",
+            "source": {
+              "type": "calculationGroup"
+            }
+          }
+        ]
+      }
+    ],
+    "relationships": [
+      {
+        "name": "Sales-Date",
+        "fromTable": "Sales",
+        "fromColumn": "DateKey",
+        "toTable": "Date",
+        "toColumn": "DateKey"
+      }
+    ],
+    "cultures": [
+      {
+        "name": "da-DK"
+      }
+    ],
+    "perspectives": [
+      {
+        "name": "Sales View"
+      }
+    ],
+    "roles": [
+      {
+        "name": "Readers",
+        "modelPermission": "read"
+      }
+    ],
+    "expressions": [
+      {
+        "name": "ServerName",
+        "kind": "m",
+        "expression": "\"localhost\" meta [IsParameterQuery=true, Type=\"Text\", IsParameterQueryRequired=true]"
+      }
+    ],
+    "functions": [
+      {
+        "name": "Double",
+        "expression": "(x: INT64) => x * 2"
+      }
+    ]
+  }
+}

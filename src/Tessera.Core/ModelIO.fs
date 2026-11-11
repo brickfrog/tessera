@@ -623,10 +623,18 @@ let private itemName (item: Pbip.Item option) (db: Database) =
     | None when not (isNull db.Model) && usable db.Model.Name -> db.Model.Name
     | None -> "SemanticModel"
 
-/// The semantic model folder a PBIP save writes: the destination itself when it's one (named
-/// X.SemanticModel, or holding a definition.pbism); else, for a project folder, the one
-/// X.SemanticModel in it, or a new one named after the item.
-let pbipTarget (item: Pbip.Item option) (db: Database) (destination: string) : Result<string, TessError> =
+/// A folder that holds a PBIP project: a .pbip file, or X.SemanticModel folders.
+let private isProjectFolder (dir: string) =
+    Directory.Exists dir
+    && (not (Seq.isEmpty (Directory.EnumerateFiles(dir, "*.pbip")))
+        || Directory.GetDirectories dir |> Array.exists Pbip.isSemanticModelFolder)
+
+/// The semantic model folder a PBIP save writes, and the item name for a new .platform there. The
+/// destination itself, unless it's an existing project folder (with a .pbip or X.SemanticModel
+/// folders, and no definition.pbism of its own): then the one X.SemanticModel in it, or a new one
+/// named after the item (`item`, else the database's or model's name). A new .platform's
+/// displayName is the folder's name without ".SemanticModel", or the item's for a folder named here.
+let pbipTarget (item: Pbip.Item option) (db: Database) (destination: string) : Result<string * string, TessError> =
     let destination = Path.GetFullPath destination
 
     let trimmed =
@@ -635,48 +643,38 @@ let pbipTarget (item: Pbip.Item option) (db: Database) (destination: string) : R
     if
         trimmed.EndsWith(Pbip.semanticModelSuffix, StringComparison.OrdinalIgnoreCase)
         || Pbip.isSemanticModelFolder destination
+        || not (isProjectFolder destination)
     then
-        Ok destination
+        Ok(destination, Pbip.displayNameOf destination)
     else
         let existing =
-            if Directory.Exists destination then
-                Directory.GetDirectories destination
-                |> Array.filter (fun d ->
-                    d.EndsWith(Pbip.semanticModelSuffix, StringComparison.OrdinalIgnoreCase)
-                    && Pbip.isSemanticModelFolder d)
-                |> Array.sortWith (fun a b -> String.CompareOrdinal(a, b))
-                |> List.ofArray
-            else
-                []
+            Directory.GetDirectories destination
+            |> Array.filter Pbip.isSemanticModelFolder
+            |> Array.sortWith (fun a b -> String.CompareOrdinal(a, b))
+            |> List.ofArray
 
         match existing with
-        | [ one ] -> Ok one
+        | [ one ] -> Ok(one, Pbip.displayNameOf one)
         | [] ->
-            let name = FolderFormat.SafeName.escape true (itemName item db)
-            Ok(Path.Combine(destination, name + Pbip.semanticModelSuffix))
+            let name = itemName item db
+
+            Ok(Path.Combine(destination, FolderFormat.SafeName.escape true name + Pbip.semanticModelSuffix), name)
         | many -> Error(AmbiguousModel(destination, many))
 
-/// Write a PBIP semantic model folder, merging into what's there: the model goes where the folder
-/// keeps it (TMDL in definition/, or model.bim for a .bim-based project), missing support files are
-/// added, and existing ones are kept (see Pbip.ensureSupportFilesFor).
-let private savePbip (opts: SaveOptions) (item: Pbip.Item option) (db: Database) (dir: string) =
+/// Write a PBIP semantic model folder (TMDL in definition/), merging into what's there: missing
+/// support files are added and existing ones kept (see Pbip.ensureSupportFilesFor). A model.bim
+/// there is replaced by the TMDL (a folder with both is ambiguous to Power BI).
+let private savePbip (opts: SaveOptions) (item: Pbip.Item) (db: Database) (dir: string) =
     let definition = Path.Combine(dir, Pbip.definitionFolderName)
-    let modelBim = Path.Combine(dir, Pbip.modelBimFileName)
-    let bimBased = File.Exists modelBim && not (Directory.Exists definition)
+    let staleBim = Path.Combine(dir, Pbip.modelBimFileName)
 
     catchIo dir (fun () -> Directory.CreateDirectory dir |> ignore)
+    |> Result.bind (fun () -> writeTmdl opts db definition)
     |> Result.bind (fun () ->
-        if bimBased then
-            saveBim opts db modelBim |> Result.map ignore
-        else
-            writeTmdl opts db definition
-            // A folder with both definition/ and model.bim is ambiguous to Power BI (tess refuses to
-            // load it); the TMDL just written wins.
-            |> Result.bind (fun () ->
-                catchIo modelBim (fun () ->
-                    if File.Exists modelBim then
-                        File.Delete modelBim)))
-    |> Result.bind (fun () -> Pbip.ensureSupportFilesFor dir item (not bimBased) (Eol.text opts.Eol) Guid.NewGuid)
+        catchIo staleBim (fun () ->
+            if File.Exists staleBim then
+                File.Delete staleBim))
+    |> Result.bind (fun () -> Pbip.ensureSupportFilesFor dir (Some item) (Eol.text opts.Eol) Guid.NewGuid)
     |> Result.map (fun () -> {
         Format = PbipFolder
         Path = dir
@@ -718,11 +716,11 @@ let saveItem
     let target =
         match format with
         | PbipFolder when not (File.Exists destination) -> pbipTarget item db destination
-        | _ -> Ok destination
+        | _ -> Ok(destination, "")
 
     match target with
     | Error e -> Error e
-    | Ok destination ->
+    | Ok(destination, displayName) ->
         if isNonEmpty destination && not force then
             Error(DestinationNotEmpty destination)
         elif format <> BimFile && File.Exists destination then
@@ -733,7 +731,13 @@ let saveItem
             match format with
             | BimFile -> saveBim opts db destination
             | TmdlFolder -> saveTmdl opts db destination
-            | PbipFolder -> savePbip opts item db destination
+            | PbipFolder ->
+                let platformItem: Pbip.Item = {
+                    DisplayName = displayName
+                    Description = item |> Option.bind (fun i -> i.Description)
+                }
+
+                savePbip opts platformItem db destination
             | DatabaseJsonFolder -> saveDatabaseJson opts db destination
 
 /// saveItem with no source item.
