@@ -54,6 +54,9 @@ namespace Tessera.DaxEngine
 //     not documented).
 //   - Names are registered once: `Registry.byName` throws if two entries share a name. Before
 //     adding a family, see which of its functions another file already has (`Engine.functions`).
+//   - An iterator gives each row its row context with `Context.pushRow` (ALLSELECTED reads the
+//     iterated table from there: a shadow filter context). A row context that is not an
+//     iteration (a calculated column's, a helper's) goes on a table from `Shadows.notAnIteration`.
 //   - `Type` is the static result type where the function has one whatever its data (COUNTROWS is
 //     always an Integer). It types result columns that are BLANK in every row.
 

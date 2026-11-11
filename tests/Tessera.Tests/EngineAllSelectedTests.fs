@@ -363,6 +363,28 @@ let tests =
                     p.Value
                     "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], \"x\", CALCULATE ( CALCULATE ( [Qty], ALLSELECTED ( Product[Brand] ) ), Product[Color] = \"Red\" ) )"
                     "filters of the row were changed")
+            // Whatever ALLSELECTED releases, the row's filters must be the ones SUMMARIZECOLUMNS set.
+            testCase "a SUMMARIZECOLUMNS row whose filters CALCULATE changed, whatever it names" (fun () ->
+                for inner in
+                    [
+                        "CALCULATE ( [Qty], ALLSELECTED ( Product[Color] ) )"
+                        "CALCULATE ( [Qty], ALLSELECTED () )"
+                        "COUNTROWS ( ALLSELECTED ( Product[Color] ) )"
+                    ] do
+                    notSupported
+                        p.Value
+                        $"EVALUATE SUMMARIZECOLUMNS ( Product[Brand], \"x\", CALCULATE ( {inner}, Product[Color] = \"Red\" ) )"
+                        "filters of the row were changed"
+
+                notSupported
+                    p.Value
+                    "EVALUATE SUMMARIZECOLUMNS ( \"x\", CALCULATE ( CALCULATE ( [Qty], ALLSELECTED () ), Product[Color] = \"Red\" ) )"
+                    "filters of the row were changed")
+            testCase "a shadow with two columns of the same model column" (fun () ->
+                notSupported
+                    p.Value
+                    "EVALUATE ROW ( \"n\", SUMX ( CROSSJOIN ( SELECTCOLUMNS ( ALL ( Product[Brand] ), \"A\", Product[Brand] ), SELECTCOLUMNS ( VALUES ( Product[Brand] ), \"B\", Product[Brand] ) ), COUNTROWS ( ALLSELECTED ( Product[Brand] ) ) ) )"
+                    "two columns of")
             testCase "row contexts that are not an iterator's" (fun () ->
                 notSupported ranked.Value "EVALUATE ROW ( \"x\", SUM ( Product[Rank] ) )" "calculated column"
 
@@ -379,6 +401,12 @@ let tests =
                 notSupported
                     p.Value
                     "EVALUATE SUMMARIZE ( Product, Product[Brand], \"n\", COUNTROWS ( ALLSELECTED ( Product[Brand] ) ) )"
+                    "SUMMARIZE extension column"
+
+                // A model table with related tables, summarized by all of its columns.
+                notSupported
+                    p.Value
+                    "EVALUATE SUMMARIZE ( Sales, Sales[Product], Sales[Qty], \"n\", COUNTROWS ( ALLSELECTED ( Product[Brand] ) ) )"
                     "SUMMARIZE extension column")
             testCase "whether a restored shadow filters the column" (fun () ->
                 notSupported

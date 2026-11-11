@@ -1081,7 +1081,12 @@ module Shadows =
             && (lineage table |> Array.distinctBy _.Id |> Array.map _.Id |> Array.sort) =
                 (lineage groups |> Array.map _.Id |> Array.sort)
 
-        if same then
+        // The rows of a model table with related tables: its shadow would reach them, the groups'
+        // wouldn't, so which one applies matters and is not documented.
+        if
+            same
+            && not (table.IsPureBase && (table.Config.Expanded table.BaseTable).Length > 1)
+        then
             groups
         else
             notAnIteration

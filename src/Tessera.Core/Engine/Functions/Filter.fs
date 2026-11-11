@@ -603,14 +603,13 @@ module Filter =
         let fc = ctx.Filter
 
         match p.Selection with
+        | Some(s, _) when not (obj.ReferenceEquals(fc.Filters, s.Row)) ->
+            Fail.notSupported
+                ctx
+                span
+                "ALLSELECTED inside SUMMARIZECOLUMNS after the filters of the row were changed (by CALCULATE): what is restored then is not documented"
         | Some(_, [||]) -> fc
         | Some(s, released) ->
-            if not (obj.ReferenceEquals(fc.Filters, s.Row)) then
-                Fail.notSupported
-                    ctx
-                    span
-                    "ALLSELECTED inside SUMMARIZECOLUMNS after the filters of the row were changed (by CALCULATE): what is restored then is not documented"
-
             // The filters the groups were computed under, with the group of the row on the
             // group-by columns that keep it.
             let kept = s.Groups |> Array.filter (fun c -> not (has released c))
@@ -661,10 +660,23 @@ module Filter =
         restore ctx call.Span (plan ctx call.Span (targetsOf ev ctx call))
 
     /// The values of some columns in the rows of an iterated table, as a table of those columns.
-    let private valuesIn (ctx: Ctx) (t: TableVal) (cols: BColumn array) : TableVal =
+    let private valuesIn (ctx: Ctx) (span: Span) (t: TableVal) (cols: BColumn array) : TableVal =
         if t.IsPureBase then
             combinations cols t.BaseRows
         else
+            for c in cols do
+                if
+                    t.Cols
+                    |> Array.filter (fun x -> obj.ReferenceEquals(x.Lineage, c))
+                    |> Array.length
+                        >
+                        1
+                then
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"ALLSELECTED of {describe c} under the shadow of a table with two columns of {describe c}"
+
             let positions = cols |> Array.map (Tables.columnIndexOfLineage t)
             let distinct = Tables.distinct ctx.Model (Tables.project t positions)
 
@@ -731,7 +743,7 @@ module Filter =
                 let c = cols.[0]
                 let ids = Filters.idsIn c (RowSet.All c.Table.Size) true
                 Tables.ofColumns [| Tables.modelColumn c |] [| ids |> Array.map c.ValueOfId |] ids.Length
-            | None, [ (t, restored) ] when restored.Length = cols.Length -> valuesIn ctx t cols
+            | None, [ (t, restored) ] when restored.Length = cols.Length -> valuesIn ctx span t cols
             | None, _ ->
                 Fail.notSupported
                     ctx
