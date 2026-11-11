@@ -1245,140 +1245,143 @@ let asRoles (roles: string list) (p: Prepared) : Result<Prepared, TessError> =
             if readers.IsEmpty then
                 Error(RoleCannotRead(chosen |> List.map (fun r -> r.Name, Security.permission r)))
             else
-                let secured =
-                    readers
-                    |> List.forall (fun r -> r.ModelPermission <> ModelPermission.Administrator)
-                    && readers |> List.exists (fun r -> not (Security.filtersOf r).IsEmpty)
+                match Security.problems p.Database readers with
+                | first :: _ -> Error(DaxNotSupported(first, ""))
+                | [] ->
+                    let secured =
+                        readers
+                        |> List.forall (fun r -> r.ModelPermission <> ModelPermission.Administrator)
+                        && readers |> List.exists (fun r -> not (Security.filtersOf r).IsEmpty)
 
-                let applied = {
-                    p with
-                        Roles = names
-                        RolesIdentity = p.Identity
-                        Secured = secured
-                }
+                    let applied = {
+                        p with
+                            Roles = names
+                            RolesIdentity = p.Identity
+                            Secured = secured
+                    }
 
-                if not secured then
-                    Ok applied
-                else
-                    run (fun () ->
-                        let visible = Security.visibleRows ev p.Database p.Model p.Identity readers
+                    if not secured then
+                        Ok applied
+                    else
+                        run (fun () ->
+                            let visible = Security.visibleRows ev p.Database p.Model p.Identity readers
 
-                        if visible.Count = 0 then
-                            applied
-                        else
-                            // The data tables' stored rows, filtered.
-                            let mutable store = p.Store
+                            if visible.Count = 0 then
+                                applied
+                            else
+                                // The data tables' stored rows, filtered.
+                                let mutable store = p.Store
 
-                            for t in p.Model.Tables do
-                                match visible.TryGetValue t.Name, store.TryTable t.Name with
-                                | (true, rows), Some s when t.Expression.IsNone ->
-                                    match
-                                        StoreTable.Create(s.Name, s.Columns |> Array.map (fun c -> subsetColumn c rows), rows.Length)
-                                    with
-                                    | Ok table -> store <- store.WithTable table
-                                    | Error why -> raise (EngineException(DaxInvalid($"table '{t.Name}': {why}", "")))
-                                | _ -> ()
+                                for t in p.Model.Tables do
+                                    match visible.TryGetValue t.Name, store.TryTable t.Name with
+                                    | (true, rows), Some s when t.Expression.IsNone ->
+                                        match
+                                            StoreTable.Create(s.Name, s.Columns |> Array.map (fun c -> subsetColumn c rows), rows.Length)
+                                        with
+                                        | Ok table -> store <- store.WithTable table
+                                        | Error why -> raise (EngineException(DaxInvalid($"table '{t.Name}': {why}", "")))
+                                    | _ -> ()
 
-                            // What `prepare` computed, filtered the same way, for the binding to reuse.
-                            let computed = Tessera.DaxEngine.Model(p.Store.Collation)
+                                // What `prepare` computed, filtered the same way, for the binding to reuse.
+                                let computed = Tessera.DaxEngine.Model(p.Store.Collation)
 
-                            computed.Tables <-
-                                p.Model.Tables
-                                |> Array.map (fun t ->
-                                    let rows =
-                                        match visible.TryGetValue t.Name with
-                                        | true, rows -> Some rows
-                                        | _ -> None
+                                computed.Tables <-
+                                    p.Model.Tables
+                                    |> Array.map (fun t ->
+                                        let rows =
+                                            match visible.TryGetValue t.Name with
+                                            | true, rows -> Some rows
+                                            | _ -> None
 
-                                    let copy = BTable(t.Id, computed, t.Name)
-                                    copy.Failure <- t.Failure
+                                        let copy = BTable(t.Id, computed, t.Name)
+                                        copy.Failure <- t.Failure
 
-                                    copy.Columns <-
-                                        t.Columns
-                                        |> Array.map (fun c ->
-                                            let k = BColumn(c.Id, copy, c.Name, c.DataType)
-                                            k.Expression <- c.Expression
-                                            k.SourceName <- c.SourceName
-                                            k.Failure <- c.Failure
+                                        copy.Columns <-
+                                            t.Columns
+                                            |> Array.map (fun c ->
+                                                let k = BColumn(c.Id, copy, c.Name, c.DataType)
+                                                k.Expression <- c.Expression
+                                                k.SourceName <- c.SourceName
+                                                k.Failure <- c.Failure
 
-                                            if
-                                                c.Failure.IsNone
-                                                && c.IsReady
-                                                && (c.Expression.IsSome || t.Expression.IsSome)
-                                            then
-                                                k.SetData(
-                                                    match rows with
-                                                    | Some r -> subsetColumn c.Stored r
-                                                    | None -> c.Stored
-                                                )
+                                                if
+                                                    c.Failure.IsNone
+                                                    && c.IsReady
+                                                    && (c.Expression.IsSome || t.Expression.IsSome)
+                                                then
+                                                    k.SetData(
+                                                        match rows with
+                                                        | Some r -> subsetColumn c.Stored r
+                                                        | None -> c.Stored
+                                                    )
 
-                                            k)
+                                                k)
 
-                                    for c in copy.Columns do
-                                        copy.ColumnByName.[c.Name] <- c
+                                        for c in copy.Columns do
+                                            copy.ColumnByName.[c.Name] <- c
 
-                                    if t.Expression.IsSome && t.IsReady then
-                                        copy.SetRowCount(
-                                            match rows with
-                                            | Some r -> r.Length
-                                            | None -> t.RowCount
-                                        )
+                                        if t.Expression.IsSome && t.IsReady then
+                                            copy.SetRowCount(
+                                                match rows with
+                                                | Some r -> r.Length
+                                                | None -> t.RowCount
+                                            )
 
-                                    computed.TableByName.[t.Name] <- copy
-                                    copy)
+                                        computed.TableByName.[t.Name] <- copy
+                                        copy)
 
-                            let bound, failures =
-                                bindWith
-                                    {
-                                        Now = p.Model.Now
-                                        UtcNow = p.Model.UtcNow
-                                    }
-                                    p.Database
-                                    store
-                                    (Some {
-                                        Source = { Label = "roles"; Text = "" }
-                                        Defs = QueryDefs()
-                                        Columns = []
-                                        Tables = []
-                                        Bound = ignore
-                                        Prepared = computed
-                                    })
+                                let bound, failures =
+                                    bindWith
+                                        {
+                                            Now = p.Model.Now
+                                            UtcNow = p.Model.UtcNow
+                                        }
+                                        p.Database
+                                        store
+                                        (Some {
+                                            Source = { Label = "roles"; Text = "" }
+                                            Defs = QueryDefs()
+                                            Columns = []
+                                            Tables = []
+                                            Bound = ignore
+                                            Prepared = computed
+                                        })
 
-                            // The blank row is decided when the model is processed: the roles must not
-                            // add one or take one away.
-                            let decided (t: BTable) =
-                                try
-                                    Ok t.HasBlankRow
-                                with EngineException e ->
-                                    Error e
+                                // The blank row is decided when the model is processed: the roles must not
+                                // add one or take one away.
+                                let decided (t: BTable) =
+                                    try
+                                        Ok t.HasBlankRow
+                                    with EngineException e ->
+                                        Error e
 
-                            for t in bound.Tables do
-                                match p.Model.TableByName.TryGetValue t.Name with
-                                | true, full when full.Gate.IsNone && isNull t.CalcGroup ->
-                                    match decided full, decided t with
-                                    | Ok a, Ok b when a = b -> ()
-                                    | Ok a, Ok _ ->
-                                        let what = if a then "lose" else "gain"
+                                for t in bound.Tables do
+                                    match p.Model.TableByName.TryGetValue t.Name with
+                                    | true, full when full.Gate.IsNone && isNull t.CalcGroup ->
+                                        match decided full, decided t with
+                                        | Ok a, Ok b when a = b -> ()
+                                        | Ok a, Ok _ ->
+                                            let what = if a then "lose" else "gain"
 
-                                        raise (
-                                            EngineException(
-                                                DaxNotSupported(
-                                                    $"under the roles, '{t.Name}' would {what} its blank row (the rows that relate to it are filtered), and the sources don't say whether the blank row stays as the model was processed",
-                                                    ""
+                                            raise (
+                                                EngineException(
+                                                    DaxNotSupported(
+                                                        $"under the roles, '{t.Name}' would {what} its blank row (the rows that relate to it are filtered), and the sources don't say whether the blank row stays as the model was processed",
+                                                        ""
+                                                    )
                                                 )
                                             )
-                                        )
-                                    | Ok _, Error e -> raise (EngineException e)
-                                    | Error(DaxNotSupported(why, _)), _ -> t.Gate <- Some why
-                                    | Error e, _ -> t.Gate <- Some(TessError.message e)
-                                | _ -> ()
+                                        | Ok _, Error e -> raise (EngineException e)
+                                        | Error(DaxNotSupported(why, _)), _ -> t.Gate <- Some why
+                                        | Error e, _ -> t.Gate <- Some(TessError.message e)
+                                    | _ -> ()
 
-                            {
-                                applied with
-                                    Model = bound
-                                    Store = store
-                                    Failures = failures
-                            })
+                                {
+                                    applied with
+                                        Model = bound
+                                        Store = store
+                                        Failures = failures
+                                })
 
 // ---- Results -----------------------------------------------------------------------------------
 
@@ -2059,11 +2062,12 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
             // context on its table, and what applying the role refuses (see Engine/Security.fs).
             for r in db.Model.Roles do
                 let filters = Security.filtersOf r
+                let problems = Security.problems db [ r ]
 
-                if not filters.IsEmpty then
+                if not filters.IsEmpty || not problems.IsEmpty then
                     yield
                         ObjectRef.modelLevel ObjectKind.Role r.Name,
-                        Security.problems db [ r ]
+                        problems
                         @ [
                             for (t, text) in filters do
                                 yield!
