@@ -2037,10 +2037,13 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   with no key. The key is what the engine knows to be unique: a column on the one side of a relationship (either
   side of a one-to-one), not one whose values happen to be unique ("The presence of a relationship forces the DAX
   engine to verify that ProductKey is a column with unique values": SQLBI, "Understanding circular
-  dependencies"). With a key, a context transition depends on it alone, so several such columns are fine. Without
-  one, a cycle that `ALLEXCEPT`, `REMOVEFILTERS` or a table filter could take away, or that a column marked as the
-  key or `USERELATIONSHIP` (which may turn the optimization off) might change, is refused rather than called
-  circular. A calculated column or table that uses something unsupported doesn't stop the rest: only the queries
+  dependencies"). With a key, a context transition depends on it alone, so several such columns are fine.
+  `ALLEXCEPT`, `ALL` or `REMOVEFILTERS` in the same `CALCULATE` take the transition down to the columns they keep,
+  key or not ("The technique using ALLEXCEPT relies on the semantics of the DAX language. As such, it works in any
+  scenario": SQLBI), so `CALCULATE ( ..., ALLEXCEPT ( T, T[Key] ) )` in two columns of a table with no relationship
+  is no cycle. Without a key, a cycle that another narrowing (a table filter argument, a modifier in a measure)
+  could take away, or that a column marked as the key or `USERELATIONSHIP` (which may turn the optimization off)
+  might change, is refused rather than called circular. A calculated column or table that uses something unsupported doesn't stop the rest: only the queries
   that read it fail, with its error.
 - **Relationships:** many-to-one either way round, single or both directions, active or not; **one-to-one**
   (filters both ways, and each table's expanded table holds the other: "you can consider the two expanded tables as

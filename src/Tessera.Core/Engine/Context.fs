@@ -1085,15 +1085,40 @@ module Context =
     }
 
     /// The filters one row context becomes: every column being iterated, at the row's value.
-    let rowFilters (ctx: Ctx) (span: Span) (rc: RowCtx) : Filter list =
+    /// `drop` names the columns a modifier of the same CALCULATE removes next (see `transitionDropping`).
+    let private rowFiltersDropping (ctx: Ctx) (span: Span) (drop: BColumn -> bool) (rc: RowCtx) : Filter list =
         let t = rc.Table
 
         if t.IsPureBase then
+            let b = t.BaseTable
+            let row = t.BaseRows.[rc.Row]
+            let expanded = Filters.expandedColumns t.Config b
+
             // "all the columns of the expanded table will be part of the newly-created filter
             // context" (SQLBI, "Understanding context transition in DAX").
-            [
-                Rows(t.BaseTable, Filters.closeRows t.BaseTable [| t.BaseRows.[rc.Row] |], t.Config)
-            ]
+            let kept (c: BColumn) =
+                not (drop c) && obj.ReferenceEquals(c.Table, b)
+
+            // A kept column being computed is a dependency on itself: `closeRows` tells a cycle.
+            if
+                expanded |> Array.exists drop
+                && not (expanded |> Array.exists (fun c -> kept c && c.Computing))
+            then
+                // A modifier then removes some of those columns, which leaves the filter on the
+                // others (`Filters.remove`): the values this row has in them. The rows equal to it
+                // in every column (`closeRows`) have those same values, so the row alone gives the
+                // same filter without reading the dropped columns. That is how ALLEXCEPT keeps a
+                // calculated column's transition to the key: "By using ALLEXCEPT, we have removed
+                // all filters except for the one on ProductKey ... The circular dependency is no
+                // longer present" (SQLBI, "Understanding circular dependencies"). The kept columns
+                // of the table not computed yet are computed, as `closeRows` would.
+                for c in expanded do
+                    if kept c && not c.IsReady then
+                        c.Data |> ignore
+
+                [ Rows(b, RowSet.One(b.Size, row), t.Config) ]
+            else
+                [ Rows(b, Filters.closeRows b [| row |], t.Config) ]
         else
             if not (isNull t.BaseTable) && (t.Config.Expanded t.BaseTable).Length > 1 then
                 Fail.notSupported
@@ -1111,9 +1136,15 @@ module Context =
                         | id -> OnColumn(c, RowSet.One(c.IdCount, id))
             ]
 
+    let rowFilters (ctx: Ctx) (span: Span) (rc: RowCtx) : Filter list =
+        rowFiltersDropping ctx span (fun _ -> false) rc
+
     /// Context transition: every row context becomes filters, outermost first, each replacing the
-    /// filters on its columns; no row context is left (dax.guide/calculate, steps 2 and 3).
-    let transition (ctx: Ctx) (span: Span) : Ctx =
+    /// filters on its columns; no row context is left (dax.guide/calculate, steps 2 and 3). `drop`
+    /// names the columns whose filters the caller removes right after, before anything reads the
+    /// context (CALCULATE's ALL, ALLEXCEPT, REMOVEFILTERS...): a transition filter is exact only
+    /// once those are gone.
+    let transitionDropping (ctx: Ctx) (span: Span) (drop: BColumn -> bool) : Ctx =
         if ctx.CallerRows then
             Fail.notSupported
                 ctx
@@ -1130,7 +1161,7 @@ module Context =
                 // Sales table" (SQLBI, "The definitive guide to ALLSELECTED"): it stays when the
                 // row context becomes filters.
                 fc <- Filters.mark fc (Shadow rc.Table)
-                let filters = rowFilters ctx span rc
+                let filters = rowFiltersDropping ctx span drop rc
                 DateTable.onTransition ctx span fc filters
                 fc <- Filters.add fc filters false
                 let t = rc.Table
@@ -1153,6 +1184,9 @@ module Context =
                 fc <- Filters.mark fc scope
 
             { ctx with Filter = fc; Rows = [] }
+
+    let transition (ctx: Ctx) (span: Span) : Ctx =
+        transitionDropping ctx span (fun _ -> false)
 
     /// The value a row context has for a model column: the innermost row context that has it,
     /// skipping `skip` of them (EARLIER).

@@ -748,20 +748,76 @@ let keyTests =
             | other -> failtestf "%A" other)
 
         // "By using the previous code based on ALLEXCEPT for both Test1 and Test2 ... The circular
-        // dependency is no longer present": the engine can't tell yet what ALLEXCEPT leaves, so it
-        // refuses rather than call the model invalid.
-        testCase "ALLEXCEPT on the key: no cycle on a server, refused here" (fun () ->
+        // dependency is no longer present ... The technique using ALLEXCEPT relies on the semantics
+        // of the DAX language. As such, it works in any scenario, regardless of any optimization"
+        // (SQLBI, "Understanding circular dependencies"). Each row counts the rows with its
+        // ProductKey and a name >= "Contoso": 1084 and 1086.
+        testCase "ALLEXCEPT on the key: no cycle, with or without a relationship" (fun () ->
             let narrowed (name: string) =
                 name,
                 DataType.Int64,
                 "CALCULATE ( COUNTROWS ( 'BestProducts' ), BestProducts[Product Name] >= \"Contoso\", ALLEXCEPT ( BestProducts, BestProducts[ProductKey] ) )"
 
-            match prepared (best [ narrowed "Test1"; narrowed "Test2" ] false) with
-            | Ok p ->
-                match Engine.failures p with
-                | (_, DaxNotSupported(what, _)) :: _ -> Expect.stringContains what "ALLEXCEPT" "what"
-                | other -> failtestf "%A" other
-            | Error e -> failtestf "%A" e
+            let p = prepare (best [ narrowed "Test1"; narrowed "Test2" ] false)
+            Expect.isEmpty (Engine.failures p) "computed"
+
+            returns
+                p
+                "EVALUATE SELECTCOLUMNS ( BestProducts, \"K\", BestProducts[ProductKey], \"T1\", BestProducts[Test1], \"T2\", BestProducts[Test2] )"
+                [ [ 1084; 1; 1 ]; [ 1085; null; null ]; [ 1086; 1; 1 ] ]
+
+            // ALLEXCEPT keeping a column that isn't unique: the rows with the same name.
+            let byName (name: string) =
+                name,
+                DataType.Int64,
+                "CALCULATE ( COUNTROWS ( 'BestProducts' ), ALLEXCEPT ( BestProducts, BestProducts[Product Name] ) )"
+
+            let p = prepare (best [ byName "N1"; byName "N2" ] false)
+            Expect.isEmpty (Engine.failures p) "computed"
+            is p "SUM ( BestProducts[N2] )" 3
+
+            // REMOVEFILTERS ( the table ) leaves no transition filter at all: every row counts 3.
+            let all (name: string) =
+                name, DataType.Int64, "CALCULATE ( COUNTROWS ( 'BestProducts' ), REMOVEFILTERS ( BestProducts ) )"
+
+            let p = prepare (best [ all "A1"; all "A2" ] false)
+            Expect.isEmpty (Engine.failures p) "computed"
+            is p "SUM ( BestProducts[A1] ) + SUM ( BestProducts[A2] )" 18
+
+            // One column narrowed and one not: the plain one depends on every column, the narrowed
+            // one on ProductKey only, so there is no cycle either.
+            let p =
+                prepare (
+                    best
+                        [
+                            narrowed "Test1"
+                            "Plain", DataType.Int64, "CALCULATE ( COUNTROWS ( 'BestProducts' ) )"
+                        ]
+                        false
+                )
+
+            Expect.isEmpty (Engine.failures p) "computed"
+            is p "SUM ( BestProducts[Plain] )" 3
+            is p "SUM ( BestProducts[Test1] )" 2
+
+            // Keeping a calculated column of the table still depends on it: two such columns are
+            // still a cycle.
+            match
+                prepared (
+                    best
+                        [
+                            "C1",
+                            DataType.Int64,
+                            "CALCULATE ( COUNTROWS ( 'BestProducts' ), ALLEXCEPT ( BestProducts, BestProducts[C2] ) )"
+                            "C2",
+                            DataType.Int64,
+                            "CALCULATE ( COUNTROWS ( 'BestProducts' ), ALLEXCEPT ( BestProducts, BestProducts[C1] ) )"
+                        ]
+                        false
+                )
+            with
+            | Ok p -> Expect.isNonEmpty (Engine.failures p) "not computed"
+            | Error _ -> ()
 
             // With the key, it is computed: each row counts itself.
             let p = prepare (best [ narrowed "Test1"; narrowed "Test2" ] true)
