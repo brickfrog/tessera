@@ -28,6 +28,7 @@ let private expectedUnsupported: Set<string> =
         "allselected"
         "calculation-groups"
         "window-functions"
+        "format-strings"
     ]
 
 /// Which of the engine's errors mean "not implemented" (see `RunConfig.defaults`).

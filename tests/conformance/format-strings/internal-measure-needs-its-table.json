@@ -1,0 +1,18 @@
+{
+  "title": "The internal format string measure is only reached with its table name",
+  "model": "g-formatstrings",
+  "query": "EVALUATE ROW ( \"Fs\", [_Sales Amount FormatString] )",
+  "expected": {
+    "error": "an unqualified reference to the internal measure is not resolved"
+  },
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-dynamic-format-strings-for-dax-measures/",
+    "quote": "The format string reference must include the table name, using the fully qualified name",
+    "supports": "[_Sales Amount FormatString] without Sales is not a reference to it"
+  },
+  "confidence": "published",
+  "tags": [
+    "format-strings"
+  ],
+  "ordered": false
+}

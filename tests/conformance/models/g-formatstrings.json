@@ -1,0 +1,94 @@
+{
+ "description": "For format strings. Currency: USD \"$#,0.00\", EUR \"€ #,0.00\". Sales: A 500 USD, B 2000000 EUR, C 1500 USD; Sales[Currency] -> Currency[Code]. Measures, each SUM ( Sales[Amount] ) (total 2002000): [Sales Amount], dynamic format string IF ( SELECTEDMEASURE () <= 1E6, \"#0,.00\", \"#0,,.00 M\" ) (SQLBI's example); [Converted], dynamic SELECTEDVALUE ( Currency[Format], \"\\$#,0.00;(\\$#,0.00);\\$#,0.00\" ) (Learn's example); [Self Ref], dynamic IF ( [Self Ref] > 10000, \"#,0\", \"0.00\" ); [Static], format string \"#,0\".",
+ "tables": [
+  {
+   "name": "Currency",
+   "columns": [
+    {
+     "name": "Code",
+     "type": "string",
+     "key": true
+    },
+    {
+     "name": "Format",
+     "type": "string"
+    }
+   ],
+   "rows": [
+    [
+     "USD",
+     "$#,0.00"
+    ],
+    [
+     "EUR",
+     "€ #,0.00"
+    ]
+   ]
+  },
+  {
+   "name": "Sales",
+   "columns": [
+    {
+     "name": "Item",
+     "type": "string"
+    },
+    {
+     "name": "Amount",
+     "type": "int64"
+    },
+    {
+     "name": "Currency",
+     "type": "string"
+    }
+   ],
+   "measures": [
+    {
+     "name": "Sales Amount",
+     "expression": "SUM ( Sales[Amount] )",
+     "formatStringExpression": "IF ( SELECTEDMEASURE () <= 1E6, \"#0,.00\", \"#0,,.00 M\" )"
+    },
+    {
+     "name": "Converted",
+     "expression": "SUM ( Sales[Amount] )",
+     "formatStringExpression": "SELECTEDVALUE ( Currency[Format], \"\\$#,0.00;(\\$#,0.00);\\$#,0.00\" )"
+    },
+    {
+     "name": "Self Ref",
+     "expression": "SUM ( Sales[Amount] )",
+     "formatStringExpression": "IF ( [Self Ref] > 10000, \"#,0\", \"0.00\" )"
+    },
+    {
+     "name": "Static",
+     "expression": "SUM ( Sales[Amount] )",
+     "formatString": "#,0"
+    }
+   ],
+   "rows": [
+    [
+     "A",
+     500,
+     "USD"
+    ],
+    [
+     "B",
+     2000000,
+     "EUR"
+    ],
+    [
+     "C",
+     1500,
+     "USD"
+    ]
+   ]
+  }
+ ],
+ "relationships": [
+  {
+   "from": "Sales[Currency]",
+   "to": "Currency[Code]",
+   "cardinality": "many-to-one",
+   "crossFilter": "single",
+   "active": true
+  }
+ ]
+}

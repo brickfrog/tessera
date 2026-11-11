@@ -1,0 +1,65 @@
+{
+  "title": "A dynamic format string is evaluated in the filter context: one currency's format, or the alternate result",
+  "model": "g-formatstrings",
+  "query": [
+    "EVALUATE SUMMARIZECOLUMNS ( Currency[Code], \"Fs\", 'Sales'[_Converted FormatString] )",
+    "EVALUATE ROW ( \"Fs\", 'Sales'[_Converted FormatString] )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Currency[Code]",
+          "type": "string"
+        },
+        {
+          "name": "[Fs]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "USD",
+          "$#,0.00"
+        ],
+        [
+          "EUR",
+          "€ #,0.00"
+        ]
+      ]
+    },
+    {
+      "columns": [
+        {
+          "name": "[Fs]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "\\$#,0.00;(\\$#,0.00);\\$#,0.00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-dynamic-format-strings",
+      "quote": "SELECTEDVALUE ( 'Country/Region Currency Format Strings'[Format], \"\\$#,0.00;(\\$#,0.00);\\$#,0.00\" )",
+      "supports": "Learn's dynamic format string, which picks the format of the one currency in the filter context"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-dynamic-format-strings-for-dax-measures/",
+      "quote": "The internal measure for the format string is [_Sales Amount FormatString].",
+      "supports": "the internal measure that holds it"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Grouped by Currency[Code], one Format is visible per row. With no filter, both are visible and SELECTEDVALUE returns its alternate result.",
+  "tags": [
+    "format-strings",
+    "summarizecolumns",
+    "selectedvalue"
+  ],
+  "ordered": false
+}

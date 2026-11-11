@@ -71,7 +71,7 @@ Column names are the engine's: `Table[Column]` for a model column, `[name]` for 
   `src/Tessera.Core/DaxValue.fs`. The ids are listed in `ConformanceTests.fs`, which fails if one has no case.
 - Areas an engine may leave for later carry their area's tag, so they can be skipped as a group:
   `time-intelligence`, `allselected`, `format`, `text-functions`, `date-functions`, `math-functions`,
-  `calculation-groups`, `window-functions`. A case in a folder of that name must have the tag.
+  `calculation-groups`, `window-functions`, `format-strings`. A case in a folder of that name must have the tag.
 
 ## A model
 
@@ -84,7 +84,8 @@ Column names are the engine's: `Table[Column]` for a model column, `[name]` for 
       "columns": [ { "name": "ProductKey", "type": "int64", "key": true },
                    { "name": "Month", "type": "string", "sortBy": "MonthNo" } ],
       "calculatedColumns": [ { "name": "Double", "type": "int64", "expression": "Product[ProductKey] * 2" } ],
-      "measures": [ { "name": "Products", "expression": "COUNTROWS ( Product )" } ],
+      "measures": [ { "name": "Products", "expression": "COUNTROWS ( Product )", "formatString": "#,0" },
+                    { "name": "Share", "expression": "...", "formatStringExpression": "IF ( SELECTEDMEASURE () < 1, \"0%\", \"0\" )" } ],
       "rows": [ [ 1, "Jan" ], [ 2, null ] ] }
   ],
   "calculatedTables": [ { "name": "Colors", "expression": "VALUES ( Product[Color] )",

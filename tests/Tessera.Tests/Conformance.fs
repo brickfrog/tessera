@@ -58,6 +58,8 @@ type MeasureDef = {
     Name: string
     Expression: string
     FormatString: string option
+    /// A dynamic format string (TOM `FormatStringDefinition`).
+    FormatStringExpression: string option
 }
 
 type TableDef = {
@@ -226,12 +228,13 @@ let private measureDef (table: string) (node: JsonNode) : MeasureDef =
     let o = asObject $"a measure of {table}" node
     let name = reqString $"a measure of {table}" o "name"
     let what = $"measure {table}[{name}]"
-    known what o [ "name"; "expression"; "formatString"; "table" ]
+    known what o [ "name"; "expression"; "formatString"; "formatStringExpression"; "table" ]
 
     {
         Name = name
         Expression = reqString what o "expression"
         FormatString = optString what o "formatString"
+        FormatStringExpression = optString what o "formatStringExpression"
     }
 
 let private rowsOf (table: string) (columns: ColumnDef list) (o: JsonObject) : QueryValue array list =
@@ -422,6 +425,9 @@ let buildDatabase (name: string) (def: ModelDef) : Database =
         for m in measures do
             let measure = new Measure(Name = m.Name, Expression = m.Expression)
             m.FormatString |> Option.iter (fun f -> measure.FormatString <- f)
+
+            m.FormatStringExpression
+            |> Option.iter (fun f -> measure.FormatStringDefinition <- new FormatStringDefinition(Expression = f))
             table.Measures.Add measure
 
     let addCalculated (table: Table) (columns: CalculatedColumnDef list) =
@@ -984,6 +990,7 @@ let laterAreas = [
     "math-functions"
     "calculation-groups"
     "window-functions"
+    "format-strings"
 ]
 
 /// Everything wrong with a case as a case (not with any engine): empty when it is sound.

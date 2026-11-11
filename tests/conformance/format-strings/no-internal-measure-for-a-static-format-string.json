@@ -1,0 +1,18 @@
+{
+  "title": "A measure with a static format string has no internal format string measure",
+  "model": "g-formatstrings",
+  "query": "EVALUATE ROW ( \"Fs\", 'Sales'[_Static FormatString] )",
+  "expected": {
+    "error": "[Static] has a static format string, so there is no measure _Static FormatString"
+  },
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-dynamic-format-strings-for-dax-measures/",
+    "quote": "The internal measure exists only for those with a dynamic format string.",
+    "supports": "no internal measure for [Static]"
+  },
+  "confidence": "published",
+  "tags": [
+    "format-strings"
+  ],
+  "ordered": false
+}

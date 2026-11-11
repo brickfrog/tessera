@@ -1,0 +1,61 @@
+{
+  "title": "A dynamic format string is the internal measure Table[_<measure> FormatString], evaluated per row",
+  "model": "g-formatstrings",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Sales[Item], \"Sales Amount\", [Sales Amount], \"Fs\", IGNORE ( 'Sales'[_Sales Amount FormatString] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Sales[Item]",
+          "type": "string"
+        },
+        {
+          "name": "[Sales Amount]",
+          "type": "int64"
+        },
+        {
+          "name": "[Fs]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "A",
+          500,
+          "#0,.00"
+        ],
+        [
+          "B",
+          2000000,
+          "#0,,.00 M"
+        ],
+        [
+          "C",
+          1500,
+          "#0,.00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-dynamic-format-strings-for-dax-measures/",
+      "quote": "The internal measure for the format string is [_Sales Amount FormatString].",
+      "supports": "the format string expression of a measure is reachable as the internal measure _<name> FormatString, which Power BI queries with IGNORE next to the measure"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-dynamic-format-strings-for-dax-measures/",
+      "quote": "IF ( SELECTEDMEASURE() <= 1E6, \"#0,.00\", \"#0,,.00 M\" )",
+      "supports": "the format string expression, with SELECTEDMEASURE () the measure's value"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Per item, SELECTEDMEASURE () is [Sales Amount] there: A 500 <= 1E6 gives \"#0,.00\", B 2000000 > 1E6 gives \"#0,,.00 M\", C 1500 gives \"#0,.00\".",
+  "tags": [
+    "format-strings",
+    "summarizecolumns",
+    "ignore",
+    "selectedmeasure"
+  ],
+  "ordered": false
+}

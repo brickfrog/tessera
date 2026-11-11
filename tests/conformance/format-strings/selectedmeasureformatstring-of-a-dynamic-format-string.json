@@ -1,0 +1,68 @@
+{
+  "title": "SELECTEDMEASUREFORMATSTRING () of a measure with a dynamic format string is that format string, where the item is evaluated",
+  "model": {
+    "base": "g-formatstrings",
+    "calculationGroups": [
+      {
+        "name": "Info",
+        "column": "Info",
+        "precedence": 0,
+        "items": [
+          {
+            "name": "Format",
+            "expression": "SELECTEDMEASUREFORMATSTRING ()"
+          }
+        ]
+      }
+    ]
+  },
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Currency[Code], TREATAS ( { \"Format\" }, Info[Info] ), \"F\", [Converted] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Currency[Code]",
+          "type": "string"
+        },
+        {
+          "name": "[F]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "USD",
+          "$#,0.00"
+        ],
+        [
+          "EUR",
+          "€ #,0.00"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/selectedmeasureformatstring-function-dax",
+      "quote": "A string holding the format string of the measure that is currently in context when the calculation item is evaluated.",
+      "supports": "the format string of [Converted] in each row's context"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/create-reports/desktop-dynamic-format-strings",
+      "quote": "SELECTEDVALUE ( 'Country/Region Currency Format Strings'[Format], \"\\$#,0.00;(\\$#,0.00);\\$#,0.00\" )",
+      "supports": "the dynamic format string picks the currency's format"
+    }
+  ],
+  "confidence": "derived",
+  "uncertain": true,
+  "alternative": "If SELECTEDMEASUREFORMATSTRING returned the measure's static FormatString property instead (none here), the rows would be empty text or an error.",
+  "derivation": "The item is applied to [Converted] in each currency's row; its format string there is that currency's Format.",
+  "tags": [
+    "format-strings",
+    "calculation-groups",
+    "selectedmeasureformatstring",
+    "summarizecolumns",
+    "treatas"
+  ],
+  "ordered": false
+}
