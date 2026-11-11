@@ -40,18 +40,31 @@ let tests =
                 let coverage = Engine.coverage db
                 Expect.isNonEmpty coverage "the model has expressions"
 
-                for (ref, unsupported) in coverage do
-                    if ref.Kind = ObjectKind.Measure && unsupported.IsEmpty then
-                        let name = List.last ref.Path
+                let failures = [
+                    for (ref, unsupported) in coverage do
+                        if ref.Kind = ObjectKind.Measure && unsupported.IsEmpty then
+                            let name = List.last ref.Path
 
-                        match Engine.evaluateScalar prepared ("[" + name.Replace("]", "]]") + "]") with
-                        | Error(DaxNotSupported(what, at)) ->
-                            // What depends on the data can't be seen without it.
-                            if not (what.Contains "blank row" || what.Contains "repeat") then
-                                failtestf
-                                    "%s: coverage cleared it, the engine refused: %s (%s)"
-                                    (ObjectRef.format ref)
-                                    what
-                                    at
-                        | _ -> ()
+                            match Engine.evaluateScalar prepared ("[" + name.Replace("]", "]]") + "]") with
+                            | Error(DaxNotSupported(what, at)) ->
+                                // What depends on the data can't be seen without it: the blank row, rows that
+                                // repeat, the sign of a number FORMAT is given, the order of NETWORKDAYS' dates.
+                                let dataDependent = [
+                                    "blank row"
+                                    "repeat"
+                                    "a negative number with a format"
+                                    "start date after the end date"
+                                ]
+
+                                if not (dataDependent |> List.exists what.Contains) then
+                                    $"{ObjectRef.format ref}: coverage cleared it, the engine refused: {what} ({at})"
+                            // The model is valid in Power BI, so the engine calling its DAX invalid (a
+                            // circular dependency, say) is a wrong verdict; an error of evaluation can
+                            // come from the synthetic data.
+                            | Error(DaxInvalid _ as e) -> $"{ObjectRef.format ref}: {TessError.message e}"
+                            | _ -> ()
+                ]
+
+                if not failures.IsEmpty then
+                    failtestf "%d measures:\n%s" failures.Length (String.concat "\n" failures)
     ]

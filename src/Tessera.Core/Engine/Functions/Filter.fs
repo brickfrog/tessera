@@ -412,6 +412,19 @@ module Filter =
     /// Whether any filter is on this column, and whether one of them is a table filter (which
     /// the definitions of ISFILTERED and HASONEFILTER don't cover).
     let private directFilters (ctx: Ctx) (c: BColumn) : Filter list =
+        // A context transition while a calculated column of the table is being computed leaves
+        // out the columns not computed yet (`Filters.without`), so whether one is filtered isn't
+        // known here.
+        if not c.IsReady && c.Table.Columns |> Array.exists _.Computing then
+            raise (
+                EngineException(
+                    DaxNotSupported(
+                        $"whether '{c.Table.Name}'[{c.Name}] is filtered while it is not computed yet and another calculated column of '{c.Table.Name}' is being computed",
+                        ""
+                    )
+                )
+            )
+
         ctx.Filter.Filters
         |> List.filter (fun f ->
             match f with

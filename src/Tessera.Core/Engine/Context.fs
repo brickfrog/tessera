@@ -228,6 +228,31 @@ module Filters =
             if not (cols |> Array.exists drop) then
                 [ f ]
             else
+                // A transition filter spelled out while a calculated column of its table was being
+                // computed leaves out the columns not computed yet (the `Rows` case below); that is
+                // the same filter while the table's unique column stays in it, or they would go too.
+                for c in cols do
+                    if drop c then
+                        match c.Table.UniqueColumn with
+                        | Some u when
+                            obj.ReferenceEquals(u, c)
+                            && c.Table.Columns |> Array.exists _.Computing
+                            && c.Table.Columns
+                               |> Array.exists (fun x ->
+                                   not x.IsReady
+                                   && not (drop x)
+                                   && not (cols |> Array.exists (fun y -> obj.ReferenceEquals(x, y))))
+                            ->
+                            raise (
+                                EngineException(
+                                    DaxNotSupported(
+                                        $"removing the filter on the unique column of '{c.Table.Name}' while one of its calculated columns is being computed",
+                                        ""
+                                    )
+                                )
+                            )
+                        | _ -> ()
+
                 let keep = [|
                     for i in 0 .. cols.Length - 1 do
                         if not (drop cols.[i]) then
@@ -251,9 +276,37 @@ module Filters =
         | Rows(table, rows, cfg) ->
             let all = expandedColumns cfg table
 
-            if not (all |> Array.exists drop) then [ f ]
-            elif all |> Array.forall drop then []
-            else spellOut table rows cfg (fun c -> not (drop c))
+            if not (all |> Array.exists drop) then
+                [ f ]
+            elif all |> Array.forall drop then
+                []
+            else
+                // While a calculated column of the table is being computed (a context transition
+                // in its expression), the table's calculated columns not computed yet have no
+                // values to spell out, and computing them may need the one being computed. While
+                // the table's unique column stays, the rows kept are the same without them, so
+                // they are left out. Without the unique column they could change the rows, and
+                // nothing says what the engine does.
+                let pending (c: BColumn) =
+                    not c.IsReady && obj.ReferenceEquals(c.Table, table) && not (drop c)
+
+                if
+                    table.Columns |> Array.exists _.Computing
+                    && table.Columns |> Array.exists pending
+                then
+                    match table.UniqueColumn with
+                    | Some u when not (drop u) -> spellOut table rows cfg (fun c -> not (drop c) && not (pending c))
+                    | _ ->
+                        raise (
+                            EngineException(
+                                DaxNotSupported(
+                                    $"removing the filter on the unique column of '{table.Name}' from a context transition while one of its calculated columns is being computed",
+                                    ""
+                                )
+                            )
+                        )
+                else
+                    spellOut table rows cfg (fun c -> not (drop c))
 
     /// A filter context with these filters under these relationships. A table filter evaluated
     /// under other relationships keeps the columns it had then ("table expansion ... happens when

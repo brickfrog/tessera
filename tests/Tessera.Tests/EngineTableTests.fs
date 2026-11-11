@@ -1083,6 +1083,41 @@ let tests =
                 match Engine.prepare db store with
                 | Error(DaxInvalid(message, _)) -> Expect.stringContains message "circular dependency" "message"
                 | other -> failtestf "%A" other)
+            // With a unique column, a filter argument that replaces part of the transition's filter
+            // keeps the same row, so the columns not computed yet aren't needed (the sample model's
+            // Date table does this, and Power BI computes it).
+            testCase "filter arguments over a transition in a table with a unique column are not circular" (fun () ->
+                let days (calculated: (string * DataType * string) list) = {
+                    Tables = [
+                        table "Days" [ "K", DataType.Int64; "Flag", DataType.Int64 ] [ [ 1; 1 ]; [ 2; 0 ]; [ 3; 0 ] ]
+                        |> withCalculated calculated
+                    ]
+                    Rels = []
+                    Measures = []
+                    Functions = []
+                }
+
+                let m =
+                    prepare (
+                        days [
+                            "A", DataType.Int64, "CALCULATE ( COUNTROWS ( Days ), Days[Flag] <> 1 )"
+                            "B", DataType.Int64, "CALCULATE ( COUNTROWS ( Days ), ALL ( Days[Flag] ) )"
+                            "C", DataType.Int64, "Days[A]"
+                        ]
+                    )
+
+                Expect.isEmpty (Engine.failures m) "every column is computed"
+                returns m "EVALUATE Days" [ [ 1; 1; null; 1; null ]; [ 2; 0; 1; 1; 1 ]; [ 3; 0; 1; 1; 1 ] ]
+
+                // Without the unique column the left-out columns could change the rows: refused.
+                let refused =
+                    prepare (days [ "D", DataType.Int64, "CALCULATE ( COUNTROWS ( Days ), ALL ( Days[K] ) )" ])
+
+                match Engine.failures refused with
+                | [ (ref, DaxNotSupported(what, _)) ] ->
+                    Expect.equal (ObjectRef.format ref) "column:Days/D" "which"
+                    Expect.stringContains what "unique column" "what"
+                | other -> failtestf "%A" other)
             testCase "a column that can't be computed fails only the queries that read it" (fun () ->
                 let m =
                     prepare {
