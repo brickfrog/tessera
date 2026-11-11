@@ -85,8 +85,13 @@ let private ruleIds (sarif: string) =
     use doc = JsonDocument.Parse sarif
 
     [
-        for r in doc.RootElement.GetProperty("runs").[0].GetProperty("tool").GetProperty("driver").GetProperty("rules").EnumerateArray() ->
-            r.GetProperty("id").GetString()
+        for r in
+            doc.RootElement
+                .GetProperty("runs")
+                .[0].GetProperty("tool")
+                .GetProperty("driver")
+                .GetProperty("rules")
+                .EnumerateArray() -> r.GetProperty("id").GetString()
     ]
 
 /// The line a result points at, read from the file under the repository root.
@@ -116,8 +121,7 @@ let tests =
 
             Expect.isEmpty (problems ok) "a minimal log is valid"
 
-            let bad (why: string) (doc: string) =
-                Expect.isNonEmpty (problems doc) why
+            let bad (why: string) (doc: string) = Expect.isNonEmpty (problems doc) why
 
             bad
                 "a level that isn't one"
@@ -148,8 +152,7 @@ let tests =
             expectValid sarif
             let rs = results sarif
 
-            let broken =
-                rs |> List.find (fun x -> x.Path = "measure:Sales Targets/Broken")
+            let broken = rs |> List.find (fun x -> x.Path = "measure:Sales Targets/Broken")
 
             Expect.equal broken.RuleId "unresolved-reference" ""
             Expect.equal broken.Level "error" ""
@@ -181,7 +184,12 @@ let tests =
             use doc = JsonDocument.Parse sarif
 
             let di004 =
-                doc.RootElement.GetProperty("runs").[0].GetProperty("tool").GetProperty("driver").GetProperty("rules").EnumerateArray()
+                doc.RootElement
+                    .GetProperty("runs")
+                    .[0].GetProperty("tool")
+                    .GetProperty("driver")
+                    .GetProperty("rules")
+                    .EnumerateArray()
                 |> Seq.find (fun r -> r.GetProperty("id").GetString() = "DI004")
 
             Expect.equal (di004.GetProperty("defaultConfiguration").GetProperty("level").GetString()) "warning" ""
@@ -221,13 +229,26 @@ let tests =
             use doc = JsonDocument.Parse sarif
 
             let rule id =
-                doc.RootElement.GetProperty("runs").[0].GetProperty("tool").GetProperty("driver").GetProperty("rules").EnumerateArray()
+                doc.RootElement
+                    .GetProperty("runs")
+                    .[0].GetProperty("tool")
+                    .GetProperty("driver")
+                    .GetProperty("rules")
+                    .EnumerateArray()
                 |> Seq.find (fun r -> r.GetProperty("id").GetString() = id)
 
             Expect.equal ((rule "WITH_URL").GetProperty("helpUri").GetString()) "https://example.org/rule" ""
             Expect.isFalse ((rule "NO_URL").TryGetProperty "helpUri" |> fst) ""
-            Expect.equal ((rule "NO_URL").GetProperty("fullDescription").GetProperty("text").GetString()) "Every table." ""
-            Expect.equal ((rule "NO_URL").GetProperty("defaultConfiguration").GetProperty("level").GetString()) "note" ""
+
+            Expect.equal
+                ((rule "NO_URL").GetProperty("fullDescription").GetProperty("text").GetString())
+                "Every table."
+                ""
+
+            Expect.equal
+                ((rule "NO_URL").GetProperty("defaultConfiguration").GetProperty("level").GetString())
+                "note"
+                ""
 
             let rs = results sarif
             let table = rs |> List.find (fun x -> x.Path = "table:Sales Targets")
@@ -254,7 +275,16 @@ let tests =
 
             let out = t.Combine "bpa.sarif"
 
-            tess [ "bpa"; path; "--no-builtin"; "--no-config"; "-r"; t.Combine "rules.json"; "--sarif"; out ]
+            tess [
+                "bpa"
+                path
+                "--no-builtin"
+                "--no-config"
+                "-r"
+                t.Combine "rules.json"
+                "--sarif"
+                out
+            ]
             |> ignore
 
             let sarif = File.ReadAllText out
@@ -298,7 +328,10 @@ let tests =
         <| fun () ->
             let t, dir = repo ()
             use _ = t
-            let r = tess [ "validate"; dir; "--sarif"; t.Combine("no", "such", "dir", "x.sarif") ]
+
+            let r =
+                tess [ "validate"; dir; "--sarif"; t.Combine("no", "such", "dir", "x.sarif") ]
+
             Expect.equal r.Code ExitCode.output r.Err
 
         testCase "data check --sarif: an issue in a fixture file points at its line there"
@@ -361,7 +394,11 @@ let tests =
                 }
 
             Expect.isNone (SourceLocations.tryFind index (ObjectRef.inTable ObjectKind.Measure "A" "X")) ""
-            Expect.equal ((SourceLocations.tryFind index (ObjectRef.inTable ObjectKind.Measure "A" "Y")).Value.Line) (Some 4) ""
+
+            Expect.equal
+                ((SourceLocations.tryFind index (ObjectRef.inTable ObjectKind.Measure "A" "Y")).Value.Line)
+                (Some 4)
+                ""
 
             let remote =
                 SourceLocations.build {
@@ -381,21 +418,19 @@ let tests =
 
             write
                 (Path.Combine(dir, "tables", "A.tmdl"))
-                (String.concat
-                    "\n"
-                    [
-                        "table A"
-                        "\tmeasure M ="
-                        "\t\t\tVAR x = 1"
-                        "\t\t\tmeasure Fake = 2"
-                        "\t\tformatString: 0"
-                        "\tcalculationGroup"
-                        "\t\tcalculationItem 'It''s' = SELECTEDMEASURE()"
-                        "\tpartition A = m"
-                        "\t\tsource ="
-                        "\t\t\tcolumn Fake"
-                        ""
-                    ])
+                (String.concat "\n" [
+                    "table A"
+                    "\tmeasure M ="
+                    "\t\t\tVAR x = 1"
+                    "\t\t\tmeasure Fake = 2"
+                    "\t\tformatString: 0"
+                    "\tcalculationGroup"
+                    "\t\tcalculationItem 'It''s' = SELECTEDMEASURE()"
+                    "\tpartition A = m"
+                    "\t\tsource ="
+                    "\t\t\tcolumn Fake"
+                    ""
+                ])
 
             let index =
                 SourceLocations.build {
@@ -435,6 +470,9 @@ let tests =
                             let r = (ObjectRef.parse x.Path |> Result.toOption).Value
                             let text = (lineAt root (uri, line)).ToLowerInvariant()
                             let name = (ObjectRef.name r).ToLowerInvariant()
-                            Expect.isTrue (text.Contains name || text.Contains(name.Replace("'", "''"))) $"{x.Path} at {uri}:{line}: {text}"
+
+                            Expect.isTrue
+                                (text.Contains name || text.Contains(name.Replace("'", "''")))
+                                $"{x.Path} at {uri}:{line}: {text}"
                         | _ -> ()
     ]

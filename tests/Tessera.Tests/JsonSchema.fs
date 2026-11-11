@@ -7,7 +7,8 @@ open System
 open System.Text.Json
 open System.Text.RegularExpressions
 
-let private annotations = set [ "description"; "default"; "title"; "id"; "$schema"; "definitions" ]
+let private annotations =
+    set [ "description"; "default"; "title"; "id"; "$schema"; "definitions" ]
 
 let private implemented =
     set [
@@ -61,7 +62,9 @@ let validate (root: JsonElement) (instance: JsonElement) : string list =
             failwithf "JsonSchema: only local $ref is implemented, got '%s'" reference
 
         reference.Substring(2).Split('/')
-        |> Array.fold (fun (e: JsonElement) (part: string) -> e.GetProperty(part.Replace("~1", "/").Replace("~0", "~"))) root
+        |> Array.fold
+            (fun (e: JsonElement) (part: string) -> e.GetProperty(part.Replace("~1", "/").Replace("~0", "~")))
+            root
 
     let rec check (schema: JsonElement) (v: JsonElement) (path: string) : string list =
         let local = ResizeArray<string>()
@@ -178,7 +181,8 @@ let validate (root: JsonElement) (instance: JsonElement) : string list =
         | _ -> ()
 
         match branches "oneOf" with
-        | Some results when (results |> List.filter List.isEmpty).Length <> 1 -> fail "doesn't match exactly one of oneOf"
+        | Some results when (results |> List.filter List.isEmpty).Length <> 1 ->
+            fail "doesn't match exactly one of oneOf"
         | _ -> ()
 
         List.ofSeq local

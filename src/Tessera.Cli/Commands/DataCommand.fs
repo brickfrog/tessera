@@ -258,7 +258,14 @@ let private checkSarif (model: string) (source: ModelSource) (selected: string l
             match i.File with
             | Some file -> {
                 Sarif.Item.Finding = finding
-                Sarif.Item.Location = Some({ SourceLocations.File = file; SourceLocations.Line = i.Line }, i.Line.IsSome)
+                Sarif.Item.Location =
+                    Some(
+                        {
+                            SourceLocations.File = file
+                            SourceLocations.Line = i.Line
+                        },
+                        i.Line.IsSome
+                    )
                 Sarif.Item.Suppressed = None
               }
             | None -> List.head (Sarif.modelItems index [ finding ])

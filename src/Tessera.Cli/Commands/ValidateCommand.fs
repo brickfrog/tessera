@@ -210,7 +210,13 @@ let ciArg (value: string option) =
 let sarifRules: Sarif.Rule list = [ for id, description in rules -> Sarif.Rule.simple id description ]
 
 /// Write `issues` as SARIF to `path`, located in the model's files.
-let writeSarif (path: string) (modelPath: string) (source: ModelSource) (rules: Sarif.Rule list) (findings: Findings.Finding list) =
+let writeSarif
+    (path: string)
+    (modelPath: string)
+    (source: ModelSource)
+    (rules: Sarif.Rule list)
+    (findings: Findings.Finding list)
+    =
     let index = SourceLocations.build source
     Sarif.write path (Sarif.log (Sarif.rootFor modelPath) rules (Sarif.modelItems index findings) [])
 

@@ -164,7 +164,8 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | Ok _ when not fixing && editSwitches -> UsageError "--save, --save-to, --force, --stat and --name-only need --fix"
     | Ok _ when fixing && (args.Contains Args.Fail_On || args.Contains Args.Ci) ->
         UsageError "--fail-on and --ci report findings; they don't combine with --fix"
-    | Ok _ when fixing && args.Contains Args.Sarif -> UsageError "--sarif reports findings; it doesn't combine with --fix"
+    | Ok _ when fixing && args.Contains Args.Sarif ->
+        UsageError "--sarif reports findings; it doesn't combine with --fix"
     | Ok(selected, minimum, _, _) when fixing ->
         let opts =
             Mutation.options

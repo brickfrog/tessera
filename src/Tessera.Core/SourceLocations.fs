@@ -22,7 +22,10 @@ type Index = {
     Declarations: Map<Step list, SourceLocation>
 }
 
-let empty = { MainFile = None; Declarations = Map.empty }
+let empty = {
+    MainFile = None
+    Declarations = Map.empty
+}
 
 let private lower (s: string) = s.ToLowerInvariant()
 
@@ -33,7 +36,12 @@ let private address (r: ObjectRef) : Step list option =
 
     match r.Kind, r.Path with
     | ObjectKind.Model, _ -> Some [ step ObjectKind.Model "" ]
-    | ObjectKind.Level, [ t; h; l ] -> Some [ step ObjectKind.Table t; step ObjectKind.Hierarchy h; step ObjectKind.Level l ]
+    | ObjectKind.Level, [ t; h; l ] ->
+        Some [
+            step ObjectKind.Table t
+            step ObjectKind.Hierarchy h
+            step ObjectKind.Level l
+        ]
     | kind, [ t; n ] -> Some [ step ObjectKind.Table t; step kind n ]
     | kind, [ n ] -> Some [ step kind n ]
     | _ -> None
@@ -137,13 +145,11 @@ let private tmdlDeclarations (file: string) : (Step list * SourceLocation) list 
 
             match step with
             | Some s ->
-                let parents =
-                    stack |> Seq.rev |> Seq.choose snd |> List.ofSeq
+                let parents = stack |> Seq.rev |> Seq.choose snd |> List.ofSeq
 
                 // Only a declaration under named declarations alone (not inside a property or an
                 // expression) is one.
-                let underProperty =
-                    stack |> Seq.exists (fun (_, s) -> s.IsNone)
+                let underProperty = stack |> Seq.exists (fun (_, s) -> s.IsNone)
 
                 if not underProperty then
                     found.Add(parents @ [ s ], { File = file; Line = Some(i + 1) })
@@ -221,7 +227,12 @@ let private bimDeclarations (file: string) : (Step list * SourceLocation) list =
 
     // The reader doesn't take a byte order mark; offsets are then relative to what follows it.
     let skip =
-        if bytes.Length >= 3 && bytes.[0] = 0xEFuy && bytes.[1] = 0xBBuy && bytes.[2] = 0xBFuy then
+        if
+            bytes.Length >= 3
+            && bytes.[0] = 0xEFuy
+            && bytes.[1] = 0xBBuy
+            && bytes.[2] = 0xBFuy
+        then
             3
         else
             0
@@ -235,7 +246,9 @@ let private bimDeclarations (file: string) : (Step list * SourceLocation) list =
     let options =
         JsonReaderOptions(CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true)
 
-    let mutable reader = Utf8JsonReader(ReadOnlySpan(bytes, skip, bytes.Length - skip), options)
+    let mutable reader =
+        Utf8JsonReader(ReadOnlySpan(bytes, skip, bytes.Length - skip), options)
+
     let containers = Collections.Generic.Stack<Container>()
     // The property whose value comes next, in the innermost object.
     let mutable property: string = null
@@ -263,7 +276,13 @@ let private bimDeclarations (file: string) : (Step list * SourceLocation) list =
 
             // The top-level "model" object (the .bim root holds it).
             if property = "model" && containers.Count = 1 then
-                found.Add([ ObjectKind.Model, "" ], { File = file; Line = Some(lineOf reader.TokenStartIndex) })
+                found.Add(
+                    [ ObjectKind.Model, "" ],
+                    {
+                        File = file
+                        Line = Some(lineOf reader.TokenStartIndex)
+                    }
+                )
 
             containers.Push(Container(true, (if isNull property then "" else property), kind, inherited ()))
             property <- null
@@ -278,7 +297,14 @@ let private bimDeclarations (file: string) : (Step list * SourceLocation) list =
             | Some k when not current.Named ->
                 current.Steps <- current.Steps @ [ k, lower (reader.GetString()) ]
                 current.Named <- true
-                found.Add(current.Steps, { File = file; Line = Some(lineOf reader.TokenStartIndex) })
+
+                found.Add(
+                    current.Steps,
+                    {
+                        File = file
+                        Line = Some(lineOf reader.TokenStartIndex)
+                    }
+                )
             | _ -> ()
 
             property <- null

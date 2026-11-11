@@ -100,7 +100,11 @@ let repositoryRoot (path: string) : string option =
 let artifactLocation (root: string) (file: string) : JsonNode =
     let relative = Path.GetRelativePath(root, Path.GetFullPath file)
 
-    if relative = ".." || relative.StartsWith(".." + string Path.DirectorySeparatorChar) || Path.IsPathRooted relative then
+    if
+        relative = ".."
+        || relative.StartsWith(".." + string Path.DirectorySeparatorChar)
+        || Path.IsPathRooted relative
+    then
         obj [ "uri", str (Uri(Path.GetFullPath file).AbsoluteUri) ]
     else
         let segments =
@@ -169,15 +173,13 @@ let log (root: string) (rules: Rule list) (items: Item list) (notifications: Not
                 let f = item.Finding
 
                 let key =
-                    String.concat
-                        "\u0000"
-                        [
-                            f.Code
-                            f.ObjectType
-                            f.Object
-                            f.ObjectPath |> Option.defaultValue ""
-                            f.Position |> Option.map _.Property |> Option.defaultValue ""
-                        ]
+                    String.concat "\u0000" [
+                        f.Code
+                        f.ObjectType
+                        f.Object
+                        f.ObjectPath |> Option.defaultValue ""
+                        f.Position |> Option.map _.Property |> Option.defaultValue ""
+                    ]
 
                 let n = seen |> Map.tryFind key |> Option.defaultValue 0
                 sha256 $"{key}\u0000{n}", Map.add key (n + 1) seen)
@@ -294,7 +296,8 @@ let log (root: string) (rules: Rule list) (items: Item list) (notifications: Not
                     "SRCROOT",
                     obj [
                         "description",
-                        text "The repository root: the nearest folder above the model holding .git, else the current folder."
+                        text
+                            "The repository root: the nearest folder above the model holding .git, else the current folder."
                     ]
                 ]
                 "invocations", arr [ invocation ]
@@ -312,7 +315,15 @@ let modelItems (index: SourceLocations.Index) (findings: Findings.Finding list) 
                 match ObjectRef.parse p with
                 | Ok r -> SourceLocations.locate index r
                 | Error _ -> None)
-            |> Option.orElse (index.MainFile |> Option.map (fun file -> { SourceLocations.File = file; Line = None }, false))
+            |> Option.orElse (
+                index.MainFile
+                |> Option.map (fun file ->
+                    {
+                        SourceLocations.File = file
+                        Line = None
+                    },
+                    false)
+            )
 
         {
             Finding = f

@@ -398,8 +398,7 @@ let sarif (modelPath: string) (source: ModelSource) (results: Bpa.RuleResult lis
             {
                 Sarif.Rule.Id = rule.Id
                 Sarif.Rule.ShortDescription = rule.Name
-                Sarif.Rule.FullDescription =
-                    rule.Description |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                Sarif.Rule.FullDescription = rule.Description |> Option.filter (String.IsNullOrWhiteSpace >> not)
                 Sarif.Rule.Level = Some(severityOf rule.Severity)
                 Sarif.Rule.HelpUri = Sarif.helpUri rule.LearnMoreUrl
                 Sarif.Rule.Category = Option.ofObj rule.Category
@@ -504,7 +503,8 @@ let private analyze (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
 
         match
             Source.load ctx modelPath
-            |> Result.bind (fun (source, db) -> Bpa.collectRules source db opts |> Result.map (fun x -> (source, db), x))
+            |> Result.bind (fun (source, db) ->
+                Bpa.collectRules source db opts |> Result.map (fun x -> (source, db), x))
         with
         | Error e -> Failed e
         | Ok((source, db), collected) ->
