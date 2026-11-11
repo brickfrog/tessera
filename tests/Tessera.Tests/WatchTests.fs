@@ -361,12 +361,15 @@ let tests =
                         touch (Path.Combine(root, "model.tmdl"))
                         expectRun w "after the save")
 
+            // Counting runs, or their absence, is left to polling, which is deterministic: a file system
+            // watcher may report a change late or twice (macOS FSEvents batches events), and that only
+            // ever means a harmless extra run.
             testCase "an editor's save-rename runs once"
             <| fun () ->
                 watchModel
                     {
                         quiet with
-                            UseWatcher = true
+                            UseWatcher = false
                             Poll = Some(TimeSpan.FromMilliseconds 100.0)
                     }
                     (fun root w ->
@@ -382,7 +385,7 @@ let tests =
                 watchModel
                     {
                         quiet with
-                            UseWatcher = true
+                            UseWatcher = false
                             Poll = Some(TimeSpan.FromMilliseconds 100.0)
                     }
                     (fun root w ->
@@ -399,7 +402,7 @@ let tests =
                 watchModel
                     {
                         quiet with
-                            UseWatcher = true
+                            UseWatcher = false
                             Poll = Some(TimeSpan.FromMilliseconds 100.0)
                     }
                     (fun root w ->

@@ -144,8 +144,10 @@ type Changes() =
         if Interlocked.Exchange(&pending, 1) = 0 then
             try
                 signal.Release() |> ignore
-            with :? SemaphoreFullException ->
-                ()
+            with
+            | :? SemaphoreFullException -> ()
+            // A watcher's late event, after the watch ended.
+            | :? ObjectDisposedException -> ()
 
     /// How long since the last change.
     member _.Quiet = Diagnostics.Stopwatch.GetElapsedTime(Interlocked.Read &last)
@@ -455,8 +457,9 @@ let runWithChanges
                         Task.Delay(options.Debounce - quiet, token).Wait(token)
                         quiet <- changes.Quiet
 
-                    changes.Take()
+                    // The baseline first: a poll between the two would report what this run reads.
                     rebase ()
+                    changes.Take()
                     let _, code = runOnce options ctx command
                     onRun code
                     status ()

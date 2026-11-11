@@ -335,8 +335,8 @@ _tess_positional() {
         'data embed|0') _tess_r='path' ;;
         'data embed|1') _tess_r='dir' ;;
         'data embed|2') _tess_r='path' ;;
-        'refresh|0') _tess_r='path' ;;
-        'refresh|'*) _tess_r='dyn' ;;
+        'refresh|0') _tess_r='text' ;;
+        'refresh|'*) _tess_r='text' ;;
         'test run|0') _tess_r='path' ;;
         'test run|'*) _tess_r='path' ;;
         'test init|0') _tess_r='path' ;;

@@ -3021,7 +3021,8 @@ tess bpa model.bim --rules team.json --watch --json | jq -c .summary
   (network drives, some container and WSL mounts) or a watcher that overflows, a check of file sizes and times every
   second.
 - **Output:** in text mode the screen is cleared before each run (only on a terminal), and a status line goes to
-  stderr. With `--json`, each run writes one JSON document on one line (JSON Lines), and nothing goes to stderr.
+  stderr. With `--json`, each run writes one JSON document on one line (JSON Lines), and no status line (`--ci`
+  annotations still go to stderr).
 - **Errors:** a usage error, or a model path that isn't there, stops it at once with the usual exit code. A model
   that fails to load once it's running (a file saved half-way) is reported, and the watch goes on.
 - Not for server models (`xmla:`), and not with `lint --fix --save` / `--save-to`, which would change the files it

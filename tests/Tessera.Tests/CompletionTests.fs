@@ -469,12 +469,8 @@ let tests =
                     [ "Sales"; "Date"; "Time Intelligence" ]
                     ""
 
-                let refresh = candidates [ "refresh"; "m" ] ""
-
-                Expect.isTrue
-                    (refresh
-                     |> List.forall (fun c -> c.StartsWith "table:" || c.StartsWith "partition:"))
-                    $"{refresh}"
+                // refresh's objects are on a server: nothing to offer without a connection.
+                Expect.equal (candidates [ "refresh"; "m" ] "") [] ""
 
             testCase "roles and perspectives by name"
             <| fun () ->
@@ -548,6 +544,42 @@ let tests =
                     Expect.equal r.Code ExitCode.ok model
                     Expect.equal r.Out "" model
                     Expect.equal r.Err "" model
+
+            testCase "what it offers, the command takes"
+            <| fun () ->
+                use t = new TempDir()
+                let bim = writeBim t
+
+                let first (current: string) (words: string list) =
+                    let r = complete ($"--current={current}" :: "--" :: words)
+
+                    match r.Out.Split('\n', StringSplitOptions.RemoveEmptyEntries) |> List.ofArray with
+                    | c :: _ -> c
+                    | [] -> failtestf "no candidates for %A %s" words current
+
+                let ok (args: string list) =
+                    let r = tess args
+                    let line = String.concat " " args
+                    Expect.equal r.Code ExitCode.ok $"tess {line}: {r.Err}"
+
+                let measure = first "measure:" [ "get"; bim ]
+                let table = first "D" [ "move"; bim; measure ]
+                let fromColumn = first "column:Sales/D" [ "add"; bim; "relationship"; "--from" ]
+
+                let toColumn =
+                    first "column:Date/Y" [ "add"; bim; "relationship"; "--from"; fromColumn; "--to" ]
+
+                let perspective = first "" [ "perspective"; "add"; bim ]
+                let member' = first "table:D" [ "perspective"; "add"; bim; perspective ]
+                let listTable = first "" [ "list"; bim; "--table" ]
+                let role = first "" [ "query"; bim; "--role" ]
+                ok [ "get"; bim; measure ]
+                ok [ "move"; bim; measure; table ]
+                ok [ "add"; bim; "relationship"; "--from"; fromColumn; "--to"; toColumn ]
+                ok [ "perspective"; "add"; bim; perspective; member' ]
+                ok [ "list"; bim; "--table"; listTable ]
+                ok [ "get"; bim; $"role:{role}" ]
+                ok [ "deps"; bim; first "column:" [ "deps"; bim ] ]
 
             testCase "a TMDL folder and a .pbip project"
             <| fun () ->

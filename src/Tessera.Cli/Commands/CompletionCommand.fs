@@ -107,19 +107,17 @@ module Node =
 // a test checks each value appears in the option's own help text.
 let private severities = Validate.Severity.all |> List.map Validate.Severity.token
 
+/// Every case of a union with no fields (so a new one is offered without a change here).
+let private casesOf<'T> () : 'T list =
+    FSharpType.GetUnionCases(typeof<'T>)
+    |> Array.map (fun c -> FSharpValue.MakeUnion(c, [||]) :?> 'T)
+    |> List.ofArray
+
 let private outputFormats =
-    [ ModelIO.BimFile; ModelIO.TmdlFolder; ModelIO.PbipFolder ]
-    |> List.map ModelIO.OutputFormat.token
+    casesOf<ModelIO.OutputFormat>() |> List.map ModelIO.OutputFormat.token
 
 let private ruleLayers =
-    [
-        BpaRules.RuleLayer.BuiltIn
-        BpaRules.RuleLayer.Model
-        BpaRules.RuleLayer.Config
-        BpaRules.RuleLayer.Env
-        BpaRules.RuleLayer.CommandLine
-    ]
-    |> List.map BpaRules.RuleLayer.token
+    casesOf<BpaRules.RuleLayer>() |> List.map BpaRules.RuleLayer.token
 
 let private kinds = ObjectKind.all |> List.map ObjectKind.token
 
@@ -151,7 +149,8 @@ let private optionOverride (command: string) (option: string) : Value option =
 let private positionalOverride (command: string) : (Value list * Value option) option =
     match command with
     | "query" -> Some([ Path ], Some Text)
-    | "refresh" -> Some([ Path ], Some(Objects [ ObjectKind.Table; ObjectKind.Partition ]))
+    // Its objects are on a server (model files are refused), and completion never connects.
+    | "refresh" -> Some([ Text ], Some Text)
     | "deploy" -> Some([ Path; Text; Text ], None)
     // The new object's reference: nothing to offer.
     | "add" -> Some([ Path; Text ], None)
