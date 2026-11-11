@@ -319,6 +319,15 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     /// See `DateTable` in Context.fs.
     member val DateKey = 0 with get, set
     member _.IsReady = not (obj.ReferenceEquals(store, null))
+    /// Why queries can't read this column, once the model is prepared (Group By Columns).
+    member val Gate: string option = None with get, set
+    /// Set for a calculated column before it is computed, from its expression and the measures
+    /// it uses: whether the filter of a context transition in it may be narrowed (ALL, ALLEXCEPT,
+    /// REMOVEFILTERS, a table as a filter argument), which can take a dependency away.
+    member val MayNarrow = false with get, set
+    /// Likewise: whether it uses USERELATIONSHIP, which may turn off the optimization that makes
+    /// a transition depend on the table's key only (see `BTable.UniqueColumn`).
+    member val ChangesRelationships = false with get, set
 
     member this.SetData(column: StoreColumn) =
         blankId <-
@@ -331,6 +340,15 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
 
     /// The stored values. Computes a calculated column that is still pending (during `prepare`).
     member this.Data: StoreColumn =
+        if obj.ReferenceEquals(store, null) then
+            table.Model.ForceColumn this
+
+        match this.Gate with
+        | Some why -> raise (EngineException(DaxNotSupported(why, "")))
+        | None -> store
+
+    /// The stored values whatever the `Gate`: for copying a computed column, not for queries.
+    member this.Stored: StoreColumn =
         if obj.ReferenceEquals(store, null) then
             table.Model.ForceColumn this
 
@@ -442,16 +460,37 @@ and [<Sealed; AllowNullLiteral>] BTable(id: int, model: Model, name: string) =
     /// Rows including the blank row.
     member this.Size: int = this.RowCount + (if this.HasBlankRow then 1 else 0)
 
-    /// A column with a different value in every row, if there is one: a row is then its value there.
+    /// The column the table is marked as keyed by (`IsKey`), if any.
+    member val MarkedKey: BColumn option = None with get, set
+
+    /// The table's key as the engine knows it: a column on the one side of a relationship (or
+    /// either side of a one-to-one relationship), active or not, with a different value in every
+    /// row. A row is then its value there, and a context transition in a calculated column
+    /// depends on that column only: "The presence of a relationship forces the DAX engine to
+    /// verify that ProductKey is a column with unique values in BestProducts. If there is a unique
+    /// column in the table, the context transition is optimized to rely on that column, without
+    /// filtering all the other columns" (SQLBI, "Understanding circular dependencies"). Values
+    /// that happen to be unique don't count: the article's unrelated BestProducts, whose
+    /// ProductKey is unique, has the circular dependency. A calculated key column not computed yet
+    /// is computed (the transition depends on it); one being computed is no key.
     member this.UniqueColumn: BColumn option =
         match unique with
         | ValueSome u -> u
         | ValueNone ->
-            let u =
-                this.Columns
-                |> Array.tryFind (fun c -> c.IsReady && c.Data.IsUnique && c.Data.BlankId < 0)
+            let candidates =
+                model.Rels
+                |> Array.collect (fun r ->
+                    if r.Limited then [||]
+                    elif r.OneToOne then [| r.To; r.From |]
+                    else [| r.To |])
+                |> Array.filter (fun c -> obj.ReferenceEquals(c.Table, this))
+                |> Array.distinct
 
-            if this.Columns |> Array.forall _.IsReady then
+            let u =
+                candidates
+                |> Array.tryFind (fun c -> not c.Computing && c.Data.IsUnique && c.Data.BlankId < 0)
+
+            if candidates |> Array.forall (fun c -> not c.Computing) then
                 unique <- ValueSome u
 
             u
@@ -499,12 +538,16 @@ and [<Sealed; AllowNullLiteral>] BTable(id: int, model: Model, name: string) =
             duplicates <- ValueSome(ready.Length, result)
             result
 
-/// A single-column relationship: `From` is the many side, `To` the one side.
+/// A single-column relationship: `From` is the many side, `To` the one side. A limited relationship
+/// (`Limited`: many-to-many cardinality) has no one side: `To` filters `From`, and `From` filters
+/// `To` too when it filters both ways.
 and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toColumn: BColumn, both: bool, active: bool)
     =
     let mutable toRow: int array = null
     let mutable orphans: int array = null
     let mutable fromIdOfToId: int array = null
+    let mutable toIdOfFromId: int array = null
+    let mutable fromRow: int array = null
 
     member _.Id = id
     member _.Name = name
@@ -513,7 +556,77 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
     member _.Both = both
     member _.IsActive = active
 
+    /// A many-to-many cardinality relationship: "a relationship is limited if it has a many-to-many
+    /// cardinality" (SQLBI, "Strong and weak relationships in Power BI"). "Table expansion never
+    /// occurs for limited relationships. Table joins are achieved by using INNER JOIN semantics,
+    /// and for this reason, blank virtual rows aren't added" (Microsoft Learn, "Model relationships
+    /// in Power BI Desktop"): a filter crosses it as the values of the column.
+    member val Limited = false with get, set
+
+    /// A one-to-one relationship: both columns are unique, it filters both ways ("For one-to-one
+    /// relationships, the cross filter direction is always from both tables": Microsoft Learn,
+    /// "Model relationships in Power BI Desktop"), and each table's expanded table holds the
+    /// other ("a one-to-one relationship is known as an identity. For all intents and purposes you
+    /// can consider the two expanded tables as being the same. An expanded table is created by
+    /// joining the columns of two tables into a larger table using a FULL OUTER JOIN": SQLBI,
+    /// "Expanded tables in DAX"). The engine keeps `From` as the side whose expanded table rows
+    /// are its rows, and refuses data where that isn't so (see `FromRowOfToRow`).
+    member val OneToOne = false with get, set
+
+    /// The relationship for messages: "'Target'[Category] -> 'Product'[Category]".
+    member _.Describe =
+        $"'{from.Table.Name}'[{from.Name}] -> '{toColumn.Table.Name}'[{toColumn.Name}]"
+
+    /// A limited relationship: the ids of values of the other column, from either side's ids
+    /// (-1 for a value the other side lacks). Its columns must have the same type.
+    member private this.BuildLimited() =
+        let f = from.Data
+        let t = toColumn.Data
+
+        if f.DataType <> t.DataType then
+            raise (
+                EngineException(
+                    DaxNotSupported(
+                        $"the many-to-many relationship {this.Describe} between columns of different types ({DaxType.name f.DataType} and {DaxType.name t.DataType})",
+                        ""
+                    )
+                )
+            )
+
+        let same (target: StoreColumn) (v: DaxValue) =
+            if DaxValue.isBlank v then
+                target.BlankId
+            else
+                target.TryFindId v
+
+        toIdOfFromId <- f.Values |> Array.map (same t)
+        fromIdOfToId <- t.Values |> Array.map (same f)
+        toRow <- [||]
+        orphans <- [||]
+
+    /// The ids of `other`'s values (one of the two columns, the other being `source`) that equal
+    /// the values of these ids of `source`. For a limited relationship.
+    member this.MatchIds(source: BColumn, ids: int seq) : int seq =
+        if isNull toIdOfFromId then
+            this.BuildLimited()
+
+        let map =
+            if obj.ReferenceEquals(source, from) then
+                toIdOfFromId
+            else
+                fromIdOfToId
+
+        ids
+        |> Seq.choose (fun id ->
+            if id < map.Length && map.[id] >= 0 then
+                Some map.[id]
+            else
+                None)
+
     member private this.Build() =
+        if this.Limited then
+            invalidOp $"the limited relationship {this.Describe} has no row map"
+
         let f = from.Data
         let t = toColumn.Data
         let toRows = toColumn.Table.RowCount
@@ -555,9 +668,61 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
             if map.[row] = toRows then
                 orphanRows.Add row
 
-        fromIdOfToId <- t.Values |> Array.map (convert t f)
+        let back = t.Values |> Array.map (convert t f)
+
+        if this.OneToOne then
+            let refuse (why: string) =
+                raise (EngineException(DaxNotSupported($"the one-to-one relationship {this.Describe}: {why}", "")))
+
+            if not f.IsUnique || f.BlankId >= 0 then
+                refuse $"'{from.Table.Name}'[{from.Name}] has values that repeat or are BLANK"
+
+            // "This join type ensures that blank virtual rows are added on either side, when
+            // necessary" (Learn): a key of `To` that `From` lacks gives `From` a blank row, which
+            // the engine doesn't do; and with two rows of `From` unmatched, `To`'s blank row is
+            // two rows of the joined table.
+            let rows =
+                Array.init (toRows + 1) (fun row ->
+                    if row < toRows then
+                        match back.[t.ValueIds.[row]] with
+                        | -1 ->
+                            refuse
+                                $"'{toColumn.Table.Name}' has keys that '{from.Table.Name}' lacks, which would give '{from.Table.Name}' a blank row"
+                        | id -> f.RowsOfId(id).[0]
+                    else
+                        match orphanRows.Count with
+                        | 0 -> from.Table.RowCount
+                        | 1 -> orphanRows.[0]
+                        | n ->
+                            refuse
+                                $"{n} rows of '{from.Table.Name}' have no match in '{toColumn.Table.Name}' (only one is implemented: the blank row of '{toColumn.Table.Name}' is then that row)")
+
+            fromRow <- rows
+
+        fromIdOfToId <- back
         orphans <- orphanRows.ToArray()
         toRow <- map
+
+    /// Checks the relationship against the data (a regular one's one side is unique, a limited
+    /// one's columns have the same type), raising `EngineException` for what isn't supported.
+    member this.Check() =
+        if this.Limited then
+            if isNull toIdOfFromId then
+                this.BuildLimited()
+        elif isNull toRow then
+            this.Build()
+
+    /// For a one-to-one relationship, the other way: for each row of the To table (its blank row
+    /// last, at `RowCount`), its row of the From table; the blank row's is the one unmatched row
+    /// of From, or From's `RowCount` when there is none.
+    member this.FromRowOfToRow: int array =
+        if isNull toRow then
+            this.Build()
+
+        if isNull fromRow then
+            invalidOp $"the relationship {this.Describe} is not one-to-one"
+
+        fromRow
 
     /// For each stored row of the From table: its row of the To table, or the To table's
     /// `RowCount` (its blank row) when the key has no match.
@@ -612,6 +777,7 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                  let found = ResizeArray<BTable * BRel list>()
                  let mutable ambiguous = None
 
+                 // A one-to-one relationship is walked both ways, but not back the way it came.
                  let rec walk (x: BTable) (path: BRel list) (depth: int) =
                      if
                          found.Exists(fun (y, _) -> obj.ReferenceEquals(x, y))
@@ -622,8 +788,18 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                      else
                          found.Add((x, List.rev path))
 
+                         let cameBy (r: BRel) =
+                             match path with
+                             | last :: _ -> obj.ReferenceEquals(last, r)
+                             | [] -> false
+
                          for r in manyToOne.Value.[x.Id] do
-                             walk r.To.Table (r :: path) (depth + 1)
+                             if not r.Limited && not (cameBy r) then
+                                 walk r.To.Table (r :: path) (depth + 1)
+
+                         for r in oneToMany.Value.[x.Id] do
+                             if r.OneToOne && not (cameBy r) then
+                                 walk r.From.Table (r :: path) (depth + 1)
 
                  walk t [] 0
                  found.ToArray(), ambiguous))
@@ -653,14 +829,23 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                 else '1')
         )
 
-    /// The active relationships in which the table is the many side.
+    /// The active relationships in which the table is the many side (its `From`), limited ones
+    /// included.
     member _.ManyToOne(table: BTable) : BRel array = manyToOne.Value.[table.Id]
-    /// The active relationships in which the table is the one side.
+    /// The active relationships in which the table is the one side (its `To`), limited ones included.
     member _.OneToMany(table: BTable) : BRel array = oneToMany.Value.[table.Id]
-    member _.FiltersBothWays(r: BRel) : bool = active.[r.Id] && both.[r.Id]
+
+    /// Whether filters cross the relationship from its many side to its one side. A limited
+    /// relationship counts whatever its direction: what crosses it is a filter on values, not
+    /// table expansion, which is cross-filtering either way (ALLCROSSFILTERED "removes all the
+    /// filters ... on columns and tables that are cross-filtering the table argument because of
+    /// limited (weak) relationships and/or bidirectional cross-filters": dax.guide/allcrossfiltered).
+    member _.FiltersBothWays(r: BRel) : bool =
+        active.[r.Id] && (both.[r.Id] || r.Limited)
 
     /// The tables of a table's expanded table: itself, then every table reached over many-to-one
-    /// relationships (SQLBI, "Expanded tables in DAX").
+    /// relationships, and over one-to-one relationships either way (SQLBI, "Expanded tables in
+    /// DAX"). The path to each is its relationships in order.
     member _.Expanded(table: BTable) : (BTable * BRel list) array = fst expanded.Value.[table.Id]
 
     /// A table that two chains of many-to-one relationships lead to from `table`, if any.
@@ -711,12 +896,21 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                     |> snd
 
                 let mutable map = Array.init (table.RowCount + 1) id
+                let mutable at = table
 
                 for r in path do
-                    let step = r.ToRowOfFromRow
-                    let fromRows = r.From.Table.RowCount
-                    let toBlank = r.To.Table.RowCount
-                    map <- map |> Array.map (fun row -> if row >= fromRows then toBlank else step.[row])
+                    if obj.ReferenceEquals(r.From.Table, at) then
+                        let step = r.ToRowOfFromRow
+                        let fromRows = r.From.Table.RowCount
+                        let toBlank = r.To.Table.RowCount
+                        map <- map |> Array.map (fun row -> if row >= fromRows then toBlank else step.[row])
+                        at <- r.To.Table
+                    else
+                        // Back across a one-to-one relationship.
+                        let step = r.FromRowOfToRow
+                        let toRows = r.To.Table.RowCount
+                        map <- map |> Array.map (fun row -> step.[min row toRows])
+                        at <- r.From.Table
 
                 map
         )
@@ -751,6 +945,8 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     member val ForceColumn: BColumn -> unit = ignore with get, set
     member val ForceTable: BTable -> unit = ignore with get, set
     member val ForceBlankRow: BTable -> unit = ignore with get, set
+    /// The calculated columns (`BColumn`) and tables (`BTable`) being computed, innermost on top.
+    member val Computing = Stack<obj>() with get
     /// The instant TODAY and NOW see (local time), fixed when the model is prepared: every
     /// calculated table and column and every query sees the same one.
     member val Now: DateTime = DateTime.MinValue with get, set

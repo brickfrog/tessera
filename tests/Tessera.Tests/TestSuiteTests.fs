@@ -720,4 +720,33 @@ test:
                 (TestRun.Snapshots.fileOf (t.Combine("b", "x.test.yaml")))
                 (t.Combine("b", "x.snapshot.json"))
                 "snapshot file")
+
+        testCase "now: on the suite and on a test" (fun () ->
+            let suite =
+                good
+                    "now: 2024-03-05T14:30:00Z\ntests:\n  - name: a\n    measure: M\n    expect: 1\n  - name: b\n    now: 2023-01-02\n    measure: M\n    expect: 1\n"
+
+            let clocks = suite.Tests |> List.map (fun t -> t.Now)
+
+            Expect.equal
+                clocks
+                [
+                    Some {
+                        Now = DateTime(2024, 3, 5, 14, 30, 0)
+                        UtcNow = DateTime(2024, 3, 5, 14, 30, 0)
+                    }
+                    Some {
+                        Now = DateTime(2023, 1, 2)
+                        UtcNow = DateTime(2023, 1, 2)
+                    }
+                ]
+                "the suite's, then the test's own"
+
+            Expect.equal ((good "tests:\n  - name: a\n    measure: M\n    expect: 1\n").Tests.Head.Now) None "none"
+
+            let line, message =
+                one "tests:\n  - name: a\n    measure: M\n    now: 2024-13-01\n    expect: 1\n"
+
+            Expect.equal line 4 "the line"
+            Expect.stringContains message "now: '2024-13-01' is not an ISO 8601 date and time" "the message")
     ]

@@ -213,9 +213,15 @@ let private staticGates (db: Database) : Dictionary<string, string> =
                     match s.FromCardinality, s.ToCardinality with
                     | RelationshipEndCardinality.Many, RelationshipEndCardinality.One
                     | RelationshipEndCardinality.One, RelationshipEndCardinality.Many -> ()
-                    | RelationshipEndCardinality.One, RelationshipEndCardinality.One ->
-                        unsupported.Add((r.FromTable.Name, $"the one-to-one relationship {between}"))
-                    | _ -> unsupported.Add((r.FromTable.Name, $"the many-to-many relationship {between}"))
+                    // "Inactive relationships are also expanded" (Learn, "Model relationships in
+                    // Power BI Desktop"): an inactive one-to-one relationship would join the two
+                    // expanded tables, which isn't implemented.
+                    | RelationshipEndCardinality.One, RelationshipEndCardinality.One when not r.IsActive ->
+                        unsupported.Add((r.FromTable.Name, $"the inactive one-to-one relationship {between}"))
+                    | RelationshipEndCardinality.One, RelationshipEndCardinality.One
+                    | RelationshipEndCardinality.Many, RelationshipEndCardinality.Many -> ()
+                    | f, t ->
+                        unsupported.Add((r.FromTable.Name, $"the relationship {between}, whose ends are {f} and {t}"))
                 | _ ->
                     unsupported.Add((r.FromTable.Name, $"the relationship {between}, which is not on a single column"))
 
@@ -245,6 +251,148 @@ let private staticGates (db: Database) : Dictionary<string, string> =
                 gates.[t.Name] <- $"calculation groups (table '{t.Name}')"
 
     gates
+
+/// What a calculated column's expression does to the filter of a context transition in it, read
+/// from the expression and the measures and functions it uses: (may narrow it: ALL, ALLEXCEPT,
+/// ALLNOBLANKROW, REMOVEFILTERS, ALLSELECTED, ALLCROSSFILTERED, or a CALCULATE or CALCULATETABLE
+/// filter argument that is not a condition; uses USERELATIONSHIP). "restrict the list of columns
+/// that the calculated column depends on, by using ALLEXCEPT or REMOVEFILTERS" (SQLBI, "Avoiding
+/// circular dependency errors in DAX"); "this optimization is not activated: You use
+/// USERELATIONSHIP in the code of the column" (SQLBI, "Understanding circular dependencies").
+let private transitionTraits (model: Model) (defs: QueryDefs option) (expr: Expr) : bool * bool =
+    let removers =
+        set [
+            "ALL"
+            "ALLEXCEPT"
+            "ALLNOBLANKROW"
+            "REMOVEFILTERS"
+            "ALLSELECTED"
+            "ALLCROSSFILTERED"
+        ]
+
+    let mutable narrows = false
+    let mutable changes = false
+    let seen = HashSet<obj>(HashIdentity.Reference)
+
+    // A filter argument that is a condition replaces the filters of its columns only.
+    let rec condition (e: Expr) =
+        match e.Kind with
+        | Paren inner -> condition inner
+        | Binary _
+        | Unary(UnaryOp.Not, _) -> true
+        | Call(name, [ inner ]) when String.Equals(name.Name, "KEEPFILTERS", StringComparison.OrdinalIgnoreCase) ->
+            condition inner
+        | Call(name, _) ->
+            match name.Name.ToUpperInvariant() with
+            | "USERELATIONSHIP"
+            | "CROSSFILTER" -> true
+            | _ -> false
+        | _ -> false
+
+    let measure (name: string) : BMeasure option =
+        let fromQuery =
+            match defs with
+            | Some d ->
+                match d.Measures.TryGetValue name with
+                | true, m -> Some m
+                | _ -> None
+            | None -> None
+
+        match fromQuery with
+        | Some m -> Some m
+        | None ->
+            match model.Measures.TryGetValue name with
+            | true, m -> Some m
+            | _ -> None
+
+    let rec walk (e: Expr) =
+        Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack()
+
+        match e.Kind with
+        | Call(name, args) ->
+            let upper = name.Name.ToUpperInvariant()
+
+            if removers.Contains upper then
+                narrows <- true
+
+            if upper = "USERELATIONSHIP" then
+                changes <- true
+
+            if
+                (upper = "CALCULATE" || upper = "CALCULATETABLE")
+                && args.Length > 1
+                && not (args.Tail |> List.forall condition)
+            then
+                narrows <- true
+
+            let fromModel =
+                match model.Functions.TryGetValue name.Name with
+                | true, f -> Some f
+                | _ -> None
+
+            let fromQuery =
+                match defs with
+                | Some d ->
+                    match d.Functions.TryGetValue name.Name with
+                    | true, f -> Some f
+                    | _ -> None
+                | None -> None
+
+            match fromQuery |> Option.orElse fromModel with
+            | Some f when seen.Add f ->
+                // What a function does with its arguments can't be told here.
+                narrows <- true
+
+                try
+                    walk f.Def.Body
+                with EngineException _ ->
+                    ()
+            | _ -> ()
+        | Bracketed name
+        | Qualified(_, name) ->
+            match measure name with
+            | Some m when seen.Add m ->
+                try
+                    walk m.Expr
+                with EngineException _ ->
+                    ()
+            | _ -> ()
+        | _ -> ()
+
+        List.iter walk (children e)
+
+    walk expr
+    narrows, changes
+
+/// The columns with Group By Columns (a field parameter's display column has them), with why
+/// queries can't use them: "The columns specified in Group By Columns must be present in the
+/// grouping conditions of any query that includes the target column ... otherwise, the query fails
+/// with an error", and "SUMMARIZE, SUMMARIZECOLUMNS, DISTINCT, and VALUES are all going to fail"
+/// without them (SQLBI, "Understanding Group By Columns in Power BI"). Which queries those are
+/// isn't implemented, so any that reads the column is refused.
+let private groupedBy (db: Database) : Dictionary<string, string> =
+    let found = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+
+    if not (isNull db.Model) then
+        for t in db.Model.Tables do
+            for c in t.Columns do
+                if
+                    not (isNull c.RelatedColumnDetails)
+                    && c.RelatedColumnDetails.GroupByColumns.Count > 0
+                then
+                    let by =
+                        c.RelatedColumnDetails.GroupByColumns
+                        |> Seq.choose (fun g ->
+                            if isNull g.GroupingColumn then
+                                None
+                            else
+                                Some $"'{g.GroupingColumn.Table.Name}'[{g.GroupingColumn.Name}]")
+                        |> String.concat ", "
+
+                    found.[t.Name + "\u0000" + c.Name] <-
+                        $"'{t.Name}'[{c.Name}], which has Group By Columns ({by}): a query that groups by it without them fails, and which queries those are is not implemented"
+
+    found
 
 let private calculatedTableExpression (t: Table) : string option =
     t.Partitions
@@ -304,7 +452,7 @@ let private bindWith
         | Some e -> column.Failure <- Some e
         | None ->
             if original.IsReady then
-                column.SetData original.Data
+                column.SetData original.Stored
 
     let gates = staticGates db
     let tables = ResizeArray<BTable>()
@@ -372,6 +520,9 @@ let private bindWith
 
                 if c.IsKey && declared = DaxType.DateTime then
                     column.DateKey <- (if t.DataCategory = "Time" then 2 else 1)
+
+                if c.IsKey then
+                    table.MarkedKey <- Some column
 
                 columns.Add column
                 table.ColumnByName.[c.Name] <- column
@@ -454,7 +605,8 @@ let private bindWith
 
     model.Tables <- tables.ToArray()
 
-    // Relationships the engine does: single column, many-to-one (either way round).
+    // Relationships the engine does: single column, many-to-one (either way round), one-to-one and
+    // many-to-many.
     let rels = ResizeArray<BRel>()
 
     for r in db.Model.Relationships do
@@ -468,26 +620,42 @@ let private bindWith
                     | _ -> None
                 | _ -> None
 
+            // (from, to, limited). A many-to-many relationship keeps the model's ends: in one
+            // direction its `ToColumn`'s table filters its `FromColumn`'s, as for any relationship.
+            // A one-to-one relationship keeps them too, and always filters both ways.
             let ends =
                 match s.FromCardinality, s.ToCardinality with
-                | RelationshipEndCardinality.Many, RelationshipEndCardinality.One -> Some(s.FromColumn, s.ToColumn)
-                | RelationshipEndCardinality.One, RelationshipEndCardinality.Many -> Some(s.ToColumn, s.FromColumn)
+                | RelationshipEndCardinality.Many, RelationshipEndCardinality.One ->
+                    Some(s.FromColumn, s.ToColumn, false)
+                | RelationshipEndCardinality.One, RelationshipEndCardinality.Many ->
+                    Some(s.ToColumn, s.FromColumn, false)
+                | RelationshipEndCardinality.Many, RelationshipEndCardinality.Many ->
+                    Some(s.FromColumn, s.ToColumn, true)
+                | RelationshipEndCardinality.One, RelationshipEndCardinality.One when s.IsActive ->
+                    Some(s.FromColumn, s.ToColumn, false)
                 | _ -> None
 
+            let oneToOne =
+                s.FromCardinality = RelationshipEndCardinality.One
+                && s.ToCardinality = RelationshipEndCardinality.One
+
             match ends with
-            | Some(many, one) ->
+            | Some(many, one, limited) ->
                 match column many, column one with
                 | Some f, Some t when f.Table.Gate.IsNone ->
-                    rels.Add(
+                    let r =
                         BRel(
                             rels.Count,
                             (if isNull s.Name then "" else s.Name),
                             f,
                             t,
-                            s.CrossFilteringBehavior = CrossFilteringBehavior.BothDirections,
+                            (oneToOne || s.CrossFilteringBehavior = CrossFilteringBehavior.BothDirections),
                             s.IsActive
                         )
-                    )
+
+                    r.Limited <- limited
+                    r.OneToOne <- oneToOne
+                    rels.Add r
                 | _ -> ()
             | None -> ()
         | _ -> ()
@@ -571,11 +739,23 @@ let private bindWith
                         )
             | None, Some source ->
                 c.Computing <- true
+                model.Computing.Push(c)
 
                 try
                     fail (fun e -> c.Failure <- Some e) (fun () ->
                         let t = c.Table
                         let n = t.RowCount
+
+                        let narrows, changes =
+                            transitionTraits
+                                model
+                                (query |> Option.map _.Defs)
+                                (match c.Parsed with
+                                 | Some parsed -> parsed
+                                 | None -> parseExpression source)
+
+                        c.MayNarrow <- narrows
+                        c.ChangesRelationships <- changes
 
                         // A query column: "populated in an empty filter context before the query
                         // is executed" (dax.guide/st/column), and it "can use any of the defined
@@ -603,6 +783,7 @@ let private bindWith
                         | Error e -> raise (DaxRuntimeException(DaxError.message e, source.Label)))
                 finally
                     c.Computing <- false
+                    model.Computing.Pop() |> ignore
 
     model.ForceTable <-
         fun (t: BTable) ->
@@ -613,6 +794,7 @@ let private bindWith
             | None, None -> t.SetRowCount 0
             | None, Some source ->
                 t.Computing <- true
+                model.Computing.Push(t)
 
                 try
                     fail (fun e -> t.Failure <- Some e) (fun () ->
@@ -678,6 +860,7 @@ let private bindWith
                         t.SetRowCount result.Count)
                 finally
                     t.Computing <- false
+                    model.Computing.Pop() |> ignore
 
     let deciding = HashSet<int>()
 
@@ -697,10 +880,40 @@ let private bindWith
                 ()
             else
                 try
+                    // "The additional blank row is never added to tables involved in a limited
+                    // relationship" (SQLBI, "Relationships in Power BI and Tabular models"): a
+                    // limited relationship adds none.
                     let incoming =
-                        model.Rels |> Array.filter (fun r -> obj.ReferenceEquals(r.To.Table, t))
+                        model.Rels
+                        |> Array.filter (fun r -> obj.ReferenceEquals(r.To.Table, t) && not r.Limited)
+
+                    // A one-to-one relationship joins the two tables row for row (`BRel.OneToOne`):
+                    // `From` would need a blank row for keys of `To` it lacks (refused when the
+                    // relationship is checked), and a blank row either side has for another reason
+                    // isn't implemented with it.
+                    for r in model.Rels do
+                        if r.OneToOne && obj.ReferenceEquals(r.From.Table, t) then
+                            try
+                                r.Check()
+                            with EngineException(DaxNotSupported(why, _)) ->
+                                refuse why
+
+                    let oneToOne =
+                        model.Rels
+                        |> Array.tryFind (fun r ->
+                            r.OneToOne
+                            && (obj.ReferenceEquals(r.From.Table, t) || obj.ReferenceEquals(r.To.Table, t)))
 
                     if incoming |> Array.exists (fun r -> r.IsActive && r.OrphanFromRows.Length > 0) then
+                        match oneToOne with
+                        | Some o when
+                            incoming
+                            |> Array.exists (fun r -> not (obj.ReferenceEquals(r, o)) && r.OrphanFromRows.Length > 0)
+                            ->
+                            refuse
+                                $"the blank row of '{t.Name}', which is in the one-to-one relationship {o.Describe} and has keys without a match in another relationship"
+                        | _ -> ()
+
                         // "a special row added to a table, in case the table is on the one-side of
                         // a strong relationship and the relationship is invalid" (SQLBI, "Blank
                         // row in DAX").
@@ -753,11 +966,20 @@ let private bindWith
                 attempt (ObjectRef.inTable ObjectKind.Column t.Name c.Name) (fun () -> c.Data |> ignore)
 
     for r in model.Rels do
-        attempt (ObjectRef.modelLevel ObjectKind.Relationship r.Name) (fun () -> r.ToRowOfFromRow |> ignore)
+        attempt (ObjectRef.modelLevel ObjectKind.Relationship r.Name) (fun () -> r.Check())
 
     for t in model.Tables do
         if t.Gate.IsNone then
             attempt (ObjectRef.table t.Name) (fun () -> t.HasBlankRow |> ignore)
+
+    // Computed, but not to be read by queries (see `groupedBy`).
+    let grouped = groupedBy db
+
+    for t in model.Tables do
+        for c in t.Columns do
+            match grouped.TryGetValue(t.Name + "\u0000" + c.Name) with
+            | true, why -> c.Gate <- Some why
+            | _ -> ()
 
     model, List.ofSeq failures
 
@@ -1172,6 +1394,7 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
         []
     else
         let gates = staticGates db
+        let grouped = groupedBy db
         let tables = HashSet<string>(StringComparer.OrdinalIgnoreCase)
         let measures = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         let udfs = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -1246,6 +1469,10 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
                 | Qualified(t, name) ->
                     table t.Name
 
+                    match grouped.TryGetValue(t.Name + "\u0000" + name) with
+                    | true, why -> found.Add why
+                    | _ -> ()
+
                     match calculatedColumns.TryGetValue(t.Name + "\u0000" + name) with
                     | true, text -> found.AddRange(ofCalculated ("c\u0000" + t.Name + "\u0000" + name) text)
                     | _ ->
@@ -1253,6 +1480,14 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
                             found.AddRange(ofMeasure name)
                 | Bracketed name when measures.ContainsKey name -> found.AddRange(ofMeasure name)
                 | QueryParameter name -> found.Add $"the query parameter @{name}"
+                // NAMEOF names its argument without evaluating it: what the object uses is not used.
+                | Call(name, args) when String.Equals(name.Name, "NAMEOF", StringComparison.OrdinalIgnoreCase) ->
+                    match Registry.byName.TryGetValue name.Name with
+                    | true, fn ->
+                        match fn.Check args with
+                        | Some why -> found.Add why
+                        | None -> ()
+                    | _ -> ()
                 | Call(name, args) ->
                     match Registry.byName.TryGetValue name.Name with
                     | true, fn ->

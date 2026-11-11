@@ -1,0 +1,31 @@
+{
+  "title": "NAMEOF of a measure defined in the query is 'Table'[Measure]",
+  "model": "sales",
+  "query": "DEFINE MEASURE Sales[Projected Sales] = SUM ( 'Sales'[Amount] ) * 1.06 EVALUATE { NAMEOF ( [Projected Sales] ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "'Sales'[Projected Sales]"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/nameof-function-dax",
+    "quote": "For measures: 'TableName'[MeasureName]",
+    "supports": "example 2 of the page: the same DEFINE MEASURE and NAMEOF return 'Sales'[Projected Sales]"
+  },
+  "confidence": "published",
+  "tags": [
+    "nameof",
+    "define-measure",
+    "table-constructor"
+  ]
+}

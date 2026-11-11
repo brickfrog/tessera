@@ -742,11 +742,17 @@ let localTarget (db: Database) (cliData: string option) : Target =
             + (tables
                |> List.map (fun t -> t.Table + "\u0001" + t.Json)
                |> String.concat "\u0000")
+            + "\u0000"
+            + (match t.Now with
+               | Some c -> $"{c.Now.Ticks}\u0001{c.UtcNow.Ticks}"
+               | None -> "")
 
         match prepared.TryGetValue key with
         | true, p -> p
         | _ ->
-            let p = loadFixture db suite directory tables |> Result.bind (Engine.prepare db)
+            let p =
+                loadFixture db suite directory tables
+                |> Result.bind (Engine.prepareWith { Clock = t.Now } db)
 
             prepared.[key] <- p
             p
@@ -773,6 +779,8 @@ let remoteRefusal (t: TestCase) : Refusal option =
             Refusal.Skip
                 "it has its own fixture data (`data` or `tables`); a server model is tested on the data it holds"
         )
+    elif t.Now.IsSome then
+        Some(Refusal.Skip "it sets `now:`; a server's clock can't be set")
     else
         None
 

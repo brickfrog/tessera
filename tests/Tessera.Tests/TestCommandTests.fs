@@ -1350,4 +1350,68 @@ tests:
                 (tess [ "test"; "compare"; path; "--against"; path; "--strict" ]).Code
                 ExitCode.findings
                 "--strict")
+
+        testCase "now: pins the clock of the local engine, a test's replacing the suite's" (fun () ->
+            let t, path = setup ()
+            use _ = t
+
+            suite
+                t
+                "s.test.yaml"
+                """suite: S
+data: ../data
+now: 2024-03-05T14:30:00+02:00
+tests:
+  - name: today
+    expression: TODAY ()
+    expect: 2024-03-05
+  - name: now
+    expression: NOW ()
+    expect: 2024-03-05T14:30:00
+  - name: utc now
+    expression: UTCNOW ()
+    expect: 2024-03-05T12:30:00
+  - name: a test's own
+    now: "2023-12-31"
+    expression: YEAR ( TODAY () ) * 10000 + MONTH ( NOW () ) * 100 + DAY ( UTCTODAY () )
+    expect: 20231231
+  - name: from a matrix
+    matrix:
+      - { day: "2024-02-29", expected: 2024-02-29 }
+    now: "{day}"
+    expression: TODAY ()
+    expect: "{expected}"
+"""
+            |> ignore
+
+            let r = tess [ "test"; "run"; path; "--json" ]
+            Expect.equal r.Code ExitCode.ok r.Out
+            Expect.equal (summary r) [ 5; 0; 0; 0; 0; 5 ] r.Out
+
+            suite
+                t
+                "s.test.yaml"
+                "suite: S\ndata: ../data\nnow: yesterday\ntests:\n  - name: x\n    measure: Amount\n    expect: 1\n"
+            |> ignore
+
+            let r = tess [ "test"; "run"; path ]
+            Expect.equal r.Code ExitCode.findings r.Out
+            Expect.stringContains (r.Out + r.Err) "s.test.yaml:3" "the line of the bad value"
+            Expect.stringContains (r.Out + r.Err) "'yesterday' is not an ISO 8601 date and time" "why")
+
+        testCase "a test that sets now: is skipped on a server" (fun () ->
+            let t, _ = setup ()
+            use _ = t
+            let server = engineServer ()
+
+            let file =
+                tests
+                    t
+                    "  - name: total\n    measure: Amount\n    expect: 625\n  - name: dated\n    now: 2024-01-01\n    measure: Amount\n    expect: 625\n"
+
+            let r = tessOn server tokenEnv [ "test"; "run"; remote; file; "--json" ]
+            Expect.equal r.Code ExitCode.ok r.Out
+            Expect.equal (outcomes r |> List.map snd) [ "passed"; "skipped" ] "outcomes"
+            Expect.stringContains (message r "dated") "a server's clock can't be set" "why skipped"
+            Expect.equal server.Queries.Length 1 "the skipped test is not sent")
     ]

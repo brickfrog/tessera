@@ -1083,16 +1083,18 @@ let tests =
                 match Engine.prepare db store with
                 | Error(DaxInvalid(message, _)) -> Expect.stringContains message "circular dependency" "message"
                 | other -> failtestf "%A" other)
-            // With a unique column, a filter argument that replaces part of the transition's filter
-            // keeps the same row, so the columns not computed yet aren't needed (the sample model's
-            // Date table does this, and Power BI computes it).
-            testCase "filter arguments over a transition in a table with a unique column are not circular" (fun () ->
+            // With a key (a unique column on the one side of a relationship), a filter argument that
+            // replaces part of the transition's filter keeps the same row, so the columns not
+            // computed yet aren't needed (the sample model's Date table does this, and Power BI
+            // computes it).
+            testCase "filter arguments over a transition in a table with a key are not circular" (fun () ->
                 let days (calculated: (string * DataType * string) list) = {
                     Tables = [
                         table "Days" [ "K", DataType.Int64; "Flag", DataType.Int64 ] [ [ 1; 1 ]; [ 2; 0 ]; [ 3; 0 ] ]
                         |> withCalculated calculated
+                        table "Fact" [ "K", DataType.Int64 ] [ [ 1 ] ]
                     ]
-                    Rels = []
+                    Rels = [ rel ("Fact", "K") ("Days", "K") ]
                     Measures = []
                     Functions = []
                 }
@@ -1117,6 +1119,22 @@ let tests =
                 | [ (ref, DaxNotSupported(what, _)) ] ->
                     Expect.equal (ObjectRef.format ref) "column:Days/D" "which"
                     Expect.stringContains what "unique column" "what"
+                | other -> failtestf "%A" other
+
+                // Unrelated, K is unique only by chance: each column depends on all the others
+                // (SQLBI, "Understanding circular dependencies"), unless ALL ( Days[Flag] ) takes
+                // the dependency away, which isn't decided: refused.
+                let unrelated =
+                    prepare {
+                        days [
+                            "A", DataType.Int64, "CALCULATE ( COUNTROWS ( Days ), Days[Flag] <> 1 )"
+                            "B", DataType.Int64, "CALCULATE ( COUNTROWS ( Days ), ALL ( Days[Flag] ) )"
+                        ] with
+                            Rels = []
+                    }
+
+                match Engine.failures unrelated with
+                | (_, DaxNotSupported(what, _)) :: _ -> Expect.stringContains what "depend on each other" "what"
                 | other -> failtestf "%A" other)
             testCase "a column that can't be computed fails only the queries that read it" (fun () ->
                 let m =
@@ -1148,12 +1166,9 @@ let tests =
         ]
 
         testList "model shapes that are refused" [
-            testCase "a many-to-many or one-to-one relationship closes the tables connected to it" (fun () ->
+            testCase "an inactive one-to-one relationship closes the tables connected to it" (fun () ->
                 for (fromEnd, toEnd, word) in
-                    [
-                        RelationshipEndCardinality.Many, RelationshipEndCardinality.Many, "many-to-many"
-                        RelationshipEndCardinality.One, RelationshipEndCardinality.One, "one-to-one"
-                    ] do
+                    [ RelationshipEndCardinality.One, RelationshipEndCardinality.One, "one-to-one" ] do
                     let m =
                         prepare {
                             star with
@@ -1166,6 +1181,7 @@ let tests =
                                                 r with
                                                     FromCardinality = fromEnd
                                                     ToCardinality = toEnd
+                                                    Active = false
                                             }
                                         else
                                             r)
@@ -1365,6 +1381,7 @@ let tests =
                                         {
                                             r with
                                                 FromCardinality = RelationshipEndCardinality.One
+                                                Active = false
                                         }
                                     else
                                         r)

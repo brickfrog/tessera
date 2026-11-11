@@ -2032,8 +2032,21 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   calculated table may read the tables related to it, as a date table does
   (`CALENDAR ( MIN ( Sales[Date] ), MAX ( Sales[Date] ) )`). A circular
   dependency is an error, including the classic one: two calculated columns that each use `CALCULATE` in a table
-  with no unique column. A calculated column or table that uses something unsupported doesn't stop the rest: only
-  the queries that read it fail, with its error.
+  with no key. The key is what the engine knows to be unique: a column on the one side of a relationship (either
+  side of a one-to-one), not one whose values happen to be unique ("The presence of a relationship forces the DAX
+  engine to verify that ProductKey is a column with unique values": SQLBI, "Understanding circular
+  dependencies"). With a key, a context transition depends on it alone, so several such columns are fine. Without
+  one, a cycle that `ALLEXCEPT`, `REMOVEFILTERS` or a table filter could take away, or that a column marked as the
+  key or `USERELATIONSHIP` (which may turn the optimization off) might change, is refused rather than called
+  circular. A calculated column or table that uses something unsupported doesn't stop the rest: only the queries
+  that read it fail, with its error.
+- **Relationships:** many-to-one either way round, single or both directions, active or not; **one-to-one**
+  (filters both ways, and each table's expanded table holds the other: "you can consider the two expanded tables as
+  being the same", SQLBI, so `RELATED` works from either side and `ALL ( either )` removes the other's filters; the
+  table without a match gets the blank row); **many-to-many** cardinality, which is a limited relationship: no
+  table expansion and no blank row, a filter crosses it as the values of the column, in its direction or both, and
+  nothing is filtered when nothing filters the other side, so a total includes the rows that match nothing.
+  `RELATED` across it is an error.
 - **Functions** (anything else is `not-supported`):
 
 | Family | Functions |
@@ -2041,7 +2054,7 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 | Aggregation | `AVERAGE` `AVERAGEA` `AVERAGEX` `CONCATENATEX` `COUNT` `COUNTA` `COUNTAX` `COUNTBLANK` `COUNTROWS` `COUNTX` `DISTINCTCOUNT` `DISTINCTCOUNTNOBLANK` `MAX` `MAXA` `MAXX` `MIN` `MINA` `MINX` `PRODUCTX` `RANKX` `SUM` `SUMX` |
 | Date and time | `CALENDAR` `CALENDARAUTO` `DATE` `DATEDIFF` `DATEVALUE` `DAY` `EDATE` `EOMONTH` `HOUR` `MINUTE` `MONTH` `NETWORKDAYS` `NOW` `QUARTER` `SECOND` `TIME` `TIMEVALUE` `TODAY` `UTCNOW` `UTCTODAY` `WEEKDAY` `WEEKNUM` `YEAR` `YEARFRAC` |
 | Filter | `ALL` `ALLCROSSFILTERED` `ALLEXCEPT` (also as a table) `ALLNOBLANKROW` `CALCULATE` `CALCULATETABLE` `CROSSFILTER` `DISTINCT` `EARLIER` `EARLIEST` `FILTER` `HASONEFILTER` `HASONEVALUE` `ISCROSSFILTERED` `ISFILTERED` `KEEPFILTERS` `REMOVEFILTERS` `SELECTEDVALUE` `TREATAS` `USERELATIONSHIP` `VALUES` |
-| Information | `CONTAINS` `CONTAINSROW` `CUSTOMDATA` `ISBLANK` `ISEMPTY` `ISERROR` `ISEVEN` `ISINSCOPE` `ISLOGICAL` `ISNONTEXT` `ISNUMBER` `ISODD` `ISTEXT` `USERCULTURE` `USERNAME` `USEROBJECTID` `USERPRINCIPALNAME` |
+| Information | `CONTAINS` `CONTAINSROW` `CUSTOMDATA` `ISBLANK` `ISEMPTY` `ISERROR` `ISEVEN` `ISINSCOPE` `ISLOGICAL` `ISNONTEXT` `ISNUMBER` `ISODD` `ISTEXT` `NAMEOF` (not calendars) `USERCULTURE` `USERNAME` `USEROBJECTID` `USERPRINCIPALNAME` |
 | Logical | `AND` `BLANK` `COALESCE` `ERROR` `FALSE` `IF` `IF.EAGER` `IFERROR` `NOT` `OR` `SWITCH` `TRUE` |
 | Math | `ABS` `CEILING` `CONVERT` `CURRENCY` `DIVIDE` `EVEN` `EXP` `FACT` `FLOOR` `GCD` `INT` `ISO.CEILING` `LCM` `LN` `LOG` `LOG10` `MOD` `MROUND` `ODD` `PI` `POWER` `QUOTIENT` `ROUND` `ROUNDDOWN` `ROUNDUP` `SIGN` `SQRT` `SQRTPI` `TRUNC` |
 | Relationship | `LOOKUPVALUE` `RELATED` `RELATEDTABLE` |
@@ -2253,11 +2266,18 @@ only: a server takes them from the connection).
   query parameters, detail rows, KPIs, natural joins of tables with model columns (joined over their expanded
   tables). Row-level and object-level
   security are not applied (a query runs as an administrator's would).
-- **Model shapes:** many-to-many and one-to-one relationships (a one-to-one relationship puts each table in the
-  other's expanded table and can give both a blank row; treating it as a two-way many-to-one would answer
-  `ALL ( table )` and table filters wrongly), relationships on several columns, DirectQuery and
+- **Model shapes:** an inactive one-to-one relationship, relationships on several columns, DirectQuery and
   Dual tables: every table connected to one is closed to queries, the rest of the model works. A calculation group
-  is closed when a query names it. Active relationships that give two filter paths between two tables.
+  is closed when a query names it. Active relationships that give two filter paths between two tables. A column
+  with Group By Columns (a field parameter's display column): a query that groups by it without them fails on a
+  server, so any query that reads it is refused (the table itself is computed, and its other columns work).
+- **One-to-one relationships, by their data:** keys of the `to` table that the `from` table lacks (`from` would
+  need a blank row), more than one unmatched row of `from`, and a blank row either table has from another
+  relationship. `CROSSFILTER` `ONEWAY` on one.
+- **Many-to-many relationships:** a filter that keeps every row of the filtering table (whether it still hides the
+  rows that match nothing isn't documented), a BLANK on one side meeting a BLANK on the other, columns of different
+  types, `CROSSFILTER` `ONEWAY` ("unclear which side is the lookup side": Learn), and `ALLCROSSFILTERED` in a model
+  with one.
 - **Where the sources don't say what the engine does,** for instance:
   - a one-side key that repeats or is BLANK;
   - keys with no match on an inactive relationship only, or at the start of a chain of relationships (whether the
@@ -2474,6 +2494,7 @@ Suite keys:
 | `data` | *(tess)* the fixture directory the tests evaluate over, relative to the suite file. `--data` replaces it |
 | `tables` | *(tess)* inline rows, for every test of the suite: see below |
 | `defaults` | `tolerance`, `tolerance_abs`, `tags`, and *(tess)* `filters`, for every test |
+| `now` | *(tess)* the instant `TODAY`, `NOW`, `UTCTODAY` and `UTCNOW` return, as `tess query --now` takes it: `2024-03-05`, `2024-03-05T14:30:00`, `2024-03-05T14:30:00+02:00` (the offset only moves the UTC functions). Without it, the machine's clock |
 | `tests` | the list of tests |
 | `connection` | te's; read and not used (a note on stderr says so): the model is the one on the command line |
 
@@ -2493,6 +2514,7 @@ Test keys:
 | `data`, `tables` | *(tess)* the test's own fixture directory, and its own inline rows |
 | `tolerance`, `tolerance_abs` | for this test's numbers |
 | `pending: true`, `skip: <reason>` | *(tess)* don't run it (it is reported as skipped) |
+| `now` | *(tess)* the test's own clock, replacing the suite's. A test with one is skipped on a server, whose clock can't be set |
 | `compare` | te's; read and not used |
 
 A test has exactly one of `query`, `query_file`, `measure`, `expression`, `assert`. An unknown key is an error, with
@@ -2635,7 +2657,7 @@ and the exit codes are those of `run`; a test either side's local engine refuses
 - **BLANK is not 0.** `expect: 0` fails for a BLANK result (`COUNTROWS` of no rows is BLANK, not 0): write
   `expect: null`, or `COUNTROWS ( ... ) + 0` in the query. te's own example suite expects `0` from such a query, so
   te may be laxer here; tess stays strict because a measure that went BLANK is the regression a test is for.
-- Not there: `te test spec` and the JSON Schema for editors, `test use`, and a `now:` setting to pin the clock.
+- Not there: `te test spec` and the JSON Schema for editors, and `test use`.
 - The suite format was matched to te's published reference, not to its binary: `matrix` (both shapes are accepted
   here) and `compare` (read and ignored) are the parts that reference doesn't spell out.
 

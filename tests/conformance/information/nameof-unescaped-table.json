@@ -1,0 +1,30 @@
+{
+  "title": "NAMEOF with FULL, UNESCAPED gives a table's name without quotes",
+  "model": "sales",
+  "query": "EVALUATE { NAMEOF ( 'Sales', FULL, UNESCAPED ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Sales"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/nameof-function-dax",
+    "quote": "Returns the raw name without any delimiters or escape characters",
+    "supports": "example 4 of the page: the same call returns Sales"
+  },
+  "confidence": "published",
+  "tags": [
+    "nameof",
+    "table-constructor"
+  ]
+}

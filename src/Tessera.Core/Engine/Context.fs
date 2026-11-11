@@ -150,34 +150,83 @@ module Filters =
             else
                 RowSet.OfSeq(size, rows)
 
-        match table.UniqueColumn with
-        | Some _ -> plain ()
-        | None ->
-            // Without a unique column the row is identified by all of its columns, so a calculated
-            // column that gets here depends on every other column of the table. Two such columns
-            // depend on each other: "CALCULATE in a calculated column performs a context
-            // transition and makes that column dependent on all the columns in the table. If two
-            // such columns exist, they depend on each other" (SQLBI, "Avoiding circular dependency
-            // errors in DAX").
-            if (table.Columns |> Array.filter _.Computing).Length > 1 then
-                let names =
-                    table.Columns
-                    |> Array.filter _.Computing
-                    |> Array.map (fun c -> $"[{c.Name}]")
-                    |> String.concat " and "
+        let computing = table.Columns |> Array.filter _.Computing
+        let key = table.UniqueColumn
 
-                raise (
-                    EngineException(
-                        DaxInvalid(
-                            $"circular dependency: the calculated columns {names} of '{table.Name}' each use a context transition, and the table has no column with unique values to identify a row by",
+        // The object whose expression is evaluated now. If it is a column of this table, it isn't
+        // part of the row yet; any other column of the table being computed is (it is computed
+        // because something it needs is), so the transition needs it.
+        let innermost =
+            if table.Model.Computing.Count > 0 then
+                table.Model.Computing.Peek()
+            else
+                null
+
+        let own (c: BColumn) = obj.ReferenceEquals(c, innermost)
+
+        match key with
+        | Some _ when not (computing |> Array.exists _.ChangesRelationships) -> plain ()
+        | _ ->
+            // Without the key the engine knows (`BTable.UniqueColumn`) the row is identified by
+            // all of its columns, so a calculated column that gets here depends on every other
+            // column of the table. Two such columns depend on each other: "CALCULATE in a
+            // calculated column performs a context transition and makes that column dependent on
+            // all the columns in the table. If two such columns exist, they depend on each other"
+            // (SQLBI, "Avoiding circular dependency errors in DAX"). That is settled when nothing
+            // in the columns narrows the transition's filter and no key could apply; otherwise
+            // (ALLEXCEPT keeping the key, a column marked as the key, USERELATIONSHIP with a key)
+            // the cycle may not be there, and it is refused.
+            // Also unsettled: a key column being computed itself, and a transition from outside
+            // the table's own columns (a calculated table, another table's column), whose
+            // expression's traits aren't known here.
+            let open' =
+                key.IsSome
+                || table.MarkedKey.IsSome
+                || not (computing |> Array.exists own)
+                || computing |> Array.exists _.MayNarrow
+                || table.Model.Rels
+                   |> Array.exists (fun r ->
+                       not r.Limited
+                       && ((obj.ReferenceEquals(r.To.Table, table) && r.To.Computing)
+                           || (r.OneToOne && obj.ReferenceEquals(r.From.Table, table) && r.From.Computing)))
+
+            let names (cols: BColumn seq) =
+                cols |> Seq.map (fun c -> $"[{c.Name}]") |> String.concat " and "
+
+            let cycle (cols: BColumn seq) : 'a =
+                if open' then
+                    let e =
+                        DaxNotSupported(
+                            $"context transitions in the calculated columns {names cols} of '{table.Name}', which depend on each other through it unless a key or ALLEXCEPT / REMOVEFILTERS keeps the dependency to one column (whether one does here isn't decided)",
                             ""
                         )
+
+                    // Not a circular dependency for sure: the columns are refused, not invalid.
+                    for c in cols do
+                        if not c.IsReady then
+                            c.Failure <- Some e
+
+                    raise (EngineException e)
+                else
+                    raise (
+                        EngineException(
+                            DaxInvalid(
+                                $"circular dependency: the calculated columns {names cols} of '{table.Name}' each use a context transition, and the table has no key (a column on the one side of a relationship) to identify a row by",
+                                ""
+                            )
+                        )
                     )
-                )
+
+            if computing |> Array.exists (fun c -> not (own c)) then
+                cycle computing
 
             for c in table.Columns do
                 if not c.IsReady && not c.Computing then
-                    c.Data |> ignore
+                    try
+                        c.Data |> ignore
+                    with EngineException(DaxInvalid(message, _)) when
+                        message.StartsWith("circular dependency", StringComparison.Ordinal) && open' ->
+                        cycle (Seq.append computing [ c ])
 
             match table.Duplicates with
             | null -> plain ()
@@ -296,6 +345,12 @@ module Filters =
                 then
                     match table.UniqueColumn with
                     | Some u when not (drop u) -> spellOut table rows cfg (fun c -> not (drop c) && not (pending c))
+                    // Without a key, `closeRows` computed every column but the ones being
+                    // computed, which aren't part of the row yet ("In the absence of Test2, Test1
+                    // does not reference columns other than the ones already present in the
+                    // table": SQLBI, "Understanding circular dependencies").
+                    | None when table.Columns |> Array.forall (fun c -> not (pending c) || c.Computing) ->
+                        spellOut table rows cfg (fun c -> not (drop c) && not (pending c))
                     | _ ->
                         raise (
                             EngineException(
@@ -317,7 +372,18 @@ module Filters =
             |> List.collect (fun f ->
                 match f with
                 | Rows(table, rows, cfg) when not (obj.ReferenceEquals(cfg, config)) ->
-                    spellOut table rows cfg (fun _ -> true)
+                    // While a calculated column of the table is computed, the columns that aren't
+                    // part of the row yet stay out, as in `without`: the one being computed, and
+                    // with a key the ones not computed yet.
+                    let computing = table.Columns |> Array.exists _.Computing
+
+                    let left (c: BColumn) =
+                        computing
+                        && obj.ReferenceEquals(c.Table, table)
+                        && not c.IsReady
+                        && (c.Computing || table.UniqueColumn.IsSome)
+
+                    spellOut table rows cfg (fun c -> not (left c))
                 | f -> [ f ])
 
         FilterCtx(filters, config, scope)
@@ -535,6 +601,7 @@ module Filters =
             // a filter would do through a table that doesn't exist yet can't be told.
             if
                 not (obj.ReferenceEquals(r, via))
+                && not r.Limited
                 && not (r.To.Table.Computing && fc.Filters.IsEmpty)
             then
                 let d = r.To.Table
@@ -567,7 +634,7 @@ module Filters =
 
         // A many-side table that filters both ways restricts us to the rows it refers to.
         for r in cfg.OneToMany t do
-            if not (obj.ReferenceEquals(r, via)) && cfg.FiltersBothWays r then
+            if not (obj.ReferenceEquals(r, via)) && not r.Limited && cfg.FiltersBothWays r then
                 let m = r.From.Table
                 let mv = vis fc m r
 
@@ -590,6 +657,62 @@ module Filters =
                             $"a filter on '{m.Name}' that keeps all of its rows, crossing the both-directions relationship to '{t.Name}'"
 
                     set <- set.Intersect referred
+
+        // A limited relationship filters by values: "Table joins are achieved by using INNER JOIN
+        // semantics" (Microsoft Learn, "Model relationships in Power BI Desktop"). With nothing
+        // filtering the other side nothing is filtered here, so a total includes the rows that
+        // match nothing ("the total shown for Weak Amount is different than the sum of individual
+        // brands": SQLBI, "Strong and weak relationships in Power BI").
+        let limited (r: BRel) (source: BColumn) (target: BColumn) =
+            let s = source.Table
+            let sv = vis fc s r
+
+            if not sv.IsAll then
+                if sv.Count = s.Size then
+                    // As for a relationship that filters both ways: no source says whether a filter
+                    // that keeps every row still hides the rows that match nothing.
+                    gate
+                        $"a filter on '{s.Name}' that keeps all of its rows, crossing the many-to-many relationship {r.Describe}"
+
+                let stored = s.RowCount
+                let data = source.Data
+                let marks = Array.zeroCreate<bool>(data.DistinctCount + 1)
+                let mutable blank = false
+
+                for row in sv.Rows do
+                    if row >= stored then
+                        blank <- true
+                    else
+                        let id = data.ValueIds.[row]
+
+                        if id = data.BlankId then
+                            blank <- true
+                        else
+                            marks.[id] <- true
+
+                if blank && (target.Data.BlankId >= 0 || t.HasBlankRow) then
+                    gate
+                        $"a BLANK of '{s.Name}'[{source.Name}] crossing the many-to-many relationship {r.Describe} to the BLANK of '{t.Name}'[{target.Name}] (whether they match isn't documented)"
+
+                let ids =
+                    r.MatchIds(
+                        source,
+                        seq {
+                            for id in 0 .. marks.Length - 1 do
+                                if marks.[id] then
+                                    id
+                        }
+                    )
+
+                set <- rowsWithIds t target (RowSet.OfSeq(target.IdCount, ids)) set
+
+        for r in cfg.ManyToOne t do
+            if r.Limited && not (obj.ReferenceEquals(r, via)) then
+                limited r r.To r.From
+
+        for r in cfg.OneToMany t do
+            if r.Limited && not (obj.ReferenceEquals(r, via)) && cfg.Both.[r.Id] then
+                limited r r.From r.To
 
         set
 
@@ -785,7 +908,8 @@ module DateTable =
             Sure
         else
             let keyOf =
-                c.Table.Model.Rels |> Array.filter (fun r -> obj.ReferenceEquals(r.To, c))
+                c.Table.Model.Rels
+                |> Array.filter (fun r -> obj.ReferenceEquals(r.To, c) && not r.Limited)
 
             if
                 keyOf
@@ -794,6 +918,11 @@ module DateTable =
                 Sure
             elif keyOf.Length > 0 then
                 Unsure "is the key of a relationship that is not active, or not from a date column"
+            elif
+                c.Table.Model.Rels
+                |> Array.exists (fun r -> r.OneToOne && obj.ReferenceEquals(r.From, c))
+            then
+                Unsure "is the key of a one-to-one relationship"
             elif c.DateKey = 1 then
                 Unsure "is the key of a table that is not marked as a date table"
             else
