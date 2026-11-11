@@ -240,6 +240,9 @@ module Filter =
             match direction with
             // ONEWAY: "Don't use this option on a many-to-many relationship because it is unclear
             // which side is the lookup side" (Microsoft Learn, CROSSFILTER).
+            // ONEWAY: "This option cannot be used with a one-to-one relationship" (the same page).
+            | "ONEWAY" when r.OneToOne ->
+                Fail.notSupported ctx call.Args.[2].Span "CROSSFILTER ONEWAY on a one-to-one relationship"
             | "ONEWAY" when r.Limited ->
                 Fail.notSupported ctx call.Args.[2].Span "CROSSFILTER ONEWAY on a many-to-many relationship"
             | "NONE" -> active.[r.Id] <- false

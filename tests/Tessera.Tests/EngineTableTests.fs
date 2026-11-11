@@ -1148,7 +1148,7 @@ let tests =
         ]
 
         testList "model shapes that are refused" [
-            testCase "a one-to-one relationship closes the tables connected to it" (fun () ->
+            testCase "an inactive one-to-one relationship closes the tables connected to it" (fun () ->
                 for (fromEnd, toEnd, word) in
                     [ RelationshipEndCardinality.One, RelationshipEndCardinality.One, "one-to-one" ] do
                     let m =
@@ -1163,6 +1163,7 @@ let tests =
                                                 r with
                                                     FromCardinality = fromEnd
                                                     ToCardinality = toEnd
+                                                    Active = false
                                             }
                                         else
                                             r)
@@ -1362,6 +1363,7 @@ let tests =
                                         {
                                             r with
                                                 FromCardinality = RelationshipEndCardinality.One
+                                                Active = false
                                         }
                                     else
                                         r)

@@ -512,6 +512,7 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
     let mutable orphans: int array = null
     let mutable fromIdOfToId: int array = null
     let mutable toIdOfFromId: int array = null
+    let mutable fromRow: int array = null
 
     member _.Id = id
     member _.Name = name
@@ -526,6 +527,16 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
     /// and for this reason, blank virtual rows aren't added" (Microsoft Learn, "Model relationships
     /// in Power BI Desktop"): a filter crosses it as the values of the column.
     member val Limited = false with get, set
+
+    /// A one-to-one relationship: both columns are unique, it filters both ways ("For one-to-one
+    /// relationships, the cross filter direction is always from both tables": Microsoft Learn,
+    /// "Model relationships in Power BI Desktop"), and each table's expanded table holds the
+    /// other ("a one-to-one relationship is known as an identity. For all intents and purposes you
+    /// can consider the two expanded tables as being the same. An expanded table is created by
+    /// joining the columns of two tables into a larger table using a FULL OUTER JOIN": SQLBI,
+    /// "Expanded tables in DAX"). The engine keeps `From` as the side whose expanded table rows
+    /// are its rows, and refuses data where that isn't so (see `FromRowOfToRow`).
+    member val OneToOne = false with get, set
 
     /// The relationship for messages: "'Target'[Category] -> 'Product'[Category]".
     member _.Describe =
@@ -622,7 +633,38 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
             if map.[row] = toRows then
                 orphanRows.Add row
 
-        fromIdOfToId <- t.Values |> Array.map (convert t f)
+        let back = t.Values |> Array.map (convert t f)
+
+        if this.OneToOne then
+            let refuse (why: string) =
+                raise (EngineException(DaxNotSupported($"the one-to-one relationship {this.Describe}: {why}", "")))
+
+            if not f.IsUnique || f.BlankId >= 0 then
+                refuse $"'{from.Table.Name}'[{from.Name}] has values that repeat or are BLANK"
+
+            // "This join type ensures that blank virtual rows are added on either side, when
+            // necessary" (Learn): a key of `To` that `From` lacks gives `From` a blank row, which
+            // the engine doesn't do; and with two rows of `From` unmatched, `To`'s blank row is
+            // two rows of the joined table.
+            let rows =
+                Array.init (toRows + 1) (fun row ->
+                    if row < toRows then
+                        match back.[t.ValueIds.[row]] with
+                        | -1 ->
+                            refuse
+                                $"'{toColumn.Table.Name}' has keys that '{from.Table.Name}' lacks, which would give '{from.Table.Name}' a blank row"
+                        | id -> f.RowsOfId(id).[0]
+                    else
+                        match orphanRows.Count with
+                        | 0 -> from.Table.RowCount
+                        | 1 -> orphanRows.[0]
+                        | n ->
+                            refuse
+                                $"{n} rows of '{from.Table.Name}' have no match in '{toColumn.Table.Name}' (only one is implemented: the blank row of '{toColumn.Table.Name}' is then that row)")
+
+            fromRow <- rows
+
+        fromIdOfToId <- back
         orphans <- orphanRows.ToArray()
         toRow <- map
 
@@ -634,6 +676,18 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
                 this.BuildLimited()
         elif isNull toRow then
             this.Build()
+
+    /// For a one-to-one relationship, the other way: for each row of the To table (its blank row
+    /// last, at `RowCount`), its row of the From table; the blank row's is the one unmatched row
+    /// of From, or From's `RowCount` when there is none.
+    member this.FromRowOfToRow: int array =
+        if isNull toRow then
+            this.Build()
+
+        if isNull fromRow then
+            invalidOp $"the relationship {this.Describe} is not one-to-one"
+
+        fromRow
 
     /// For each stored row of the From table: its row of the To table, or the To table's
     /// `RowCount` (its blank row) when the key has no match.
@@ -688,6 +742,7 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                  let found = ResizeArray<BTable * BRel list>()
                  let mutable ambiguous = None
 
+                 // A one-to-one relationship is walked both ways, but not back the way it came.
                  let rec walk (x: BTable) (path: BRel list) (depth: int) =
                      if
                          found.Exists(fun (y, _) -> obj.ReferenceEquals(x, y))
@@ -698,9 +753,18 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                      else
                          found.Add((x, List.rev path))
 
+                         let cameBy (r: BRel) =
+                             match path with
+                             | last :: _ -> obj.ReferenceEquals(last, r)
+                             | [] -> false
+
                          for r in manyToOne.Value.[x.Id] do
-                             if not r.Limited then
+                             if not r.Limited && not (cameBy r) then
                                  walk r.To.Table (r :: path) (depth + 1)
+
+                         for r in oneToMany.Value.[x.Id] do
+                             if r.OneToOne && not (cameBy r) then
+                                 walk r.From.Table (r :: path) (depth + 1)
 
                  walk t [] 0
                  found.ToArray(), ambiguous))
@@ -745,7 +809,8 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
         active.[r.Id] && (both.[r.Id] || r.Limited)
 
     /// The tables of a table's expanded table: itself, then every table reached over many-to-one
-    /// relationships (SQLBI, "Expanded tables in DAX").
+    /// relationships, and over one-to-one relationships either way (SQLBI, "Expanded tables in
+    /// DAX"). The path to each is its relationships in order.
     member _.Expanded(table: BTable) : (BTable * BRel list) array = fst expanded.Value.[table.Id]
 
     /// A table that two chains of many-to-one relationships lead to from `table`, if any.
@@ -796,12 +861,21 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                     |> snd
 
                 let mutable map = Array.init (table.RowCount + 1) id
+                let mutable at = table
 
                 for r in path do
-                    let step = r.ToRowOfFromRow
-                    let fromRows = r.From.Table.RowCount
-                    let toBlank = r.To.Table.RowCount
-                    map <- map |> Array.map (fun row -> if row >= fromRows then toBlank else step.[row])
+                    if obj.ReferenceEquals(r.From.Table, at) then
+                        let step = r.ToRowOfFromRow
+                        let fromRows = r.From.Table.RowCount
+                        let toBlank = r.To.Table.RowCount
+                        map <- map |> Array.map (fun row -> if row >= fromRows then toBlank else step.[row])
+                        at <- r.To.Table
+                    else
+                        // Back across a one-to-one relationship.
+                        let step = r.FromRowOfToRow
+                        let toRows = r.To.Table.RowCount
+                        map <- map |> Array.map (fun row -> step.[min row toRows])
+                        at <- r.From.Table
 
                 map
         )

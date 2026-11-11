@@ -213,8 +213,11 @@ let private staticGates (db: Database) : Dictionary<string, string> =
                     match s.FromCardinality, s.ToCardinality with
                     | RelationshipEndCardinality.Many, RelationshipEndCardinality.One
                     | RelationshipEndCardinality.One, RelationshipEndCardinality.Many -> ()
-                    | RelationshipEndCardinality.One, RelationshipEndCardinality.One ->
-                        unsupported.Add((r.FromTable.Name, $"the one-to-one relationship {between}"))
+                    // "Inactive relationships are also expanded" (Learn, "Model relationships in
+                    // Power BI Desktop"): an inactive one-to-one relationship would join the two
+                    // expanded tables, which isn't implemented.
+                    | RelationshipEndCardinality.One, RelationshipEndCardinality.One when not r.IsActive ->
+                        unsupported.Add((r.FromTable.Name, $"the inactive one-to-one relationship {between}"))
                     | _ -> ()
                 | _ ->
                     unsupported.Add((r.FromTable.Name, $"the relationship {between}, which is not on a single column"))
@@ -484,7 +487,8 @@ let private bindWith
 
     model.Tables <- tables.ToArray()
 
-    // Relationships the engine does: single column, many-to-one (either way round) and many-to-many.
+    // Relationships the engine does: single column, many-to-one (either way round), one-to-one and
+    // many-to-many.
     let rels = ResizeArray<BRel>()
 
     for r in db.Model.Relationships do
@@ -500,6 +504,7 @@ let private bindWith
 
             // (from, to, limited). A many-to-many relationship keeps the model's ends: in one
             // direction its `ToColumn`'s table filters its `FromColumn`'s, as for any relationship.
+            // A one-to-one relationship keeps them too, and always filters both ways.
             let ends =
                 match s.FromCardinality, s.ToCardinality with
                 | RelationshipEndCardinality.Many, RelationshipEndCardinality.One ->
@@ -508,7 +513,13 @@ let private bindWith
                     Some(s.ToColumn, s.FromColumn, false)
                 | RelationshipEndCardinality.Many, RelationshipEndCardinality.Many ->
                     Some(s.FromColumn, s.ToColumn, true)
+                | RelationshipEndCardinality.One, RelationshipEndCardinality.One when s.IsActive ->
+                    Some(s.FromColumn, s.ToColumn, false)
                 | _ -> None
+
+            let oneToOne =
+                s.FromCardinality = RelationshipEndCardinality.One
+                && s.ToCardinality = RelationshipEndCardinality.One
 
             match ends with
             | Some(many, one, limited) ->
@@ -520,11 +531,12 @@ let private bindWith
                             (if isNull s.Name then "" else s.Name),
                             f,
                             t,
-                            s.CrossFilteringBehavior = CrossFilteringBehavior.BothDirections,
+                            (oneToOne || s.CrossFilteringBehavior = CrossFilteringBehavior.BothDirections),
                             s.IsActive
                         )
 
                     r.Limited <- limited
+                    r.OneToOne <- oneToOne
                     rels.Add r
                 | _ -> ()
             | None -> ()
@@ -742,7 +754,33 @@ let private bindWith
                         model.Rels
                         |> Array.filter (fun r -> obj.ReferenceEquals(r.To.Table, t) && not r.Limited)
 
+                    // A one-to-one relationship joins the two tables row for row (`BRel.OneToOne`):
+                    // `From` would need a blank row for keys of `To` it lacks (refused when the
+                    // relationship is checked), and a blank row either side has for another reason
+                    // isn't implemented with it.
+                    for r in model.Rels do
+                        if r.OneToOne && obj.ReferenceEquals(r.From.Table, t) then
+                            try
+                                r.Check()
+                            with EngineException(DaxNotSupported(why, _)) ->
+                                refuse why
+
+                    let oneToOne =
+                        model.Rels
+                        |> Array.tryFind (fun r ->
+                            r.OneToOne
+                            && (obj.ReferenceEquals(r.From.Table, t) || obj.ReferenceEquals(r.To.Table, t)))
+
                     if incoming |> Array.exists (fun r -> r.IsActive && r.OrphanFromRows.Length > 0) then
+                        match oneToOne with
+                        | Some o when
+                            incoming
+                            |> Array.exists (fun r -> not (obj.ReferenceEquals(r, o)) && r.OrphanFromRows.Length > 0)
+                            ->
+                            refuse
+                                $"the blank row of '{t.Name}', which is in the one-to-one relationship {o.Describe} and has keys without a match in another relationship"
+                        | _ -> ()
+
                         // "a special row added to a table, in case the table is on the one-side of
                         // a strong relationship and the relationship is invalid" (SQLBI, "Blank
                         // row in DAX").

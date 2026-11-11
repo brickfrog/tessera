@@ -852,6 +852,11 @@ module DateTable =
                 Sure
             elif keyOf.Length > 0 then
                 Unsure "is the key of a relationship that is not active, or not from a date column"
+            elif
+                c.Table.Model.Rels
+                |> Array.exists (fun r -> r.OneToOne && obj.ReferenceEquals(r.From, c))
+            then
+                Unsure "is the key of a one-to-one relationship"
             elif c.DateKey = 1 then
                 Unsure "is the key of a table that is not marked as a date table"
             else

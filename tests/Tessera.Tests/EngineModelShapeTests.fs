@@ -401,3 +401,180 @@ let limitedTests =
                     "different types"
             | Error e -> Expect.stringContains (TessError.message e) "different types" "refused")
     ]
+
+// ---- One-to-one relationships ------------------------------------------------------------------
+
+let private oneToOne (r: TestRel) = {
+    r with
+        FromCardinality = RelationshipEndCardinality.One
+        ToCardinality = RelationshipEndCardinality.One
+        Both = true
+}
+
+/// The Product / Product Category rows of learn.microsoft.com/power-bi/guidance/relationships-one-to-one
+/// (as the corpus's c-onetoone): Jeans (CL-02) has no category. Product also relates to Brand, and
+/// Sales to Product.
+let private identity: TestModel = {
+    Tables = [
+        table "Product" [
+            "SKU", DataType.String
+            "Product", DataType.String
+            "Color", DataType.String
+            "BrandId", DataType.Int64
+        ] [
+            [ "CL-01"; "T-shirt"; "Green"; 1 ]
+            [ "CL-02"; "Jeans"; "Blue"; 2 ]
+            [ "AC-01"; "Hat"; "Blue"; 1 ]
+        ]
+        table "ProductCategory" [ "SKU", DataType.String; "Category", DataType.String ] [
+            [ "CL-01"; "Clothing" ]
+            [ "AC-01"; "Accessories" ]
+        ]
+        table "Brand" [ "BrandId", DataType.Int64; "Brand", DataType.String ] [ [ 1; "Acme" ]; [ 2; "Zed" ] ]
+        table "Sales" [ "SKU", DataType.String; "Qty", DataType.Int64 ] [
+            [ "CL-01"; 2 ]
+            [ "CL-02"; 3 ]
+            [ "AC-01"; 5 ]
+        ]
+    ]
+    Rels = [
+        oneToOne (rel ("Product", "SKU") ("ProductCategory", "SKU"))
+        rel ("Product", "BrandId") ("Brand", "BrandId")
+        rel ("Sales", "SKU") ("Product", "SKU")
+    ]
+    Measures = [ "Sales", "Units", "SUM ( Sales[Qty] )" ]
+    Functions = []
+}
+
+let private identityPrepared = lazy (prepare identity)
+
+let private withRows (table: string) (rows: obj list list) (m: TestModel) = {
+    m with
+        Tables =
+            m.Tables
+            |> List.map (fun t -> if t.Name = table then { t with Rows = rows } else t)
+}
+
+[<Tests>]
+let oneToOneTests =
+    testList "one-to-one relationships" [
+        // "For one-to-one relationships, the cross filter direction is always from both tables"
+        // (Learn, "Model relationships in Power BI Desktop").
+        testCase "filters cross both ways, and on to the tables beyond" (fun () ->
+            let p = identityPrepared.Value
+            is p "CALCULATE ( COUNTROWS ( Product ), ProductCategory[Category] = \"Clothing\" )" 1
+            is p "CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Blue\" )" 1
+            is p "CALCULATE ( [Units], ProductCategory[Category] = \"Accessories\" )" 5
+            is p "CALCULATE ( COUNTROWS ( ProductCategory ), Brand[Brand] = \"Zed\" )" (null: obj))
+
+        // "This join type ensures that blank virtual rows are added on either side, when
+        // necessary" (Learn): Jeans has no category, so ProductCategory gets the blank row.
+        testCase "the table without a match gets the blank row" (fun () ->
+            let p = identityPrepared.Value
+            returns p "EVALUATE VALUES ( ProductCategory[Category] )" [ [ "Clothing" ]; [ "Accessories" ]; [ null ] ]
+            returns p "EVALUATE DISTINCT ( ProductCategory[Category] )" [ [ "Clothing" ]; [ "Accessories" ] ]
+            is p "COUNTROWS ( ProductCategory )" 2
+            is p "CALCULATE ( [Units], ISBLANK ( ProductCategory[Category] ) )" 3)
+
+        // "a one-to-one relationship is known as an identity. For all intents and purposes you can
+        // consider the two expanded tables as being the same" (SQLBI, "Expanded tables in DAX").
+        testCase "each table's expanded table holds the other: RELATED, ALL and table filters" (fun () ->
+            let p = identityPrepared.Value
+
+            returns
+                p
+                "EVALUATE ADDCOLUMNS ( ProductCategory, \"P\", RELATED ( Product[Product] ), \"B\", RELATED ( Brand[Brand] ) )"
+                [
+                    [ "CL-01"; "Clothing"; "T-shirt"; "Acme" ]
+                    [ "AC-01"; "Accessories"; "Hat"; "Acme" ]
+                ]
+
+            // ALL ( ProductCategory ) removes the filters of its expanded table, Product's among them
+            // (the outer filter is there when the inner CALCULATE removes filters).
+            is
+                p
+                "CALCULATE ( CALCULATE ( COUNTROWS ( Product ), ALL ( ProductCategory ) ), Product[Color] = \"Blue\" )"
+                3
+
+            is
+                p
+                "CALCULATE ( CALCULATE ( COUNTROWS ( Brand ), REMOVEFILTERS ( ProductCategory ) ), Brand[Brand] = \"Zed\" )"
+                2
+
+            // The other way, ALL ( Product ) removes ProductCategory's filters, as it would for any
+            // table Product expands to.
+            is
+                p
+                "CALCULATE ( CALCULATE ( COUNTROWS ( ProductCategory ), ALL ( Product ) ), ProductCategory[Category] = \"Clothing\" )"
+                2
+            // A table filter on ProductCategory filters its expanded table: Brand too.
+            is
+                p
+                "CALCULATE ( COUNTROWS ( Brand ), FILTER ( ProductCategory, ProductCategory[Category] = \"Clothing\" ) )"
+                1
+            // A context transition on a ProductCategory row is a filter on the joined row.
+            is p "SUMX ( ProductCategory, [Units] )" 7)
+
+        testCase "a filter that pairs columns of the two tables tests the joined rows" (fun () ->
+            let p = identityPrepared.Value
+
+            is
+                p
+                "CALCULATE ( COUNTROWS ( Product ), TREATAS ( { ( \"Blue\", \"Accessories\" ) }, Product[Color], ProductCategory[Category] ) )"
+                1
+
+            // Jeans is joined to the blank row: its category is BLANK.
+            is
+                p
+                "CALCULATE ( SELECTEDVALUE ( Product[Product] ), TREATAS ( { ( \"Blue\", BLANK () ) }, Product[Color], ProductCategory[Category] ) )"
+                "Jeans"
+
+            is
+                p
+                "CALCULATE ( COUNTROWS ( ProductCategory ), TREATAS ( { ( \"Blue\", BLANK () ) }, Product[Color], ProductCategory[Category] ) )"
+                (null: obj)
+
+            is
+                p
+                "CALCULATE ( [Units], TREATAS ( { ( \"Green\", \"Clothing\" ), ( \"Blue\", BLANK () ) }, Product[Color], ProductCategory[Category] ) )"
+                5)
+
+        testCase "what isn't implemented is refused" (fun () ->
+            // A category for a product that doesn't exist: Product would need a blank row.
+            let extra =
+                prepare (
+                    identity
+                    |> withRows "ProductCategory" [
+                        [ "CL-01"; "Clothing" ]
+                        [ "AC-01"; "Accessories" ]
+                        [ "ZZ-01"; "Toys" ]
+                    ]
+                )
+
+            notSupported extra "EVALUATE VALUES ( Product[Color] )" "lacks"
+            notSupported extra "EVALUATE ROW ( \"x\", [Units] )" "lacks"
+
+            // Two products without a category.
+            let two =
+                prepare (identity |> withRows "ProductCategory" [ [ "CL-01"; "Clothing" ] ])
+
+            notSupported two "EVALUATE VALUES ( ProductCategory[Category] )" "2 rows of 'Product'"
+
+            // Product with a blank row of its own, for Sales' key ZZ-09.
+            let orphan =
+                prepare (identity |> withRows "Sales" [ [ "CL-01"; 2 ]; [ "ZZ-09"; 1 ] ])
+
+            notSupported orphan "EVALUATE VALUES ( Product[Color] )" "one-to-one"
+
+            let p = identityPrepared.Value
+
+            notSupported
+                p
+                "EVALUATE ROW ( \"x\", CALCULATE ( [Units], CROSSFILTER ( Product[SKU], ProductCategory[SKU], ONEWAY ) ) )"
+                "ONEWAY on a one-to-one"
+
+            is
+                p
+                "CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Green\", CROSSFILTER ( Product[SKU], ProductCategory[SKU], NONE ) )"
+                2)
+    ]
