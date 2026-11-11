@@ -370,6 +370,7 @@ module TimeIntelligence =
             OnColumn(c, RowSet.One(c.IdCount, c.FindId(DaxValue.DateTime(float day))))
 
         let fc = DateTable.onFilterArguments after span after.Filter [ [ filter ], false ]
+        let fc = Calendars.onFilterArguments fc [ [ filter ], false ]
 
         let fc = Filters.add fc [ filter ] false
 
@@ -743,6 +744,8 @@ module TimeIntelligence =
         DateFiltered: bool
         /// A time-related column is filtered.
         TimeRelatedFiltered: bool
+        /// The categories of the filtered columns that only another calendar tags.
+        Foreign: Set<Category>
     }
 
     let private calendarSet (ctx: Ctx) : CalendarSet =
@@ -750,9 +753,26 @@ module TimeIntelligence =
         | Some s -> s
         | None -> invalidOp "a calendar was resolved in a model without calendars"
 
+    /// The calendar's data. A calendar whose result is its Date column alone is a filter on that
+    /// column only, so on the key of a date table the date-table rule would remove the filters on
+    /// every column of the table, where dax.guide says those on untagged columns stay: refused.
+    let private calendarData (ctx: Ctx) (span: Span) (name: string) (cal: BCalendar) : Calendars.Data =
+        let d = Calendars.data ctx span name cal
+
+        if
+            cal.ResultColumns.Length = 1
+            && DateTable.standing ctx.Filter.Config d.DateColumn <> DateTable.No
+        then
+            Fail.notSupported
+                ctx
+                span
+                $"{name} over the calendar '{cal.Name}', which tags only the date column of a date table (whether the date-table rule then applies is not documented)"
+
+        d
+
     /// The rows of the calendar's table visible after context transition.
     let private seen (ctx: Ctx) (span: Span) (name: string) (cal: BCalendar) : Seen =
-        let d = Calendars.data ctx span name cal
+        let d = calendarData ctx span name cal
         let set = calendarSet ctx
         let fc = (Context.transition ctx span).Filter
         let t = cal.Table
@@ -777,6 +797,10 @@ module TimeIntelligence =
         let mutable filtered = Set.empty
         let mutable dateFiltered = false
         let mutable timeRelated = false
+        let mutable foreign = Set.empty
+
+        let mine =
+            HashSet<BColumn>(cal.Groups |> Seq.collect (fun g -> g.Primary :: g.Associated), HashIdentity.Reference)
 
         let column (c: BColumn) =
             if obj.ReferenceEquals(c, d.DateColumn) then
@@ -784,7 +808,11 @@ module TimeIntelligence =
 
             match set.CategoryOf.TryGetValue c with
             | true, Category.Date -> dateFiltered <- true
-            | true, cat -> filtered <- filtered.Add cat
+            | true, cat ->
+                filtered <- filtered.Add cat
+
+                if not (mine.Contains c) then
+                    foreign <- foreign.Add cat
             | _ ->
                 if set.TimeRelated.Contains c then
                     timeRelated <- true
@@ -806,6 +834,7 @@ module TimeIntelligence =
             Filtered = filtered
             DateFiltered = dateFiltered
             TimeRelatedFiltered = timeRelated
+            Foreign = foreign
         }
 
     /// Each position's period. "TOTALWTD expects specific categories to be present in the
@@ -896,6 +925,14 @@ module TimeIntelligence =
             s.Filtered.Contains Category.Week
             && not (Category.routes CalendarPeriod.Week |> List.exists (List.forall cal.Has))
         then
+            if s.DateFiltered then
+                // The page's rules for a filtered Date column and for a filtered week column of
+                // another calendar meet here; which one wins is not documented.
+                Fail.notSupported
+                    ctx
+                    span
+                    $"{name} over the calendar '{cal.Name}', which has no Week category, while both the date and a column another calendar tags as Week are filtered"
+
             Fail.runtime
                 ctx
                 span
@@ -912,6 +949,14 @@ module TimeIntelligence =
                         ctx
                         span
                         $"{name} over a calendar while a column of the category {Category.name days.MinimumElement} is filtered (where the result ends is not documented)"
+
+                if not s.Foreign.IsEmpty then
+                    // Whose periods such a filter ends the result at (this calendar's or the other
+                    // calendar's) is not documented.
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"{name} over the calendar '{cal.Name}' while a column only another calendar tags is filtered (category {Category.name s.Foreign.MinimumElement})"
 
                 if s.TimeRelatedFiltered then
                     Fail.notSupported
@@ -1056,7 +1101,7 @@ module TimeIntelligence =
     /// the same data type and the same format as the column tagged as Day. If a value does not
     /// exist in that column, DATESBETWEEN uses it as BLANK" (dax.guide/datesbetween).
     let private datesBetweenCalendar (ev: IEval) (ctx: Ctx) (call: Call) (cal: BCalendar) : TableVal =
-        let d = Calendars.data ctx call.Span "DATESBETWEEN" cal
+        let d = calendarData ctx call.Span "DATESBETWEEN" cal
 
         let position (e: Expr) (whenMissing: int) =
             match ev.Scalar(ctx, e) with

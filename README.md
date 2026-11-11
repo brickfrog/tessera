@@ -2275,22 +2275,27 @@ calendar-based time intelligence in DAX".
 - **The result** is a table of the primary column of each category and the time-related columns. With a calendar,
   `DATES*TD` end on the last visible date when the Date column is filtered, at the end of the last visible period of
   a filtered category otherwise, and at the end of the period when only untagged columns are filtered (dax.guide).
-- **Context clearing.** A filter on a tagged column clears, first, the filters on the columns of the categories
-  Learn's lattice says depend on it, in every calendar of the table: a filter on the year clears the month, the week
-  and the date, not the month of the year. This holds for any `CALCULATE` filter, not only the time intelligence
-  functions ("regardless if the context is set using time intelligence functions or otherwise"). Untagged columns
-  of the table keep their filters, and the date-table rule doesn't apply to a calendar's result.
+- **Context clearing.** A `CALCULATE` (or `CALCULATETABLE`) filter argument on a tagged column clears, first, the
+  filters on the columns of the categories Learn's lattice relates to it, in every calendar of the table: a filter
+  on the year clears the month, the week and the date, not the month of the year. This holds for any filter
+  argument, not only the time intelligence functions ("regardless if the context is set using time intelligence
+  functions or otherwise"). Untagged columns of the table keep their filters, and the date-table rule doesn't apply
+  to a calendar's result. Every other way a filter is set (a context transition, `KEEPFILTERS`, `SUMMARIZECOLUMNS`'
+  groups and filter arguments, `FIRSTNONBLANK`'s own filter) clears nothing, and is refused where clearing would
+  change the rows: grouping by the date under a filter on its week is fine, by the year under a filter on the month
+  is not.
 - **Errors**, as the sources state them: a week function over a date column or a calendar without weeks; a calendar
   without the categories a function needs; a year end date with a calendar; a filter on a column another calendar
   tags as Week when this calendar has no Week.
 
 Refused, because the sources don't settle them: `DATEADD`, `SAMEPERIODLASTYEAR`, `PARALLELPERIOD`, `DATESINPERIOD`,
 `FIRSTDATE` and `LASTDATE` over a calendar; a calendar without the Date category, or with semesters; tagged columns
-with BLANKs, periods whose dates are not next to one another or don't sort in date order; a context transition,
-`KEEPFILTERS` or a `SUMMARIZECOLUMNS` group on a tagged column, and a calendar's result over another calendar's
-time-related columns, wherever clearing would change the rows; `DATES*TD` with no visible date, with a day
-category other than Date or a time-related column filtered, or with filtered periods that don't nest; filters on
-other tables that cross-filter the calendar's table.
+with BLANKs, periods whose dates are not next to one another or don't sort in date order; a calendar of a date
+table's date column alone; the cases above where clearing would change the rows, and a calendar's result over
+another calendar's time-related columns; `DATES*TD` with no visible date, with a day category other than Date, a
+time-related column or a column only another calendar tags filtered, with filtered periods that don't nest, or
+with both the date and another calendar's week filtered over a calendar without weeks; filters on other tables
+that cross-filter the calendar's table.
 
 #### Numbers, conversion and the identity functions
 

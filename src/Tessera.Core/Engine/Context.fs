@@ -1135,7 +1135,6 @@ module Context =
                 fc <- Filters.mark fc (Shadow rc.Table)
                 let filters = rowFilters ctx span rc
                 DateTable.onTransition ctx span fc filters
-                CalendarHooks.onTransition fc filters
                 fc <- Filters.add fc filters false
                 let t = rc.Table
 

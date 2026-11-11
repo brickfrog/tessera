@@ -836,6 +836,8 @@ module Filter =
         // A filter on the date column of a date table first removes the filters on that table
         // (not a calendar function's result: Calendars.fs).
         fc <- DateTable.onFilterArguments ctx call.Span fc (Calendars.forDateTable ctx.Model filters)
+        // A filter on a column a calendar tags first removes the filters it clears (Calendars.fs).
+        fc <- Calendars.onFilterArguments fc filters
 
         // 5. The filters: each replaces the filters on its columns, unless under KEEPFILTERS.
         fc <- Filters.add fc (filters |> List.filter (fun (_, keep) -> not keep) |> List.collect fst) false

@@ -34,6 +34,7 @@ let private dateTable =
         "WeekKey", DataType.Int64
         "DayOfWeek", DataType.String
         "IsWorkingDay", DataType.Boolean
+        "FiscalMonth", DataType.Int64
     ] [
         for d in days ->
             let w = weekStart d
@@ -47,6 +48,7 @@ let private dateTable =
                 box (w.Year * 10000 + w.Month * 100 + w.Day)
                 box (d.DayOfWeek.ToString().Substring(0, 3))
                 box (d.DayOfWeek <> DayOfWeek.Saturday && d.DayOfWeek <> DayOfWeek.Sunday)
+                box (d.Year * 100 + d.Month)
             ]
     ]
 
@@ -374,16 +376,27 @@ let tests =
                     "the week"
             }
 
-            test "grouping by the year under a filter on the month: one filter holds both" {
-                // "SUMMARIZECOLUMNS always combines all the filters on the same table into a single
-                // filter" (SQLBI): the group's filter is on the year and the month together, so no
-                // earlier filter on the month is left to clear.
+            test "grouping by the year under a filter on the month is refused" {
+                // SUMMARIZECOLUMNS combines the month's filter with the year's group; whether the
+                // year, a group-by column, clears the month is not documented, and it would matter.
                 Expect.equal
-                    (rows
+                    (code
                         (p ())
                         "EVALUATE SUMMARIZECOLUMNS ( 'Date'[Year], TREATAS ( { 202501 }, 'Date'[YearMonth] ), \"t\", [Total] )")
-                    (expected [ [ box 2025; box 496 ] ])
+                    "not-supported"
                     "group by year"
+            }
+
+            test "a filter a context transition leaves is not cleared" {
+                // The transition sets the date; the week's filter stays (whether it would be
+                // cleared is not documented), and DATESMTD of a calendar without weeks then meets
+                // both a filtered date and another calendar's week: refused.
+                Expect.equal
+                    (code
+                        (p ())
+                        "EVALUATE CALCULATETABLE ( ROW ( \"t\", SUMX ( VALUES ( 'Date'[Date] ), TOTALMTD ( [Total], Gregorian ) ) ), 'Date'[WeekKey] = 20250105 )")
+                    "not-supported"
+                    "week and date"
             }
 
             test "a context transition on the year under a filter on the month is refused" {
@@ -483,6 +496,38 @@ let tests =
                     (code p "EVALUATE CALCULATETABLE ( VALUES ( 'Date'[Year] ), 'Date'[Date] = dt\"2025-01-02\" )")
                     "not-supported"
                     "semester"
+            }
+
+            test "a column only another calendar tags, filtered, is refused by the to-date functions" {
+                let p =
+                    prepareWith (fun db ->
+                        addCalendar db "Date" "Gregorian" gregorian []
+
+                        addCalendar db "Date" "Fiscal" [
+                            TimeUnit.Year, "Year", []
+                            TimeUnit.Month, "FiscalMonth", []
+                            TimeUnit.Date, "Date", []
+                        ] [])
+
+                Expect.equal
+                    (code p "EVALUATE CALCULATETABLE ( DATESYTD ( Fiscal ), 'Date'[YearMonth] = 202501 )")
+                    "not-supported"
+                    "Gregorian's month"
+
+                Expect.equal
+                    (span p "'Date'[FiscalMonth] = 202501" "DATESYTD ( Fiscal )")
+                    (expected [ [ box (date 2025 1 1); box (date 2025 1 31); box 31 ] ])
+                    "its own month"
+            }
+
+            test "a calendar of the date column of a date table alone is refused" {
+                let p =
+                    prepareWith (fun db -> addCalendar db "Date" "Days" [ TimeUnit.Date, "Date", [] ] [])
+
+                Expect.equal
+                    (code p "EVALUATE CALCULATETABLE ( PREVIOUSDAY ( Days ), 'Date'[Date] = dt\"2025-01-02\" )")
+                    "not-supported"
+                    "Days"
             }
 
             test "time-related columns of another calendar under a calendar's result are refused" {

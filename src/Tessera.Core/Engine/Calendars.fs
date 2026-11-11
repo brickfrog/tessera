@@ -9,16 +9,15 @@ namespace Tessera.DaxEngine
 // in a calendar or associated sort-by columns regardless if the context is set using time
 // intelligence functions or otherwise"; "If there are multiple calendars defined on the same table,
 // these processes are completed for every calendar defined on the table" (Microsoft Learn,
-// "Implement time-based calculations in Power BI", Context clearing). So a filter that REPLACES the
-// filters on its columns (CALCULATE's and SUMMARIZECOLUMNS' filter arguments) first removes the
-// filters on the columns, of any calendar of the table, in the categories `Category.cleared` gives.
-// Where the sources stop, the engine refuses when the reading it would have to pick could change
-// the visible rows:
+// "Implement time-based calculations in Power BI", Context clearing). So a filter argument of
+// CALCULATE (and CALCULATETABLE) first removes the filters on the columns, of any calendar of the
+// table, in the categories `Category.cleared` gives (`onFilterArguments`). Every other way a filter
+// is set clears nothing, and is refused where clearing would change the visible rows (`beforeAdd`,
+// `onGroup`), because no source says whether it clears:
 //
-//   - a context transition (no source says whether it clears; the date-table rule, the classic
-//     counterpart, is refused there too);
-//   - a filter added the way KEEPFILTERS adds it (KEEPFILTERS, the groups of a SUMMARIZECOLUMNS
-//     row): whether it clears anything is not documented;
+//   - a context transition (the date-table rule, the classic counterpart, is refused there too),
+//     KEEPFILTERS, the groups and filter arguments of SUMMARIZECOLUMNS, the filters FIRSTNONBLANK,
+//     LOOKUPVALUE and ALLSELECTED set;
 //   - the result of a calendar function (a table of a calendar's columns) while time-related
 //     columns of ANOTHER calendar of the table are filtered: "Most time intelligence functions,
 //     except for DATEADD and SAMEPERIODLASTYEAR, will clear context on all time-related columns",
@@ -128,100 +127,132 @@ module Calendars =
                 |> List.distinct
                 |> List.exists (fun t -> (Filters.visible kept t).Rows <> (Filters.visible cleared t).Rows)
 
-    /// A context transition: whether its filters clear others is not documented ("regardless if
-    /// the context is set using time intelligence functions or otherwise" names no transition,
-    /// and the date-table rule, its classic counterpart, is not documented for one either), so it
-    /// is refused where clearing would change what is visible.
-    let private onTransition (fc: FilterCtx) (filters: Filter list) : unit =
-        match CalendarRegistry.tryGet fc.Config.Model with
-        | None -> ()
-        | Some set ->
-            let tagged =
-                filters
-                |> List.collect setColumns
-                |> List.filter (fun c -> set.CategoryOf.ContainsKey c)
+    /// What adding these filters (as KEEPFILTERS does, or replacing the filters on their columns)
+    /// would clear under the calendar rule: the columns to clear, and the time-related columns of
+    /// other calendars a calendar's result would also clear (`check`).
+    let private clearing
+        (set: CalendarSet)
+        (filters: Filter list)
+        (keep: bool)
+        : (BColumn -> bool) * (BColumn -> bool) =
+        let tagged =
+            filters
+            |> List.collect setColumns
+            |> List.filter (fun c -> set.CategoryOf.ContainsKey c || set.TableProblem.ContainsKey c.Table)
 
-            if not tagged.IsEmpty then
-                let categories =
-                    tagged
-                    |> List.fold (fun acc c -> Set.union acc (Category.cleared set.CategoryOf.[c])) Set.empty
+        for c in tagged do
+            match set.TableProblem.TryGetValue c.Table with
+            | true, why -> refuse $"a filter on {describe c}, a column of a calendar's table: {why}"
+            | _ -> ()
 
-                let drop = HashSet<BColumn>(HashIdentity.Reference)
+        let drop = HashSet<BColumn>(HashIdentity.Reference)
+        let check = HashSet<BColumn>(HashIdentity.Reference)
 
-                for t in tagged |> List.map (fun c -> c.Table) |> List.distinct do
-                    for c in set.ColumnsIn(t, categories) do
-                        drop.Add c |> ignore
+        for (t, cols) in tagged |> List.groupBy (fun c -> c.Table) do
+            let categories =
+                cols
+                |> List.fold (fun acc c -> Set.union acc (Category.cleared set.CategoryOf.[c])) Set.empty
 
-                let replaced (x: BColumn) =
-                    filters |> List.exists (fun f -> covers f x)
+            for c in set.ColumnsIn(t, categories) do
+                drop.Add c |> ignore
 
-                if matters fc filters false (fun x -> drop.Contains x && not (replaced x)) then
-                    refuse
-                        "a context transition that filters a column a calendar tags while other columns the calendars tag are filtered (whether calendar context clearing applies to a context transition is not documented)"
+            for f in filters do
+                match shapeOf set f with
+                | Some cal when obj.ReferenceEquals(cal.Table, t) ->
+                    for other in set.ByTable.[t] do
+                        for c in other.TimeRelated do
+                            if not (has cal.ResultColumns c) then
+                                check.Add c |> ignore
+                | _ -> ()
 
+        let replaced (x: BColumn) =
+            not keep && filters |> List.exists (fun f -> covers f x)
+
+        (fun x -> drop.Contains x && not (replaced x)), (fun x -> check.Contains x && not (replaced x))
+
+    /// Every addition of filters other than CALCULATE's filter arguments (which `onFilterArguments`
+    /// clears first): a context transition, KEEPFILTERS, a SUMMARIZECOLUMNS group or filter
+    /// argument, FIRSTNONBLANK's and the other functions' own filters. Whether calendar context
+    /// clearing applies there is not documented, so nothing is cleared and the addition is
+    /// refused where clearing would change the visible rows.
     let private beforeAdd (fc: FilterCtx) (filters: Filter list) (keep: bool) : FilterCtx =
         match CalendarRegistry.tryGet fc.Config.Model with
         | None -> fc
         | Some set ->
-            let tagged =
-                filters
-                |> List.collect setColumns
-                |> List.filter (fun c -> set.CategoryOf.ContainsKey c || set.TableProblem.ContainsKey c.Table)
+            let dropping, checking = clearing set filters keep
 
-            if tagged.IsEmpty then
+            if matters fc filters keep (fun x -> dropping x || checking x) then
+                refuse
+                    "a filter on a column a calendar tags, other than a CALCULATE filter argument (a context transition, KEEPFILTERS, SUMMARIZECOLUMNS, an iterator's own filter), while other columns the calendars tag are filtered (whether calendar context clearing applies to it is not documented)"
+
+            fc
+
+    /// CALCULATE's filter arguments: the context without the filters they clear (see the top of
+    /// the file). The ones under KEEPFILTERS clear nothing (`beforeAdd` refuses where that
+    /// matters).
+    let onFilterArguments (fc: FilterCtx) (filters: (Filter list * bool) list) : FilterCtx =
+        match CalendarRegistry.tryGet fc.Config.Model with
+        | None -> fc
+        | Some set ->
+            let replacing =
+                filters |> List.filter (fun (_, keep) -> not keep) |> List.collect fst
+
+            if replacing.IsEmpty then
                 fc
             else
-                for c in tagged do
-                    match set.TableProblem.TryGetValue c.Table with
-                    | true, why -> refuse $"a filter on {describe c}, a column of a calendar's table: {why}"
-                    | _ -> ()
+                let dropping, checking = clearing set replacing false
 
+                if matters fc replacing false checking then
+                    refuse
+                        "a calendar's columns as a filter while time-related columns of another calendar of the table are filtered (whether those filters are cleared is not documented)"
+
+                if fc.Filters |> List.exists (fun f -> touches f dropping) then
+                    Filters.remove fc dropping
+                else
+                    fc
+
+    /// A SUMMARIZECOLUMNS row: its groups' filters (`keys`, on the group-by columns and on the
+    /// other filtered columns of their tables, combined) added to `fc`. Whether a group-by column
+    /// that a calendar tags clears the other columns' filters is not documented: refused where it
+    /// would change the visible rows (grouping by the date under a filter on its week is fine; by
+    /// the year under a filter on the month is not).
+    let onGroup (fc: FilterCtx) (groupCols: BColumn array) (keys: Filter list) : unit =
+        match CalendarRegistry.tryGet fc.Config.Model with
+        | None -> ()
+        | Some set ->
+            let tagged = groupCols |> Array.filter (fun c -> set.CategoryOf.ContainsKey c)
+
+            if tagged.Length > 0 then
                 let drop = HashSet<BColumn>(HashIdentity.Reference)
-                let check = HashSet<BColumn>(HashIdentity.Reference)
 
-                for (t, cols) in tagged |> List.groupBy (fun c -> c.Table) do
+                for (t, cols) in tagged |> Array.groupBy (fun c -> c.Table) do
                     let categories =
                         cols
-                        |> List.fold (fun acc c -> Set.union acc (Category.cleared set.CategoryOf.[c])) Set.empty
+                        |> Array.fold (fun acc c -> Set.union acc (Category.cleared set.CategoryOf.[c])) Set.empty
 
                     for c in set.ColumnsIn(t, categories) do
-                        drop.Add c |> ignore
+                        if not (has groupCols c) then
+                            drop.Add c |> ignore
 
-                    for f in filters do
-                        match shapeOf set f with
-                        | Some cal when obj.ReferenceEquals(cal.Table, t) ->
-                            for other in set.ByTable.[t] do
-                                for c in other.TimeRelated do
-                                    if not (has cal.ResultColumns c) then
-                                        check.Add c |> ignore
-                        | _ -> ()
+                if drop.Count > 0 then
+                    let off (x: BColumn) = not (drop.Contains x)
+                    let cfg = fc.Config
+                    let kept = Filters.build cfg (fc.Filters @ keys)
 
-                let replaced (x: BColumn) =
-                    not keep && filters |> List.exists (fun f -> covers f x)
+                    let cleared =
+                        Filters.build cfg (List.collect (Filters.project off) (fc.Filters @ keys))
 
-                let dropping (x: BColumn) = drop.Contains x && not (replaced x)
-                let checking (x: BColumn) = check.Contains x && not (replaced x)
+                    let tables = drop |> Seq.map (fun c -> c.Table) |> Seq.distinct
 
-                if keep then
-                    if matters fc filters true (fun x -> dropping x || checking x) then
+                    if
+                        tables
+                        |> Seq.exists (fun t -> (Filters.visible kept t).Rows <> (Filters.visible cleared t).Rows)
+                    then
                         refuse
-                            "a filter added without replacing others (KEEPFILTERS, or a group of SUMMARIZECOLUMNS) on a column a calendar tags, while other columns the calendars tag are filtered (whether calendar context clearing applies to it is not documented)"
-
-                    fc
-                else
-                    if matters fc filters false checking then
-                        refuse
-                            "a calendar's columns as a filter while time-related columns of another calendar of the table are filtered (whether those filters are cleared is not documented)"
-
-                    if fc.Filters |> List.exists (fun f -> touches f dropping) then
-                        Filters.remove fc dropping
-                    else
-                        fc
+                            "a SUMMARIZECOLUMNS group-by column a calendar tags, with a filter on another column the calendars tag whose filter it would clear (whether calendar context clearing applies to the groups is not documented)"
 
     /// Puts the clearing rule in force: called when a model with calendars is bound.
-    let install () =
-        CalendarHooks.beforeAdd <- beforeAdd
-        CalendarHooks.onTransition <- onTransition
+    let install () = CalendarHooks.beforeAdd <- beforeAdd
 
     /// CALCULATE's filter arguments without the calendar functions' results, for the date-table
     /// rule, which doesn't apply to them (see the top of the file).

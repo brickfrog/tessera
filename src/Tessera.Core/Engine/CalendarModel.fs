@@ -276,14 +276,10 @@ module CalendarRegistry =
         | true, s when s.ByName.Count > 0 -> Some s
         | _ -> None
 
-/// Where Context.fs's `Filters.add` asks the calendar rules (Calendars.fs, compiled after it) what
-/// a new filter clears: set by `Calendars.install`. The arguments are the context, the filters
-/// being added and whether they are added as KEEPFILTERS does; the result is the context to add
-/// them to.
+/// Where Context.fs's `Filters.add` asks the calendar rules (Calendars.fs, compiled after it)
+/// whether adding filters would be changed by calendar context clearing (which it refuses): set by
+/// `Calendars.install`. The arguments are the context, the filters being added and whether they
+/// are added as KEEPFILTERS does; the result is the context to add them to.
 module CalendarHooks =
     let mutable beforeAdd: FilterCtx -> Filter list -> bool -> FilterCtx =
         fun fc _ _ -> fc
-
-    /// Called by `Context.transition` before a row context's filters are added (`beforeAdd` then
-    /// runs too): a context transition is refused where calendar context clearing would change it.
-    let mutable onTransition: FilterCtx -> Filter list -> unit = fun _ _ -> ()
