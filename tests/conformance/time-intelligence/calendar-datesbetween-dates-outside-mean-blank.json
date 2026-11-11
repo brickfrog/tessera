@@ -1,0 +1,42 @@
+{
+  "title": "DATESBETWEEN over a calendar with two dates after its last date returns every date",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"first\", MINX ( DATESBETWEEN ( Gregorian, DATE ( 2015, 1, 1 ), DATE ( 2015, 12, 31 ) ), 'Date'[Date] ), \"last\", MAXX ( DATESBETWEEN ( Gregorian, DATE ( 2015, 1, 1 ), DATE ( 2015, 12, 31 ) ), 'Date'[Date] ), \"days\", COUNTROWS ( DATESBETWEEN ( Gregorian, DATE ( 2015, 1, 1 ), DATE ( 2015, 12, 31 ) ) ) ), ALL ( 'Date' ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[first]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[last]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[days]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2008-07-27T00:00:00",
+          "2008-09-06T00:00:00",
+          42
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datesbetween/",
+    "quote": "Thus, with a calendar, two dates after the last date return all the dates.",
+    "supports": "stated outright"
+  },
+  "confidence": "derived",
+  "derivation": "Neither date is in Date, so both are read as BLANK: the first date to the last, 42 days.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "datesbetween"
+  ]
+}

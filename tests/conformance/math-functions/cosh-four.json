@@ -1,0 +1,32 @@
+{
+  "title": "COSH ( 4 ) is 27.308233",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COSH ( 4 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          27.308233
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-07,
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/cosh-function-dax",
+    "quote": "Hyperbolic cosine of 4",
+    "supports": "the example gives 27.308233"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "cosh",
+    "trigonometric"
+  ]
+}

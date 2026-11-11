@@ -1,0 +1,33 @@
+{
+  "title": "ACOT ( -1 ) is 3pi/4: the arccotangent is between 0 and pi",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ACOT ( -1 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          2.356194490192345
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-12,
+  "source": {
+    "url": "https://dax.guide/acot/",
+    "quote": "Returns the principal value of the arccotangent, or inverse cotangent, of a number.",
+    "supports": "the function; its example table has the row -2¼π, where COT is -1.00 and ACOT is 2.36"
+  },
+  "confidence": "derived",
+  "derivation": "dax.guide's example evaluates ACOT ( COT ( x ) ) for x = -9π/4 + 0.001: COT is -1.00 and ACOT is shown as 2.36, so the arccotangent of -1 is 3π/4 (2.356194490192345), the range 0 to π, not -π/4.",
+  "tags": [
+    "math-functions",
+    "acot",
+    "trigonometric"
+  ]
+}

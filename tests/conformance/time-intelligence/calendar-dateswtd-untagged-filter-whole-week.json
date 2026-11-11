@@ -1,0 +1,42 @@
+{
+  "title": "DATESWTD over a calendar, with only an untagged column filtered, is the whole week of the last visible date",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"first\", MINX ( DATESWTD ( Weekly ), 'Date'[Date] ), \"last\", MAXX ( DATESWTD ( Weekly ), 'Date'[Date] ), \"days\", COUNTROWS ( DATESWTD ( Weekly ) ) ), 'Date'[DateKey] >= 20080801, 'Date'[DateKey] <= 20080813 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[first]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[last]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[days]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2008-08-10T00:00:00",
+          "2008-08-16T00:00:00",
+          7
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/dateswtd/",
+    "quote": "with a filter on the DateKey column from August 1 to August 13, 2008, DATESWTD ( \u2018Weekly 445\u2019 ) returns all the days from August 10 to August 16, 2008",
+    "supports": "the same filter and the same weeks (W33-2008 is August 10 to 16)"
+  },
+  "confidence": "derived",
+  "derivation": "The last visible date is 2008-08-13, in W33-2008 (Sunday August 10 to Saturday August 16): 7 days.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "dateswtd"
+  ]
+}

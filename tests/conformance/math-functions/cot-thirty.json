@@ -1,0 +1,39 @@
+{
+  "title": "COT ( 30 ) is -0.156119952161659",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COT ( 30 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -0.156119952161659
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-12,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/cot-function-dax",
+      "quote": "EVALUATE { COT(30) }",
+      "supports": "the example query returns -0.156119952161659"
+    },
+    {
+      "url": "https://dax.guide/cot/",
+      "quote": "A single decimal value.",
+      "supports": "the result is a decimal number"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "cot",
+    "trigonometric"
+  ]
+}

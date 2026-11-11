@@ -1,0 +1,20 @@
+{
+  "title": "ATANH ( 1 ) is an error",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ATANH ( 1 ) )",
+  "expected": {
+    "error": "ATANH of 1"
+  },
+  "source": {
+    "url": "https://dax.guide/atanh/",
+    "quote": "If Number is -1, 1, or outside this range, ATANH returns an error.",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "atanh",
+    "trigonometric",
+    "error"
+  ]
+}

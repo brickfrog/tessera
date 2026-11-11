@@ -1,0 +1,33 @@
+{
+  "title": "A filter on a calendar's year keeps the filter on the month of the year",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"t\", CALCULATE ( [Total], 'Date'[Year] = 2008 ) ), 'Date'[MonthNumber] = 8 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[t]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          496
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-time-intelligence",
+    "quote": "All category dependencies of X. This can be thought of as all categories above X.",
+    "supports": "the rule; in the lattice diagram Month of Year depends on Quarter of Year and Month of Quarter, not on Year, so it is not a dependent of Year"
+  },
+  "confidence": "derived",
+  "derivation": "Year's dependents are Quarter, Month, Week and Date; Month of Year (MonthNumber) is none of them, so MonthNumber = 8 stays: August, 496.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "context-clearing",
+    "calculate"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "title": "COT ( BLANK () ) is an error: BLANK is read as 0",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", COT ( BLANK () ) )",
+  "expected": {
+    "error": "COT of BLANK"
+  },
+  "source": {
+    "url": "https://dax.guide/cot/",
+    "quote": "A BLANK argument is treated as 0. Therefore, a BLANK argument returns an error.",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "cot",
+    "trigonometric",
+    "error",
+    "blank"
+  ]
+}

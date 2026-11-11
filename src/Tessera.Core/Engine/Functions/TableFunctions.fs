@@ -614,6 +614,9 @@ module TableFunctions =
 
         combos
         |> Array.choose (fun (key, fs) ->
+            // Calendar context clearing by a group-by column is refused where it matters (Calendars.fs).
+            Calendars.onGroup baseCtx groupCols fs
+
             let inner =
                 Context.withFilter ctx (Filters.mark (Filters.add baseCtx fs true) (Grouped groupCols))
 

@@ -87,6 +87,7 @@
     <Compile Include="EngineSmokeTests.fs" />
     <Compile Include="EngineScalarTests.fs" />
     <Compile Include="EngineMathTests.fs" />
+    <Compile Include="EngineCalendarTests.fs" />
     <Compile Include="EngineContextTests.fs" />
     <Compile Include="EngineAllSelectedTests.fs" />
     <Compile Include="EngineTableTests.fs" />

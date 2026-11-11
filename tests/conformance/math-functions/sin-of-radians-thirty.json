@@ -1,0 +1,40 @@
+{
+  "title": "SIN ( RADIANS ( 30 ) ) is 0.5",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", SIN ( RADIANS ( 30 ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          0.5
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-12,
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/sin-function-dax",
+      "quote": "Sine of 30 degrees.",
+      "supports": "SIN(RADIANS(30)) is 0.5"
+    },
+    {
+      "url": "https://dax.guide/sin/",
+      "quote": "A single decimal value.",
+      "supports": "the result is a decimal number"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "sin",
+    "radians",
+    "trigonometric"
+  ]
+}

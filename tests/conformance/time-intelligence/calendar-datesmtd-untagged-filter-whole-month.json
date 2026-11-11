@@ -1,0 +1,49 @@
+{
+  "title": "DATESMTD over a calendar, with only an untagged column filtered, is the whole month of the last visible date",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"first\", MINX ( DATESMTD ( Gregorian ), 'Date'[Date] ), \"last\", MAXX ( DATESMTD ( Gregorian ), 'Date'[Date] ), \"days\", COUNTROWS ( DATESMTD ( Gregorian ) ) ), 'Date'[DateKey] >= 20080801, 'Date'[DateKey] <= 20080813 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[first]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[last]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[days]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2008-08-01T00:00:00",
+          "2008-08-31T00:00:00",
+          31
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://dax.guide/datesmtd/",
+      "quote": "For example, with a filter on the DateKey column from August 1 to August 13, 2008, DATESMTD ( Gregorian ) returns August 1 to August 31, 2008",
+      "supports": "a filter on a column no calendar tags gives the whole month of the last visible date"
+    },
+    {
+      "url": "https://dax.guide/datesmtd/",
+      "quote": "If the filter context filters only columns that no calendar tags, for example the day of the week, the result has all the days of the month that includes the last visible date.",
+      "supports": "the rule"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "DateKey is tagged by no calendar. The last visible date is 2008-08-13; its month (YearMonth 200808) has every day from August 1 to 31 in Date: 31 days.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "datesmtd"
+  ]
+}

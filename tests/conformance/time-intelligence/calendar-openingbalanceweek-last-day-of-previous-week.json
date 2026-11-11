@@ -1,0 +1,32 @@
+{
+  "title": "OPENINGBALANCEWEEK uses the last date of the week before",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"open\", OPENINGBALANCEWEEK ( [Total], Weekly ) ), 'Date'[Date] = DATE ( 2008, 8, 14 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[open]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          9
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/openingbalanceweek/",
+    "quote": "OPENINGBALANCEWEEK evaluates Expression at the last date of the previous week, as the calendar defines the week.",
+    "supports": "the rule"
+  },
+  "confidence": "derived",
+  "derivation": "August 14 is in W33-2008 (August 10 to 16); the week before is August 3 to 9; its last date, August 9, has Amount 9.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "openingbalanceweek"
+  ]
+}

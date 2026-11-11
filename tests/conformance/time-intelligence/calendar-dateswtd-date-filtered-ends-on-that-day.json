@@ -1,0 +1,42 @@
+{
+  "title": "DATESWTD over a calendar, with the date filtered, runs from the start of the week to that date",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"first\", MINX ( DATESWTD ( Weekly ), 'Date'[Date] ), \"last\", MAXX ( DATESWTD ( Weekly ), 'Date'[Date] ), \"days\", COUNTROWS ( DATESWTD ( Weekly ) ) ), 'Date'[Date] = DATE ( 2008, 8, 14 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[first]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[last]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[days]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2008-08-10T00:00:00",
+          "2008-08-14T00:00:00",
+          5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/dateswtd/",
+    "quote": "If the filter context filters the column tagged as Day, the result ends with the last visible day.",
+    "supports": "the rule; the page's example, CALCULATETABLE ( DATESWTD ( 'Weekly 445' ), 'Date'[Date] = DATE ( 2008, 8, 14 ) ), lists August 10 to 14"
+  },
+  "confidence": "derived",
+  "derivation": "Date is tagged Date in Weekly; the last visible date is Thursday 2008-08-14; its week starts on Sunday August 10: August 10 to 14, 5 days.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "dateswtd"
+  ]
+}

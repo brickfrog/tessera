@@ -1,0 +1,42 @@
+{
+  "title": "DATESYTD over a calendar, with only an untagged column filtered, is every date of the year",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"first\", MINX ( DATESYTD ( Gregorian ), 'Date'[Date] ), \"last\", MAXX ( DATESYTD ( Gregorian ), 'Date'[Date] ), \"days\", COUNTROWS ( DATESYTD ( Gregorian ) ) ), 'Date'[DateKey] >= 20080801, 'Date'[DateKey] <= 20080813 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[first]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[last]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[days]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2008-07-27T00:00:00",
+          "2008-09-06T00:00:00",
+          42
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datesytd/",
+    "quote": "For example, with a filter on the DateKey column from August 1 to August 13, 2008, DATESYTD ( Gregorian ) returns January 1 to December 31, 2008",
+    "supports": "the whole year of the last visible date"
+  },
+  "confidence": "derived",
+  "derivation": "The year of 2008-08-13 is 2008; Date has its days from July 27 to September 6 only: 42 days.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "datesytd"
+  ]
+}

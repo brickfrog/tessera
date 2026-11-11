@@ -2061,13 +2061,13 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 | Filter | `ALL` `ALLCROSSFILTERED` `ALLEXCEPT` (also as a table) `ALLNOBLANKROW` `CALCULATE` `CALCULATETABLE` `CROSSFILTER` `DISTINCT` `EARLIER` `EARLIEST` `FILTER` `HASONEFILTER` `HASONEVALUE` `ISCROSSFILTERED` `ISFILTERED` `KEEPFILTERS` `REMOVEFILTERS` `SELECTEDVALUE` `TREATAS` `USERELATIONSHIP` `VALUES` |
 | Information | `CONTAINS` `CONTAINSROW` `CUSTOMDATA` `ISBLANK` `ISEMPTY` `ISERROR` `ISEVEN` `ISINSCOPE` `ISLOGICAL` `ISNONTEXT` `ISNUMBER` `ISODD` `ISTEXT` `NAMEOF` (not calendars) `USERCULTURE` `USERNAME` `USEROBJECTID` `USERPRINCIPALNAME` |
 | Logical | `AND` `BLANK` `COALESCE` `ERROR` `FALSE` `IF` `IF.EAGER` `IFERROR` `NOT` `OR` `SWITCH` `TRUE` |
-| Math | `ABS` `CEILING` `CONVERT` `CURRENCY` `DIVIDE` `EVEN` `EXP` `FACT` `FLOOR` `GCD` `INT` `ISO.CEILING` `LCM` `LN` `LOG` `LOG10` `MOD` `MROUND` `ODD` `PI` `POWER` `QUOTIENT` `ROUND` `ROUNDDOWN` `ROUNDUP` `SIGN` `SQRT` `SQRTPI` `TRUNC` |
+| Math | `ABS` `ACOS` `ACOSH` `ACOT` `ACOTH` `ASIN` `ASINH` `ATAN` `ATANH` `CEILING` `CONVERT` `COS` `COSH` `COT` `COTH` `CURRENCY` `DEGREES` `DIVIDE` `EVEN` `EXP` `FACT` `FLOOR` `GCD` `INT` `ISO.CEILING` `LCM` `LN` `LOG` `LOG10` `MOD` `MROUND` `ODD` `PI` `POWER` `QUOTIENT` `RADIANS` `ROUND` `ROUNDDOWN` `ROUNDUP` `SIGN` `SIN` `SINH` `SQRT` `SQRTPI` `TAN` `TANH` `TRUNC` |
 | Relationship | `LOOKUPVALUE` `RELATED` `RELATEDTABLE` |
 | Statistical | `GEOMEAN` `GEOMEANX` `MEDIAN` `MEDIANX` `PERCENTILE.EXC` `PERCENTILE.INC` `PERCENTILEX.EXC` `PERCENTILEX.INC` `RANK.EQ` `STDEV.P` `STDEV.S` `STDEVX.P` `STDEVX.S` `VAR.P` `VAR.S` `VARX.P` `VARX.S` |
 | Table manipulation | `ADDCOLUMNS` `CROSSJOIN` `CURRENTGROUP` `DATATABLE` `EXCEPT` `GENERATE` `GENERATEALL` `GROUPBY` `IGNORE` `INTERSECT` `NATURALINNERJOIN` `NATURALLEFTOUTERJOIN` `NONVISUAL` `ROLLUPADDISSUBTOTAL` `ROLLUPGROUP` `ROW` `SELECTCOLUMNS` `SUMMARIZE` `SUMMARIZECOLUMNS` `TOPN` `UNION` |
 | Calculation groups | `ISSELECTEDMEASURE` `SELECTEDMEASURE` `SELECTEDMEASUREFORMATSTRING` `SELECTEDMEASURENAME` |
 | Text | `COMBINEVALUES` `CONCATENATE` `CONTAINSSTRING` `CONTAINSSTRINGEXACT` `EXACT` `FIND` `FIXED` `FORMAT` `LEFT` `LEN` `LOWER` `MID` `REPLACE` `REPT` `RIGHT` `SEARCH` `SUBSTITUTE` `TOCSV` `TOJSON` `TRIM` `UNICHAR` `UNICODE` `UPPER` `VALUE` |
-| Time intelligence | `CLOSINGBALANCEMONTH` `CLOSINGBALANCEQUARTER` `CLOSINGBALANCEYEAR` `DATEADD` `DATESBETWEEN` `DATESINPERIOD` `DATESMTD` `DATESQTD` `DATESYTD` `ENDOFMONTH` `ENDOFQUARTER` `ENDOFYEAR` `FIRSTDATE` `FIRSTNONBLANK` `FIRSTNONBLANKVALUE` `LASTDATE` `LASTNONBLANK` `LASTNONBLANKVALUE` `NEXTDAY` `NEXTMONTH` `NEXTQUARTER` `NEXTYEAR` `OPENINGBALANCEMONTH` `OPENINGBALANCEQUARTER` `OPENINGBALANCEYEAR` `PARALLELPERIOD` `PREVIOUSDAY` `PREVIOUSMONTH` `PREVIOUSQUARTER` `PREVIOUSYEAR` `SAMEPERIODLASTYEAR` `STARTOFMONTH` `STARTOFQUARTER` `STARTOFYEAR` `TOTALMTD` `TOTALQTD` `TOTALYTD` |
+| Time intelligence | `CLOSINGBALANCEMONTH` `CLOSINGBALANCEQUARTER` `CLOSINGBALANCEWEEK` `CLOSINGBALANCEYEAR` `DATEADD` `DATESBETWEEN` `DATESINPERIOD` `DATESMTD` `DATESQTD` `DATESWTD` `DATESYTD` `ENDOFMONTH` `ENDOFQUARTER` `ENDOFWEEK` `ENDOFYEAR` `FIRSTDATE` `FIRSTNONBLANK` `FIRSTNONBLANKVALUE` `LASTDATE` `LASTNONBLANK` `LASTNONBLANKVALUE` `NEXTDAY` `NEXTMONTH` `NEXTQUARTER` `NEXTWEEK` `NEXTYEAR` `OPENINGBALANCEMONTH` `OPENINGBALANCEQUARTER` `OPENINGBALANCEWEEK` `OPENINGBALANCEYEAR` `PARALLELPERIOD` `PREVIOUSDAY` `PREVIOUSMONTH` `PREVIOUSQUARTER` `PREVIOUSWEEK` `PREVIOUSYEAR` `SAMEPERIODLASTYEAR` `STARTOFMONTH` `STARTOFQUARTER` `STARTOFWEEK` `STARTOFYEAR` `TOTALMTD` `TOTALQTD` `TOTALWTD` `TOTALYTD` |
 
   `SUMMARIZE` takes a table, group-by columns (its own, or of tables it has a many-to-one relationship to) and
   name/expression pairs; not `ROLLUP`. `SUMMARIZECOLUMNS` takes group-by columns, filter tables (with
@@ -2233,8 +2233,8 @@ Each is implemented to the definition DAX Guide, SQLBI or Microsoft Learn publis
 
 Refused, because the sources don't settle them (each error says which):
 
-- calendar-based time intelligence: a calendar as the dates argument, the `WEEK` interval and the week functions,
-  `DATEADD`'s Extension and Truncation and `DATESINPERIOD`'s EndBehavior;
+- over a date column, the `WEEK` interval, `DATEADD`'s Extension and Truncation and `DATESINPERIOD`'s EndBehavior
+  (calendar-based arguments; the week functions over a date column are an error, as the sources say);
 - a True/False expression as the dates argument; a table of dates that are not the values of a model column; a date
   column with a time of day;
 - a year end date that reads differently by culture (`"6/7"`, the day first as in `"30/6"`, a month name) or is in
@@ -2260,9 +2260,60 @@ On a date column that is not unique or has gaps (a fact table's), `DATEADD` and 
 with gaps are an error, with the message the Power BI community quotes from the engine: "Function 'DATEADD' expects a contiguous selection when the date column is
 not unique, has gaps or it contains time portion."
 
+#### Calendar-based time intelligence
+
+A model's calendars (TOM `Calendar` objects: a table's columns tagged as Year, Quarter, Month, Week, Date and the
+partial categories such as Month of Year, plus time-related columns) can be the dates argument, by name:
+`TOTALYTD ( [Sales], 'Fiscal' )`. Sources: Microsoft Learn's "Implement time-based calculations in Power BI"
+(calendar-based time intelligence), the functions' pages on Learn and dax.guide, and SQLBI's "Introducing
+calendar-based time intelligence in DAX".
+
+| | Over a calendar |
+|---|---|
+| To date | `DATESWTD` `DATESMTD` `DATESQTD` `DATESYTD` `TOTALWTD` `TOTALMTD` `TOTALQTD` `TOTALYTD` |
+| First and last | `STARTOFWEEK` … `STARTOFYEAR`, `ENDOFWEEK` … `ENDOFYEAR` |
+| Neighbours | `PREVIOUSDAY` `NEXTDAY`, `PREVIOUSWEEK` … `PREVIOUSYEAR`, `NEXTWEEK` … `NEXTYEAR` |
+| Balances | `OPENINGBALANCEWEEK` … `YEAR`, `CLOSINGBALANCEWEEK` … `YEAR` |
+| Ranges | `DATESBETWEEN` |
+
+- **The rows** are the calendar's table's, in the order of the column tagged as Date; a period (week, month,
+  quarter, year) is the rows that share the values of the categories that identify it (Week, or Week of Year and
+  Year, and so on: Learn's "Period Uniqueness" sets). The dates need not be complete: `PREVIOUSDAY` of a Monday in
+  a table without weekends is the Friday.
+- **The result** is a table of the primary column of each category and the time-related columns. With a calendar,
+  `DATES*TD` end on the last visible date when the Date column is filtered, at the end of the last visible period of
+  a filtered category otherwise, and at the end of the period when only untagged columns are filtered (dax.guide).
+- **Context clearing.** A `CALCULATE` (or `CALCULATETABLE`) filter argument on a tagged column clears, first, the
+  filters on the columns of the categories Learn's lattice relates to it, in every calendar of the table: a filter
+  on the year clears the month, the week and the date, not the month of the year. This holds for any filter
+  argument, not only the time intelligence functions ("regardless if the context is set using time intelligence
+  functions or otherwise"). Untagged columns of the table keep their filters, and the date-table rule doesn't apply
+  to a calendar's result. Every other way a filter is set (a context transition, `KEEPFILTERS`, `SUMMARIZECOLUMNS`'
+  groups and filter arguments, `FIRSTNONBLANK`'s own filter) clears nothing, and is refused where clearing would
+  change the rows: grouping by the date under a filter on its week is fine, by the year under a filter on the month
+  is not.
+- **Errors**, as the sources state them: a week function over a date column or a calendar without weeks; a calendar
+  without the categories a function needs; a year end date with a calendar; a filter on a column another calendar
+  tags as Week when this calendar has no Week.
+
+Refused, because the sources don't settle them: `DATEADD`, `SAMEPERIODLASTYEAR`, `PARALLELPERIOD`, `DATESINPERIOD`,
+`FIRSTDATE` and `LASTDATE` over a calendar; a calendar without the Date category, or with semesters; tagged columns
+with BLANKs, periods whose dates are not next to one another or don't sort in date order; a calendar of a date
+table's date column alone; the cases above where clearing would change the rows, and a calendar's result over
+another calendar's time-related columns; `DATES*TD` with no visible date, with a day category other than Date, a
+time-related column or a column only another calendar tags filtered, with filtered periods that don't nest, or
+with both the date and another calendar's week filtered over a calendar without weeks; filters on other tables
+that cross-filter the calendar's table.
+
 #### Numbers, conversion and the identity functions
 
 `RAND` and `RANDBETWEEN` are known names but always refused: a random answer can't be checked against a server's.
+
+The trigonometric and hyperbolic functions (`SIN` … `ACOTH`, `DEGREES`, `RADIANS`) return a decimal number, in
+radians. `ACOT` is between 0 and π (dax.guide's example table). The documented errors are errors: `COT` and `COTH`
+of 0 or BLANK ("A BLANK argument is treated as 0": dax.guide), `COT` of 2^27 or more, `ATANH` of -1, 1 or beyond.
+BLANK is refused elsewhere, as is an argument outside what a page says it "must" be where it doesn't say what
+happens (`ASIN ( 2 )`, `ACOSH ( 0.5 )`, `ACOTH ( 1 )`), and a result too large for a float.
 
 Arithmetic follows the published descriptions of the engine (SQLBI's "Rounding errors with different data types in
 DAX" and "Understanding numeric data type conversions", Microsoft Learn's data types tables); where they say nothing
@@ -2366,7 +2417,7 @@ expressions only, say).
 
 #### What it refuses
 
-- **Not implemented yet:** calendar-based time intelligence, the trigonometric functions, visual calculations,
+- **Not implemented yet:** visual calculations,
   query parameters, detail rows, KPIs, natural joins of tables with model columns (joined over their expanded
   tables). Row-level and object-level
   security are not applied (a query runs as an administrator's would).

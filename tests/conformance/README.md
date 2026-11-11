@@ -71,7 +71,8 @@ Column names are the engine's: `Table[Column]` for a model column, `[name]` for 
   `src/Tessera.Core/DaxValue.fs`. The ids are listed in `ConformanceTests.fs`, which fails if one has no case.
 - Areas an engine may leave for later carry their area's tag, so they can be skipped as a group:
   `time-intelligence`, `allselected`, `format`, `text-functions`, `date-functions`, `math-functions`,
-  `calculation-groups`, `window-functions`. A case in a folder of that name must have the tag.
+  `calculation-groups`, `window-functions`. A case in a folder of that name must have the tag. Cases on
+  calendar-based time intelligence also carry `calendar`.
 
 ## A model
 
@@ -93,7 +94,12 @@ Column names are the engine's: `Table[Column]` for a model column, `[name]` for 
                        "cardinality": "many-to-one", "crossFilter": "single", "active": true } ],
   "functions": [ { "name": "AddTax", "expression": "( amount : NUMERIC ) => amount * 1.1" } ],
   "calculationGroups": [ { "name": "Time", "column": "Calc", "precedence": 0,
-                           "items": [ { "name": "Current", "expression": "SELECTEDMEASURE ()" } ] } ]
+                           "items": [ { "name": "Current", "expression": "SELECTEDMEASURE ()" } ] } ],
+  "calendars": [ { "name": "Fiscal", "table": "Date",
+                   "groups": [ { "category": "year", "primary": "FiscalYear" },
+                               { "category": "month", "primary": "FiscalMonth", "associated": [ "MonthName" ] },
+                               { "category": "date", "primary": "Date" } ],
+                   "timeRelated": [ "IsHoliday" ] } ]
 }
 ```
 
@@ -102,6 +108,9 @@ Column names are the engine's: `Table[Column]` for a model column, `[name]` for 
 - A relationship's `from` is the many side. `cardinality` is `many-to-one` (default), `one-to-one` or
   `many-to-many`; `crossFilter` is `single` (default: `to` filters `from`) or `both`.
 - A calculated table declares its `columns` only if a relationship, `sortBy` or `key` needs them.
+- A calendar's `category` is a TOM `TimeUnit`, written as TMDL writes it: `year`, `quarter`, `quarterOfYear`,
+  `month`, `monthOfYear`, `monthOfQuarter`, `week`, `weekOfYear`, `weekOfQuarter`, `weekOfMonth`, `date`,
+  `dayOfYear`, `dayOfQuarter`, `dayOfMonth`, `dayOfWeek`. `timeRelated` lists the columns tagged with no category.
 - Culture defaults to `en-US`. Everything else is TOM's default (compatibility level 1702).
 
 Most cases use a shared model as it is. A case that needs something more changes it for itself:
@@ -110,7 +119,7 @@ Most cases use a shared model as it is. A case that needs something more changes
 "model": { "base": "sales",
            "measures": [ { "table": "Sales", "name": "Big", "expression": "..." } ],
            "calculatedColumns": [ { "table": "Product", "name": "Rank", "type": "int64", "expression": "..." } ],
-           "calculatedTables": [ ... ], "functions": [ ... ], "calculationGroups": [ ... ], "tables": [ ... ],
+           "calculatedTables": [ ... ], "functions": [ ... ], "calculationGroups": [ ... ], "calendars": [ ... ], "tables": [ ... ],
            "rows": { "Sales": [ [ ... ] ] },
            "addRelationships": [ ... ], "relationships": [ ...replaces them all... ] }
 ```

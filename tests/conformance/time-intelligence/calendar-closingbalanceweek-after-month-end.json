@@ -1,0 +1,32 @@
+{
+  "title": "CLOSINGBALANCEWEEK of a month uses the last day of the week of its last date, after the month's end",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"close\", CLOSINGBALANCEWEEK ( [Total], Weekly ) ), 'Date'[YearMonth] = 200808 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[close]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          6
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/closingbalanceweek/",
+    "quote": "CLOSINGBALANCEWEEK uses the last date of the week that contains the last date in the filter context. This date can be after the end of the month.",
+    "supports": "the rule"
+  },
+  "confidence": "derived",
+  "derivation": "The last date of August 2008 is Sunday August 31, in W36-2008 (August 31 to September 6). Its last date, September 6, has Amount 6.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "closingbalanceweek"
+  ]
+}

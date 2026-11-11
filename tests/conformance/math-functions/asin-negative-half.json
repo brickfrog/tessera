@@ -1,0 +1,32 @@
+{
+  "title": "ASIN ( -0.5 ) is -pi/6",
+  "model": "scalar",
+  "query": "EVALUATE ROW ( \"r\", ASIN ( -0.5 ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -0.523598776
+        ]
+      ]
+    }
+  ],
+  "tolerance": 1e-08,
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/asin-function-dax",
+    "quote": "Arcsine of -0.5 in radians, -pi/6",
+    "supports": "the example gives -0.523598776"
+  },
+  "confidence": "published",
+  "tags": [
+    "math-functions",
+    "asin",
+    "trigonometric"
+  ]
+}

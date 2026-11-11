@@ -414,6 +414,9 @@ module Filters =
         if filters.IsEmpty then
             fc
         else
+            // Where calendar context clearing would change these filters: refused (Calendars.fs).
+            let fc = CalendarHooks.beforeAdd fc filters keep
+
             let old, scope =
                 if keep then
                     fc.Filters, fc.Scope

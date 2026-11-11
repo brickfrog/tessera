@@ -656,4 +656,111 @@ let tests =
                     && near (get "STDEVX.P" * get "STDEVX.P") varP
                     && near (get "STDEVX.S" * get "STDEVX.S") varS)
         ]
+        testList "trigonometric" [
+            test "the published values" {
+                // Microsoft Learn's examples, each function's page.
+                close "SIN ( PI () / 2 )" 1.0
+                close "SIN ( RADIANS ( 30 ) )" 0.5
+                close "COS ( RADIANS ( 60 ) )" 0.5
+                close "TAN ( RADIANS ( 45 ) )" 1.0
+                close "COT ( 30 )" -0.156119952161659
+                close "ASIN ( -0.5 )" (-Math.PI / 6.0)
+                close "DEGREES ( ASIN ( -0.5 ) )" -30.0
+                close "ACOS ( -0.5 )" (2.0 * Math.PI / 3.0)
+                close "ATAN ( 1 )" (Math.PI / 4.0)
+                close "COSH ( 4 )" 27.308232836016487
+                close "TANH ( 0.5 )" 0.46211715726000974
+                close "COTH ( 2 )" 1.03731472072755
+                close "ASINH ( 10 )" 2.99822295029797
+                close "ACOSH ( 1 )" 0.0
+                close "ATANH ( -0.1 )" -0.100335347731076
+                close "DEGREES ( PI () )" 180.0
+                close "RADIANS ( 270 )" (3.0 * Math.PI / 2.0)
+                // dax.guide/acot's table: the arccotangent of -1 is 2.36, of a large negative 1.57.
+                close "ACOT ( -1 )" (3.0 * Math.PI / 4.0)
+                close "ACOT ( 1 )" (Math.PI / 4.0)
+                close "ACOT ( 0 )" (Math.PI / 2.0)
+                close "ACOTH ( 2 )" (0.5 * log 3.0)
+            }
+
+            test "the result is a decimal number, also of a whole number" {
+                Expect.equal (scalar (p ()) "SIN ( 0 )") (QueryValue.Double 0.0) "SIN ( 0 )"
+                Expect.equal (scalar (p ()) "DEGREES ( 0 )") (QueryValue.Double 0.0) "DEGREES ( 0 )"
+            }
+
+            test "the documented errors" {
+                // COT: 0, or 2^27 and more; BLANK is 0 (dax.guide/cot). COTH: 0 (dax.guide/coth).
+                daxError "COT ( 0 )"
+                daxError "COT ( 134217728 )"
+                daxError "COT ( -134217728 )"
+                daxError "COT ( BLANK () )"
+                daxError "COTH ( 0 )"
+                daxError "COTH ( BLANK () )"
+                // ATANH: -1, 1 or outside (dax.guide/atanh).
+                daxError "ATANH ( 1 )"
+                daxError "ATANH ( -1 )"
+                daxError "ATANH ( 2 )"
+                close "COT ( 134217727 )" (1.0 / tan 134217727.0)
+            }
+
+            test "what the pages leave open is refused" {
+                for f in
+                    [
+                        "SIN"
+                        "COS"
+                        "TAN"
+                        "ASIN"
+                        "ACOS"
+                        "ATAN"
+                        "ACOT"
+                        "SINH"
+                        "COSH"
+                        "TANH"
+                        "ASINH"
+                        "ACOSH"
+                        "ATANH"
+                        "ACOTH"
+                        "DEGREES"
+                        "RADIANS"
+                    ] do
+                    refused $"{f} ( BLANK () )"
+
+                refused "ASIN ( 1.5 )"
+                refused "ACOS ( -2 )"
+                refused "ACOSH ( 0.5 )"
+                refused "ACOTH ( 1 )"
+                refused "ACOTH ( 0.5 )"
+                refused "SINH ( 1000 )"
+                refused "SIN ( TRUE () )"
+                refused "SIN ( DATE ( 2024, 1, 1 ) )"
+            }
+
+            test "text that is a number is read as one" { close "SIN ( \"0\" )" 0.0 }
+
+            testPropertyWithConfig config "identities, within a rounding error"
+            <| fun (n: int) ->
+                let x = float (n % 100000) / 1000.0
+                let get (dax: string) = number (scalar (p ()) dax)
+
+                let near (a: float) (b: float) =
+                    abs (a - b) <= 1e-9 * (1.0 + abs a + abs b)
+
+                let l = lit x
+                let hx = x / 100.0
+                let h = lit hx
+                let s, c = get $"SIN ( {l} )", get $"COS ( {l} )"
+
+                near (s * s + c * c) 1.0
+                && (abs c < 1e-6 || near (get $"TAN ( {l} )") (s / c))
+                && (abs c < 1e-6
+                    || (let a = get $"ATAN ( TAN ( {l} ) )"
+                        let k = Math.Round((x - a) / Math.PI)
+                        abs a <= Math.PI / 2.0 && abs (x - a - k * Math.PI) < 1e-6))
+                && near (get $"RADIANS ( DEGREES ( {l} ) )") x
+                && near (get $"ASINH ( SINH ( {h} ) )") hx
+                && near (get $"COSH ( {h} ) ^ 2 - SINH ( {h} ) ^ 2") 1.0
+                && near (get $"ACOT ( {l} ) + ATAN ( {l} )") (Math.PI / 2.0)
+                && (hx = 0.0 || near (get $"COTH ( {h} ) * TANH ( {h} )") 1.0)
+                && (abs (s) < 1e-9 || near (get $"COT ( {l} ) * TAN ( {l} )") 1.0)
+        ]
     ]
