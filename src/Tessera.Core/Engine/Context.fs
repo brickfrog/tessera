@@ -308,6 +308,9 @@ module Filters =
                 else
                     spellOut table rows cfg (fun c -> not (drop c))
 
+    /// The filter on the columns `keep` names only (a filter with none of them is gone).
+    let project (keep: BColumn -> bool) (f: Filter) : Filter list = without (fun c -> not (keep c)) f
+
     /// A filter context with these filters under these relationships. A table filter evaluated
     /// under other relationships keeps the columns it had then ("table expansion ... happens when
     /// you define a table": SQLBI, "Expanded tables in DAX"), so it is spelled out by column.
@@ -993,6 +996,10 @@ module Context =
             let mutable fc = ctx.Filter
 
             for rc in List.rev rows do
+                // "Being an iterator, SUMX generates a shadow filter context that contains the
+                // Sales table" (SQLBI, "The definitive guide to ALLSELECTED"): it stays when the
+                // row context becomes filters.
+                fc <- Filters.mark fc (Shadow rc.Table)
                 let filters = rowFilters ctx span rc
                 DateTable.onTransition ctx span fc filters
                 fc <- Filters.add fc filters false
@@ -1037,3 +1044,60 @@ module Context =
             rows <- rows.Tail
 
         result
+
+/// Row contexts that are not an iterator's, and the rows of SUMMARIZECOLUMNS, for ALLSELECTED: an
+/// iterator's table is a shadow filter context (`ScopeMark.Shadow`); a row context that no source
+/// describes as an iteration (a calculated column's, the rows ORDER BY sorts) is marked here, and
+/// ALLSELECTED refuses under one.
+module Shadows =
+
+    let private notIterations =
+        System.Runtime.CompilerServices.ConditionalWeakTable<TableVal, string>()
+
+    /// The same table, as a value whose row contexts are not an iteration (`what` says whose they are).
+    let notAnIteration (what: string) (t: TableVal) : TableVal =
+        let copy = TableVal(t.Cols, t.Count, t.BaseTable, t.BaseRows, t.Data, t.Config)
+        notIterations.AddOrUpdate(copy, what)
+        copy
+
+    /// Why a row context on this table is not an iteration, if it isn't.
+    let whyNot (t: TableVal) : string option =
+        match notIterations.TryGetValue t with
+        | true, what -> Some what
+        | _ -> None
+
+    /// SUMMARIZE's extension columns are evaluated in a row context on each group. When the table
+    /// summarized has no columns but the group-by columns, the groups are its rows, and Microsoft
+    /// Learn's ALLSELECTED example (SUMMARIZE over a CROSSJOIN of the group-by columns) shows them
+    /// restored as a shadow filter context. Over a wider table, whether the shadow holds the table
+    /// or the groups is not documented.
+    let summarized (table: TableVal) (groups: TableVal) : TableVal =
+        let lineage (t: TableVal) = t.Cols |> Array.map (fun c -> c.Lineage)
+
+        let same =
+            lineage table |> Array.forall (fun c -> not (isNull c))
+            && lineage groups |> Array.forall (fun c -> not (isNull c))
+            && (lineage table |> Array.distinctBy _.Id |> Array.map _.Id |> Array.sort) = (lineage groups
+                                                                                           |> Array.map _.Id
+                                                                                           |> Array.sort)
+
+        if same then
+            groups
+        else
+            notAnIteration
+                "a SUMMARIZE extension column over a table with columns that are not group-by columns (whether its shadow filter context holds the table or the groups is not documented)"
+                groups
+
+    /// A SUMMARIZECOLUMNS row: `ctx` is the row's context, `before` what the groups were computed
+    /// under, `keys` the filters that hold the row's group.
+    let inGroup (ctx: Ctx) (before: FilterCtx) (groups: BColumn array) (keys: Filter list) : Ctx =
+        let fc = ctx.Filter
+
+        let m = {
+            Before = before.Filters
+            Row = fc.Filters
+            Groups = groups
+            Keys = keys
+        }
+
+        Context.withFilter ctx (Filters.mark fc (Selection m))

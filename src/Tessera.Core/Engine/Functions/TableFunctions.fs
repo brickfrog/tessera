@@ -290,6 +290,9 @@ module TableFunctions =
                             Array.create left.Cols.Length DaxValue.Blank
                         ]
 
+                    let blanks =
+                        Shadows.notAnIteration "the row of BLANKs GENERATE uses to find the columns of its second table" blanks
+
                     try
                         ev.Table(Context.pushRow ctx blanks 0, call.Args.[1])
                     with DaxRuntimeException _ ->
@@ -559,6 +562,9 @@ module TableFunctions =
         |> Array.choose (fun (key, fs) ->
             let inner =
                 Context.withFilter ctx (Filters.mark (Filters.add baseCtx fs true) (Grouped groupCols))
+
+            // For ALLSELECTED: the filters the groups were computed under, and this row's group.
+            let inner = Shadows.inGroup inner filtered groupCols fs
 
             let values = exprs |> Array.map (fun (expr, _) -> ev.Scalar(inner, expr))
 
@@ -1041,6 +1047,7 @@ module TableFunctions =
             let headerCols = groupCols |> Array.map fst
             checkNewNames ctx call.Span "SUMMARIZE" headerCols (added |> List.map fst)
             let header = Tables.ofRows headerCols (groups |> Array.map fst)
+            let header = Shadows.summarized table header
 
             let extensions =
                 added

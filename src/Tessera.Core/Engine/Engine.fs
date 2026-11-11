@@ -587,6 +587,9 @@ let private bindWith
 
                         let table = Tables.ofBase model.DefaultConfig t (Array.init n id)
 
+                        let table =
+                            Shadows.notAnIteration "the row context of a calculated column" table
+
                         let values =
                             Array.init n (fun row -> ev.Scalar(Context.pushRow ctx table row, expr))
 
@@ -872,6 +875,7 @@ let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
         Fail.invalid ctx e.StartAt.Head.Span "START AT has more values than ORDER BY has keys"
 
     let table = ev.Table(ctx, e.Table)
+    let table = Shadows.notAnIteration "the rows ORDER BY sorts" table
 
     let order =
         if e.OrderBy.IsEmpty then
