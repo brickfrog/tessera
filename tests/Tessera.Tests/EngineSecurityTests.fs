@@ -18,10 +18,7 @@ open Tessera.Tests.EngineHelpers
 /// Totals = ROW ( "Total", SUM ( Sales[Amount] ) ), a calculated table: 280.
 let private shop: TestModel = {
     Tables = [
-        table "Region" [ "RegionKey", DataType.Int64; "Name", DataType.String ] [
-            [ 1; "North" ]
-            [ 2; "South" ]
-        ]
+        table "Region" [ "RegionKey", DataType.Int64; "Name", DataType.String ] [ [ 1; "North" ]; [ 2; "South" ] ]
         table "Customer" [
             "CustomerKey", DataType.Int64
             "Name", DataType.String
@@ -78,11 +75,20 @@ let private role (db: Database) (name: string) (permission: ModelPermission) (fi
 
 /// The standard roles of `shop`.
 let private withRoles (db: Database) =
-    role db "North" ModelPermission.Read [ "Region", "Region[Name] = \"North\"" ] |> ignore
-    role db "South" ModelPermission.Read [ "Region", "Region[Name] = \"South\"" ] |> ignore
-    role db "Bikes" ModelPermission.Read [ "Product", "Product[Name] = \"Bike\"" ] |> ignore
-    role db "BigSales" ModelPermission.Read [ "Sales", "Sales[Amount] > 50" ] |> ignore
-    role db "Me" ModelPermission.Read [ "Customer", "Customer[Email] = USERPRINCIPALNAME ()" ] |> ignore
+    role db "North" ModelPermission.Read [ "Region", "Region[Name] = \"North\"" ]
+    |> ignore
+
+    role db "South" ModelPermission.Read [ "Region", "Region[Name] = \"South\"" ]
+    |> ignore
+
+    role db "Bikes" ModelPermission.Read [ "Product", "Product[Name] = \"Bike\"" ]
+    |> ignore
+
+    role db "BigSales" ModelPermission.Read [ "Sales", "Sales[Amount] > 50" ]
+    |> ignore
+
+    role db "Me" ModelPermission.Read [ "Customer", "Customer[Email] = USERPRINCIPALNAME ()" ]
+    |> ignore
 
     role db "Lookup" ModelPermission.ReadRefresh [
         "Region", "Region[RegionKey] = LOOKUPVALUE ( Users[RegionKey], Users[Email], CUSTOMDATA () )"
@@ -95,20 +101,37 @@ let private withRoles (db: Database) =
     role db "Processor" ModelPermission.Refresh [] |> ignore
     role db "Closed" ModelPermission.Read [ "Region", "FALSE ()" ] |> ignore
     role db "Text" ModelPermission.Read [ "Region", "Region[Name]" ] |> ignore
-    role db "OwnTable" ModelPermission.Read [ "Customer", "Customer[CustomerKey] = MAX ( Customer[CustomerKey] )" ] |> ignore
-    role db "ReadsSales" ModelPermission.Read [ "Customer", "CONTAINS ( Sales, Sales[CustomerKey], Customer[CustomerKey] )" ] |> ignore
+
+    role db "OwnTable" ModelPermission.Read [ "Customer", "Customer[CustomerKey] = MAX ( Customer[CustomerKey] )" ]
+    |> ignore
+
+    role db "ReadsSales" ModelPermission.Read [
+        "Customer", "CONTAINS ( Sales, Sales[CustomerKey], Customer[CustomerKey] )"
+    ]
+    |> ignore
+
     role db "Measure" ModelPermission.Read [ "Customer", "[Amount] > 50" ] |> ignore
-    role db "Udf" ModelPermission.Read [ "Customer", "Twice ( Customer[CustomerKey] ) = 2" ] |> ignore
-    role db "WithVar" ModelPermission.Read [ "Customer", "VAR k = Customer[CustomerKey] RETURN k IN { 1, 3 }" ] |> ignore
+
+    role db "Udf" ModelPermission.Read [ "Customer", "Twice ( Customer[CustomerKey] ) = 2" ]
+    |> ignore
+
+    role db "WithVar" ModelPermission.Read [ "Customer", "VAR k = Customer[CustomerKey] RETURN k IN { 1, 3 }" ]
+    |> ignore
 
     let ols = role db "Hidden" ModelPermission.Read []
-    ols.TablePermissions.Add(new TablePermission(Table = db.Model.Tables.["Product"], MetadataPermission = MetadataPermission.None))
+
+    ols.TablePermissions.Add(
+        new TablePermission(Table = db.Model.Tables.["Product"], MetadataPermission = MetadataPermission.None)
+    )
 
     let cols = role db "HiddenColumn" ModelPermission.Read []
     let tp = new TablePermission(Table = db.Model.Tables.["Customer"])
 
     tp.ColumnPermissions.Add(
-        new ColumnPermission(Column = db.Model.Tables.["Customer"].Columns.["Email"], MetadataPermission = MetadataPermission.None)
+        new ColumnPermission(
+            Column = db.Model.Tables.["Customer"].Columns.["Email"],
+            MetadataPermission = MetadataPermission.None
+        )
     )
 
     cols.TablePermissions.Add tp
@@ -185,6 +208,7 @@ let securityTests =
 
         testCase "calculated columns and tables keep the values computed without the roles" (fun () ->
             let p = asRoles [ "North" ] shopPrepared.Value
+
             returns p "EVALUATE SELECTCOLUMNS ( Customer, \"n\", Customer[Name], \"all\", Customer[AllSales] )" [
                 [ "Ann"; 280 ]
                 [ "Bob"; 280 ]
@@ -199,7 +223,8 @@ let securityTests =
             is same "SUM ( Sales[Amount] )" 135)
 
         testCase "several roles that filter different tables are refused where the readings differ" (fun () ->
-            asRolesError [ "North"; "Bikes" ] shopPrepared.Value |> refusedMentioning "together")
+            asRolesError [ "North"; "Bikes" ] shopPrepared.Value
+            |> refusedMentioning "together")
 
         testCase "a role without filters, and an administrator, see everything" (fun () ->
             is (asRoles [ "Everyone" ] shopPrepared.Value) "SUM ( Sales[Amount] )" 280
@@ -239,7 +264,8 @@ let securityTests =
             is p "SUM ( Sales[Amount] )" 115
 
             // Without an identity the filter can't be evaluated.
-            asRolesError [ "Me" ] shopPrepared.Value |> refusedMentioning "USERPRINCIPALNAME")
+            asRolesError [ "Me" ] shopPrepared.Value
+            |> refusedMentioning "USERPRINCIPALNAME")
 
         testCase "dynamic security: LOOKUPVALUE in another table, with CUSTOMDATA" (fun () ->
             let id = {
@@ -265,14 +291,19 @@ let securityTests =
             | other -> failtestf "%A" other)
 
         testCase "a filter must be TRUE or FALSE" (fun () ->
-            asRolesError [ "Text" ] shopPrepared.Value |> refusedMentioning "not TRUE or FALSE")
+            asRolesError [ "Text" ] shopPrepared.Value
+            |> refusedMentioning "not TRUE or FALSE")
 
         testCase "object-level security is refused" (fun () ->
-            asRolesError [ "Hidden" ] shopPrepared.Value |> refusedMentioning "object-level security"
+            asRolesError [ "Hidden" ] shopPrepared.Value
+            |> refusedMentioning "object-level security"
+
             asRolesError [ "HiddenColumn" ] shopPrepared.Value |> refusedMentioning "Email")
 
         testCase "a filter that reads its own table, a secured table, a measure or a function is refused" (fun () ->
-            asRolesError [ "OwnTable" ] shopPrepared.Value |> refusedMentioning "other than as the row"
+            asRolesError [ "OwnTable" ] shopPrepared.Value
+            |> refusedMentioning "other than as the row"
+
             asRolesError [ "ReadsSales" ] shopPrepared.Value |> refusedMentioning "'Sales'"
             asRolesError [ "Measure" ] shopPrepared.Value |> refusedMentioning "measure"
             asRolesError [ "Udf" ] shopPrepared.Value |> refusedMentioning "Twice")
@@ -322,7 +353,9 @@ let securityTests =
 
                     for r in db.Model.Relationships do
                         match r with
-                        | :? SingleColumnRelationship as s when s.FromTable.Name = "Sales" && s.ToTable.Name = "Customer" ->
+                        | :? SingleColumnRelationship as s when
+                            s.FromTable.Name = "Sales" && s.ToTable.Name = "Customer"
+                            ->
                             s.SecurityFilteringBehavior <- SecurityFilteringBehavior.BothDirections
                         | _ -> ())
 
@@ -385,7 +418,8 @@ let securityTests =
                                 {
                                     t with
                                         Columns = t.Columns @ [ "Referrer", DataType.Int64 ]
-                                        Rows = t.Rows |> List.map (fun r -> r @ [ box (if r.[0] = box 2 then 3 else 1) ])
+                                        Rows =
+                                            t.Rows |> List.map (fun r -> r @ [ box (if r.[0] = box 2 then 3 else 1) ])
                                 }
                             else
                                 t)
@@ -400,7 +434,11 @@ let securityTests =
         testCase "a filter reaching a many-to-many relationship is refused" (fun () ->
             let m = {
                 shop with
-                    Tables = shop.Tables @ [ table "Budget" [ "RegionKey", DataType.Int64; "Amount", DataType.Int64 ] [ [ 1; 5 ] ] ]
+                    Tables =
+                        shop.Tables
+                        @ [
+                            table "Budget" [ "RegionKey", DataType.Int64; "Amount", DataType.Int64 ] [ [ 1; 5 ] ]
+                        ]
                     Rels =
                         shop.Rels
                         @ [
@@ -428,5 +466,8 @@ let securityTests =
             Expect.isEmpty (of' "Lookup") "Lookup"
             Expect.isNonEmpty (of' "OwnTable") "OwnTable"
             Expect.isNonEmpty (of' "Hidden" @ of' "HiddenColumn") "OLS"
-            Expect.isFalse (coverage.ContainsKey(ObjectRef.modelLevel ObjectKind.Role "Everyone")) "no filters, no entry")
+
+            Expect.isFalse
+                (coverage.ContainsKey(ObjectRef.modelLevel ObjectKind.Role "Everyone"))
+                "no filters, no entry")
     ]

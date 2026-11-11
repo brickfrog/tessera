@@ -1097,7 +1097,9 @@ module TestSuite =
         ]
 
         checkKeys "identity" keys pairs
-        let get key = tryKey key pairs |> Option.map (asText key)
+
+        let get key =
+            tryKey key pairs |> Option.map (asText key)
 
         {
             UserName = get "user_name"

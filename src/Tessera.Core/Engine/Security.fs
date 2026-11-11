@@ -59,7 +59,8 @@ module Security =
 
     let private ci = StringComparer.OrdinalIgnoreCase
 
-    let private eq (a: string) (b: string) = String.Equals(a, b, StringComparison.OrdinalIgnoreCase)
+    let private eq (a: string) (b: string) =
+        String.Equals(a, b, StringComparison.OrdinalIgnoreCase)
 
     /// An active relationship a role's filter crosses: from the one side to the many side, and
     /// back when `Both` (its security filter goes both ways).
@@ -110,8 +111,7 @@ module Security =
             changed <- false
 
             for s in relationships do
-                let touches =
-                    reached.Contains s.FromTable.Name || reached.Contains s.ToTable.Name
+                let touches = reached.Contains s.FromTable.Name || reached.Contains s.ToTable.Name
 
                 if touches && not (used.ContainsKey s) then
                     let ends =
@@ -284,7 +284,8 @@ module Security =
         for f in db.Model.Functions do
             functions.Add f.Name |> ignore
 
-        let own = $"a role's filter on '{table}' that reads '{table}' other than as the row being filtered"
+        let own =
+            $"a role's filter on '{table}' that reads '{table}' other than as the row being filtered"
 
         let readsTable (name: string) =
             if eq name table then
@@ -414,11 +415,17 @@ module Security =
     let problems (db: Database) (roles: ModelRole list) : string list =
         let readers = roles |> List.filter canRead
 
-        if readers |> List.exists (fun r -> r.ModelPermission = ModelPermission.Administrator) then
+        if
+            readers
+            |> List.exists (fun r -> r.ModelPermission = ModelPermission.Administrator)
+        then
             []
         else
             let filtered =
-                readers |> List.collect filtersOf |> List.map (fun (t, _) -> t.Name) |> List.distinct
+                readers
+                |> List.collect filtersOf
+                |> List.map (fun (t, _) -> t.Name)
+                |> List.distinct
 
             let reached = reach db filtered
 
@@ -497,8 +504,7 @@ module Security =
                         | _ -> null
 
                     let next =
-                        Array.init many.RowCount (fun row ->
-                            (isNull current || current.[row]) && oneRows.[map.[row]])
+                        Array.init many.RowCount (fun row -> (isNull current || current.[row]) && oneRows.[map.[row]])
 
                     if isNull current || next <> current then
                         kept.[many.Id] <- next
@@ -551,7 +557,12 @@ module Security =
 
         let result = Dictionary<string, int array>(ci)
 
-        if not (roles |> List.exists (fun r -> r.ModelPermission = ModelPermission.Administrator)) then
+        if
+            not (
+                roles
+                |> List.exists (fun r -> r.ModelPermission = ModelPermission.Administrator)
+            )
+        then
             let tableOf (name: string) =
                 match model.TableByName.TryGetValue name with
                 | true, t when t.Gate.IsNone -> t
@@ -559,7 +570,10 @@ module Security =
                 | _ -> refuse $"a role's filter on '{name}', which the engine has no table for"
 
             let filtered =
-                roles |> List.collect filtersOf |> List.map (fun (t, _) -> t.Name) |> List.distinct
+                roles
+                |> List.collect filtersOf
+                |> List.map (fun (t, _) -> t.Name)
+                |> List.distinct
 
             let reached = reach db filtered
 

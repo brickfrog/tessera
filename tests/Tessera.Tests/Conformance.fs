@@ -1351,7 +1351,8 @@ let runAsWith (config: RunConfig) (evaluate: EvaluateAs) (c: Case) : Outcome =
 /// Run an engine on a case. A case that runs as members of roles needs `runAsWith`.
 let runWith (config: RunConfig) (evaluate: Evaluate) (c: Case) : Outcome =
     match c.As with
-    | Some _ -> Outcome.Error "the case runs as members of roles (\"as\"): run it with an engine that takes them (runAsWith)"
+    | Some _ ->
+        Outcome.Error "the case runs as members of roles (\"as\"): run it with an engine that takes them (runAsWith)"
     | None -> runAsWith config (fun _ -> evaluate) c
 
 /// Run an engine on a case, with the default configuration.

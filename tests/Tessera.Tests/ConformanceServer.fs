@@ -227,6 +227,7 @@ let private runModel
                                     cases
                                     |> List.map (fun case ->
                                         let clock = Stopwatch.StartNew()
+
                                         let answer =
                                             match case.As with
                                             | None -> query c database case.Query

@@ -279,7 +279,9 @@ let private withTarget
                                     match
                                         address.Properties
                                         |> List.tryFind (fun (k, _) ->
-                                            given |> List.exists (fun g -> String.Equals(g, k, StringComparison.OrdinalIgnoreCase)))
+                                            given
+                                            |> List.exists (fun g ->
+                                                String.Equals(g, k, StringComparison.OrdinalIgnoreCase)))
                                     with
                                     | Some(key, _) ->
                                         Some(

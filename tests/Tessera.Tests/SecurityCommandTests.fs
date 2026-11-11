@@ -54,7 +54,10 @@ let private setup () =
     t, path, dir
 
 let private lines (s: string) =
-    s.Split('\n') |> Array.map (fun l -> l.TrimEnd '\r') |> Array.filter ((<>) "") |> List.ofArray
+    s.Split('\n')
+    |> Array.map (fun l -> l.TrimEnd '\r')
+    |> Array.filter ((<>) "")
+    |> List.ofArray
 
 let private errorCode (r: Run) =
     use doc = json r
@@ -71,7 +74,12 @@ let private server () =
     s.OnQuery <-
         fun _ -> [
             {
-                Columns = [ { Name = "[Value]"; Type = QueryType.Int64 } ]
+                Columns = [
+                    {
+                        Name = "[Value]"
+                        Type = QueryType.Int64
+                    }
+                ]
                 Rows = [ [| QueryValue.Int64 1L |] ]
                 Truncated = false
             }
@@ -94,7 +102,16 @@ let tests =
             Expect.equal (lines all.Out |> List.tail) [ "625" ] "everything"
 
             let uk =
-                tess [ "query"; model; "--data"; dir; "--role"; "UK"; "EVALUATE { [Amount] }"; "--csv" ]
+                tess [
+                    "query"
+                    model
+                    "--data"
+                    dir
+                    "--role"
+                    "UK"
+                    "EVALUATE { [Amount] }"
+                    "--csv"
+                ]
 
             Expect.equal uk.Code ExitCode.ok uk.Err
             Expect.equal (lines uk.Out |> List.tail) [ "140" ] "the UK role"
@@ -118,7 +135,18 @@ let tests =
 
             // Cy's sales don't include sale 5: the role would take Product's blank row away.
             let refused =
-                tess [ "query"; model; "--data"; dir; "--role"; "Me"; "--custom-data"; "Cy"; "EVALUATE { 1 }"; "--json" ]
+                tess [
+                    "query"
+                    model
+                    "--data"
+                    dir
+                    "--role"
+                    "Me"
+                    "--custom-data"
+                    "Cy"
+                    "EVALUATE { 1 }"
+                    "--json"
+                ]
 
             Expect.equal (errorCode refused) "not-supported" refused.Out
             Expect.stringContains refused.Out "blank row" "why")
@@ -134,7 +162,16 @@ let tests =
             Expect.equal (errorCode r) "role-not-found" "code"
 
             let r =
-                tess [ "query"; model; "--data"; dir; "--role"; "Hidden"; "EVALUATE { 1 }"; "--json" ]
+                tess [
+                    "query"
+                    model
+                    "--data"
+                    dir
+                    "--role"
+                    "Hidden"
+                    "EVALUATE { 1 }"
+                    "--json"
+                ]
 
             Expect.equal (errorCode r) "not-supported" "code"
             Expect.stringContains r.Out "object-level security" "why")
@@ -175,11 +212,7 @@ let tests =
             Expect.equal
                 (properties s)
                 [
-                    [
-                        "Roles", "UK,Me"
-                        "EffectiveUserName", "cy@contoso.com"
-                        "CustomData", "Cy"
-                    ]
+                    [ "Roles", "UK,Me"; "EffectiveUserName", "cy@contoso.com"; "CustomData", "Cy" ]
                 ]
                 "the connection's properties")
 
@@ -279,18 +312,16 @@ tests:
     expect: 1
 """
 
-            let r = tessOn s tokenEnv [ "test"; "run"; remote; t.Combine ".tess-tests"; "--json" ]
+            let r =
+                tessOn s tokenEnv [ "test"; "run"; remote; t.Combine ".tess-tests"; "--json" ]
+
             Expect.equal r.Code ExitCode.ok (r.Out + r.Err)
 
             Expect.equal
                 (properties s)
                 [
                     []
-                    [
-                        "Roles", "UK,Me"
-                        "EffectiveUserName", "contoso\\cy"
-                        "CustomData", "Cy"
-                    ]
+                    [ "Roles", "UK,Me"; "EffectiveUserName", "contoso\\cy"; "CustomData", "Cy" ]
                 ]
                 "a second connection, with the test's roles"
 

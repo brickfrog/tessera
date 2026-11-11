@@ -95,7 +95,9 @@ let private connectionProperties (args: ParseResults<Args>) : Result<(string * s
         Error "on a server, --user-name and --user-principal-name both set EffectiveUserName: give one"
     else
         match roles |> List.tryFind (fun r -> r.Contains ',' || String.IsNullOrWhiteSpace r) with
-        | Some bad -> Error $"--role '{bad}': a server takes the roles as a comma-separated list, so a role name can't contain a comma or be empty"
+        | Some bad ->
+            Error
+                $"--role '{bad}': a server takes the roles as a comma-separated list, so a role name can't contain a comma or be empty"
         | None ->
             Ok [
                 if not roles.IsEmpty then
@@ -337,8 +339,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         ((identity args).IsSome || args.Contains Args.Role)
         && args.Contains Args.Coverage
         ->
-        UsageError
-            "--role and the identity options are for running a query: --coverage reports every role's filters"
+        UsageError "--role and the identity options are for running a query: --coverage reports every role's filters"
     | source :: _ when
         XmlaAddress.isRemote source
         && (match connectionProperties args with
@@ -398,4 +399,5 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
                 | Ok address ->
                     match Remote.query (Source.access ctx) address dax limit with
                     | Error e -> Failed e
-                    | Ok(address, results) -> render ctx args (XmlaAddress.display address) results clock.Elapsed maxRows
+                    | Ok(address, results) ->
+                        render ctx args (XmlaAddress.display address) results clock.Elapsed maxRows

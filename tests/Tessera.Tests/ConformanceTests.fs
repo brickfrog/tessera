@@ -732,11 +732,17 @@ let harnessTests =
 
             let c =
                 single (
-                    (caseText ", \"as\": { \"roles\": [ \"One\" ], \"customData\": \"x\" }")
-                        .Replace("\"m\"", roles)
+                    (caseText ", \"as\": { \"roles\": [ \"One\" ], \"customData\": \"x\" }").Replace("\"m\"", roles)
                 )
 
-            Expect.equal c.As (Some { Roles = [ "One" ]; CustomData = Some "x" }) "as"
+            Expect.equal
+                c.As
+                (Some {
+                    Roles = [ "One" ]
+                    CustomData = Some "x"
+                })
+                "as"
+
             Expect.isEmpty (validate c) ""
 
             match prepared c with
@@ -778,7 +784,8 @@ let harnessTests =
             let t, corpus =
                 corpusOf [
                     "area/bad.json",
-                    (caseText "").Replace("\"m\"", """{ "base": "m", "roles": [ { "name": "R", "permission": "owner" } ] }""")
+                    (caseText "")
+                        .Replace("\"m\"", """{ "base": "m", "roles": [ { "name": "R", "permission": "owner" } ] }""")
                 ]
 
             use _ = t

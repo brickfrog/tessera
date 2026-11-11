@@ -1227,16 +1227,26 @@ let asRoles (roles: string list) (p: Prepared) : Result<Prepared, TessError> =
         let found =
             roles
             |> List.map (fun name ->
-                match all |> List.tryFind (fun r -> String.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase)) with
+                match
+                    all
+                    |> List.tryFind (fun r -> String.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase))
+                with
                 | Some r -> Ok r
                 | None -> Error name)
 
-        match found |> List.tryPick (function Error name -> Some name | Ok _ -> None) with
+        match
+            found
+            |> List.tryPick (function
+                | Error name -> Some name
+                | Ok _ -> None)
+        with
         | Some missing -> Error(RoleNotFound(missing, all |> List.map _.Name))
         | None ->
             let chosen =
                 found
-                |> List.choose (function Ok r -> Some r | Error _ -> None)
+                |> List.choose (function
+                    | Ok r -> Some r
+                    | Error _ -> None)
                 |> List.distinctBy (fun r -> r.Name.ToUpperInvariant())
 
             let names = chosen |> List.map _.Name
@@ -1276,10 +1286,15 @@ let asRoles (roles: string list) (p: Prepared) : Result<Prepared, TessError> =
                                     match visible.TryGetValue t.Name, store.TryTable t.Name with
                                     | (true, rows), Some s when t.Expression.IsNone ->
                                         match
-                                            StoreTable.Create(s.Name, s.Columns |> Array.map (fun c -> subsetColumn c rows), rows.Length)
+                                            StoreTable.Create(
+                                                s.Name,
+                                                s.Columns |> Array.map (fun c -> subsetColumn c rows),
+                                                rows.Length
+                                            )
                                         with
                                         | Ok table -> store <- store.WithTable table
-                                        | Error why -> raise (EngineException(DaxInvalid($"table '{t.Name}': {why}", "")))
+                                        | Error why ->
+                                            raise (EngineException(DaxInvalid($"table '{t.Name}': {why}", "")))
                                     | _ -> ()
 
                                 // What `prepare` computed, filtered the same way, for the binding to reuse.

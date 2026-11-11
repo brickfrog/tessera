@@ -53,6 +53,7 @@ well-formed, the metadata is complete). Files are JSON; comments and trailing co
 | `uncertain`, `alternative` | `"uncertain": true` when the sources disagree or are silent. The expectation is then the likelier reading, and `alternative` states the other reading and the result it would give. Only for `derived`. |
 | `tags` | lower-case: the functions (`calculate`, `rankx`) and features (`context-transition`, `blank-row`) exercised. |
 | `notes` | anything else worth knowing. |
+| `as` | `{ "roles": [ ... ], "customData": "..." }`: the query runs as a member of these roles of the model (on a server: a connection with `Roles=` and `CustomData=`). Without it, as an administrator. |
 
 Expected values are spelled as `tess query --json` spells them: BLANK is `null`, an `int64` has no decimal
 point, a `double` and a `decimal` (DAX currency) have one, a `dateTime` is `"2024-01-31T00:00:00"`. In a column of
@@ -71,7 +72,7 @@ Column names are the engine's: `Table[Column]` for a model column, `[name]` for 
   `src/Tessera.Core/DaxValue.fs`. The ids are listed in `ConformanceTests.fs`, which fails if one has no case.
 - Areas an engine may leave for later carry their area's tag, so they can be skipped as a group:
   `time-intelligence`, `allselected`, `format`, `text-functions`, `date-functions`, `math-functions`,
-  `calculation-groups`, `window-functions`. A case in a folder of that name must have the tag.
+  `calculation-groups`, `window-functions`, `security`. A case in a folder of that name must have the tag.
 
 ## A model
 
@@ -93,14 +94,18 @@ Column names are the engine's: `Table[Column]` for a model column, `[name]` for 
                        "cardinality": "many-to-one", "crossFilter": "single", "active": true } ],
   "functions": [ { "name": "AddTax", "expression": "( amount : NUMERIC ) => amount * 1.1" } ],
   "calculationGroups": [ { "name": "Time", "column": "Calc", "precedence": 0,
-                           "items": [ { "name": "Current", "expression": "SELECTEDMEASURE ()" } ] } ]
+                           "items": [ { "name": "Current", "expression": "SELECTEDMEASURE ()" } ] } ],
+  "roles": [ { "name": "Europe", "permission": "read", "filters": { "Customer": "Customer[Continent] = \"Europe\"" } } ]
 }
 ```
 
 - Column types: `string`, `int64`, `double`, `decimal`, `dateTime`, `boolean`. Rows are arrays in column order,
   spelled like expected values; `null` is BLANK and `""` the empty string.
 - A relationship's `from` is the many side. `cardinality` is `many-to-one` (default), `one-to-one` or
-  `many-to-many`; `crossFilter` is `single` (default: `to` filters `from`) or `both`.
+  `many-to-many`; `crossFilter` is `single` (default: `to` filters `from`) or `both`; `securityFilter` (`single` or
+  `both`) is how far a role's filter crosses it.
+- A role's `permission` is `read` (default), `readRefresh`, `administrator`, `none` or `refresh`; `filters` maps a
+  table to its row filter. A case's model overlay may replace `roles`.
 - A calculated table declares its `columns` only if a relationship, `sortBy` or `key` needs them.
 - Culture defaults to `en-US`. Everything else is TOM's default (compatibility level 1702).
 

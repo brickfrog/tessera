@@ -320,6 +320,8 @@ module TessError =
             | names -> $"The model has no role '{role}'; it has: " + String.concat ", " names
         | RoleCannotRead roles ->
             let list =
-                roles |> List.map (fun (name, permission) -> $"'{name}' ({permission})") |> String.concat ", "
+                roles
+                |> List.map (fun (name, permission) -> $"'{name}' ({permission})")
+                |> String.concat ", "
 
             $"Members of {list} can't query data: a role needs the Read, ReadRefresh or Administrator permission"
