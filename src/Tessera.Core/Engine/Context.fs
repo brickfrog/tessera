@@ -414,7 +414,7 @@ module Filters =
         if filters.IsEmpty then
             fc
         else
-            // A filter on a column a calendar tags clears others first (Calendars.fs).
+            // Where calendar context clearing would change these filters: refused (Calendars.fs).
             let fc = CalendarHooks.beforeAdd fc filters keep
 
             let old, scope =
