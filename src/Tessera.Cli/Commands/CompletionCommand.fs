@@ -571,10 +571,11 @@ let private kindOf (value: Value) =
 let private brief (help: string) =
     let oneLine = help.Replace("\r", " ").Replace("\n", " ").Trim()
 
+    // Not at "e.g. " or "i.e. ".
     let sentence =
-        match oneLine.IndexOf ". " with
-        | -1 -> oneLine
-        | i -> oneLine.Substring(0, i)
+        match RegularExpressions.Regex.Match(oneLine, @"(?<!\be\.g|\bi\.e)\. ") with
+        | m when m.Success -> oneLine.Substring(0, m.Index)
+        | _ -> oneLine
 
     sentence.TrimEnd('.')
 
@@ -969,7 +970,7 @@ let pwsh (root: Node) =
         for k, items in rows do
             let entries =
                 items
-                |> List.map (fun (name, help) -> $"@({pwshQuote name}, {pwshQuote help})")
+                |> List.map (fun (name, help) -> $"@{{ n = {pwshQuote name}; h = {pwshQuote help} }}")
                 |> String.concat ", "
 
             $"        {pwshQuote k} = @({entries})"
@@ -1009,6 +1010,8 @@ let pwsh (root: Node) =
             )
         "    }"
         ""
+        "    # The word without its quotes (PowerShell closes an open quote in $wordToComplete)."
+        "    $current = $wordToComplete -replace '^([''\"])(.*?)\\1?$', '$2'"
         "    $words = @()"
         "    foreach ($e in $commandAst.CommandElements | Select-Object -Skip 1) {"
         "        if ($e.Extent.EndOffset -gt $cursorPosition) { break }"
@@ -1019,7 +1022,7 @@ let pwsh (root: Node) =
         "    $node = ''; $pos = 0; $skip = $false"
         "    foreach ($w in $words) {"
         "        if ($skip) { $skip = $false; continue }"
-        "        if ($children.ContainsKey($node) -and ($children[$node] | Where-Object { $_[0] -ceq $w })) {"
+        "        if ($children.ContainsKey($node) -and ($children[$node] | Where-Object { $_.n -ceq $w })) {"
         "            $node = ($node + ' ' + $w).Trim(); $pos = 0; continue"
         "        }"
         "        if ($w -match '^-.') { if ($values.ContainsKey(\"$node|$w\")) { $skip = $true }; continue }"
@@ -1029,7 +1032,7 @@ let pwsh (root: Node) =
         "    $result = [System.Collections.Generic.List[System.Management.Automation.CompletionResult]]::new()"
         "    $add = {"
         "        param($text, $type, $tip)"
-        "        if (-not $text.StartsWith($wordToComplete, [System.StringComparison]::OrdinalIgnoreCase)) { return }"
+        "        if (-not $text.StartsWith($current, [System.StringComparison]::OrdinalIgnoreCase)) { return }"
         "        $insert = if ($text -match '[\\s''\"`$#;,(){}@|&<>]') { \"'\" + $text.Replace(\"'\", \"''\") + \"'\" } else { $text }"
         "        if (-not $tip) { $tip = $text }"
         "        $result.Add([System.Management.Automation.CompletionResult]::new($insert, $text, $type, $tip))"
@@ -1038,18 +1041,18 @@ let pwsh (root: Node) =
         "    if ($skip) {"
         "        $kind = $values[\"$node|$($words[-1])\"]"
         "    } elseif ($wordToComplete.StartsWith('-')) {"
-        "        foreach ($o in $options[$node]) { & $add $o[0] 'ParameterName' $o[1] }"
+        "        foreach ($o in $options[$node]) { & $add $o.n 'ParameterName' $o.h }"
         "        return $result"
         "    } else {"
         "        $kind = $positionals[\"$node|$pos\"]"
         "        if (-not $kind) { $kind = $positionals[\"$node|*\"] }"
-        "        if ($pos -eq 0 -and $children.ContainsKey($node)) { foreach ($c in $children[$node]) { & $add $c[0] 'Command' $c[1] } }"
+        "        if ($pos -eq 0 -and $children.ContainsKey($node)) { foreach ($c in $children[$node]) { & $add $c.n 'Command' $c.h } }"
         "    }"
         "    if ($kind -like 'choice *') {"
         "        foreach ($v in $kind.Substring(7).Split(' ')) { & $add $v 'ParameterValue' $null }"
         "    } elseif ($kind -eq 'dyn') {"
         "        $exe = $commandAst.CommandElements[0].Extent.Text"
-        "        foreach ($c in (& $exe __complete \"--current=$wordToComplete\" -- @words 2>$null)) { if ($c) { & $add $c 'ParameterValue' $null } }"
+        "        foreach ($c in (& $exe __complete \"--current=$current\" -- @words 2>$null)) { if ($c) { & $add $c 'ParameterValue' $null } }"
         "    }"
         "    # For a path, no results: PowerShell completes file names itself."
         "    if ($result.Count -gt 0) { return $result }"
