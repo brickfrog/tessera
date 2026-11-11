@@ -6,6 +6,8 @@ open System.IO
 type ModelFormat =
     | Bim
     | Tmdl
+    /// Tabular Editor's "save to folder" layout: a folder with database.json (FolderFormat).
+    | DatabaseJson
     /// A database on a server (`xmla:<server>;<database>`). Core never loads these itself: only a
     /// command given a connection does (Tessera.Xmla).
     | Xmla
@@ -13,7 +15,8 @@ type ModelFormat =
 /// A located, loadable model: on disk, or (Format = Xmla) on a server.
 type ModelSource = {
     Format: ModelFormat
-    /// The .bim file, or the TMDL root folder (the one holding database.tmdl / model.tmdl).
+    /// The .bim file, the TMDL root folder (the one holding database.tmdl / model.tmdl), or the folder
+    /// holding database.json.
     /// For a remote model, its address as `xmla:<server>;<database>`: not a file path.
     Path: string
     /// The enclosing PBIP "X.SemanticModel" folder, when the model lives in one.
@@ -25,6 +28,7 @@ module ModelFormat =
         function
         | Bim -> "bim"
         | Tmdl -> "tmdl"
+        | DatabaseJson -> "database.json"
         | Xmla -> "xmla"
 
 module ModelSource =
@@ -57,6 +61,13 @@ module ModelSource =
                 match Directory.GetParent root with
                 | null -> None
                 | parent -> enclosingSemanticModel parent.FullName
+        }
+
+    let private databaseJson (dir: string) =
+        Ok {
+            Format = DatabaseJson
+            Path = dir
+            SemanticModelFolder = None
         }
 
     /// Walk up from a .tmdl file's folder to the TMDL root (as TE2 does, bounded).
@@ -144,6 +155,14 @@ module ModelSource =
                     fromSemanticModelFolder dir
                 elif hasExt ".pbir" full then
                     fromReportFolder dir
+                elif
+                    String.Equals(
+                        Path.GetFileName full,
+                        FolderFormat.databaseJsonFileName,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                then
+                    databaseJson dir
                 elif hasExt ".tmdl" full || hasExt ".tmd" full then
                     match findTmdlRoot dir with
                     | Some root -> tmdl root
@@ -156,6 +175,8 @@ module ModelSource =
                     fromSemanticModelFolder full
                 elif isTmdlRoot full then
                     tmdl full
+                elif FolderFormat.isFolder full then
+                    databaseJson full
                 elif File.Exists(Path.Combine(full, Pbip.pbirFileName)) then
                     fromReportFolder full
                 else
@@ -164,7 +185,8 @@ module ModelSource =
                 Error(PathNotFound full)
 
     /// Work out what model a user-supplied path refers to. Accepts:
-    /// a .bim file; a TMDL folder (or any .tmdl file inside one); a PBIP "X.SemanticModel" folder or
+    /// a .bim file; a TMDL folder (or any .tmdl file inside one); a folder with database.json (or that
+    /// file); a PBIP "X.SemanticModel" folder or
     /// its definition.pbism; a .pbip file; a "X.Report" folder or its definition.pbir; or a project
     /// folder containing exactly one of those.
     /// A remote model (`xmla:...`) is refused here: only commands that open a connection load one,

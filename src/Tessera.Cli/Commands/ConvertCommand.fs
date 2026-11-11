@@ -11,11 +11,11 @@ open Tessera.Cli.Output
 open Tessera.Cli.Common
 
 /// One-line description, shown in `tess --help`.
-let summary = "convert a model between .bim, TMDL and PBIP."
+let summary = "convert a model between .bim, TMDL, PBIP and database.json folders."
 
 type Args =
     | [<MainCommand; ExactlyOnce>] Paths of source: string * destination: string
-    | [<AltCommandLine("-f")>] Format of format: string
+    | [<AltCommandLine("-f", "--serialization")>] Format of format: string
     | Force
     | Eol of eol: string
     | Indent_Spaces of spaces: int
@@ -26,8 +26,10 @@ type Args =
             match this with
             | Paths _ -> "model to read, and where to write it."
             | Format _ ->
-                "output format: bim | tmdl | pbip. Default: inferred from the destination "
-                + "(*.bim -> bim, *.SemanticModel -> pbip, otherwise a tmdl folder)."
+                "output format: "
+                + String.Join(" | ", ModelIO.OutputFormat.tokens)
+                + ". Default: inferred from the destination (*.bim -> bim, *.SemanticModel -> pbip, "
+                + ".../database.json or a folder holding one -> database.json, otherwise a tmdl folder)."
             | Force -> "overwrite a non-empty destination."
             | Eol _ ->
                 "line endings: auto (default: match files already at the destination, else the source, else lf) "
@@ -65,7 +67,9 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         | Some f ->
             ModelIO.OutputFormat.tryParse f
             |> Option.map Ok
-            |> Option.defaultValue (Error $"unknown format '{f}' (expected bim, tmdl or pbip)")
+            |> Option.defaultValue (
+                Error $"""unknown format '{f}' (expected {String.Join(", ", ModelIO.OutputFormat.tokens)})"""
+            )
 
     // None = auto: decided once the source is resolved (see Eol.resolveAuto).
     let eol =
@@ -97,7 +101,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
                     IndentSpaces = indent
                 }
 
-                ModelIO.save format opts (args.Contains Args.Force) db destination
+                ModelIO.saveItem (ModelIO.sourceItem src) format opts (args.Contains Args.Force) db destination
                 |> Result.map (fun saved -> src, saved))
 
         match result with

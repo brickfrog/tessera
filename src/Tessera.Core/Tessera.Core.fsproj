@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="Errors.fs" />
     <Compile Include="ObjectRef.fs" />
+    <Compile Include="FolderFormat.fs" />
     <Compile Include="Pbip.fs" />
     <Compile Include="XmlaAddress.fs" />
     <Compile Include="ModelSource.fs" />
