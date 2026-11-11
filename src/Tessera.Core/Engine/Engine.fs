@@ -1079,7 +1079,13 @@ let private bindWith
                             r.OneToOne
                             && (obj.ReferenceEquals(r.From.Table, t) || obj.ReferenceEquals(r.To.Table, t)))
 
-                    if incoming |> Array.exists (fun r -> r.IsActive && r.OrphanFromRows.Length > 0) then
+                    // An inactive relationship counts as an active one does: "Inactive relationships
+                    // are also expanded, even when the relationship isn't used by a calculation ...
+                    // When a matching value from the "many" to the "one" side doesn't exist, a blank
+                    // virtual row is added to the "one" side table" (Learn, "Model relationships in
+                    // Power BI Desktop"). Which relationships filter and what RELATED reads still
+                    // follow the active ones (SQLBI, "Expanded tables in DAX").
+                    if incoming |> Array.exists (fun r -> r.OrphanFromRows.Length > 0) then
                         match oneToOne with
                         | Some o when
                             incoming
@@ -1094,15 +1100,6 @@ let private bindWith
                         // row in DAX").
                         t.SetBlankRow true
                     else
-                        match
-                            incoming
-                            |> Array.tryFind (fun r -> not r.IsActive && r.OrphanFromRows.Length > 0)
-                        with
-                        | Some r ->
-                            refuse
-                                $"the blank row of '{t.Name}': only the inactive relationship from '{r.From.Table.Name}'[{r.From.Name}] has keys without a match, and the sources don't say whether an inactive relationship adds the blank row"
-                        | None -> ()
-
                         match
                             incoming
                             |> Array.tryFind (fun r ->

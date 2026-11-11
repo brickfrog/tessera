@@ -1246,9 +1246,12 @@ let tests =
                     }
 
                 notSupported m "EVALUATE ROW ( \"v\", [Amount] )" "repeat")
-            // The sources say an invalid relationship adds the blank row, not whether an inactive
-            // one does.
-            testCase "keys without a match on an inactive relationship only" (fun () ->
+            // "Inactive relationships are also expanded, even when the relationship isn't used by a
+            // calculation ... When a matching value from the "many" to the "one" side doesn't
+            // exist, a blank virtual row is added to the "one" side table" (Learn, "Model
+            // relationships in Power BI Desktop"). Filters still go through the active one: F's
+            // row 2 (B = 7) reaches the blank row only under USERELATIONSHIP.
+            testCase "keys without a match on an inactive relationship only give the blank row" (fun () ->
                 let m =
                     prepare {
                         Tables = [
@@ -1260,8 +1263,17 @@ let tests =
                         Functions = []
                     }
 
-                notSupported m "EVALUATE VALUES ( D[K] )" "blank row"
-                notSupported m "EVALUATE ROW ( \"n\", COUNTROWS ( F ) )" "blank row")
+                returns m "EVALUATE VALUES ( D[K] )" [ [ 1 ]; [ 2 ]; [ null ] ]
+                returns m "EVALUATE DISTINCT ( D[K] )" [ [ 1 ]; [ 2 ] ]
+                is m "COUNTROWS ( F )" 2
+                is m "COUNTROWS ( ALL ( D ) )" 3
+                is m "CALCULATE ( COUNTROWS ( F ), ISBLANK ( D[K] ) )" (null: obj)
+                is m "CALCULATE ( COUNTROWS ( F ), ISBLANK ( D[K] ), USERELATIONSHIP ( F[B], D[K] ) )" 1
+                is m "CALCULATE ( COUNTROWS ( F ), D[K] = 1, USERELATIONSHIP ( F[B], D[K] ) )" 1
+                is m "CALCULATE ( COUNTROWS ( F ), D[K] = 2, USERELATIONSHIP ( F[B], D[K] ) )" (null: obj)
+
+                // RELATED reads the active relationship (SQLBI, "Expanded tables in DAX").
+                returns m "EVALUATE ADDCOLUMNS ( F, \"R\", RELATED ( D[K] ) )" [ [ 1; 1; 1 ]; [ 2; 7; 2 ] ])
             // Sales -> Product -> Category with a sale of a product that doesn't exist: whether
             // Category gets a blank row of its own is not documented.
             testCase "a blank row at the start of a chain of relationships" (fun () ->

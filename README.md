@@ -2016,7 +2016,9 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 - **Relationships:** many-to-one, single column. Filters travel from the one side; both ways where the model says
   so or under `CROSSFILTER`; inactive relationships under `USERELATIONSHIP`; expanded tables (a table used as a
   filter filters the tables it relates to, and `ALL ( Sales )` removes filters from them); the blank row for keys
-  with no match (`VALUES` and `ALL` have it, `DISTINCT`, `ALLNOBLANKROW` and a plain table reference don't).
+  with no match (`VALUES` and `ALL` have it, `DISTINCT`, `ALLNOBLANKROW` and a plain table reference don't), on an
+  inactive relationship too ("Inactive relationships are also expanded": Learn), though filters and `RELATED` go
+  through the active one.
 - **`CALCULATE` / `CALCULATETABLE`:** the documented order (filter arguments in the original context, context
   transition, modifiers, then the filters); True/False filters over one or several columns of a table; table
   filters; `KEEPFILTERS`; `ALL`, `ALLEXCEPT`, `ALLNOBLANKROW`, `REMOVEFILTERS`, `ALLCROSSFILTERED`,
@@ -2377,8 +2379,7 @@ expressions only, say).
   with one.
 - **Where the sources don't say what the engine does,** for instance:
   - a one-side key that repeats or is BLANK;
-  - keys with no match on an inactive relationship only, or at the start of a chain of relationships (whether the
-    blank row exists);
+  - keys with no match at the start of a chain of relationships (whether the blank row exists);
   - a filter that crosses a both-directions relationship while keeping every row of the many side;
   - `TOPN` without an order-by on more rows than asked for, and `CONCATENATEX` without one over different texts
     (the engine defines no order), and sorting where BLANK meets zero or negative values, or values of different
