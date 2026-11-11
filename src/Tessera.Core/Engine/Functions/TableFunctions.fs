@@ -512,9 +512,20 @@ module TableFunctions =
                             let maps = tables |> Array.map (fun t -> t.Id, cfg.RowMap(x, t)) |> dict
                             rows.Length, (fun (t: BTable) (p: int) -> maps.[t.Id].[rows.[p]])
 
+                // A column with Group By Columns is grouped with them all here, or not at all
+                // (`BColumn.GroupedWith`; it is then read through its gate, which refuses).
+                let grouped (c: BColumn) = c.Gate.IsSome && c.GroupedWith mine
+
                 let keys =
                     mine
-                    |> Array.map (fun c -> Array.init count (fun p -> c.ValueAt(rowOf c.Table p)))
+                    |> Array.map (fun c ->
+                        if grouped c then
+                            Array.init count (fun p -> c.StoredValueAt(rowOf c.Table p))
+                        else
+                            Array.init count (fun p -> c.ValueAt(rowOf c.Table p)))
+
+                let idAt (c: BColumn) (row: int) =
+                    if grouped c then c.StoredIdAt row else c.IdAt row
 
                 let groups =
                     groupRows ctx.Model keys count
@@ -523,7 +534,7 @@ module TableFunctions =
                             HashSet<int array>(IntArrayComparer.Instance :> IEqualityComparer<int array>)
 
                         for p in positions do
-                            tuples.Add(cols |> Array.map (fun c -> c.IdAt(rowOf c.Table p))) |> ignore
+                            tuples.Add(cols |> Array.map (fun c -> idAt c (rowOf c.Table p))) |> ignore
 
                         let filter =
                             if cols.Length = 1 then

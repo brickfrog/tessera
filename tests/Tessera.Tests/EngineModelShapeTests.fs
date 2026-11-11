@@ -208,6 +208,92 @@ let nameofTests =
                  |> String.concat "; ")
                 "Group By Columns"
                 "coverage names the column")
+
+        // "The DAX query generated for the report ... contains Customer[State] and Customer[Country]
+        // in all the functions that participate in the groupby condition"; "The columns specified
+        // in Group By Columns must be present in the grouping conditions of any query that includes
+        // the target column ... otherwise, the query fails with an error" (SQLBI, "Understanding
+        // Group By Columns in Power BI"). Power BI queries a field parameter that way.
+        testCase "a column with Group By Columns can be grouped by SUMMARIZECOLUMNS with them all" (fun () ->
+            let m = {
+                star with
+                    Tables =
+                        star.Tables
+                        @ [
+                            calculatedTable
+                                "Metric"
+                                [
+                                    "Value1", DataType.String
+                                    "Value2", DataType.String
+                                    "Value3", DataType.Int64
+                                ]
+                                "{ (\"Amount\", NAMEOF ( 'Sales'[Amount] ), 0), (\"Units\", NAMEOF ( 'Sales'[Units] ), 1) }"
+                        ]
+                    Measures = star.Measures @ [ "Sales", "Picked", "SELECTEDVALUE ( Metric[Value3] )" ]
+            }
+
+            let db, store = build m
+            let metric = db.Model.Tables.["Metric"]
+            let details = new RelatedColumnDetails()
+            details.GroupByColumns.Add(new GroupByColumn(GroupingColumn = metric.Columns.["Value2"]))
+            metric.Columns.["Value1"].RelatedColumnDetails <- details
+
+            let p =
+                match Engine.prepare db store with
+                | Ok p -> p
+                | Error e -> failtestf "%s" (TessError.message e)
+
+            returns p "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], Metric[Value3] )" [
+                [ "Amount"; "'Sales'[Amount]"; 0 ]
+                [ "Units"; "'Sales'[Units]"; 1 ]
+            ]
+
+            // The group's filter is one filter on all of them: a measure under it sees its row.
+            returnsInOrder
+                p
+                "EVALUATE SUMMARIZECOLUMNS ( Metric[Value3], Metric[Value2], Metric[Value1], \"P\", [Picked], \"N\", COUNTROWS ( Metric ) ) ORDER BY Metric[Value3] DESC"
+                [
+                    [ 1; "'Sales'[Units]"; "Units"; 1; 1 ]
+                    [ 0; "'Sales'[Amount]"; "Amount"; 0; 1 ]
+                ]
+
+            // With a filter table on the group-by column, as Power BI sends a slicer's selection.
+            returns
+                p
+                "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], TREATAS ( { \"'Sales'[Units]\" }, Metric[Value2] ), \"P\", [Picked] )"
+                [ [ "Units"; "'Sales'[Units]"; 1 ] ]
+
+            // A query with definitions binds the model again.
+            returns
+                p
+                "DEFINE MEASURE Sales[C] = COUNTROWS ( Metric ) EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], \"C\", [C] )"
+                [ [ "Amount"; "'Sales'[Amount]"; 1 ]; [ "Units"; "'Sales'[Units]"; 1 ] ]
+
+            // Everything else is still refused: grouping without the group-by column...
+            notSupported p "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1] )" "Group By Columns"
+            notSupported p "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value3] )" "Group By Columns"
+            // ... in another call than the one that groups by it ...
+            notSupported
+                p
+                "EVALUATE SUMMARIZECOLUMNS ( Metric[Value2], \"X\", COUNTROWS ( SUMMARIZECOLUMNS ( Metric[Value1] ) ) )"
+                "Group By Columns"
+            // ... reading its value under the group ("the same restrictions apply to ...
+            // HASONEVALUE and SELECTEDVALUE") ...
+            notSupported
+                p
+                "DEFINE MEASURE Sales[S] = SELECTEDVALUE ( Metric[Value1] ) EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], \"S\", [S] )"
+                "Group By Columns"
+            // ... a filter on it alone ...
+            notSupported
+                p
+                "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], TREATAS ( { \"Units\" }, Metric[Value1] ) )"
+                "Group By Columns"
+            // ... and a context transition over the result ("The context transition too should
+            // include the three columns").
+            notSupported
+                p
+                "EVALUATE ADDCOLUMNS ( SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2] ), \"P\", [Picked] )"
+                "Group By Columns")
     ]
 
 // ---- Limited (many-to-many cardinality) relationships -------------------------------------------

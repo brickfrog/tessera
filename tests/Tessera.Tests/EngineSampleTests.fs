@@ -67,4 +67,47 @@ let tests =
 
                 if not failures.IsEmpty then
                     failtestf "%d measures:\n%s" failures.Length (String.concat "\n" failures)
+
+            // The field parameters: their display column has Group By Columns (its Fields column),
+            // and Power BI groups by both ("Power BI takes care of adding the columns to the DAX
+            // query": SQLBI, "Understanding Group By Columns in Power BI").
+            testCase "field parameters group by their display column with its Fields column"
+            <| fun () ->
+                use t = new TempDir()
+                let _, db = ModelIO.loadPath path |> ok
+                let fixture = t.Combine "fixture"
+                FixtureInit.write db fixture { Rows = 20; Seed = 1L } false |> ok |> ignore
+                let loaded, _ = Fixture.loadAndCheck db fixture |> ok
+                let prepared = Engine.prepare db loaded.Store |> ok
+
+                let parameters = [
+                    for table in db.Model.Tables do
+                        for c in table.Columns do
+                            if
+                                not (isNull c.RelatedColumnDetails)
+                                && c.RelatedColumnDetails.GroupByColumns.Count > 0
+                            then
+                                table.Name,
+                                c.Name,
+                                [ for g in c.RelatedColumnDetails.GroupByColumns -> g.GroupingColumn.Name ]
+                ]
+
+                Expect.equal parameters.Length 3 "spaceparts has three field parameters"
+
+                for (table, display, fields) in parameters do
+                    let quote (c: string) = $"'{table}'[{c}]"
+                    let grouped = String.concat ", " (quote display :: (fields |> List.map quote))
+
+                    let n =
+                        match Engine.evaluateScalar prepared $"COUNTROWS ( '{table}' )" |> ok with
+                        | QueryValue.Int64 n -> n
+                        | other -> failtestf "%A" other
+
+                    match Engine.evaluateQuery prepared $"EVALUATE SUMMARIZECOLUMNS ( {grouped} )" with
+                    | Ok [ r ] -> Expect.equal (int64 r.Rows.Length) n $"{table}: one row per parameter"
+                    | other -> failtestf "%s: %A" table other
+
+                    match Engine.evaluateQuery prepared $"EVALUATE SUMMARIZECOLUMNS ( {quote display} )" with
+                    | Error(DaxNotSupported(what, _)) -> Expect.stringContains what "Group By Columns" table
+                    | other -> failtestf "%s: %A" table other
     ]

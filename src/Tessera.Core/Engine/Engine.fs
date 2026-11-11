@@ -385,7 +385,7 @@ let private groupedBy (db: Database) : Dictionary<string, string> =
                         |> String.concat ", "
 
                     found.[t.Name + "\u0000" + c.Name] <-
-                        $"'{t.Name}'[{c.Name}], which has Group By Columns ({by}): a query that groups by it without them fails, and which queries those are is not implemented"
+                        $"'{t.Name}'[{c.Name}], which has Group By Columns ({by}): a query that groups by it without them fails; the engine reads it only where SUMMARIZECOLUMNS groups by it together with all of them"
 
     found
 
@@ -1158,7 +1158,29 @@ let private bindWith
     for t in model.Tables do
         for c in t.Columns do
             match grouped.TryGetValue(t.Name + "\u0000" + c.Name) with
-            | true, why -> c.Gate <- Some why
+            | true, why ->
+                c.Gate <- Some why
+
+                // Its Group By Columns, as the engine's columns; one the engine doesn't have
+                // leaves the column gated everywhere.
+                let source = db.Model.Tables.[t.Name].Columns.[c.Name]
+
+                let by =
+                    source.RelatedColumnDetails.GroupByColumns
+                    |> Seq.map (fun g ->
+                        if isNull g.GroupingColumn then
+                            None
+                        else
+                            match model.TableByName.TryGetValue g.GroupingColumn.Table.Name with
+                            | true, bt ->
+                                match bt.ColumnByName.TryGetValue g.GroupingColumn.Name with
+                                | true, bc -> Some bc
+                                | _ -> None
+                            | _ -> None)
+                    |> Array.ofSeq
+
+                if by |> Array.forall Option.isSome then
+                    c.GroupBy <- by |> Array.choose id
             | _ -> ()
 
     model, List.ofSeq failures

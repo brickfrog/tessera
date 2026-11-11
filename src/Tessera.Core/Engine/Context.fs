@@ -533,11 +533,22 @@ module Filters =
 
                             let buffer = Array.zeroCreate<int> columns.Length
 
+                            // A column with Group By Columns is read here when they are all in the
+                            // same filter: the group of a SUMMARIZECOLUMNS that groups by them all
+                            // (SQLBI, "Understanding Group By Columns in Power BI": the columns
+                            // "must be part of the same table").
+                            let grouped = columns |> Array.map (fun c -> c.Gate.IsSome && c.GroupedWith columns)
+
                             set <-
                                 set.Where(fun row ->
                                     for i in 0 .. columns.Length - 1 do
                                         let r = if isNull maps.[i] then row else maps.[i].[row]
-                                        buffer.[i] <- columns.[i].IdAt r
+
+                                        buffer.[i] <-
+                                            if grouped.[i] then
+                                                columns.[i].StoredIdAt r
+                                            else
+                                                columns.[i].IdAt r
 
                                     projected.Contains buffer)
                 | Rows(x, rows, _) ->

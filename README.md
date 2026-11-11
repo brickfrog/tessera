@@ -2370,7 +2370,12 @@ expressions only, say).
   Dual tables: every table connected to one is closed to queries, the rest of the model works. A calculation group
   is closed when a query names it. Active relationships that give two filter paths between two tables. A column
   with Group By Columns (a field parameter's display column): a query that groups by it without them fails on a
-  server, so any query that reads it is refused (the table itself is computed, and its other columns work).
+  server, so a query that reads it is refused (the table itself is computed, and its other columns work), except
+  `SUMMARIZECOLUMNS` grouping by it together with all of its Group By Columns, as Power BI queries a field
+  parameter ("The columns specified in Group By Columns must be present in the grouping conditions of any query
+  that includes the target column": SQLBI, "Understanding Group By Columns in Power BI"). Under such a group,
+  measures see the group's row; reading the column there (`SELECTEDVALUE`, `VALUES`), filtering it alone, a context
+  transition over the result, and `SUMMARIZE`, `ALL` and `TREATAS` over it are still refused.
 - **One-to-one relationships, by their data:** keys missing on both sides (both tables would need a blank row),
   more than one unmatched row on the side with the extra keys, and a blank row either table has from another
   relationship. The declared direction doesn't matter (a one-to-one relationship filters both ways and its two
