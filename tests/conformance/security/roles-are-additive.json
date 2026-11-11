@@ -1,0 +1,49 @@
+{
+  "title": "A member of two roles sees what either role lets through",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Customers\", COUNTROWS ( Customer ), \"Amount\", [Sales Amount] )",
+  "as": {
+    "roles": [
+      "Europe",
+      "Asia"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Customers]",
+          "type": "int64"
+        },
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3,
+          180
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/fabric/security/service-admin-row-level-security",
+      "quote": "A user can belong to multiple roles, and the roles are additive.",
+      "supports": "the rows of both roles are visible"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/computing-accurate-percentages-with-row-level-security-in-power-bi/",
+      "quote": "we browse the model while impersonating a user with two roles, Australia and Europe.",
+      "supports": "SQLBI's example of a user with two continent roles sees both continents"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Europe keeps Ann and Bob, Asia keeps Cy: three customers. Their sales: 130 + 50 = 180.",
+  "tags": [
+    "security",
+    "role"
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "title": "A percentage over ALL ( Customer ) is of what the roles let the user see",
+  "model": "security",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Customer[Continent], \"Pct\", [Pct over All] )",
+  "as": {
+    "roles": [
+      "Europe",
+      "Australia"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Continent]",
+          "type": "string"
+        },
+        {
+          "name": "[Pct]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          "Australia",
+          0.1875
+        ],
+        [
+          "Europe",
+          0.8125
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/computing-accurate-percentages-with-row-level-security-in-power-bi/",
+    "quote": "we are not computing the percentage against all sales but the percentage against the sales we are allowed to see.",
+    "supports": "with roles, the denominator is the total of the visible sales"
+  },
+  "confidence": "derived",
+  "derivation": "Europe and Australia together see Ann, Bob and Di: sales 130 (Europe) + 30 (Australia) = 160. Europe 130 / 160 = 0.8125; Australia 30 / 160 = 0.1875. Asia's customer is not visible, so it has no row.",
+  "tags": [
+    "security",
+    "role",
+    "all",
+    "summarizecolumns",
+    "divide"
+  ]
+}

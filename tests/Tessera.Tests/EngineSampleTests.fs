@@ -117,3 +117,55 @@ let tests =
                     | Error(DaxNotSupported(what, _)) -> Expect.stringContains what "Group By Columns" table
                     | other -> failtestf "%s: %A" table other
     ]
+
+/// Roles on the sample: a dimension's filter applies, and every measure coverage clears still
+/// evaluates under it (or is refused as not supported, never called invalid).
+[<Tests>]
+let securityTests =
+    testList "Engine on a sample model with roles (TESSERA_SAMPLE_MODEL)" [
+        match samplePath with
+        | None ->
+            testCase "not configured"
+            <| fun () -> skiptest "TESSERA_SAMPLE_MODEL is not set"
+        | Some path ->
+            testCase "a role on a dimension, and the measures under it"
+            <| fun () ->
+                use t = new TempDir()
+                let _, db = ModelIO.loadPath path |> ok
+                let fixture = t.Combine "fixture"
+                FixtureInit.write db fixture { Rows = 200; Seed = 1L } false |> ok |> ignore
+                let loaded, _ = Fixture.loadAndCheck db fixture |> ok
+
+                let role =
+                    new Microsoft.AnalysisServices.Tabular.ModelRole(
+                        Name = "Brands",
+                        ModelPermission = Microsoft.AnalysisServices.Tabular.ModelPermission.Read
+                    )
+
+                role.TablePermissions.Add(
+                    new Microsoft.AnalysisServices.Tabular.TablePermission(
+                        Table = db.Model.Tables.["Brand"],
+                        FilterExpression = "LEN ( Brand[Sub Brand] ) > 3"
+                    )
+                )
+
+                db.Model.Roles.Add role
+                let prepared = Engine.prepare db loaded.Store |> ok
+                let secured = Engine.asRoles [ "Brands" ] prepared |> ok
+                let count (p: Engine.Prepared) dax = Engine.evaluateScalar p dax |> ok
+
+                Expect.isLessThanOrEqual
+                    (count secured "COUNTROWS ( Brand ) + 0")
+                    (count prepared "COUNTROWS ( Brand ) + 0")
+                    "the role keeps some brands"
+
+                let failures = [
+                    for (ref, unsupported) in Engine.coverage db do
+                        if ref.Kind = ObjectKind.Measure && unsupported.IsEmpty then
+                            match Engine.evaluateScalar secured $"[{ObjectRef.name ref}]" with
+                            | Error(DaxInvalid _ as e) -> $"{ObjectRef.format ref}: {TessError.message e}"
+                            | _ -> ()
+                ]
+
+                Expect.isEmpty failures "no measure is called invalid under the role"
+    ]

@@ -1,0 +1,44 @@
+{
+  "title": "Row filters don't apply to an administrator, whatever other roles the user has",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Amount\", [Sales Amount] )",
+  "as": {
+    "roles": [
+      "Admins",
+      "Europe"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          210
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+      "quote": "Row filters don't apply. All data can be queried in this role.",
+      "supports": "the Administrator permission sees all the data"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+      "quote": "When a user is a member of multiple roles, the permissions defined for each role are cumulative.",
+      "supports": "the administrator's permission adds to Europe's"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Admins has the Administrator permission: all five sales, 210. Europe's filter takes nothing away (permissions are cumulative).",
+  "tags": [
+    "security",
+    "role"
+  ]
+}

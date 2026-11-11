@@ -1,0 +1,55 @@
+{
+  "title": "A relationship that cross-filters both ways still carries a role's filter one way only",
+  "model": {
+    "base": "security",
+    "relationships": [
+      {
+        "from": "Sales[CustomerKey]",
+        "to": "Customer[CustomerKey]",
+        "crossFilter": "both"
+      },
+      {
+        "from": "Sales[ProductKey]",
+        "to": "Product[ProductKey]"
+      },
+      {
+        "from": "Sales[BillToKey]",
+        "to": "Customer[CustomerKey]",
+        "active": false
+      }
+    ]
+  },
+  "query": "EVALUATE ROW ( \"Customers\", COUNTROWS ( Customer ) )",
+  "as": {
+    "roles": [
+      "BigSales"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Customers]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          4
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/fabric/security/service-admin-row-level-security",
+    "quote": "By default, row-level security filtering uses single-directional filters, whether the relationships are set to single direction or bi-directional.",
+    "supports": "the both-ways relationship doesn't carry the security filter from Sales to Customer"
+  },
+  "confidence": "derived",
+  "derivation": "BigSales filters Sales. Sales -> Customer cross-filters both ways, but its security filtering is one direction (the default), so Customer keeps its four rows.",
+  "tags": [
+    "security",
+    "role",
+    "bidirectional"
+  ]
+}

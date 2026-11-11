@@ -1,0 +1,51 @@
+{
+  "title": "A dynamic role filter reads CUSTOMDATA through LOOKUPVALUE",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Customers\", COUNTROWS ( Customer ), \"Amount\", [Sales Amount] )",
+  "as": {
+    "roles": [
+      "ByCustomData"
+    ],
+    "customData": "cy@contoso.com"
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Customers]",
+          "type": "int64"
+        },
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          50
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+      "quote": "Dynamic security lets you define row-level security based on the username of the user currently logged on or the CustomData property returned from a connection string.",
+      "supports": "CUSTOMDATA () is the connection's CustomData"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+      "quote": "You can use the LOOKUPVALUE function to return values for a column where the Windows username is the same as the username returned by the USERNAME function or a string returned by the CustomData function.",
+      "supports": "the LOOKUPVALUE pattern of the role"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "CustomData is cy@contoso.com, whose continent in Users is Asia. The role keeps the customers of Asia: Cy, with sale 3 (50).",
+  "tags": [
+    "security",
+    "role",
+    "customdata",
+    "lookupvalue"
+  ]
+}

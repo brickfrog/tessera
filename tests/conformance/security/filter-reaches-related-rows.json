@@ -1,0 +1,37 @@
+{
+  "title": "A role's filter on a dimension hides the related rows of the fact table",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Amount\", [Sales Amount] )",
+  "as": {
+    "roles": [
+      "Europe"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          130
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+    "quote": "Row filters apply to the specified rows as well as related rows.",
+    "supports": "the filter on Customer also hides the Sales rows of the other customers"
+  },
+  "confidence": "derived",
+  "derivation": "Europe keeps Ann (1) and Bob (2). Their sales are 1 (100), 2 (20) and 5 (10): 130.",
+  "tags": [
+    "security",
+    "role",
+    "relationship"
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "title": "Two roles that filter different dimensions: the union of the rows each lets through",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"Amount\", [Sales Amount] )",
+  "as": {
+    "roles": [
+      "Europe",
+      "Bikes"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Amount]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          180
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/fabric/security/service-admin-row-level-security",
+    "quote": "For example, if a user belongs to both the \"Sales\" and \"Marketing\" roles, they can see data for both these roles.",
+    "supports": "a row either role lets through is visible"
+  },
+  "confidence": "derived",
+  "derivation": "Europe lets through sales 1, 2 and 5 (of Ann and Bob); Bikes lets through sales 1 and 3 (bikes). Together 1, 2, 3, 5: 100 + 20 + 50 + 10 = 180.",
+  "uncertain": true,
+  "alternative": "If each table's filters are combined first (Customer is unfiltered because Bikes doesn't filter it, Product because Europe doesn't), every sale is visible: 210.",
+  "tags": [
+    "security",
+    "role"
+  ]
+}

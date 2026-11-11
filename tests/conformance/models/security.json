@@ -1,0 +1,250 @@
+{
+  "description": "A star schema with roles, for row-level security. Sales total 210. By continent: Europe (Ann, Bob) 130, Asia (Cy) 50, Australia (Di) 30. Bikes 150, Clothing 60. Sales[BillToKey] -> Customer is inactive (it equals CustomerKey in every row). GrandTotalSales is a calculated table: ROW of the total. Roles: Europe, Asia, Australia, Bikes (Product), Denied (FALSE () on Customer), EuropeBikes (Europe on Customer and Bikes on Product), BigSales (Sales[Amount] >= 50: sales 1 and 3, 150), ByCustomData (the continent of the user whose email is CUSTOMDATA, from the unrelated Users), Admins (administrator), NoAccess (permission none).",
+  "tables": [
+    {
+      "name": "Customer",
+      "columns": [
+        {
+          "name": "CustomerKey",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Customer",
+          "type": "string"
+        },
+        {
+          "name": "Continent",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Ann",
+          "Europe"
+        ],
+        [
+          2,
+          "Bob",
+          "Europe"
+        ],
+        [
+          3,
+          "Cy",
+          "Asia"
+        ],
+        [
+          4,
+          "Di",
+          "Australia"
+        ]
+      ]
+    },
+    {
+      "name": "Product",
+      "columns": [
+        {
+          "name": "ProductKey",
+          "type": "int64",
+          "key": true
+        },
+        {
+          "name": "Product",
+          "type": "string"
+        },
+        {
+          "name": "Category",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          "Bike",
+          "Bikes"
+        ],
+        [
+          2,
+          "Cap",
+          "Clothing"
+        ]
+      ]
+    },
+    {
+      "name": "Sales",
+      "columns": [
+        {
+          "name": "SalesKey",
+          "type": "int64"
+        },
+        {
+          "name": "CustomerKey",
+          "type": "int64"
+        },
+        {
+          "name": "BillToKey",
+          "type": "int64"
+        },
+        {
+          "name": "ProductKey",
+          "type": "int64"
+        },
+        {
+          "name": "Amount",
+          "type": "int64"
+        }
+      ],
+      "measures": [
+        {
+          "name": "Sales Amount",
+          "expression": "SUM ( Sales[Amount] )"
+        },
+        {
+          "name": "Pct over All",
+          "expression": "DIVIDE ( [Sales Amount], CALCULATE ( [Sales Amount], ALL ( Customer ) ) )"
+        }
+      ],
+      "rows": [
+        [
+          1,
+          1,
+          1,
+          1,
+          100
+        ],
+        [
+          2,
+          2,
+          2,
+          2,
+          20
+        ],
+        [
+          3,
+          3,
+          3,
+          1,
+          50
+        ],
+        [
+          4,
+          4,
+          4,
+          2,
+          30
+        ],
+        [
+          5,
+          1,
+          1,
+          2,
+          10
+        ]
+      ]
+    },
+    {
+      "name": "Users",
+      "columns": [
+        {
+          "name": "Email",
+          "type": "string"
+        },
+        {
+          "name": "Continent",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "ann@contoso.com",
+          "Europe"
+        ],
+        [
+          "cy@contoso.com",
+          "Asia"
+        ]
+      ]
+    }
+  ],
+  "calculatedTables": [
+    {
+      "name": "GrandTotalSales",
+      "expression": "ROW ( \"Grand Total Sales\", [Sales Amount] )"
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Sales[CustomerKey]",
+      "to": "Customer[CustomerKey]"
+    },
+    {
+      "from": "Sales[ProductKey]",
+      "to": "Product[ProductKey]"
+    },
+    {
+      "from": "Sales[BillToKey]",
+      "to": "Customer[CustomerKey]",
+      "active": false
+    }
+  ],
+  "roles": [
+    {
+      "name": "Europe",
+      "filters": {
+        "Customer": "Customer[Continent] = \"Europe\""
+      }
+    },
+    {
+      "name": "Asia",
+      "filters": {
+        "Customer": "Customer[Continent] = \"Asia\""
+      }
+    },
+    {
+      "name": "Australia",
+      "filters": {
+        "Customer": "Customer[Continent] = \"Australia\""
+      }
+    },
+    {
+      "name": "Bikes",
+      "filters": {
+        "Product": "Product[Category] = \"Bikes\""
+      }
+    },
+    {
+      "name": "Denied",
+      "filters": {
+        "Customer": "FALSE ()"
+      }
+    },
+    {
+      "name": "EuropeBikes",
+      "filters": {
+        "Customer": "Customer[Continent] = \"Europe\"",
+        "Product": "Product[Category] = \"Bikes\""
+      }
+    },
+    {
+      "name": "BigSales",
+      "filters": {
+        "Sales": "Sales[Amount] >= 50"
+      }
+    },
+    {
+      "name": "ByCustomData",
+      "filters": {
+        "Customer": "Customer[Continent] = LOOKUPVALUE ( Users[Continent], Users[Email], CUSTOMDATA () )"
+      }
+    },
+    {
+      "name": "Admins",
+      "permission": "administrator"
+    },
+    {
+      "name": "NoAccess",
+      "permission": "none"
+    }
+  ]
+}

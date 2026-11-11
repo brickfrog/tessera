@@ -1,0 +1,37 @@
+{
+  "title": "ISCROSSFILTERED doesn't see a role's filter",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"x\", ISCROSSFILTERED ( Customer ) )",
+  "as": {
+    "roles": [
+      "Europe"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[x]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          false
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/implement-non-visual-totals-with-power-bi-security-roles/",
+    "quote": "any calculation that doesn't filter any Customer will always display the total of all the customers",
+    "supports": "the article's IF ( ISCROSSFILTERED ( Customer ), ... ) takes the unfiltered branch under a role that filters Customer"
+  },
+  "confidence": "derived",
+  "derivation": "The article's measures use IF ( ISCROSSFILTERED ( Customer ), [Internal Revenues], SUM ( SalesNoProducts[LineRevenues] ) ) under roles that filter Customer, and show the non-visual total where the report doesn't filter Customer: so ISCROSSFILTERED ( Customer ) is FALSE there. The query filters nothing.",
+  "tags": [
+    "security",
+    "role",
+    "iscrossfiltered"
+  ]
+}

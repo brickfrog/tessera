@@ -1,0 +1,40 @@
+{
+  "title": "A role's row filter hides the rows of its table that it doesn't keep",
+  "model": "security",
+  "query": "EVALUATE VALUES ( Customer[Customer] )",
+  "as": {
+    "roles": [
+      "Europe"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Customer[Customer]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Ann"
+        ],
+        [
+          "Bob"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/roles-ssas-tabular",
+    "quote": "Rows not included in the DAX formula can't be queried.",
+    "supports": "a role's members can query only the rows its filter keeps"
+  },
+  "confidence": "derived",
+  "derivation": "Europe keeps the customers whose Continent is Europe: Ann and Bob. Cy (Asia) and Di (Australia) can't be queried.",
+  "tags": [
+    "security",
+    "role",
+    "values"
+  ]
+}

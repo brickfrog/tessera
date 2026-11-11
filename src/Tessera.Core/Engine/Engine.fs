@@ -30,6 +30,14 @@ type Prepared = internal {
     Failures: (ObjectRef * TessError) list
     /// Who is asking, for queries (see `withIdentity`); calculated columns and tables never see it.
     Identity: Tessera.DaxEngine.Identity option
+    /// The roles the model is seen as (see `asRoles`), as the model names them; empty: none (all
+    /// the data, as an administrator sees it).
+    Roles: string list
+    /// Who was asking when the roles' filters were evaluated: a query refuses if `Identity` has
+    /// changed since.
+    RolesIdentity: Tessera.DaxEngine.Identity option
+    /// Some role in `Roles` filters rows (none is an administrator, and one has a row filter).
+    Secured: bool
 }
 
 /// The same model for someone in particular: USERNAME, USERPRINCIPALNAME, USEROBJECTID, USERCULTURE
@@ -1333,6 +1341,9 @@ let prepareWith (options: Options) (db: Database) (store: DataStore) : Result<Pr
                     Store = store
                     Failures = failures
                     Identity = None
+                    Roles = []
+                    RolesIdentity = None
+                    Secured = false
                 })
 
 /// `prepareWith` with the defaults: the date functions see the machine's clock, read once here.
@@ -1346,6 +1357,215 @@ let clock (p: Prepared) : Clock = {
 
 /// What `prepare` could not compute, with why.
 let failures (p: Prepared) : (ObjectRef * TessError) list = p.Failures
+
+// ---- Roles -------------------------------------------------------------------------------------
+
+/// The roles `asRoles` was given, as the model names them.
+let roles (p: Prepared) : string list = p.Roles
+
+/// A column of these stored rows only, in their order.
+let private subsetColumn (c: StoreColumn) (rows: int array) : StoreColumn =
+    match StoreColumn.ofValues c.Collation c.Name c.DataType (rows |> Seq.map (fun r -> c.Values.[c.ValueIds.[r]])) with
+    | Ok column -> column
+    | Error e -> raise (EngineException(DaxInvalid($"column '{c.Name}': {DaxError.message e}", "")))
+
+/// The model as members of these roles see it: each role's row filters evaluated over the data as
+/// processed, carried over the relationships, the roles combined (see Engine/Security.fs), and the
+/// hidden rows gone from a copy of the model, so that nothing a query does (ALL, REMOVEFILTERS,
+/// ALLSELECTED) brings them back. Calculated columns and tables keep the values they were
+/// computed with, without the roles ("The calculated table is computed during the data refresh,
+/// when security is not active yet": SQLBI, "Computing accurate percentages with row-level
+/// security in Power BI"). The filters see `p`'s identity (`withIdentity`), so give that first: a
+/// query refuses if the identity changes afterwards.
+///
+/// Fails for a role the model doesn't have (`role-not-found`), for roles none of which may read
+/// data (`role-cannot-read`: permission None or Refresh), and for what the engine doesn't support
+/// (object-level security, how a filter crosses the relationships, what a filter reads: see
+/// `Security.problems`). No roles: `p` unchanged. A role with Administrator permission sees
+/// everything.
+let asRoles (roles: string list) (p: Prepared) : Result<Prepared, TessError> =
+    let model = p.Database.Model
+
+    if roles.IsEmpty then
+        Ok p
+    elif not p.Roles.IsEmpty then
+        Error(DaxInvalid("the model already has roles applied: apply them all in one call", ""))
+    else
+        let all = model.Roles |> List.ofSeq
+
+        let found =
+            roles
+            |> List.map (fun name ->
+                match
+                    all
+                    |> List.tryFind (fun r -> String.Equals(r.Name, name, StringComparison.OrdinalIgnoreCase))
+                with
+                | Some r -> Ok r
+                | None -> Error name)
+
+        match
+            found
+            |> List.tryPick (function
+                | Error name -> Some name
+                | Ok _ -> None)
+        with
+        | Some missing -> Error(RoleNotFound(missing, all |> List.map _.Name))
+        | None ->
+            let chosen =
+                found
+                |> List.choose (function
+                    | Ok r -> Some r
+                    | Error _ -> None)
+                |> List.distinctBy (fun r -> r.Name.ToUpperInvariant())
+
+            let names = chosen |> List.map _.Name
+            let readers = chosen |> List.filter Security.canRead
+
+            if readers.IsEmpty then
+                Error(RoleCannotRead(chosen |> List.map (fun r -> r.Name, Security.permission r)))
+            else
+                match Security.problems p.Database readers with
+                | first :: _ -> Error(DaxNotSupported(first, ""))
+                | [] ->
+                    let secured =
+                        readers
+                        |> List.forall (fun r -> r.ModelPermission <> ModelPermission.Administrator)
+                        && readers |> List.exists (fun r -> not (Security.filtersOf r).IsEmpty)
+
+                    let applied = {
+                        p with
+                            Roles = names
+                            RolesIdentity = p.Identity
+                            Secured = secured
+                    }
+
+                    if not secured then
+                        Ok applied
+                    else
+                        run (fun () ->
+                            let visible = Security.visibleRows ev p.Database p.Model p.Identity readers
+
+                            if visible.Count = 0 then
+                                applied
+                            else
+                                // The data tables' stored rows, filtered.
+                                let mutable store = p.Store
+
+                                for t in p.Model.Tables do
+                                    match visible.TryGetValue t.Name, store.TryTable t.Name with
+                                    | (true, rows), Some s when t.Expression.IsNone ->
+                                        match
+                                            StoreTable.Create(
+                                                s.Name,
+                                                s.Columns |> Array.map (fun c -> subsetColumn c rows),
+                                                rows.Length
+                                            )
+                                        with
+                                        | Ok table -> store <- store.WithTable table
+                                        | Error why ->
+                                            raise (EngineException(DaxInvalid($"table '{t.Name}': {why}", "")))
+                                    | _ -> ()
+
+                                // What `prepare` computed, filtered the same way, for the binding to reuse.
+                                let computed = Tessera.DaxEngine.Model(p.Store.Collation)
+
+                                computed.Tables <-
+                                    p.Model.Tables
+                                    |> Array.map (fun t ->
+                                        let rows =
+                                            match visible.TryGetValue t.Name with
+                                            | true, rows -> Some rows
+                                            | _ -> None
+
+                                        let copy = BTable(t.Id, computed, t.Name)
+                                        copy.Failure <- t.Failure
+
+                                        copy.Columns <-
+                                            t.Columns
+                                            |> Array.map (fun c ->
+                                                let k = BColumn(c.Id, copy, c.Name, c.DataType)
+                                                k.Expression <- c.Expression
+                                                k.SourceName <- c.SourceName
+                                                k.Failure <- c.Failure
+
+                                                if
+                                                    c.Failure.IsNone
+                                                    && c.IsReady
+                                                    && (c.Expression.IsSome || t.Expression.IsSome)
+                                                then
+                                                    k.SetData(
+                                                        match rows with
+                                                        | Some r -> subsetColumn c.Stored r
+                                                        | None -> c.Stored
+                                                    )
+
+                                                k)
+
+                                        for c in copy.Columns do
+                                            copy.ColumnByName.[c.Name] <- c
+
+                                        if t.Expression.IsSome && t.IsReady then
+                                            copy.SetRowCount(
+                                                match rows with
+                                                | Some r -> r.Length
+                                                | None -> t.RowCount
+                                            )
+
+                                        computed.TableByName.[t.Name] <- copy
+                                        copy)
+
+                                let bound, failures =
+                                    bindWith
+                                        {
+                                            Now = p.Model.Now
+                                            UtcNow = p.Model.UtcNow
+                                        }
+                                        p.Database
+                                        store
+                                        (Some {
+                                            Source = { Label = "roles"; Text = "" }
+                                            Defs = QueryDefs()
+                                            Columns = []
+                                            Tables = []
+                                            Bound = ignore
+                                            Prepared = computed
+                                        })
+
+                                // The blank row is decided when the model is processed: the roles must not
+                                // add one or take one away.
+                                let decided (t: BTable) =
+                                    try
+                                        Ok t.HasBlankRow
+                                    with EngineException e ->
+                                        Error e
+
+                                for t in bound.Tables do
+                                    match p.Model.TableByName.TryGetValue t.Name with
+                                    | true, full when full.Gate.IsNone && isNull t.CalcGroup ->
+                                        match decided full, decided t with
+                                        | Ok a, Ok b when a = b -> ()
+                                        | Ok a, Ok _ ->
+                                            let what = if a then "lose" else "gain"
+
+                                            raise (
+                                                EngineException(
+                                                    DaxNotSupported(
+                                                        $"under the roles, '{t.Name}' would {what} its blank row (the rows that relate to it are filtered), and the sources don't say whether the blank row stays as the model was processed",
+                                                        ""
+                                                    )
+                                                )
+                                            )
+                                        | Ok _, Error e -> raise (EngineException e)
+                                        | Error(DaxNotSupported(why, _)), _ -> t.Gate <- Some why
+                                        | Error e, _ -> t.Gate <- Some(TessError.message e)
+                                    | _ -> ()
+
+                                {
+                                    applied with
+                                        Model = bound
+                                        Store = store
+                                        Failures = failures
+                                })
 
 // ---- Results -----------------------------------------------------------------------------------
 
@@ -1525,6 +1745,18 @@ let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
 /// DEFINE MEASURE, VAR, FUNCTION, COLUMN and TABLE are supported; ORDER BY sorts by any expressions over the
 /// result's columns. Without ORDER BY the rows come in the order the engine produced them, which
 /// (as on a server) is not defined.
+/// A query on a model with roles applied refuses if who is asking changed since (see `asRoles`).
+let private rolesUnchanged (p: Prepared) =
+    if not p.Roles.IsEmpty && p.Identity <> p.RolesIdentity then
+        raise (
+            EngineException(
+                DaxInvalid(
+                    "the identity changed after the roles were applied: give the identity first (withIdentity), then the roles (asRoles)",
+                    ""
+                )
+            )
+        )
+
 let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessError> =
     match DaxParser.parseQuery dax with
     | Error errors -> Error(syntaxError "query" errors)
@@ -1565,6 +1797,17 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                     match d.Kind with
                     | DefinitionKind.Table(name, value) -> Some(name, value)
                     | _ -> None)
+
+            rolesUnchanged p
+
+            // Under a role, binding again would start from the data as processed. Whether a query
+            // column sees the rows the role hides isn't documented either.
+            if p.Secured && not (columns.IsEmpty && tables.IsEmpty) then
+                raise (
+                    EngineException(
+                        DaxNotSupported("DEFINE COLUMN and DEFINE TABLE under a role's row-level security", "")
+                    )
+                )
 
             // DEFINE COLUMN and DEFINE TABLE: the model is bound again for this query with them
             // in it, and they are computed before anything else (`p` itself never changes).
@@ -1614,6 +1857,23 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                     match failures |> List.tryFind (fun (_, e) -> isCircular e) with
                     | Some(_, e) -> raise (EngineException e)
                     | None -> model
+
+            if p.Secured then
+                let exprs = [
+                    for e in query.Evaluates do
+                        e.Table
+                        yield! e.OrderBy |> List.map _.Expr
+                        yield! e.StartAt
+
+                    for d in query.Definitions do
+                        match d.Kind with
+                        | DefinitionKind.Var(_, value) -> value
+                        | _ -> ()
+                ]
+
+                match Security.relationshipFunction model defs exprs with
+                | Some what -> raise (EngineException(DaxNotSupported(what, "")))
+                | None -> ()
 
             let mutable ctx = {
                 Context.root model defs source true with
@@ -1704,6 +1964,13 @@ let evaluateScalar (p: Prepared) (dax: string) : Result<QueryValue, TessError> =
     | Error errors -> Error(syntaxError source.Label errors)
     | Ok expr ->
         run (fun () ->
+            rolesUnchanged p
+
+            if p.Secured then
+                match Security.relationshipFunction p.Model null [ expr ] with
+                | Some what -> raise (EngineException(DaxNotSupported(what, "")))
+                | None -> ()
+
             let ctx = {
                 Context.root p.Model null source true with
                     Identity = p.Identity
@@ -1974,11 +2241,30 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
                 match calculatedTableExpression t with
                 | Some text -> yield ObjectRef.table t.Name, ofText t.Name text
                 | None -> ()
+
+            // A role is reported like a measure: what its row filters use, each evaluated in a row
+            // context on its table, and what applying the role refuses (see Engine/Security.fs).
+            for r in db.Model.Roles do
+                let filters = Security.filtersOf r
+                let problems = Security.problems db [ r ]
+
+                if not filters.IsEmpty || not problems.IsEmpty then
+                    yield
+                        ObjectRef.modelLevel ObjectKind.Role r.Name,
+                        problems
+                        @ [
+                            for (t, text) in filters do
+                                yield!
+                                    ofText
+                                        t.Name
+                                        ("COUNTROWS ( '" + t.Name.Replace("'", "''") + "' ) + (" + text + "\n)")
+                        ]
+                        |> List.distinct
         ]
 
 
-/// For every measure, calculated column and calculated table of a model: what it uses that the
-/// engine doesn't support (an empty list: nothing, as far as can be told without data). Follows
+/// For every measure, calculated column, calculated table, calculation item and role with row
+/// filters of a model: what it uses that the engine doesn't support (an empty list: nothing, as far as can be told without data). Follows
 /// references to measures, functions and calculated objects, and through relationships to the
 /// calculated tables and columns a table's rows depend on. Each item is a function name, or a
 /// sentence about an argument form or a model feature.

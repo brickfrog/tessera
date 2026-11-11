@@ -1,0 +1,38 @@
+{
+  "title": "ALL removes every filter on a table except a role's",
+  "model": "security",
+  "query": "EVALUATE ROW ( \"All\", CALCULATE ( [Sales Amount], ALL ( Customer ) ) )",
+  "as": {
+    "roles": [
+      "Europe"
+    ]
+  },
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[All]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          130
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/computing-accurate-percentages-with-row-level-security-in-power-bi/",
+    "quote": "In other words, when ALL ( Customer ) is executed, ALL removes all the filters from the Customer table except for the security filters.",
+    "supports": "the role's filter on Customer survives ALL ( Customer )"
+  },
+  "confidence": "derived",
+  "derivation": "Europe keeps Ann and Bob; ALL ( Customer ) can't remove that, so the amount is that of their sales: 100 + 20 + 10 = 130, not the 210 of all sales.",
+  "tags": [
+    "security",
+    "role",
+    "all",
+    "calculate"
+  ]
+}

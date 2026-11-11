@@ -1604,6 +1604,9 @@ result, `--csv` is RFC 4180 with results separated by an empty line, and `--json
 caps each result (default 1000, 0 for all); a capped result is marked `truncated` and stderr says so. Queries to a
 server are sent as they are: tess doesn't check them first. On model files, `query` needs `--data <fixture>` and
 runs offline: see [the local DAX engine](#the-local-dax-engine-query---data).
+`--role <name>` (repeatable), `--user-name` / `--user-principal-name` and `--custom-data` query as someone else:
+they become the connection's `Roles=`, `EffectiveUserName=` and `CustomData=` (see
+[roles](#roles-row-level-security)).
 
 The JSON shape is shared with the local DAX engine, so the two can be compared value by value:
 
@@ -2348,8 +2351,69 @@ A field left `None` stays refused (`CUSTOMDATA` is then BLANK, as for a connecti
 tess query model.bim --data fixture "EVALUATE { USERNAME () }" --user-name 'CONTOSO\ann'
 ```
 
-with `--user-name`, `--user-principal-name`, `--user-object-id`, `--user-culture` and `--custom-data` (for `--data`
-only: a server takes them from the connection).
+with `--user-name`, `--user-principal-name`, `--user-object-id`, `--user-culture` and `--custom-data`. On a server
+model, `--user-name` / `--user-principal-name` and `--custom-data` become the connection's `EffectiveUserName=` and
+`CustomData=` (see [roles](#roles-row-level-security)); the other two have no connection property and are refused there.
+
+#### Roles (row-level security)
+
+`--role <name>` (repeatable) runs the query as a member of the model's roles: each role's row filters hide the rows
+they don't keep, and what that leaves is all the query sees.
+
+```sh
+tess query model.bim --data fixture --role Europe "EVALUATE { [Sales Amount] }"
+tess query model.bim --data fixture --role ByEmail --user-principal-name ann@contoso.com "EVALUATE Customer"
+tess query 'xmla:<server>;<database>' --role Europe --role Asia --custom-data 7 "EVALUATE { [Sales Amount] }"
+```
+
+On a server the roles become the connection's `Roles=` and the identity options `EffectiveUserName=` and
+`CustomData=` ("Connection string properties (Analysis Services)" on Learn; `EffectiveUserName` needs administrator
+rights on the server). Nothing else changes: the connection is the one the address already asked for. A role name
+with a comma, or an address that already sets one of those properties, is a usage error. Learn's note for Power BI:
+"If specifying roles when connecting to a Power BI Premium workspace, use workspace roles from the Power BI security
+model."
+
+Over fixture data, the engine follows what Microsoft Learn ("Roles in Analysis Services tabular models",
+"Row-level security (RLS) with Power BI", "RLS guidance") and SQLBI ("Computing accurate percentages with row-level
+security", "Implement non-visual totals with Power BI security roles", "DAX limitations with inactive relationships
+and RLS") describe:
+
+- **A filter is evaluated on every row of its table**, in a row context, over the data as the model was processed
+  (no role applied), with the identity options for `USERNAME`, `USERPRINCIPALNAME`, `CUSTOMDATA` and the others. It
+  must be `TRUE` or `FALSE`.
+- **It reaches other tables over active relationships only**, from the one side to the many side, and back where
+  the relationship's security filtering behavior is BothDirections ("Apply security filter in both directions"),
+  whatever its cross-filter direction. A role's filters on several tables intersect.
+- **Several roles add up**: a row is visible if one of the roles lets it through. A role with the Administrator
+  permission sees everything; one with None or Refresh adds nothing (if no role given can read, the query fails:
+  `role-cannot-read`). An unknown role is `role-not-found`.
+- **The hidden rows are gone**, not filtered: `ALL`, `REMOVEFILTERS` and `ALLSELECTED` can't bring them back, a
+  percentage over `ALL ( Customer )` is of what the user may see, and `ISFILTERED` / `ISCROSSFILTERED` don't see the
+  role (SQLBI: "Any customer from outside Europe disappears as if they did not exist").
+- **Calculated columns and tables keep the values they were computed with**, at processing time, without the roles.
+
+Refused, because the sources don't settle them: object-level security (a table or column a role hides); a filter
+that reads its own table other than as the row being filtered (`MAX ( Customer[Key] )`, `PATHCONTAINS` over a
+`LOOKUPVALUE` of the same table), reads another table the roles' filters reach, or refers to a measure or a
+user-defined function; a role's filter that reaches a one-to-one or many-to-many relationship, or two tables along
+more than one path; rows of the many side with no match on a filtered one side, and a role that would add or take
+away a table's blank row (it is decided when the model is processed); two roles whose filters reach a table through
+different tables (the union of each role's rows, or each table's filters combined first: the sources can be read
+both ways); `USERELATIONSHIP` and `CROSSFILTER` anywhere a query under a filtering role may reach ("The
+UseRelationship() and CrossFilter() functions may not be used when querying 'Sales' because it is constrained by
+row-level security", the error SQLBI quotes); `DEFINE COLUMN` / `DEFINE TABLE` under a role. A role's members list
+is not used: `--role` says which roles the query runs as.
+
+In code:
+
+```fsharp
+Engine.asRoles : string list -> Engine.Prepared -> Result<Engine.Prepared, TessError>
+// Engine.prepare db store |> Result.map (Engine.withIdentity id) |> Result.bind (Engine.asRoles [ "Europe" ])
+Engine.roles : Engine.Prepared -> string list
+```
+
+`asRoles` builds a copy of the prepared model without the hidden rows (`p` is unchanged). Give the identity first:
+the filters are evaluated with it, and a query refuses if `withIdentity` changes it afterwards.
 
 #### ALLSELECTED
 
@@ -2419,8 +2483,8 @@ expressions only, say).
 
 - **Not implemented yet:** visual calculations,
   query parameters, detail rows, KPIs, natural joins of tables with model columns (joined over their expanded
-  tables). Row-level and object-level
-  security are not applied (a query runs as an administrator's would).
+  tables). Without `--role` a query runs as an administrator's would; object-level security is refused (see
+  [roles](#roles-row-level-security)).
 - **Model shapes:** an inactive one-to-one relationship, relationships on several columns, DirectQuery and
   Dual tables: every table connected to one is closed to queries, the rest of the model works. A calculation group
   is closed when a query names it. Active relationships that give two filter paths between two tables. A column
@@ -2470,12 +2534,13 @@ compare such results as sets.
 #### `--coverage`
 
 `tess query <model> --coverage` reads the model only (no data) and lists every measure, calculated column,
-calculated table and calculation item that uses something the engine doesn't support, with what; then how many of each kind it can
+calculated table, calculation item and role (its row filters, and what applying it refuses) that uses something the
+engine doesn't support, with what; then how many of each kind it can
 evaluate, and the unsupported things ranked by how many objects use them. It follows references: a measure that
 calls an unsupported measure or function is unsupported, and so is everything that depends, over relationships, on a
 calculated table or column that can't be computed (a date table that can't be computed closes most of a model).
 `--json` writes `{"command": "query coverage", "source", "summary": {measures, calculatedColumns,
-calculatedTables, calculationItems: {total, supported}}, "objects": [{ref, kind, supported, unsupported: [...]}], "unsupported":
+calculatedTables, calculationItems, roles: {total, supported}}, "objects": [{ref, kind, supported, unsupported: [...]}], "unsupported":
 [{reason, objects}]}`.
 
 Coverage runs each function's static check of its argument forms, the same one the evaluator runs before a call. A
@@ -2626,7 +2691,8 @@ as `--fail-on warning`) makes any unsupported test fail the run, for a suite tha
 
 What stops a run altogether, with its usual exit code and no report: no suites found (3, `no-test-suites`), a
 model that can't be loaded (3), a server that can't be reached (5), a `--trx` / `--junit` file that can't be
-written (4), and, when the first test that needs it gets there, a fixture that can't be loaded or has errors (3)
+written (4), and, when the first test that needs it gets there, a fixture that can't be loaded or has errors (3),
+a role the model doesn't have (3, `role-not-found`) or roles none of which can read (3, `role-cannot-read`)
 or a snapshot file that can't be read (3). An invalid suite stops it too, as findings (exit 1): **suites are checked before the model is
 loaded or a connection made**, and nothing runs if one of them is wrong, so a broken file can't pass as "no tests
 failed".
@@ -2656,6 +2722,8 @@ Suite keys:
 | `tables` | *(tess)* inline rows, for every test of the suite: see below |
 | `defaults` | `tolerance`, `tolerance_abs`, `tags`, and *(tess)* `filters`, for every test |
 | `now` | *(tess)* the instant `TODAY`, `NOW`, `UTCTODAY` and `UTCNOW` return, as `tess query --now` takes it: `2024-03-05`, `2024-03-05T14:30:00`, `2024-03-05T14:30:00+02:00` (the offset only moves the UTC functions). Without it, the machine's clock |
+| `roles` | *(tess)* the model's roles every test queries as (`roles: Europe`, or a list), as `tess query --role`: see [roles](#roles-row-level-security) |
+| `identity` | *(tess)* who is asking, for every test: `{ user_name, user_principal_name, user_object_id, user_culture, custom_data }`, as `tess query`'s identity options |
 | `tests` | the list of tests |
 | `connection` | te's; read and not used (a note on stderr says so): the model is the one on the command line |
 
@@ -2676,6 +2744,7 @@ Test keys:
 | `tolerance`, `tolerance_abs` | for this test's numbers |
 | `pending: true`, `skip: <reason>` | *(tess)* don't run it (it is reported as skipped) |
 | `now` | *(tess)* the test's own clock, replacing the suite's. A test with one is skipped on a server, whose clock can't be set |
+| `roles`, `identity` | *(tess)* the test's own, replacing the suite's (`roles: []` for none). On a server the test has a connection of its own with `Roles=`, `EffectiveUserName=` and `CustomData=`; a test with `user_object_id` or `user_culture` is skipped there |
 | `compare` | te's; read and not used |
 
 A test has exactly one of `query`, `query_file`, `measure`, `expression`, `assert`. An unknown key is an error, with
