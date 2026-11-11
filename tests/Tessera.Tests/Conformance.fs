@@ -428,6 +428,7 @@ let buildDatabase (name: string) (def: ModelDef) : Database =
 
             m.FormatStringExpression
             |> Option.iter (fun f -> measure.FormatStringDefinition <- new FormatStringDefinition(Expression = f))
+
             table.Measures.Add measure
 
     let addCalculated (table: Table) (columns: CalculatedColumnDef list) =

@@ -1639,6 +1639,12 @@ Each value has exactly one spelling:
 | `string` | a string |
 | `binary` | a base64 string |
 
+With `--formatted` (local engine only: a server's DAX query result carries no format strings), a column whose cells
+have format strings gets `"formatString"` when every row has the same one, otherwise `"formatStrings"` (one per row,
+`null` where a cell has none), and each result gets `"formatted"`, parallel to `"rows"`: each cell's value formatted
+with its format string, `null` where it has none. `rows` keeps the values. Without the flag none of these keys are
+there. See [format strings](#format-strings).
+
 Read `decimal` values with a decimal type; a parser that goes through binary floating point can lose digits. In a
 `variant` column a number with a decimal point may be a `double` or a `decimal`. In text and CSV output BLANK is
 empty, booleans are `TRUE`/`FALSE`, and CSV writes an empty string as `""`. The type is `Tessera.QueryResult` in
@@ -2095,7 +2101,8 @@ application of calculation items"). The rules, each cited in `Engine/Functions/C
 - **Sideways recursion.** A `CALCULATE` in an item that selects another item of its group applies that one (Learn's
   `YOY%`, `PY YTD`).
 - **The functions** `SELECTEDMEASURE`, `SELECTEDMEASURENAME`, `ISSELECTEDMEASURE` and `SELECTEDMEASUREFORMATSTRING`
-  (the measure's own format string) work in an item's expression. A measure's result type is its values'.
+  (the measure's format string: see [format strings](#format-strings)) work in an item's expression. A measure's
+  result type is its values'.
 
 Refused, as the sources leave them open: an item selected again by a filter while it is being applied (itself, a
 cycle, `KEEPFILTERS` over its own filter: "Other types of recursion aren't supported"); `multipleOrEmptySelectionExpression`
@@ -2103,9 +2110,50 @@ and `noSelectionExpression`; several or no items under `selectionExpressionBehav
 1702 (Learn says Automatic becomes Visual "above a future compatibility level") or no items under Visual; two groups
 with the same precedence; a group with an Ordinal column and items left at ordinal -1; `ROLLUPADDISSUBTOTAL` over a group's column (its subtotals depend on the selection
 behaviour); an item applied in a calculated column or table; these functions outside an item's expression or in a
-function it calls; `SELECTEDMEASUREFORMATSTRING` for a measure with no format string or a dynamic one, or after an item
-with a format string expression was applied to the same measure. Format string expressions are read but not
-evaluated: a query result has no format strings. `--coverage` lists calculation items like measures.
+function it calls; what [format strings](#format-strings) refuses. `--coverage` lists calculation items like
+measures (what their expressions use, not their format string expressions).
+
+#### Format strings
+
+A measure's format string is its `formatString`, or its dynamic format string (`formatStringDefinition`, a DAX
+expression), and a calculation item's format string expression replaces it while the item is applied. The local
+engine evaluates them where the measure is evaluated; `tess query --formatted` shows a result's measure columns with
+them, and these functions see them:
+
+```sh
+tess query ./Sales.pbip --data ./fixtures --formatted "EVALUATE SUMMARIZECOLUMNS ( 'Date'[Year], \"Sales\", [Sales Amount] )"
+```
+
+- **Dynamic format strings** are evaluated as the internal measure Power BI makes of them, `Table[_<measure>
+  FormatString]`, which a query can name too (with the table: SQLBI, "Introducing dynamic format strings for DAX
+  measures"): in the cell's filter context, after the context transition, with `SELECTEDMEASURE ()` the measure. It
+  may name its own measure (Learn). `SELECTEDMEASURENAME` and `ISSELECTEDMEASURE` work there ("The same DAX patterns
+  that work with calculation groups also work in dynamic format strings for measures": Learn). A measure with a
+  static format string has no internal measure, and a `DEFINE MEASURE` has no format string at all.
+- **Calculation items.** An item with a format string expression gives its result, evaluated where the item is
+  applied; an item without one leaves the measure's ("all the calculation items except YOY% should use the format of
+  the current measure in context": Learn). `SELECTEDMEASUREFORMATSTRING ()` in an item is the measure's format
+  string, a dynamic one evaluated there.
+- **`--formatted`** gives format strings to the columns of a top-level `SUMMARIZECOLUMNS`, `ADDCOLUMNS` or `ROW`
+  whose expression is a measure reference (`[Sales]`, `'Sales'[Sales]`, `IGNORE ( [Sales] )`), as Power BI asks
+  for them: one hidden column per measure, `IGNORE`d, so `SUMMARIZECOLUMNS` keeps the same rows. Each value is
+  formatted as `FORMAT ( <value>, <format string> )` is, with everything [FORMAT](#text-functions-and-format)
+  refuses refused here too (other cultures among it); BLANK is the empty text. The rows and values are the same as
+  without the flag. Other columns, and the columns of other table expressions (`TOPN ( ... )`, a model table),
+  have none. Text and CSV output show the formatted values; JSON adds them (see [`query`](#query)).
+- **Local only.** A server's DAX query result carries no format strings, so `--formatted` is refused with
+  `xmla:` models.
+
+Refused, as the sources leave them open or disagree: two calculation items with format string expressions that could
+both be applied to one measure (Learn: "The highest precedence calculation group dynamic format string is the only
+one applied"; SQLBI: `SELECTEDMEASUREFORMATSTRING` in the lower one sees "the one already modified by another
+calculation item"), and an item without one whose expression may select one of a lower group; a measure reference,
+`SELECTEDMEASURE` or a user-defined function in a format string evaluated under a calculation item (whether the item
+applies to them there); the internal `_<measure> FormatString` measure in a model with calculation groups; a format
+string expression that returns BLANK, an empty text or something that is not text; `SELECTEDMEASUREFORMATSTRING` for
+a measure with no format string, and in a measure's own dynamic format string; the format string of a cell made
+BLANK by several items selected under `selectionExpressionBehavior` Visual; under `--formatted`, a query that
+redefines `_<measure> FormatString`.
 
 #### Dates, times and the clock
 
@@ -2189,8 +2237,9 @@ are implemented for **en-US**. The model's culture is read from the model; `FORM
   with literal text (`"$0.00"`); a number with a date format, a date with a number format, text as the value;
   `Short Time` before 10:00; `General Date` of a date with no time or of a time alone; `ww` of a Sunday; a time
   with a fraction of a second; dates before March 1, 1900; `TOCSV` and `TOJSON`.
-- A measure's format string (`FormatString`, or a format string expression) is **not** applied to query results: the
-  real engine doesn't apply it either.
+- A measure's format string (`FormatString`, or a format string expression) is **not** applied to the values of query
+  results: the real engine doesn't apply it either. `--formatted` shows them formatted, locally (see
+  [format strings](#format-strings)).
 
 #### Time intelligence
 
