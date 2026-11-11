@@ -107,6 +107,8 @@
     <Compile Include="EngineCacheTests.fs" />
     <Compile Include="TestSuiteTests.fs" />
     <Compile Include="TestCommandTests.fs" />
+    <Compile Include="WatchTests.fs" />
+    <Compile Include="CompletionTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

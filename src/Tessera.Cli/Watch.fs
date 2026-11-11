@@ -398,7 +398,9 @@ let private runOnce (options: Options) (ctx: Ctx) (command: Ctx -> Outcome) =
 /// (Ctrl+C), which ends it with exit 0. A usage error on the first run ends it at once, with that
 /// error; later failures (a model saved half-way, say) are reported and the watch goes on.
 /// `onRun` is told each run's exit code (tests wait on it).
-let runWith
+/// `changes` also takes notifications from elsewhere (tests drive the loop through it).
+let runWithChanges
+    (changes: Changes)
     (options: Options)
     (token: CancellationToken)
     (onRun: int -> unit)
@@ -406,7 +408,6 @@ let runWith
     (scope: Scope)
     (command: Ctx -> Outcome)
     : Outcome =
-    use changes = new Changes()
     let reported = HashSet<string>()
 
     let onError (message: string) =
@@ -469,6 +470,10 @@ let runWith
             w.Dispose()
 
         poller |> Option.iter (fun p -> (p :> IDisposable).Dispose())
+
+let runWith options token onRun ctx scope command =
+    use changes = new Changes()
+    runWithChanges changes options token onRun ctx scope command
 
 /// `--watch` from the command line: watch until Ctrl+C.
 let run (ctx: Ctx) (scope: Result<Scope, TessError>) (command: Ctx -> Outcome) : Outcome =
