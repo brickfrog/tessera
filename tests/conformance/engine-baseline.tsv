@@ -37,16 +37,10 @@ format/percent-large-number	not-supported
 format/time-upper-case-hour-with-am-pm	not-supported
 format/time-upper-case-month-after-hour	not-supported
 grouping/summarize-group-by-extension-column	not-supported
-relationships/many-to-many-cardinality-filter-on-other-column	not-supported
-relationships/many-to-many-cardinality-filter-propagation	not-supported
-relationships/many-to-many-cardinality-no-blank-row	not-supported
-relationships/many-to-many-cardinality-single-direction	not-supported
-relationships/many-to-many-cardinality-total-includes-unmatched-rows	not-supported
 relationships/one-to-one-blank-row-for-missing-row	not-supported
 relationships/one-to-one-filter-to-first-table	not-supported
 relationships/one-to-one-filter-to-second-table	not-supported
 relationships/one-to-one-related-blank-for-missing-row	not-supported
-relationships/related-across-limited-relationship-error	not-supported
 selection/isfiltered-iscrossfiltered-filter-on-many-side	not-supported
 set-functions/table-constructor-mixed-types-to-string	not-supported
 sorting/maxx-variant-true-ranks-text-above-numbers	not-supported

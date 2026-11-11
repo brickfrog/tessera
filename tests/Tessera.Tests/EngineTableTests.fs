@@ -1148,12 +1148,9 @@ let tests =
         ]
 
         testList "model shapes that are refused" [
-            testCase "a many-to-many or one-to-one relationship closes the tables connected to it" (fun () ->
+            testCase "a one-to-one relationship closes the tables connected to it" (fun () ->
                 for (fromEnd, toEnd, word) in
-                    [
-                        RelationshipEndCardinality.Many, RelationshipEndCardinality.Many, "many-to-many"
-                        RelationshipEndCardinality.One, RelationshipEndCardinality.One, "one-to-one"
-                    ] do
+                    [ RelationshipEndCardinality.One, RelationshipEndCardinality.One, "one-to-one" ] do
                     let m =
                         prepare {
                             star with

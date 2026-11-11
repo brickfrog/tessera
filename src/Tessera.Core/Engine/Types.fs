@@ -503,12 +503,15 @@ and [<Sealed; AllowNullLiteral>] BTable(id: int, model: Model, name: string) =
             duplicates <- ValueSome(ready.Length, result)
             result
 
-/// A single-column relationship: `From` is the many side, `To` the one side.
+/// A single-column relationship: `From` is the many side, `To` the one side. A limited relationship
+/// (`Limited`: many-to-many cardinality) has no one side: `To` filters `From`, and `From` filters
+/// `To` too when it filters both ways.
 and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toColumn: BColumn, both: bool, active: bool)
     =
     let mutable toRow: int array = null
     let mutable orphans: int array = null
     let mutable fromIdOfToId: int array = null
+    let mutable toIdOfFromId: int array = null
 
     member _.Id = id
     member _.Name = name
@@ -517,7 +520,67 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
     member _.Both = both
     member _.IsActive = active
 
+    /// A many-to-many cardinality relationship: "a relationship is limited if it has a many-to-many
+    /// cardinality" (SQLBI, "Strong and weak relationships in Power BI"). "Table expansion never
+    /// occurs for limited relationships. Table joins are achieved by using INNER JOIN semantics,
+    /// and for this reason, blank virtual rows aren't added" (Microsoft Learn, "Model relationships
+    /// in Power BI Desktop"): a filter crosses it as the values of the column.
+    member val Limited = false with get, set
+
+    /// The relationship for messages: "'Target'[Category] -> 'Product'[Category]".
+    member _.Describe =
+        $"'{from.Table.Name}'[{from.Name}] -> '{toColumn.Table.Name}'[{toColumn.Name}]"
+
+    /// A limited relationship: the ids of values of the other column, from either side's ids
+    /// (-1 for a value the other side lacks). Its columns must have the same type.
+    member private this.BuildLimited() =
+        let f = from.Data
+        let t = toColumn.Data
+
+        if f.DataType <> t.DataType then
+            raise (
+                EngineException(
+                    DaxNotSupported(
+                        $"the many-to-many relationship {this.Describe} between columns of different types ({DaxType.name f.DataType} and {DaxType.name t.DataType})",
+                        ""
+                    )
+                )
+            )
+
+        let same (target: StoreColumn) (v: DaxValue) =
+            if DaxValue.isBlank v then
+                target.BlankId
+            else
+                target.TryFindId v
+
+        toIdOfFromId <- f.Values |> Array.map (same t)
+        fromIdOfToId <- t.Values |> Array.map (same f)
+        toRow <- [||]
+        orphans <- [||]
+
+    /// The ids of `other`'s values (one of the two columns, the other being `source`) that equal
+    /// the values of these ids of `source`. For a limited relationship.
+    member this.MatchIds(source: BColumn, ids: int seq) : int seq =
+        if isNull toIdOfFromId then
+            this.BuildLimited()
+
+        let map =
+            if obj.ReferenceEquals(source, from) then
+                toIdOfFromId
+            else
+                fromIdOfToId
+
+        ids
+        |> Seq.choose (fun id ->
+            if id < map.Length && map.[id] >= 0 then
+                Some map.[id]
+            else
+                None)
+
     member private this.Build() =
+        if this.Limited then
+            invalidOp $"the limited relationship {this.Describe} has no row map"
+
         let f = from.Data
         let t = toColumn.Data
         let toRows = toColumn.Table.RowCount
@@ -562,6 +625,15 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
         fromIdOfToId <- t.Values |> Array.map (convert t f)
         orphans <- orphanRows.ToArray()
         toRow <- map
+
+    /// Checks the relationship against the data (a regular one's one side is unique, a limited
+    /// one's columns have the same type), raising `EngineException` for what isn't supported.
+    member this.Check() =
+        if this.Limited then
+            if isNull toIdOfFromId then
+                this.BuildLimited()
+        elif isNull toRow then
+            this.Build()
 
     /// For each stored row of the From table: its row of the To table, or the To table's
     /// `RowCount` (its blank row) when the key has no match.
@@ -627,7 +699,8 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                          found.Add((x, List.rev path))
 
                          for r in manyToOne.Value.[x.Id] do
-                             walk r.To.Table (r :: path) (depth + 1)
+                             if not r.Limited then
+                                 walk r.To.Table (r :: path) (depth + 1)
 
                  walk t [] 0
                  found.ToArray(), ambiguous))
@@ -657,11 +730,19 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                 else '1')
         )
 
-    /// The active relationships in which the table is the many side.
+    /// The active relationships in which the table is the many side (its `From`), limited ones
+    /// included.
     member _.ManyToOne(table: BTable) : BRel array = manyToOne.Value.[table.Id]
-    /// The active relationships in which the table is the one side.
+    /// The active relationships in which the table is the one side (its `To`), limited ones included.
     member _.OneToMany(table: BTable) : BRel array = oneToMany.Value.[table.Id]
-    member _.FiltersBothWays(r: BRel) : bool = active.[r.Id] && both.[r.Id]
+
+    /// Whether filters cross the relationship from its many side to its one side. A limited
+    /// relationship counts whatever its direction: what crosses it is a filter on values, not
+    /// table expansion, which is cross-filtering either way (ALLCROSSFILTERED "removes all the
+    /// filters ... on columns and tables that are cross-filtering the table argument because of
+    /// limited (weak) relationships and/or bidirectional cross-filters": dax.guide/allcrossfiltered).
+    member _.FiltersBothWays(r: BRel) : bool =
+        active.[r.Id] && (both.[r.Id] || r.Limited)
 
     /// The tables of a table's expanded table: itself, then every table reached over many-to-one
     /// relationships (SQLBI, "Expanded tables in DAX").

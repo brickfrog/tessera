@@ -215,7 +215,7 @@ let private staticGates (db: Database) : Dictionary<string, string> =
                     | RelationshipEndCardinality.One, RelationshipEndCardinality.Many -> ()
                     | RelationshipEndCardinality.One, RelationshipEndCardinality.One ->
                         unsupported.Add((r.FromTable.Name, $"the one-to-one relationship {between}"))
-                    | _ -> unsupported.Add((r.FromTable.Name, $"the many-to-many relationship {between}"))
+                    | _ -> ()
                 | _ ->
                     unsupported.Add((r.FromTable.Name, $"the relationship {between}, which is not on a single column"))
 
@@ -484,7 +484,7 @@ let private bindWith
 
     model.Tables <- tables.ToArray()
 
-    // Relationships the engine does: single column, many-to-one (either way round).
+    // Relationships the engine does: single column, many-to-one (either way round) and many-to-many.
     let rels = ResizeArray<BRel>()
 
     for r in db.Model.Relationships do
@@ -498,17 +498,23 @@ let private bindWith
                     | _ -> None
                 | _ -> None
 
+            // (from, to, limited). A many-to-many relationship keeps the model's ends: in one
+            // direction its `ToColumn`'s table filters its `FromColumn`'s, as for any relationship.
             let ends =
                 match s.FromCardinality, s.ToCardinality with
-                | RelationshipEndCardinality.Many, RelationshipEndCardinality.One -> Some(s.FromColumn, s.ToColumn)
-                | RelationshipEndCardinality.One, RelationshipEndCardinality.Many -> Some(s.ToColumn, s.FromColumn)
+                | RelationshipEndCardinality.Many, RelationshipEndCardinality.One ->
+                    Some(s.FromColumn, s.ToColumn, false)
+                | RelationshipEndCardinality.One, RelationshipEndCardinality.Many ->
+                    Some(s.ToColumn, s.FromColumn, false)
+                | RelationshipEndCardinality.Many, RelationshipEndCardinality.Many ->
+                    Some(s.FromColumn, s.ToColumn, true)
                 | _ -> None
 
             match ends with
-            | Some(many, one) ->
+            | Some(many, one, limited) ->
                 match column many, column one with
                 | Some f, Some t when f.Table.Gate.IsNone ->
-                    rels.Add(
+                    let r =
                         BRel(
                             rels.Count,
                             (if isNull s.Name then "" else s.Name),
@@ -517,7 +523,9 @@ let private bindWith
                             s.CrossFilteringBehavior = CrossFilteringBehavior.BothDirections,
                             s.IsActive
                         )
-                    )
+
+                    r.Limited <- limited
+                    rels.Add r
                 | _ -> ()
             | None -> ()
         | _ -> ()
@@ -727,8 +735,12 @@ let private bindWith
                 ()
             else
                 try
+                    // "The additional blank row is never added to tables involved in a limited
+                    // relationship" (SQLBI, "Relationships in Power BI and Tabular models"): a
+                    // limited relationship adds none.
                     let incoming =
-                        model.Rels |> Array.filter (fun r -> obj.ReferenceEquals(r.To.Table, t))
+                        model.Rels
+                        |> Array.filter (fun r -> obj.ReferenceEquals(r.To.Table, t) && not r.Limited)
 
                     if incoming |> Array.exists (fun r -> r.IsActive && r.OrphanFromRows.Length > 0) then
                         // "a special row added to a table, in case the table is on the one-side of
@@ -783,7 +795,7 @@ let private bindWith
                 attempt (ObjectRef.inTable ObjectKind.Column t.Name c.Name) (fun () -> c.Data |> ignore)
 
     for r in model.Rels do
-        attempt (ObjectRef.modelLevel ObjectKind.Relationship r.Name) (fun () -> r.ToRowOfFromRow |> ignore)
+        attempt (ObjectRef.modelLevel ObjectKind.Relationship r.Name) (fun () -> r.Check())
 
     for t in model.Tables do
         if t.Gate.IsNone then

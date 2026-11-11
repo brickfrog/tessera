@@ -201,3 +201,203 @@ let nameofTests =
                 "Group By Columns"
                 "coverage names the column")
     ]
+
+// ---- Limited (many-to-many cardinality) relationships -------------------------------------------
+
+let private manyToMany (r: TestRel) = {
+    r with
+        FromCardinality = RelationshipEndCardinality.Many
+        ToCardinality = RelationshipEndCardinality.Many
+}
+
+/// The model of learn.microsoft.com/power-bi/guidance/relationships-many-to-many ("Relate
+/// many-to-many facts"), as the corpus's c-weak has it: Target[Category] -> Product[Category],
+/// many-to-many, Product filters Target. Target's Footwear (30) matches no product. Sales relates
+/// to Product (regular) with a key 9 that Product lacks, so Product has a blank row.
+let private weak (both: bool) : TestModel = {
+    Tables = [
+        table "Product" [
+            "ProductID", DataType.Int64
+            "Color", DataType.String
+            "Category", DataType.String
+        ] [
+            [ 1; "Green"; "Clothing" ]
+            [ 2; "Blue"; "Clothing" ]
+            [ 3; "Blue"; "Accessories" ]
+        ]
+        table "Target" [
+            "Category", DataType.String
+            "Year", DataType.Int64
+            "Quantity", DataType.Int64
+        ] [
+            [ "Clothing"; 2019; 100 ]
+            [ "Accessories"; 2019; 50 ]
+            [ "Clothing"; 2020; 120 ]
+            [ "Accessories"; 2020; 60 ]
+            [ "Footwear"; 2020; 30 ]
+        ]
+        table "Sales" [ "ProductID", DataType.Int64; "Amount", DataType.Int64 ] [ [ 1; 10 ]; [ 9; 5 ] ]
+    ]
+    Rels = [
+        (if both then bothWays else id) (manyToMany (rel ("Target", "Category") ("Product", "Category")))
+        rel ("Sales", "ProductID") ("Product", "ProductID")
+    ]
+    Measures = [ "Target", "Target Qty", "SUM ( Target[Quantity] )" ]
+    Functions = []
+}
+
+let private weakOne = lazy (prepare (weak false))
+let private weakBoth = lazy (prepare (weak true))
+
+[<Tests>]
+let limitedTests =
+    testList "limited relationships" [
+        // "Table joins are achieved by using INNER JOIN semantics" (Learn, "Model relationships in
+        // Power BI Desktop"); "the categories of the products in the filter are what filters Target"
+        // (Learn, relationships-many-to-many).
+        testCase "a filter crosses by the values of the column: each product row gives its category" (fun () ->
+            let p = weakOne.Value
+            is p "CALCULATE ( [Target Qty], Product[Color] = \"Green\" )" 220
+            is p "CALCULATE ( [Target Qty], Product[Color] = \"Blue\" )" 330
+            // Context transition on each Product row: T-shirt 220, Jeans 220, Hat 110.
+            is p "SUMX ( Product, [Target Qty] )" 550
+            is p "CALCULATE ( [Target Qty], Product[ProductID] = 3 )" 110
+            // RELATEDTABLE is CALCULATETABLE: the same filter (dax.guide/relatedtable).
+            is p "SUMX ( Product, COUNTROWS ( RELATEDTABLE ( Target ) ) )" 6)
+
+        testCase "nothing filters the other side, nothing is filtered: the total keeps unmatched rows" (fun () ->
+            let p = weakOne.Value
+            is p "[Target Qty]" 360
+            is p "CALCULATE ( [Target Qty], ALL ( Product ) )" 360
+            is p "CALCULATE ( [Target Qty], Target[Year] = 2020 )" 210)
+
+        // "for many-to-many relationships, cross filter direction can be from either one of the
+        // tables, or from both tables" (Learn, "Model relationships in Power BI Desktop").
+        testCase "single direction doesn't filter back; both directions do, by values" (fun () ->
+            is weakOne.Value "CALCULATE ( COUNTROWS ( Product ), Target[Year] = 2019 )" 3
+            is weakOne.Value "CALCULATE ( COUNTROWS ( Product ), Target[Category] = \"Footwear\" )" 3
+            is weakBoth.Value "CALCULATE ( COUNTROWS ( Product ), Target[Category] = \"Accessories\" )" 1
+            is weakBoth.Value "CALCULATE ( COUNTROWS ( Product ), Target[Category] = \"Footwear\" )" (null: obj)
+            is weakBoth.Value "CALCULATE ( COUNTROWS ( Product ), Target[Quantity] >= 100 )" 2)
+
+        // "The additional blank row is never added to tables involved in a limited relationship"
+        // (SQLBI, "Relationships in Power BI and Tabular models"); "no revenues in the Weak Amount
+        // measure are related to the blank row" (SQLBI, "Strong and weak relationships in Power BI").
+        testCase
+            "no blank row from a limited relationship, and the blank row of a regular one matches nothing"
+            (fun () ->
+                let p = weakOne.Value
+                returns p "EVALUATE VALUES ( Target[Category] )" [ [ "Clothing" ]; [ "Accessories" ]; [ "Footwear" ] ]
+                // Product's blank row comes from Sales' key 9.
+                is p "COUNTROWS ( VALUES ( Product[ProductID] ) )" 4
+                is p "CALCULATE ( [Target Qty], Product[ProductID] = 1 )" 220
+                is p "CALCULATE ( [Target Qty], Product[ProductID] = 9 )" (null: obj))
+
+        // "Table expansion never occurs for limited relationships"; "The RELATED DAX function can't
+        // be used to retrieve the "one" side column values" (Learn, "Model relationships").
+        testCase "no table expansion across it: RELATED is an error, ALL ( Target ) leaves Product's filters" (fun () ->
+            let p = weakOne.Value
+
+            match queryError p "EVALUATE ADDCOLUMNS ( Target, \"Color\", RELATED ( Product[Color] ) )" with
+            | DaxInvalid _ -> ()
+            | other -> failtestf "%A" other
+
+            is p "CALCULATE ( [Target Qty], Product[Color] = \"Green\", ALL ( Target ) )" 220)
+
+        testCase "CROSSFILTER and USERELATIONSHIP" (fun () ->
+            let p = weakOne.Value
+
+            is
+                p
+                "CALCULATE ( [Target Qty], Product[Color] = \"Green\", CROSSFILTER ( Target[Category], Product[Category], NONE ) )"
+                360
+
+            is
+                p
+                "CALCULATE ( COUNTROWS ( Product ), Target[Category] = \"Accessories\", CROSSFILTER ( Target[Category], Product[Category], BOTH ) )"
+                1
+
+            notSupported
+                p
+                "EVALUATE ROW ( \"x\", CALCULATE ( [Target Qty], CROSSFILTER ( Target[Category], Product[Category], ONEWAY ) ) )"
+                "ONEWAY on a many-to-many")
+
+        testCase "what the sources leave open is refused" (fun () ->
+            let p = weakOne.Value
+            // A filter that keeps every Product row, its blank row too.
+            notSupported
+                p
+                "EVALUATE ROW ( \"x\", CALCULATE ( [Target Qty], Product[Color] IN { \"Green\", \"Blue\", BLANK () } ) )"
+                "keeps all of its rows"
+
+            // One that leaves out only the blank row, which matches nothing anyway, is a filter.
+            is p "CALCULATE ( [Target Qty], Product[Color] IN { \"Green\", \"Blue\" } )" 330
+
+            // ALLCROSSFILTERED also removes what crosses a limited relationship: which filters those
+            // are isn't implemented.
+            notSupported
+                p
+                "EVALUATE ROW ( \"x\", CALCULATE ( [Target Qty], ALLCROSSFILTERED ( Target ) ) )"
+                "ALLCROSSFILTERED"
+
+            // ISCROSSFILTERED of a table connected through it, which no filter reaches.
+            notSupported
+                p
+                "EVALUATE ROW ( \"x\", CALCULATE ( ISCROSSFILTERED ( Product ), Target[Year] = 2019 ) )"
+                "ISCROSSFILTERED"
+
+            is p "CALCULATE ( ISCROSSFILTERED ( Target ), Product[Color] = \"Green\" )" true)
+
+        testCase "BLANK on both sides, and columns of different types, are refused" (fun () ->
+            let blanks = {
+                weak false with
+                    Tables =
+                        weak false
+                        |> fun m ->
+                            m.Tables
+                            |> List.map (fun t ->
+                                match t.Name with
+                                | "Product" -> {
+                                    t with
+                                        Rows = t.Rows @ [ [ 4; "Red"; null ] ]
+                                  }
+                                | "Target" -> {
+                                    t with
+                                        Rows = t.Rows @ [ [ null; 2021; 7 ] ]
+                                  }
+                                | _ -> t)
+            }
+
+            let p = prepare blanks
+            is p "CALCULATE ( [Target Qty], Product[Color] = \"Green\" )" 220
+            notSupported p "EVALUATE ROW ( \"x\", CALCULATE ( [Target Qty], Product[Color] = \"Red\" ) )" "BLANK"
+
+            let typed = {
+                weak false with
+                    Tables =
+                        (weak false).Tables
+                        |> List.map (fun t ->
+                            if t.Name = "Target" then
+                                {
+                                    t with
+                                        Columns = [
+                                            "Category", DataType.Int64
+                                            "Year", DataType.Int64
+                                            "Quantity", DataType.Int64
+                                        ]
+                                        Rows = [ [ 1; 2019; 1 ] ]
+                                }
+                            else
+                                t)
+            }
+
+            let db, store = build typed
+
+            match Engine.prepare db store with
+            | Ok p ->
+                notSupported
+                    p
+                    "EVALUATE ROW ( \"x\", CALCULATE ( [Target Qty], Product[Color] = \"Green\" ) )"
+                    "different types"
+            | Error e -> Expect.stringContains (TessError.message e) "different types" "refused")
+    ]

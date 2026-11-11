@@ -535,6 +535,7 @@ module Filters =
             // a filter would do through a table that doesn't exist yet can't be told.
             if
                 not (obj.ReferenceEquals(r, via))
+                && not r.Limited
                 && not (r.To.Table.Computing && fc.Filters.IsEmpty)
             then
                 let d = r.To.Table
@@ -567,7 +568,7 @@ module Filters =
 
         // A many-side table that filters both ways restricts us to the rows it refers to.
         for r in cfg.OneToMany t do
-            if not (obj.ReferenceEquals(r, via)) && cfg.FiltersBothWays r then
+            if not (obj.ReferenceEquals(r, via)) && not r.Limited && cfg.FiltersBothWays r then
                 let m = r.From.Table
                 let mv = vis fc m r
 
@@ -590,6 +591,62 @@ module Filters =
                             $"a filter on '{m.Name}' that keeps all of its rows, crossing the both-directions relationship to '{t.Name}'"
 
                     set <- set.Intersect referred
+
+        // A limited relationship filters by values: "Table joins are achieved by using INNER JOIN
+        // semantics" (Microsoft Learn, "Model relationships in Power BI Desktop"). With nothing
+        // filtering the other side nothing is filtered here, so a total includes the rows that
+        // match nothing ("the total shown for Weak Amount is different than the sum of individual
+        // brands": SQLBI, "Strong and weak relationships in Power BI").
+        let limited (r: BRel) (source: BColumn) (target: BColumn) =
+            let s = source.Table
+            let sv = vis fc s r
+
+            if not sv.IsAll then
+                if sv.Count = s.Size then
+                    // As for a relationship that filters both ways: no source says whether a filter
+                    // that keeps every row still hides the rows that match nothing.
+                    gate
+                        $"a filter on '{s.Name}' that keeps all of its rows, crossing the many-to-many relationship {r.Describe}"
+
+                let stored = s.RowCount
+                let data = source.Data
+                let marks = Array.zeroCreate<bool>(data.DistinctCount + 1)
+                let mutable blank = false
+
+                for row in sv.Rows do
+                    if row >= stored then
+                        blank <- true
+                    else
+                        let id = data.ValueIds.[row]
+
+                        if id = data.BlankId then
+                            blank <- true
+                        else
+                            marks.[id] <- true
+
+                if blank && (target.Data.BlankId >= 0 || t.HasBlankRow) then
+                    gate
+                        $"a BLANK of '{s.Name}'[{source.Name}] crossing the many-to-many relationship {r.Describe} to the BLANK of '{t.Name}'[{target.Name}] (whether they match isn't documented)"
+
+                let ids =
+                    r.MatchIds(
+                        source,
+                        seq {
+                            for id in 0 .. marks.Length - 1 do
+                                if marks.[id] then
+                                    id
+                        }
+                    )
+
+                set <- rowsWithIds t target (RowSet.OfSeq(target.IdCount, ids)) set
+
+        for r in cfg.ManyToOne t do
+            if r.Limited && not (obj.ReferenceEquals(r, via)) then
+                limited r r.To r.From
+
+        for r in cfg.OneToMany t do
+            if r.Limited && not (obj.ReferenceEquals(r, via)) && cfg.Both.[r.Id] then
+                limited r r.From r.To
 
         set
 
@@ -785,7 +842,8 @@ module DateTable =
             Sure
         else
             let keyOf =
-                c.Table.Model.Rels |> Array.filter (fun r -> obj.ReferenceEquals(r.To, c))
+                c.Table.Model.Rels
+                |> Array.filter (fun r -> obj.ReferenceEquals(r.To, c) && not r.Limited)
 
             if
                 keyOf
