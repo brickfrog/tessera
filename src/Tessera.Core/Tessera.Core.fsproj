@@ -71,6 +71,7 @@
     <Compile Include="Engine/Functions/NonBlank.fs" />
     <Compile Include="Engine/Functions/TimeIntelligence.fs" />
     <Compile Include="Engine/Functions/CalculationGroups.fs" />
+    <Compile Include="Engine/Functions/FormatStrings.fs" />
     <Compile Include="Engine/Functions/Window.fs" />
     <Compile Include="Engine/Eval.fs" />
     <Compile Include="Engine/Registry.fs" />

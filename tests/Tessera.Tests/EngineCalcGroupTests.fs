@@ -317,10 +317,13 @@ let tests =
             testCase "SELECTEDMEASUREFORMATSTRING is the measure's format string"
             <| fun () -> is (p ()) "CALCULATE ( [Total], Adjust[Adjustment] = \"Fmt\" )" "0.00"
 
+            // A dynamic format string is evaluated where the function is (EngineFormatStringTests).
+            testCase "SELECTEDMEASUREFORMATSTRING of a dynamic format string"
+            <| fun () -> is (p ()) "CALCULATE ( [Dynamic], Adjust[Adjustment] = \"Fmt\" )" "0"
+
             testCase "SELECTEDMEASUREFORMATSTRING is refused where the format string is not settled"
             <| fun () ->
                 notSupported (p ()) (r "CALCULATE ( [Count], Adjust[Adjustment] = \"Fmt\" )") "no format string"
-                notSupported (p ()) (r "CALCULATE ( [Dynamic], Adjust[Adjustment] = \"Fmt\" )") "dynamic format string"
                 // Scale (200, with a format string expression) is applied before Adjust.
                 notSupported
                     (p ())

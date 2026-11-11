@@ -98,6 +98,7 @@
     <Compile Include="EngineDateTimeTests.fs" />
     <Compile Include="EngineModelShapeTests.fs" />
     <Compile Include="EngineCalcGroupTests.fs" />
+    <Compile Include="EngineFormatStringTests.fs" />
     <Compile Include="EngineSampleTests.fs" />
     <Compile Include="EnginePerfTests.fs" />
     <Compile Include="TestSuiteTests.fs" />

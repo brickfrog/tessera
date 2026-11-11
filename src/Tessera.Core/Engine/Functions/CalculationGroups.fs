@@ -1,8 +1,8 @@
 namespace Tessera.DaxEngine.Functions
 
 // Calculation groups: which calculation item a measure reference becomes, and the functions of a
-// calculation item's expression (SELECTEDMEASURE, SELECTEDMEASURENAME, ISSELECTEDMEASURE,
-// SELECTEDMEASUREFORMATSTRING).
+// calculation item's expression (SELECTEDMEASURE, SELECTEDMEASURENAME, ISSELECTEDMEASURE; format
+// strings and SELECTEDMEASUREFORMATSTRING are in FormatStrings.fs).
 //
 // The rules, with where they come from:
 //
@@ -148,7 +148,7 @@ module CalculationGroups =
 
     /// The item whose expression this is: these functions are only for one ("Can only be
     /// referenced in the expression for a calculation item": Learn, SELECTEDMEASURE).
-    let private current (ctx: Ctx) (call: Call) : ItemApplication =
+    let current (ctx: Ctx) (call: Call) : ItemApplication =
         let name = call.Name.Name.ToUpperInvariant()
 
         match ctx.Items.Current with
@@ -229,45 +229,5 @@ module CalculationGroups =
 
             DaxValue.Boolean(named |> List.exists (fun m -> obj.ReferenceEquals(m, app.Measure))))
 
-        // "A string holding the format string of the measure that is currently in context" (Learn).
-        // Which format string that is once another item with a format string expression has been
-        // applied to the same measure ("This format string may already have been defined by
-        // another calculation item with higher precedence": SQLBI, "Controlling format strings in
-        // calculation groups"), or for a measure with a dynamic format string or none, is not
-        // something the engine evaluates: refused.
-        Fn.scalar
-            "SELECTEDMEASUREFORMATSTRING"
-            "Calculation groups"
-            (0, 0)
-            (Fn.typeIs DaxType.String)
-            (fun _ ctx call ->
-                let app = current ctx call
-                let m = app.Measure
-
-                let earlier =
-                    ctx.Items.Applied
-                    |> List.exists (fun a ->
-                        not (obj.ReferenceEquals(a, app))
-                        && obj.ReferenceEquals(a.Measure, m)
-                        && a.Item.FormatStringExpression.IsSome)
-
-                if earlier then
-                    Fail.notSupported
-                        ctx
-                        call.Span
-                        $"SELECTEDMEASUREFORMATSTRING of [{m.Name}] after a calculation item with a format string expression was applied to it"
-
-                if m.HasFormatStringExpression then
-                    Fail.notSupported
-                        ctx
-                        call.Span
-                        $"SELECTEDMEASUREFORMATSTRING of [{m.Name}], which has a dynamic format string"
-
-                if String.IsNullOrEmpty m.FormatString then
-                    Fail.notSupported
-                        ctx
-                        call.Span
-                        $"SELECTEDMEASUREFORMATSTRING of [{m.Name}], which has no format string"
-
-                DaxValue.String m.FormatString)
+        // SELECTEDMEASUREFORMATSTRING is in Functions/FormatStrings.fs.
     ]

@@ -933,6 +933,9 @@ and [<Sealed; AllowNullLiteral>] BMeasure(name: string, table: BTable, source: S
     member val FormatString: string = null with get, set
     /// Whether the measure has a dynamic format string (TOM `FormatStringDefinition`).
     member val HasFormatStringExpression = false with get, set
+    /// The text of the measure's dynamic format string (TOM `FormatStringDefinition`), if it has
+    /// one: evaluated by Functions/FormatStrings.fs.
+    member val FormatStringSource: SourceText option = None with get, set
 
 and [<Sealed; AllowNullLiteral>] BFunction(name: string, source: SourceText, parsed: Lazy<FunctionDef>) =
     member _.Name = name

@@ -31,6 +31,7 @@ type Args =
     | User_Object_Id of id: string
     | User_Culture of culture: string
     | Custom_Data of text: string
+    | Formatted
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -58,6 +59,10 @@ type Args =
             | User_Culture _ -> "with --data: what USERCULTURE () returns (refused unless given)."
             | Custom_Data _ ->
                 "with --data: what CUSTOMDATA () returns (BLANK if another identity option is given, else refused)."
+            | Formatted ->
+                "with --data: show the measure columns of SUMMARIZECOLUMNS, ADDCOLUMNS and ROW formatted with their "
+                + "format strings (the measure's, static or dynamic, or a calculation item's); with --json, add the "
+                + "format strings and the formatted values to the result. Local only: a server's query result has none."
 
 /// The identity options given, if any: who the local engine says is asking.
 let private identity (args: ParseResults<Args>) : DaxEngine.Identity option =
@@ -122,6 +127,46 @@ let private render
                 ctx.Out.WriteLine line)
 
     if not ctx.Json && results |> List.exists _.Truncated then
+        ctx.Err.WriteLine($"Showing the first {maxRows} rows of each result (--max-rows 0 for all).")
+
+    Done
+
+let private formattedJson (source: string) (results: FormattedResult list) (elapsed: TimeSpan) =
+    obj [
+        "command", str "query"
+        "source", str source
+        "results", FormattedResult.listToJson results
+        "durationMs", num (int elapsed.TotalMilliseconds)
+    ]
+
+/// `render`, for results with format strings (`--formatted`).
+let private renderFormatted
+    (ctx: Ctx)
+    (args: ParseResults<Args>)
+    (source: string)
+    (results: FormattedResult list)
+    (elapsed: TimeSpan)
+    (maxRows: int)
+    =
+    if ctx.Json then
+        writeJson ctx.Out (formattedJson source results elapsed)
+    elif args.Contains Args.Csv then
+        results
+        |> List.iteri (fun i r ->
+            if i > 0 then
+                ctx.Out.WriteLine()
+
+            ctx.Out.Write(FormattedResult.toCsv ctx.Out.NewLine r))
+    else
+        results
+        |> List.iteri (fun i r ->
+            if i > 0 then
+                ctx.Out.WriteLine()
+
+            for line in FormattedResult.toTable r do
+                ctx.Out.WriteLine line)
+
+    if not ctx.Json && results |> List.exists _.Result.Truncated then
         ctx.Err.WriteLine($"Showing the first {maxRows} rows of each result (--max-rows 0 for all).")
 
     Done
@@ -245,7 +290,7 @@ let private local
             if errors > 0 then
                 Failed(FixtureHasErrors(loaded.Directory, errors))
             else
-                match
+                let prepared =
                     Engine.prepareWith
                         {
                             Engine.Options.defaults with
@@ -257,12 +302,24 @@ let private local
                         match identity args with
                         | Some id -> Engine.withIdentity id p
                         | None -> p)
-                    |> Result.bind (fun p -> Engine.evaluateQuery p dax)
-                with
-                | Error e -> Failed e
-                | Ok results ->
-                    let limit = if maxRows = 0 then None else Some maxRows
-                    render ctx args (src.Path) (results |> List.map (cap limit)) clock.Elapsed maxRows
+
+                if args.Contains Args.Formatted then
+                    match prepared |> Result.bind (fun p -> Engine.evaluateQueryFormatted p dax) with
+                    | Error e -> Failed e
+                    | Ok results ->
+                        let capped =
+                            if maxRows = 0 then
+                                results
+                            else
+                                results |> List.map (FormattedResult.truncate maxRows)
+
+                        renderFormatted ctx args (src.Path) capped clock.Elapsed maxRows
+                else
+                    match prepared |> Result.bind (fun p -> Engine.evaluateQuery p dax) with
+                    | Error e -> Failed e
+                    | Ok results ->
+                        let limit = if maxRows = 0 then None else Some maxRows
+                        render ctx args (src.Path) (results |> List.map (cap limit)) clock.Elapsed maxRows
 
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let maxRows = args.TryGetResult Args.Max_Rows |> Option.defaultValue defaultMaxRows
@@ -276,6 +333,10 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | _ when ctx.Json && args.Contains Args.Csv -> UsageError "--json and --csv can't be combined"
     | source :: _ when XmlaAddress.isRemote source && (data.IsSome || args.Contains Args.Coverage) ->
         UsageError "--data and --coverage are for model files: a server model is queried on the server"
+    | source :: _ when args.Contains Args.Formatted && XmlaAddress.isRemote source ->
+        UsageError "--formatted is for the local engine (--data): a server's DAX query result carries no format strings"
+    | _ when args.Contains Args.Formatted && args.Contains Args.Coverage ->
+        UsageError "--formatted goes with a query, not --coverage"
     | source :: _ when
         (identity args).IsSome
         && (XmlaAddress.isRemote source || args.Contains Args.Coverage)

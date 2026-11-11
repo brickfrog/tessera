@@ -898,3 +898,120 @@ module QueryResult =
             Error $"{actual.Length} result sets, expected {expected.Length}"
         else
             Ok(List.map2 (compare options) expected actual)
+
+/// One cell's format string, and its value formatted with it.
+type FormattedCell = {
+    FormatString: string
+    /// The value as FORMAT ( <value>, <format string> ) writes it; BLANK is "".
+    Text: string
+}
+
+/// A result with the format strings of its cells, where the local engine can tell them exactly
+/// (`tess query --formatted`). A server's DAX query result carries no format strings.
+type FormattedResult = {
+    Result: QueryResult
+    /// Parallel to `Result.Rows`: per row, per column, the cell's format string and its formatted
+    /// value, or None where the cell has no format string.
+    Cells: FormattedCell option array list
+}
+
+module FormattedResult =
+
+    /// The first `n` rows, marked truncated if there were more.
+    let truncate (n: int) (r: FormattedResult) : FormattedResult =
+        if r.Result.Rows.Length > n then
+            {
+                Result = {
+                    r.Result with
+                        Rows = List.truncate n r.Result.Rows
+                        Truncated = true
+                }
+                Cells = List.truncate n r.Cells
+            }
+        else
+            r
+
+    /// The format strings of column `c`, one per row.
+    let private formatStrings (r: FormattedResult) (c: int) : string option list =
+        r.Cells |> List.map (fun row -> row.[c] |> Option.map _.FormatString)
+
+    /// As `QueryResult.toJson`, and also:
+    ///   - on each column with a format string: "formatString" when every row has the same one,
+    ///     otherwise "formatStrings", one per row (null for a row whose cell has none);
+    ///   - "formatted": parallel to "rows", each cell's value formatted with its format string, or
+    ///     null where it has none.
+    let toJson (r: FormattedResult) : JsonNode =
+        let o = (QueryResult.toJson r.Result).AsObject()
+        let columns = o.["columns"].AsArray()
+
+        for c in 0 .. columns.Count - 1 do
+            let col = columns.[c].AsObject()
+            let fs = formatStrings r c
+
+            match List.distinct fs with
+            | [ Some f ] -> col.["formatString"] <- JsonValue.Create f
+            | distinct when distinct |> List.exists Option.isSome ->
+                col.["formatStrings"] <-
+                    JsonArray(
+                        fs
+                        |> List.map (fun f ->
+                            match f with
+                            | Some f -> JsonValue.Create f :> JsonNode
+                            | None -> null)
+                        |> Array.ofList
+                    )
+            | _ -> ()
+
+        let formatted =
+            JsonArray(
+                [|
+                    for row in r.Cells ->
+                        JsonArray(
+                            row
+                            |> Array.map (fun cell ->
+                                match cell with
+                                | Some cell -> JsonValue.Create cell.Text :> JsonNode
+                                | None -> null)
+                        )
+                        :> JsonNode
+                |]
+            )
+
+        // After "rows", before "rowCount".
+        let rowCount = o.["rowCount"]
+        let truncated = o.["truncated"]
+        o.Remove "rowCount" |> ignore
+        o.Remove "truncated" |> ignore
+        o.["formatted"] <- formatted
+        o.["rowCount"] <- rowCount
+        o.["truncated"] <- truncated
+        o
+
+    /// The "results" array of a query: one entry per EVALUATE, in order.
+    let listToJson (results: FormattedResult list) : JsonNode =
+        JsonArray(results |> List.map toJson |> Array.ofList)
+
+    /// The result with every cell that has a format string replaced by its formatted text (a
+    /// string), for the text and CSV output.
+    let private shown (r: FormattedResult) : QueryResult = {
+        r.Result with
+            Rows =
+                List.map2
+                    (fun (values: QueryValue array) (cells: FormattedCell option array) ->
+                        Array.map2
+                            (fun v cell ->
+                                match v, cell with
+                                | QueryValue.Blank, _ -> QueryValue.Blank
+                                | _, Some cell -> QueryValue.String cell.Text
+                                | _, None -> v)
+                            values
+                            cells)
+                    r.Result.Rows
+                    r.Cells
+    }
+
+    /// As `QueryResult.toCsv`, with formatted values where cells have a format string.
+    let toCsv (eol: string) (r: FormattedResult) : string = QueryResult.toCsv eol (shown r)
+
+    /// As `QueryResult.toTable`, with formatted values where cells have a format string.
+    let toTable (r: FormattedResult) : string list = QueryResult.toTable (shown r)
