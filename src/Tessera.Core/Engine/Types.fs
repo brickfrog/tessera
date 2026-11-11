@@ -59,6 +59,24 @@ namespace Tessera.DaxEngine
 //     iteration (a calculated column's, a helper's) goes on a table from `Shadows.notAnIteration`.
 //   - `Type` is the static result type where the function has one whatever its data (COUNTROWS is
 //     always an Integer). It types result columns that are BLANK in every row.
+//
+// ---- Caches --------------------------------------------------------------------------------------
+//
+// An iterator's context transitions would redo the same work per row, so results are shared
+// between filter contexts that have the same filters (Caching.fs has the details and the keys):
+// the rows a table shows (per relationship set-up, compared by the filters that can reach it),
+// the value of a measure reference and the filter of a True/False filter argument (per query).
+// What that asks of a function author:
+//   - `Check` must depend on the argument trees alone: its answer is kept per call of parsed code.
+//   - A function that reads a filter context's `ScopeMark`s (as ALLSELECTED, ISINSCOPE and
+//     ISFILTERED do) must be named in `MeasureCache.readsScope`: a measure that uses it, directly
+//     or through measures and functions it names, is then never shared between contexts.
+//   - A function named in `pureFunctions` (Functions/Filter.fs) must be a function of its
+//     arguments' values alone (and of what is fixed for a model: the clock, culture, collation).
+//   - Anything new that a table's visible rows or a measure's value depend on, other than the
+//     filters, the relationships, the model and the query, must go into the keys in Caching.fs.
+//   - The row sets and arrays a function gets from the context (`Filters.visible`,
+//     `Filters.visibleStored`) are shared between contexts and threads: never modify them.
 
 open System
 open System.Collections.Concurrent
