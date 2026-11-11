@@ -145,6 +145,7 @@ module Options =
 /// The functions the engine implements: name and family, by family then name.
 let functions: (string * string) list =
     Registry.all
+    |> List.filter (fun f -> f.Family <> Functions.FormatStrings.internalFamily)
     |> List.map (fun f -> f.Name, f.Family)
     |> List.sortBy (fun (name, family) -> family, name)
 
@@ -985,6 +986,17 @@ let private bindWith
             model.Measures.[m.Name].FormatString <- m.FormatString
             model.Measures.[m.Name].HasFormatStringExpression <- not (isNull m.FormatStringDefinition)
 
+            if not (isNull m.FormatStringDefinition) then
+                model.Measures.[m.Name].FormatStringSource <-
+                    Some {
+                        Label = $"format string of measure '{t.Name}'[{m.Name}]"
+                        Text =
+                            (if isNull m.FormatStringDefinition.Expression then
+                                 ""
+                             else
+                                 m.FormatStringDefinition.Expression)
+                    }
+
     for f in db.Model.Functions do
         let source = {
             Label = $"function {f.Name}"
@@ -1634,7 +1646,7 @@ let private toResult (t: TableVal) (order: int array) : QueryResult =
 
 // ---- Queries -----------------------------------------------------------------------------------
 
-let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
+let private evaluateTable (ctx: Ctx) (e: Evaluate) : TableVal * int array =
     if e.StartAt.Length > e.OrderBy.Length then
         Fail.invalid ctx e.StartAt.Head.Span "START AT has more values than ORDER BY has keys"
 
@@ -1738,13 +1750,8 @@ let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult =
 
                 sorted |> Array.filter (fun row -> not (before row))
 
-    toResult table order
+    table, order
 
-/// Run a DAX query: one result per EVALUATE.
-///
-/// DEFINE MEASURE, VAR, FUNCTION, COLUMN and TABLE are supported; ORDER BY sorts by any expressions over the
-/// result's columns. Without ORDER BY the rows come in the order the engine produced them, which
-/// (as on a server) is not defined.
 /// A query on a model with roles applied refuses if who is asking changed since (see `asRoles`).
 let private rolesUnchanged (p: Prepared) =
     if not p.Roles.IsEmpty && p.Identity <> p.RolesIdentity then
@@ -1757,7 +1764,55 @@ let private rolesUnchanged (p: Prepared) =
             )
         )
 
-let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessError> =
+let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult = evaluateTable ctx e ||> toResult
+
+/// One EVALUATE with the format strings of its measure columns (see `evaluateQueryFormatted`).
+let private evaluateFormatted (ctx: Ctx) (e: Evaluate) : FormattedResult =
+    let expr, probes, pairs = Functions.FormatStrings.withProbes e.Table
+    let table, order = evaluateTable ctx { e with Table = expr }
+
+    // The hidden columns are the last ones, after the name/expression pairs.
+    let shownCount = table.Cols.Length - probes.Length
+    let firstPair = shownCount - pairs
+
+    let shown =
+        TableVal(
+            Array.sub table.Cols 0 shownCount,
+            table.Count,
+            table.BaseTable,
+            table.BaseRows,
+            Array.sub table.Data 0 shownCount,
+            table.Config
+        )
+
+    let probeOf =
+        Array.init shownCount (fun i ->
+            probes
+            |> List.tryFindIndex (fun p -> firstPair + p.Pair = i)
+            |> Option.map (fun k -> probes.[k], shownCount + k))
+
+    {
+        Result = toResult shown order
+        Cells = [
+            for row in order ->
+                probeOf
+                |> Array.mapi (fun c probe ->
+                    match probe with
+                    | Some(p, h) ->
+                        match Functions.FormatStrings.probeValue (table.Get(h, row)) with
+                        | DaxValue.String f ->
+                            Some {
+                                FormatString = f
+                                Text =
+                                    Functions.FormatStrings.render ctx p.Reference.Span p.Column f (table.Get(c, row))
+                            }
+                        | _ -> None
+                    | None -> None)
+        ]
+    }
+
+/// `evaluateQuery`, with `each` evaluating each EVALUATE.
+let private evaluateQueryAs (each: Ctx -> Evaluate -> 'r) (p: Prepared) (dax: string) : Result<'r list, TessError> =
     match DaxParser.parseQuery dax with
     | Error errors -> Error(syntaxError "query" errors)
     | Ok query ->
@@ -1950,10 +2005,26 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                     }
                 | DefinitionKind.MParameter(name, _) -> Fail.notSupported ctx name.Span "DEFINE MPARAMETER"
 
-            let results = query.Evaluates |> List.map (evaluateOne ctx)
+            let results = query.Evaluates |> List.map (each ctx)
             // A variable the query refers to and didn't need is still evaluated (see `settle`).
             Variables.settle ctx (List.ofSeq queryVars)
             results)
+
+/// Run a DAX query: one result per EVALUATE.
+///
+/// DEFINE MEASURE, VAR, FUNCTION, COLUMN and TABLE are supported; ORDER BY sorts by any expressions over the
+/// result's columns. Without ORDER BY the rows come in the order the engine produced them, which
+/// (as on a server) is not defined.
+let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessError> = evaluateQueryAs evaluateOne p dax
+
+/// Run a DAX query as `evaluateQuery` does, and give the measure columns of each result their format
+/// strings: the columns of a top-level SUMMARIZECOLUMNS, ADDCOLUMNS or ROW whose expression is a
+/// measure reference. Each cell's format string is the measure's (static or dynamic) or the
+/// calculation item's applied to it, evaluated where the cell is (Functions/FormatStrings.fs), and
+/// its value is formatted with it as FORMAT does. The rows and values are those `evaluateQuery`
+/// gives.
+let evaluateQueryFormatted (p: Prepared) (dax: string) : Result<FormattedResult list, TessError> =
+    evaluateQueryAs evaluateFormatted p dax
 
 /// Evaluate one scalar expression with no filter context and no row context, as `EVALUATE ROW (
 /// "v", <expression> )` would.

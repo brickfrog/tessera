@@ -1,0 +1,32 @@
+{
+  "title": "A query can define the internal format string measure as a query measure",
+  "model": "g-formatstrings",
+  "query": "DEFINE MEASURE Sales[_Sales Amount FormatString] = \"0\" EVALUATE ROW ( \"Fs\", 'Sales'[_Sales Amount FormatString] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Fs]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "0"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-dynamic-format-strings-for-dax-measures/",
+    "quote": "If the format string expression is defined for a measure, it can be rewritten as a query measure in a DAX query.",
+    "supports": "DEFINE MEASURE Sales[_Sales Amount FormatString] replaces it for the query"
+  },
+  "confidence": "derived",
+  "derivation": "The query measure is the one the query's reference reaches: \"0\".",
+  "tags": [
+    "format-strings",
+    "define-measure"
+  ],
+  "ordered": false
+}

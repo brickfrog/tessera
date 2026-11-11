@@ -151,7 +151,11 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
         | _ ->
             match tryMeasure ctx name with
             | Some m -> Choice2Of2 m
-            | None -> Fail.invalid ctx span $"table '{t.Name}' has no column or measure '{name}'"
+            | None ->
+                // `Table[_<measure> FormatString]`: a measure's dynamic format string.
+                match Functions.FormatStrings.internalMeasure ctx t name with
+                | Some m -> Choice2Of2 m
+                | None -> Fail.invalid ctx span $"table '{t.Name}' has no column or measure '{name}'"
 
     /// An extension column `[Name]` of a row context, innermost first; then a model column of one.
     let rowContextColumnAt (ctx: Ctx) (name: string) : (RowCtx * int) option =

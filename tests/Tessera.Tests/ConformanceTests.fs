@@ -47,6 +47,7 @@ let private expectedUnsupported: Set<string> =
         "calculation-groups"
         "window-functions"
         "security"
+        "format-strings"
     ]
 
 /// Which of the engine's errors mean "not implemented" (see `RunConfig.defaults`).
