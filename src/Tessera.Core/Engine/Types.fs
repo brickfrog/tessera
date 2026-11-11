@@ -66,7 +66,8 @@ namespace Tessera.DaxEngine
 // between filter contexts that have the same filters (Caching.fs has the details and the keys):
 // the rows a table shows (per relationship set-up, compared by the filters that can reach it),
 // the value of a measure reference and the filter of a True/False filter argument (per query).
-// What that asks of a function author:
+// A context made from another also works out a table's rows from its parent's (see "Incremental
+// filter contexts" below). What that asks of a function author:
 //   - `Check` must depend on the argument trees alone: its answer is kept per call of parsed code.
 //   - A function that reads a filter context's `ScopeMark`s (as ALLSELECTED, ISINSCOPE and
 //     ISFILTERED do) must be named in `MeasureCache.readsScope`: a measure that uses it, directly
@@ -87,7 +88,11 @@ namespace Tessera.DaxEngine
 // worked out from that context's rows: `Filters.compute` over the added filters alone, starting from
 // the base's rows instead of all of them. For a transition on a dimension row that is the fact rows
 // of one key (an index lookup) instead of a scan. `mark`, `remove` and `withConfig` keep a chain of
-// bases (each through the same change), up to a few deep.
+// bases (each through the same change), up to a few deep. The base is shared, not rebuilt: `add`
+// keeps, in the parent's `FilterState.Bases`, the base for each set of columns the new filters
+// replace, and a base keeps, in its `FilterState.Derived`, the rows worked out for each set of
+// filters added to it (two CALCULATEs in one row of an iteration add the same ones). A context
+// worked out this way doesn't use `VisCache` for those rows; its base does.
 //
 // Why it is exact. Write V(L, t) for the rows of table t that `compute` gives under the filter list
 // L. Each of its steps on t is one of: an intersection with what one filter allows of t's rows (a
@@ -130,7 +135,7 @@ namespace Tessera.DaxEngine
 //     preimage of a related table's rows over a regular relationship, must make
 //     `VisCache.Intersective` false for the tables it applies to.
 //   - A filter context with the same filters as another may share its `FilterCtx.State` (the rows
-//     it shows); one with different filters never.
+//     it shows), and only while nothing is being computed; one with different filters never.
 
 open System
 open System.Collections.Concurrent
@@ -1356,6 +1361,10 @@ type FilterState() =
             bases <- Dictionary<obj array, obj>(ReferenceArrayComparer.Instance)
 
         bases
+
+    /// The rows of contexts with these filters first and others added, worked out incrementally,
+    /// by the table, the relationship, and the filters added (a `VisKey`, Caching.fs).
+    member val Derived: obj = null with get, set
 
 /// A filter context: filters, and the relationships in force. Immutable; the caches belong to one
 /// evaluation (one thread).

@@ -15,7 +15,9 @@ namespace Tessera.DaxEngine
 //     its rows are computed from, a superset). Not used while a calculated column or table is
 //     being computed (the rows then depend on what is computed so far), nor for a set-up whose
 //     relationships let a table's rows depend on themselves (then the order of evaluation decides
-//     what is refused). Bounded by size; cleared when full.
+//     what is refused). Bounded by size; cleared when full. A context whose rows of a table are
+//     worked out incrementally (see "Incremental filter contexts" in the author's guide) neither
+//     looks them up here nor adds them: they are cheap from its base's rows, which are.
 //   - `PredicateKey` (in `QueryDefs.Predicates`, so for one query): the filter a True/False filter
 //     argument of CALCULATE stands for, when the predicate reads nothing but its own columns,
 //     constants, variables and pure functions (`closedVariables` in Functions/Filter.fs). Keyed on

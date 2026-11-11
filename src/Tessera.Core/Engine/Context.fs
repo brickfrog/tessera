@@ -437,7 +437,14 @@ module Filters =
 
     /// The same filters, with a mark added for ISINSCOPE (see `ScopeMark`).
     let mark (fc: FilterCtx) (m: ScopeMark) : FilterCtx =
-        let marked = FilterCtx(fc.Filters, fc.Config, m :: fc.Scope, fc.State)
+        // While something is computed, a table's rows depend on what is computed so far: nothing
+        // is shared then (as `VisCache.Usable`).
+        let marked =
+            if fc.Config.Model.Computing.Count = 0 then
+                FilterCtx(fc.Filters, fc.Config, m :: fc.Scope, fc.State)
+            else
+                FilterCtx(fc.Filters, fc.Config, m :: fc.Scope)
+
         marked.Base <- fc.Base
         marked
 
@@ -454,8 +461,7 @@ module Filters =
             match f with
             | OnColumn(c, _) -> box c
             | Tuples(cols, _) ->
-                box cols.Length
-
+                // What it replaces is the union of the columns, so their order or grouping doesn't matter.
                 for c in cols do
                     box c
             | Rows(table, _, cfg) ->
@@ -571,6 +577,10 @@ module Filters =
                             RowSet.All t.Size
                         else
                             compute fc t via (RowSet.All t.Size)
+                    elif shared.Usable && incrementable fc t then
+                        // Its own rows are cheap from the base's (shared, cached): not worth a
+                        // key and an entry of their own.
+                        fresh fc t via
                     elif shared.Usable then
                         let k = shared.Key(fc.Filters, t, via)
                         let mutable found = null
@@ -602,18 +612,23 @@ module Filters =
     /// The rows under the context's first filters (`FilterCtx.Base`), intersected with what the
     /// others allow: null where that isn't known to be exact, or it raised (see "Incremental
     /// filter contexts" in the author's guide).
+    /// Whether the rows of `t` may be worked out incrementally (see `incremental`).
+    and private incrementable (fc: FilterCtx) (t: BTable) : bool =
+        let shared = VisCache.Of fc.Config
+
+        not (isNull fc.Base)
+        && IncrementalStats.Global.Enabled
+        && t.Model.Incremental.Enabled
+        && shared.Usable
+        && shared.Intersective t
+        && shared.Safe(t, fc.Filters)
+
     and private incremental (fc: FilterCtx) (t: BTable) (via: BRel) : RowSet =
         let stats = t.Model.Incremental
         let all = IncrementalStats.Global
         let shared = VisCache.Of fc.Config
 
-        if
-            isNull fc.Base
-            || not (all.Enabled && stats.Enabled)
-            || not shared.Usable
-            || not (shared.Intersective t)
-            || not (shared.Safe(t, fc.Filters))
-        then
+        if not (incrementable fc t) then
             null
         else
             if isNull fc.Added then
@@ -626,7 +641,29 @@ module Filters =
                     let start = vis fc.Base t via
 
                     if shared.Reached(fc.Added.Filters, t) then
-                        compute fc.Added t via start
+                        // Shared by the contexts that add the same filters to the same base (two
+                        // CALCULATEs in one row of an iteration).
+                        let derived =
+                            match fc.Base.State.Derived with
+                            | :? Dictionary<VisKey, RowSet> as d -> d
+                            | _ ->
+                                let d = Dictionary<VisKey, RowSet>()
+                                fc.Base.State.Derived <- d
+                                d
+
+                        let k =
+                            VisKey(t.Id, (if isNull via then -1 else via.Id), Array.ofList fc.Added.Filters)
+
+                        match derived.TryGetValue k with
+                        | true, rows -> rows
+                        | _ ->
+                            let rows = compute fc.Added t via start
+
+                            if derived.Count >= 100_000 then
+                                derived.Clear()
+
+                            derived.[k] <- rows
+                            rows
                     else
                         start
                 with _ ->
