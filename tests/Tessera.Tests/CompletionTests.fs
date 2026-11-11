@@ -88,8 +88,10 @@ let private available =
              if not (OperatingSystem.IsWindows()) then
                  if works "bash" [ "-c"; "exit 0" ] then
                      Bash
+
                  if works "zsh" [ "-c"; "exit 0" ] then
                      Zsh
+
                  if works "fish" [ "-c"; "exit 0" ] then
                      Fish
              if works "pwsh" [ "-NoProfile"; "-NonInteractive"; "-Command"; "exit 0" ] then
@@ -105,7 +107,11 @@ let private requireShell (shell: Shell) =
 let private stubTess (t: TempDir) (candidates: string list) =
     let bin = t.Combine "bin"
     Directory.CreateDirectory bin |> ignore
-    let lines = candidates |> List.map (fun c -> c.Replace("'", "'\\''")) |> List.map (sprintf "'%s'")
+
+    let lines =
+        candidates
+        |> List.map (fun c -> c.Replace("'", "'\\''"))
+        |> List.map (sprintf "'%s'")
 
     let argsFile = Path.Combine(bin, "args.txt")
     let quoted = String.concat " " lines
@@ -244,7 +250,11 @@ let tests =
                     + "printf '%s\\n' \"${COMPREPLY[@]}\"\n"
 
                 let r =
-                    (runProgram "bash" [ "--norc"; "--noprofile"; "-s" ] [ "PATH", bin + ":/usr/bin:/bin" ] (Some driver))
+                    (runProgram
+                        "bash"
+                        [ "--norc"; "--noprofile"; "-s" ]
+                        [ "PATH", bin + ":/usr/bin:/bin" ]
+                        (Some driver))
                         .Value
 
                 Expect.equal r.Code 0 r.Err
@@ -266,7 +276,11 @@ let tests =
                 Expect.equal (bashComplete t bin [ "tess"; "bpa"; "rules"; "l" ] "tess bpa rules l") [ "list" ] ""
 
                 Expect.equal
-                    (bashComplete t bin [ "tess"; "bpa"; "rules"; "list"; "m"; "--layer"; "b" ] "tess bpa rules list m --layer b")
+                    (bashComplete
+                        t
+                        bin
+                        [ "tess"; "bpa"; "rules"; "list"; "m"; "--layer"; "b" ]
+                        "tess bpa rules list m --layer b")
                     [ "builtin" ]
                     ""
 
@@ -413,7 +427,11 @@ let tests =
             testCase "commands, then subcommands"
             <| fun () ->
                 Expect.equal (candidates [] "va") [ "validate" ] ""
-                Expect.equal (candidates [ "bpa"; "rules" ] "") [ "list"; "show"; "add"; "remove"; "ignore"; "unignore" ] ""
+
+                Expect.equal
+                    (candidates [ "bpa"; "rules" ] "")
+                    [ "list"; "show"; "add"; "remove"; "ignore"; "unignore" ]
+                    ""
 
             testCase "options, after options and positionals"
             <| fun () ->
@@ -427,17 +445,36 @@ let tests =
 
             testCase "objects of the model, as references"
             <| fun () ->
-                Expect.equal (candidates [ "get"; "m" ] "measure:") [ "measure:Sales/Total"; "measure:Sales/Total (hidden)" ] ""
-                Expect.equal (candidates [ "remove"; "m"; "table:Sales" ] "table:D") [ "table:Date" ] "any number of them"
+                Expect.equal
+                    (candidates [ "get"; "m" ] "measure:")
+                    [ "measure:Sales/Total"; "measure:Sales/Total (hidden)" ]
+                    ""
+
+                Expect.equal
+                    (candidates [ "remove"; "m"; "table:Sales" ] "table:D")
+                    [ "table:Date" ]
+                    "any number of them"
+
                 Expect.equal (candidates [ "get"; "m" ] "MEASURE:sales/t").Length 2 "case-insensitive"
 
             testCase "only the kinds a position takes"
             <| fun () ->
-                Expect.equal (candidates [ "move"; "m" ] "") [ "measure:Sales/Total"; "measure:Sales/Total (hidden)" ] ""
-                Expect.equal (candidates [ "move"; "m"; "measure:Sales/Total" ] "") [ "Sales"; "Date"; "Time Intelligence" ] ""
+                Expect.equal
+                    (candidates [ "move"; "m" ] "")
+                    [ "measure:Sales/Total"; "measure:Sales/Total (hidden)" ]
+                    ""
+
+                Expect.equal
+                    (candidates [ "move"; "m"; "measure:Sales/Total" ] "")
+                    [ "Sales"; "Date"; "Time Intelligence" ]
+                    ""
 
                 let refresh = candidates [ "refresh"; "m" ] ""
-                Expect.isTrue (refresh |> List.forall (fun c -> c.StartsWith "table:" || c.StartsWith "partition:")) $"{refresh}"
+
+                Expect.isTrue
+                    (refresh
+                     |> List.forall (fun c -> c.StartsWith "table:" || c.StartsWith "partition:"))
+                    $"{refresh}"
 
             testCase "roles and perspectives by name"
             <| fun () ->
@@ -474,7 +511,10 @@ let tests =
             <| fun () ->
                 use t = new TempDir()
                 let bim = writeBim t
-                let r = complete [ "--quoted"; "--current='measure:Sales/Total (h"; "--"; "get"; $"'{bim}'" ]
+
+                let r =
+                    complete [ "--quoted"; "--current='measure:Sales/Total (h"; "--"; "get"; $"'{bim}'" ]
+
                 Expect.equal r.Out "measure:Sales/Total (hidden)\n" ""
 
             testCase "options and help flags among the words are words, not options of __complete"
@@ -512,7 +552,10 @@ let tests =
             testCase "a TMDL folder and a .pbip project"
             <| fun () ->
                 use p = project ()
-                let r = complete [ "--current="; "--"; "list"; Path.Combine(p.Path, "Sales.pbip"); "--table" ]
+
+                let r =
+                    complete [ "--current="; "--"; "list"; Path.Combine(p.Path, "Sales.pbip"); "--table" ]
+
                 Expect.equal r.Out "Sales\nDate\nTime Intelligence\n" ""
         ]
 
@@ -528,7 +571,13 @@ let tests =
                     Expect.equal tables.Out "Brand\nBudget Rate\n" ""
 
                     let measures =
-                        complete [ "--quoted"; "--current=measure:Invoiced\\ Sales/Gross\\ P"; "--"; "get"; $"'{sample}'" ]
+                        complete [
+                            "--quoted"
+                            "--current=measure:Invoiced\\ Sales/Gross\\ P"
+                            "--"
+                            "get"
+                            $"'{sample}'"
+                        ]
 
                     Expect.stringContains measures.Out "measure:Invoiced Sales/Gross Profit\n" ""
                     Expect.stringContains measures.Out "measure:Invoiced Sales/Gross Profit (PY)\n" ""

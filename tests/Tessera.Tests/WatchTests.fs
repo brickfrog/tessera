@@ -125,8 +125,13 @@ let tests =
 
             testCase "the single files, and nothing else beside them"
             <| fun () ->
-                Expect.isTrue (Watch.concerns scope (Path.Combine(Path.GetTempPath(), "tessera-watch-scope", "rules.json"))) ""
-                Expect.isFalse (Watch.concerns scope (Path.Combine(Path.GetTempPath(), "tessera-watch-scope", "other.json"))) ""
+                Expect.isTrue
+                    (Watch.concerns scope (Path.Combine(Path.GetTempPath(), "tessera-watch-scope", "rules.json")))
+                    ""
+
+                Expect.isFalse
+                    (Watch.concerns scope (Path.Combine(Path.GetTempPath(), "tessera-watch-scope", "other.json")))
+                    ""
 
             testCase "outside the folder, including a sibling whose name starts the same"
             <| fun () ->
@@ -143,18 +148,19 @@ let tests =
 
             testCase "editors' temporary files"
             <| fun () ->
-                for name in [
-                    "model.tmdl~"
-                    ".#model.tmdl"
-                    "#model.tmdl#"
-                    "~$model.tmdl"
-                    "model.tmdl.swp"
-                    ".model.tmdl.swx"
-                    "4913"
-                    "model.tmdl.tmp"
-                    "model.tmdl___jb_tmp___"
-                    "model.tmdl.crswap"
-                ] do
+                for name in
+                    [
+                        "model.tmdl~"
+                        ".#model.tmdl"
+                        "#model.tmdl#"
+                        "~$model.tmdl"
+                        "model.tmdl.swp"
+                        ".model.tmdl.swx"
+                        "4913"
+                        "model.tmdl.tmp"
+                        "model.tmdl___jb_tmp___"
+                        "model.tmdl.crswap"
+                    ] do
                     Expect.isFalse (Watch.concerns scope (at [ name ])) name
 
             testCase "the command's own outputs"
@@ -346,9 +352,14 @@ let tests =
 
             testCase "polling alone: saving a file runs again"
             <| fun () ->
-                watchModel { quiet with Poll = Some(TimeSpan.FromMilliseconds 100.0) } (fun root w ->
-                    touch (Path.Combine(root, "model.tmdl"))
-                    expectRun w "after the save")
+                watchModel
+                    {
+                        quiet with
+                            Poll = Some(TimeSpan.FromMilliseconds 100.0)
+                    }
+                    (fun root w ->
+                        touch (Path.Combine(root, "model.tmdl"))
+                        expectRun w "after the save")
 
             testCase "an editor's save-rename runs once"
             <| fun () ->
