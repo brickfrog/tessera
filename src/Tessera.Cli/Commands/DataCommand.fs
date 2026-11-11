@@ -286,9 +286,7 @@ let private check (ctx: Ctx) (args: ParseResults<CheckArgs>) =
 
     let options =
         match selected |> List.tryFind (fun r -> not (List.contains r known)) with
-        | Some bad ->
-            let list = String.concat ", " known
-            Error $"unknown rule '{bad}' (known: {list})"
+        | Some bad -> Error(unknownValue "--rule" "rule" bad known)
         | None ->
             ValidateCommand.severityArg "--min-severity" (args.TryGetResult CheckArgs.Min_Severity) Severity.Info
             |> Result.bind (fun minimum ->
@@ -296,8 +294,8 @@ let private check (ctx: Ctx) (args: ParseResults<CheckArgs>) =
                 |> Result.map (fun failOn -> minimum, failOn))
 
     match options, ValidateCommand.ciArg (args.TryGetResult CheckArgs.Ci) with
-    | Error message, _
-    | _, Error message -> UsageError message
+    | Error problem, _
+    | _, Error problem -> usage problem
     | Ok(minimum, failOn), Ok ci ->
         let clock = Diagnostics.Stopwatch.StartNew()
 
@@ -450,7 +448,10 @@ let private embed (ctx: Ctx) (args: ParseResults<EmbedArgs>) =
         | Some f ->
             ModelIO.OutputFormat.tryParse f
             |> Option.map Ok
-            |> Option.defaultValue (Error $"unknown format '{f}' (expected bim, tmdl or pbip)")
+            |> Option.defaultValue (
+                Error
+                    $"""unknown format '{f}'{Suggest.hint (Suggest.closest [ "bim"; "tmdl"; "pbip" ] f)} (expected bim, tmdl or pbip)"""
+            )
 
     match format with
     | Error message -> UsageError message

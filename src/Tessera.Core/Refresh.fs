@@ -278,6 +278,7 @@ let private resolve (db: Database) (input: string) : Result<Target, TessError> =
                 $"a {kind} isn't refreshed by itself: name the model, tables or partitions"
         | Error(AmbiguousObject _)
         | Error(ObjectNotFound _) -> Error(ObjectNotFound input)
+        | Error(ObjectNotFoundSuggest _ as e) -> Error e
         | Error e -> Error e
 
     Inventory.Selector.parse input

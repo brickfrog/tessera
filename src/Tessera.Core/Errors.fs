@@ -53,6 +53,8 @@ type TessError =
     | CannotScript of objectRef: string * reason: string
     /// `bpa rules`: no rule with this ID where it was looked for (with a hint where it is, if anywhere).
     | RuleNotFound of ruleId: string * where: string * hint: string option
+    /// `bpa rules show`: no rule with this ID, but some have a similar one.
+    | RuleNotFoundSuggest of ruleId: string * where: string * suggestions: string list
     /// `bpa rules add`: a rule with this ID is already there (without --replace).
     | RuleExists of ruleId: string * where: string
     /// `bpa rules ignore`: an object that can't carry an ignore annotation.
@@ -146,6 +148,7 @@ module TessError =
         | ScriptObjectFailed(_, _, _, inner) -> code inner
         | CannotScript _ -> "cannot-script"
         | RuleNotFound _ -> "rule-not-found"
+        | RuleNotFoundSuggest _ -> "rule-not-found"
         | RuleExists _ -> "rule-exists"
         | CannotIgnore _ -> "cannot-ignore"
         | InvalidServerAddress _ -> "invalid-server-address"
@@ -256,6 +259,8 @@ module TessError =
         | RuleNotFound(ruleId, where, hint) ->
             let hint = hint |> Option.map (fun h -> $"; {h}") |> Option.defaultValue ""
             $"No BPA rule '{ruleId}' in {where}{hint}"
+        | RuleNotFoundSuggest(ruleId, where, suggestions) ->
+            $"No BPA rule '{ruleId}' in {where}{Suggest.hint suggestions}"
         | RuleExists(ruleId, where) -> $"{where} already has a BPA rule '{ruleId}' (use --replace to replace it)"
         | CannotIgnore(objectRef, reason) -> $"Can't ignore rules on {objectRef}: {reason}"
         | InvalidServerAddress(input, reason) -> $"Invalid server address '{input}': {reason}"
@@ -325,3 +330,12 @@ module TessError =
                 |> String.concat ", "
 
             $"Members of {list} can't query data: a role needs the Read, ReadRefresh or Administrator permission"
+
+    /// Close matches for what wasn't found ("did you mean"), for the JSON error's `suggestions`.
+    let rec suggestions =
+        function
+        | UnknownProperty(_, _, s) -> s
+        | ObjectNotFoundSuggest(_, candidates) -> candidates
+        | RuleNotFoundSuggest(_, _, s) -> s
+        | ScriptObjectFailed(_, _, _, inner) -> suggestions inner
+        | _ -> []

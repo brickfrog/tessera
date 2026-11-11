@@ -10,6 +10,65 @@ open Tessera.Cli.Output
 
 let private parser = lazy (ArgumentParser.Create<CliArgs>(programName = "tess"))
 
+/// For Argu's "unrecognized argument: 'x'": the subcommands (or, for `-x`, the options) of the
+/// command it was given to that are close to x. The command is found by following the
+/// subcommands named before x on the command line.
+let private argumentSuggestions (argv: string array) (message: string) =
+    let m =
+        System.Text.RegularExpressions.Regex.Match(message, "unrecognized argument: '(.*?)'")
+
+    if not m.Success then
+        []
+    else
+        let bad = m.Groups.[1].Value
+
+        let subcommands (p: ArgumentParser) = [
+            for sub in p.GetSubCommandParsers() do
+                match sub.ParentInfo with
+                | Some info -> info.CommandLineNames.Value, sub
+                | None -> ()
+        ]
+
+        let rec walk (p: ArgumentParser) (tokens: string list) =
+            match tokens with
+            | [] -> p
+            | t :: _ when t = bad -> p
+            | t :: rest ->
+                match subcommands p |> List.tryFind (fun (names, _) -> List.contains t names) with
+                | Some(_, sub) -> walk sub rest
+                | None -> walk p rest
+
+        let p = walk parser.Value (List.ofArray argv)
+
+        let candidates =
+            if bad.StartsWith "-" then
+                [
+                    for c in p.GetArgumentCases() do
+                        if not c.IsMainCommand && not c.IsHidden.Value then
+                            yield! c.CommandLineNames.Value |> List.filter (fun n -> n.StartsWith "-")
+                    "--help"
+                    "--json"
+                ]
+            else
+                subcommands p |> List.collect fst
+
+        Suggest.closest candidates bad
+
+/// Argu's message with the hint added to its first line ("ERROR: unrecognized argument: 'x'.").
+let private withHint (message: string) (suggestions: string list) =
+    match suggestions with
+    | [] -> message
+    | _ ->
+        let newline = message.IndexOf '\n'
+
+        let first, rest =
+            if newline < 0 then
+                message, ""
+            else
+                message.Substring(0, newline), message.Substring newline
+
+        first.TrimEnd('.') + Suggest.hint suggestions + "." + rest
+
 /// Run the CLI with these environment variables, making any server connections through
 /// `connector`. Returns the process exit code.
 let runWithConnector
@@ -22,13 +81,15 @@ let runWithConnector
     // Decide JSON mode before parsing so usage errors can be reported as JSON too.
     let jsonRequested = argv |> Array.exists (fun a -> a = "--json" || a = "-j")
 
-    let usageError (message: string) =
+    let usageErrorWith (message: string) (suggestions: string list) =
         if jsonRequested then
-            writeJson out (errorJson "usage" message)
+            writeJson out (errorJsonWith "usage" message suggestions)
         else
             err.WriteLine(message)
 
         ExitCode.usage
+
+    let usageError (message: string) = usageErrorWith message []
 
     try
         let results = parser.Value.ParseCommandLine(argv, raiseOnUsage = true)
@@ -83,6 +144,7 @@ let runWithConnector
             | Done -> ExitCode.ok
             | DoneWith code -> code
             | UsageError message -> usageError message
+            | UsageErrorSuggest(message, suggestions) -> usageErrorWith message suggestions
             | Failed e ->
                 if ctx.Json then
                     writeJson out (tessErrorJson e)
@@ -94,7 +156,9 @@ let runWithConnector
     | :? ArguParseException as e when e.ErrorCode = ErrorCode.HelpText ->
         out.WriteLine(e.Message)
         ExitCode.ok
-    | :? ArguParseException as e -> usageError e.Message
+    | :? ArguParseException as e ->
+        let suggestions = argumentSuggestions argv e.Message
+        usageErrorWith (withHint e.Message suggestions) suggestions
     | e ->
         if jsonRequested then
             writeJson out (errorJson "internal" e.Message)

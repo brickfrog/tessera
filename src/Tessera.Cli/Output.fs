@@ -56,10 +56,20 @@ let sourceJson (s: ModelSource) =
 let errorJson (code: string) (message: string) =
     obj [ "error", obj [ "code", str code; "message", str message ] ]
 
+/// An error with close matches for what wasn't found ("did you mean"): `suggestions`, when any.
+let errorJsonWith (code: string) (message: string) (suggestions: string list) =
+    let json = errorJson code message
+
+    if not suggestions.IsEmpty then
+        json.["error"].AsObject().["suggestions"] <- arr (suggestions |> List.map str)
+
+    json
+
 let versionJson (v: string) = obj [ "version", str v ]
 
 let tessErrorJson (e: TessError) =
-    let json = errorJson (TessError.code e) (TessError.message e)
+    let json =
+        errorJsonWith (TessError.code e) (TessError.message e) (TessError.suggestions e)
 
     // Errors in a DAX script also say where.
     match e with

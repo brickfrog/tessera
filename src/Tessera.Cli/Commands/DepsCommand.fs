@@ -188,7 +188,7 @@ let private runUnused (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) 
             match kinds |> List.tryFind (fun k -> not (List.contains k Unused.kinds)) with
             | Some k ->
                 let known = Unused.kinds |> List.map ObjectKind.token |> String.concat ", "
-                Error $"--unused reports {known}, not {ObjectKind.token k}"
+                Error($"--unused reports {known}, not {ObjectKind.token k}", [])
             | None -> Ok kinds)
 
     let conflicting = [
@@ -201,7 +201,7 @@ let private runUnused (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) 
     ]
 
     match kinds, conflicting with
-    | Error message, _ -> UsageError message
+    | Error problem, _ -> usage problem
     | _, flag :: _ -> UsageError $"{flag} can't be combined with --unused"
     | Ok kinds, [] ->
         match Source.load ctx modelPath with

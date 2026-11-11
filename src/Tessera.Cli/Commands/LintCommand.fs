@@ -128,12 +128,11 @@ let private effect (result: Lint.FixResult) : Tessera.Mutation.Effect =
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let modelPath = args.GetResult Args.Model
     let ruleIds = parseList (args.GetResults Args.Rule)
-    let known = Lint.rules |> List.map (fun r -> r.Id) |> String.concat ", "
     let fixing = args.Contains Args.Fix
 
     let selected =
         match ruleIds |> List.tryFind (fun id -> (Lint.tryRule id).IsNone) with
-        | Some bad -> Error $"unknown rule '{bad}' (known: {known})"
+        | Some bad -> Error(unknownValue "--rule" "rule" bad (Lint.rules |> List.map (fun r -> r.Id)))
         | None -> Ok(ruleIds |> List.choose Lint.tryRule |> List.map (fun r -> r.Id) |> Set.ofList)
 
     let options =
@@ -160,7 +159,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         |> List.exists id
 
     match options with
-    | Error message -> UsageError message
+    | Error problem -> usage problem
     | Ok _ when not fixing && editSwitches -> UsageError "--save, --save-to, --force, --stat and --name-only need --fix"
     | Ok _ when fixing && (args.Contains Args.Fail_On || args.Contains Args.Ci) ->
         UsageError "--fail-on and --ci report findings; they don't combine with --fix"

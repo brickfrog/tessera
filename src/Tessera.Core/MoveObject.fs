@@ -81,6 +81,9 @@ let move (db: Database) (spec: MoveSpec) : Result<Mutation.Effect, TessError> =
     let destination (m: ObjectEntry) =
         match Selector.resolve tables spec.Table with
         | Error(ObjectNotFound _) -> Error(UnsupportedMove(ObjectRef.format m.Ref, $"there is no table '{spec.Table}'"))
+        | Error(ObjectNotFoundSuggest(_, close)) ->
+            let reason = $"there is no table '{spec.Table}'{Suggest.hint close}"
+            Error(UnsupportedMove(ObjectRef.format m.Ref, reason))
         | Error e -> Error e
         | Ok t -> Ok t
 

@@ -61,9 +61,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     let kinds = kindTokens |> List.map (fun t -> t, ObjectKind.tryParse t)
 
     match kinds |> List.tryFind (fun (_, k) -> k.IsNone) with
-    | Some(bad, _) ->
-        let known = ObjectKind.all |> List.map ObjectKind.token |> String.concat ", "
-        UsageError $"unknown kind '{bad}' (known: {known})"
+    | Some(bad, _) -> usage (unknownValue "" "kind" bad (ObjectKind.all |> List.map ObjectKind.token))
     | None ->
         match Source.load ctx (args.GetResult Args.Model) with
         | Error e -> Failed e

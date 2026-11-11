@@ -3051,6 +3051,14 @@ jobs:
 
 `--json` (or `-j`) writes one JSON document to stdout, errors included (`{"error": {"code", "message"}}`).
 
+**"Did you mean":** when something isn't found or recognised, the error names the closest matches (within about a
+third of the length in edits, ignoring case; swapped letters count as one edit), at most three, and JSON lists them
+as the error's `suggestions`. That covers an object reference (any form: `measure:Sales/Totl`, `'Sales'[Totl]`,
+`[Totl]`, `Sles`), a command or subcommand (`tess vaildate`), an option (`--fial-on`), and option values: `--ci`,
+`--fail-on`, `--min-severity`, `--kind`, and `--rule` for `validate`, `lint` and `data check`. `bpa rules show`
+does the same for a rule ID, and `bpa rules ignore` warns with one. The message alone carries the hint for
+`--format`, `--eol`, `refresh --type` / `--progress`, `bpa rules list --layer` and `test --ci`.
+
 A key with no value is left out rather than written as `null`, in every command (as in the Tabular Editor CLI's
 findings): `list`'s `table`, `hidden` and `detail`, `deps --unused`'s `note`, `info`'s `semanticModelFolder`, an
 edit's `saved` on a dry run, and so on. `null` appears only where it is itself the value: a property that holds

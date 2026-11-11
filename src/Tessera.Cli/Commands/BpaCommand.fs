@@ -485,7 +485,7 @@ let private analyze (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
         | Some "error" -> Ok 3
         | Some "warning" -> Ok 2
         | Some "info" -> Ok 1
-        | Some other -> Error $"--fail-on: unknown severity '{other}' (known: error, warning, info)"
+        | Some other -> Error(unknownValue "--fail-on" "severity" other [ "error"; "warning"; "info" ])
 
     let ci =
         match args.TryGetResult Args.Ci with
@@ -493,11 +493,11 @@ let private analyze (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
         | Some c ->
             Findings.Ci.tryParse c
             |> Option.map Ok
-            |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
+            |> Option.defaultValue (Error(ValidateCommand.ciUnknown c))
 
     match failOn, ci, opts with
-    | Error message, _, _
-    | _, Error message, _
+    | Error problem, _, _
+    | _, Error problem, _ -> usage problem
     | _, _, Error message -> UsageError message
     | Ok failOn, Ok ci, Ok opts ->
 

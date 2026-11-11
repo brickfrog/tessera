@@ -195,7 +195,14 @@ let severityArg (name: string) (value: string option) (fallback: Severity) =
     | Some v ->
         match Severity.tryParse v with
         | Some s -> Ok s
-        | None -> Error $"{name}: unknown severity '{v}' (known: error, warning, info)"
+        | None -> Error(unknownValue name "severity" v [ "error"; "warning"; "info" ])
+
+/// An unknown --ci value: the message (listing the names with their aliases) and suggestions.
+let ciUnknown (value: string) =
+    let suggestions =
+        Suggest.closest [ "github"; "gh"; "azdo"; "azure-devops"; "vsts"; "none" ] value
+
+    $"--ci: unknown CI system '{value}'{Suggest.hint suggestions} (known: {Findings.Ci.names})", suggestions
 
 /// A --ci value (shared with `lint`).
 let ciArg (value: string option) =
@@ -204,7 +211,7 @@ let ciArg (value: string option) =
     | Some c ->
         Findings.Ci.tryParse c
         |> Option.map Ok
-        |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
+        |> Option.defaultValue (Error(ciUnknown c))
 
 /// The validate rules, for SARIF.
 let sarifRules: Sarif.Rule list = [ for id, description in rules -> Sarif.Rule.simple id description ]
@@ -224,11 +231,10 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     let modelPath = args.GetResult Args.Model
     let selected = parseList (args.GetResults Args.Rule)
     let known = rules |> List.map fst
-    let knownList = String.concat ", " known
 
     let options =
         match selected |> List.tryFind (fun r -> not (List.contains r known)) with
-        | Some bad -> Error $"unknown rule '{bad}' (known: {knownList})"
+        | Some bad -> Error(unknownValue "--rule" "rule" bad known)
         | None ->
             severityArg "--min-severity" (args.TryGetResult Args.Min_Severity) Severity.Info
             |> Result.bind (fun minimum ->
@@ -238,8 +244,8 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     let ci = ciArg (args.TryGetResult Args.Ci)
 
     match options, ci with
-    | Error message, _
-    | _, Error message -> UsageError message
+    | Error problem, _
+    | _, Error problem -> usage problem
     | Ok(minimum, failOn), Ok ci ->
         let clock = Diagnostics.Stopwatch.StartNew()
 

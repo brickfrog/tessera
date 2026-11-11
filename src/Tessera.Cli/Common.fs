@@ -54,6 +54,7 @@ module ExitCode =
         | CannotScript _ -> input
         | ScriptObjectFailed(_, _, _, inner) -> ofError inner
         | RuleNotFound _
+        | RuleNotFoundSuggest _
         | RuleExists _
         | CannotIgnore _ -> input
         | InvalidServerAddress _
@@ -96,6 +97,9 @@ type Outcome =
     | DoneWith of exitCode: int
     | Failed of TessError
     | UsageError of string
+    /// A usage error about something not recognised, with close matches ("did you mean"), which
+    /// JSON lists as the error's `suggestions`.
+    | UsageErrorSuggest of message: string * suggestions: string list
 
 /// Where a command writes, and whether it should write JSON.
 type Ctx = {
@@ -122,12 +126,18 @@ let parseList (values: string list) =
         v.Split(',', StringSplitOptions.RemoveEmptyEntries ||| StringSplitOptions.TrimEntries)
         |> List.ofArray)
 
-/// Kind tokens (repeatable and/or comma-separated) to ObjectKinds.
+/// A usage error with close matches for what wasn't recognised (from Suggest.unknown).
+let usage (message: string, suggestions: string list) = UsageErrorSuggest(message, suggestions)
+
+/// "<option>: unknown <what> '<value>' (did you mean ...?) (known: ...)", with the suggestions.
+let unknownValue (option: string) (what: string) (value: string) (known: string list) =
+    let message, suggestions = Suggest.unknown what value known
+    (if option = "" then message else $"{option}: {message}"), suggestions
+
+/// Kind tokens (repeatable and/or comma-separated) to ObjectKinds. The error carries suggestions.
 let parseKinds (tokens: string list) =
     let kinds = parseList tokens |> List.map (fun t -> t, ObjectKind.tryParse t)
 
     match kinds |> List.tryFind (fun (_, k) -> k.IsNone) with
-    | Some(bad, _) ->
-        let known = ObjectKind.all |> List.map ObjectKind.token |> String.concat ", "
-        Error $"unknown kind '{bad}' (known: {known})"
+    | Some(bad, _) -> Error(unknownValue "" "kind" bad (ObjectKind.all |> List.map ObjectKind.token))
     | None -> Ok(kinds |> List.choose snd)

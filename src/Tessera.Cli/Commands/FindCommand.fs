@@ -67,7 +67,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     let modelPath, text = args.GetResult Args.Target
 
     match parseKinds (args.GetResults Args.Kind) with
-    | Error e -> UsageError e
+    | Error e -> usage e
     | Ok kinds ->
         let opts: Find.Options = {
             Pattern = text

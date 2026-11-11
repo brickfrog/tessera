@@ -263,7 +263,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             })
 
         match selection with
-        | Error message -> UsageError message
+        | Error problem -> usage problem
         | Ok _ when opts.Semicolons ->
             UsageError "--semicolons is for loose DAX; a model's DAX always separates arguments with ','"
         | Ok _ when checking && editSwitches ->
