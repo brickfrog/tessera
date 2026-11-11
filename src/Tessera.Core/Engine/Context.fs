@@ -150,34 +150,62 @@ module Filters =
             else
                 RowSet.OfSeq(size, rows)
 
-        match table.UniqueColumn with
-        | Some _ -> plain ()
-        | None ->
-            // Without a unique column the row is identified by all of its columns, so a calculated
-            // column that gets here depends on every other column of the table. Two such columns
-            // depend on each other: "CALCULATE in a calculated column performs a context
-            // transition and makes that column dependent on all the columns in the table. If two
-            // such columns exist, they depend on each other" (SQLBI, "Avoiding circular dependency
-            // errors in DAX").
-            if (table.Columns |> Array.filter _.Computing).Length > 1 then
-                let names =
-                    table.Columns
-                    |> Array.filter _.Computing
-                    |> Array.map (fun c -> $"[{c.Name}]")
-                    |> String.concat " and "
+        let computing = table.Columns |> Array.filter _.Computing
+        let key = table.UniqueColumn
 
-                raise (
-                    EngineException(
-                        DaxInvalid(
-                            $"circular dependency: the calculated columns {names} of '{table.Name}' each use a context transition, and the table has no column with unique values to identify a row by",
+        match key with
+        | Some _ when not (computing |> Array.exists _.ChangesRelationships) -> plain ()
+        | _ ->
+            // Without the key the engine knows (`BTable.UniqueColumn`) the row is identified by
+            // all of its columns, so a calculated column that gets here depends on every other
+            // column of the table. Two such columns depend on each other: "CALCULATE in a
+            // calculated column performs a context transition and makes that column dependent on
+            // all the columns in the table. If two such columns exist, they depend on each other"
+            // (SQLBI, "Avoiding circular dependency errors in DAX"). That is settled when nothing
+            // in the columns narrows the transition's filter and no key could apply; otherwise
+            // (ALLEXCEPT keeping the key, a column marked as the key, USERELATIONSHIP with a key)
+            // the cycle may not be there, and it is refused.
+            let open' =
+                key.IsSome || table.MarkedKey.IsSome || computing |> Array.exists _.MayNarrow
+
+            let names (cols: BColumn seq) =
+                cols |> Seq.map (fun c -> $"[{c.Name}]") |> String.concat " and "
+
+            let cycle (cols: BColumn seq) : 'a =
+                if open' then
+                    let e =
+                        DaxNotSupported(
+                            $"context transitions in the calculated columns {names cols} of '{table.Name}', which depend on each other through it unless a key or ALLEXCEPT / REMOVEFILTERS keeps the dependency to one column (whether one does here isn't decided)",
                             ""
                         )
-                    )
-                )
 
-            for c in table.Columns do
-                if not c.IsReady && not c.Computing then
-                    c.Data |> ignore
+                    // Not a circular dependency for sure: the columns are refused, not invalid.
+                    for c in cols do
+                        if not c.IsReady then
+                            c.Failure <- Some e
+
+                    raise (EngineException e)
+                else
+                    raise (
+                        EngineException(
+                            DaxInvalid(
+                                $"circular dependency: the calculated columns {names cols} of '{table.Name}' each use a context transition, and the table has no key (a column on the one side of a relationship) to identify a row by",
+                                ""
+                            )
+                        )
+                    )
+
+            if computing.Length > 1 then
+                cycle computing
+
+            if computing.Length > 0 then
+                for c in table.Columns do
+                    if not c.IsReady && not c.Computing then
+                        try
+                            c.Data |> ignore
+                        with EngineException(DaxInvalid(message, _)) when
+                            message.StartsWith("circular dependency", StringComparison.Ordinal) && open' ->
+                            cycle (Seq.append computing [ c ])
 
             match table.Duplicates with
             | null -> plain ()
@@ -296,6 +324,12 @@ module Filters =
                 then
                     match table.UniqueColumn with
                     | Some u when not (drop u) -> spellOut table rows cfg (fun c -> not (drop c) && not (pending c))
+                    // Without a key, `closeRows` computed every column but the ones being
+                    // computed, which aren't part of the row yet ("In the absence of Test2, Test1
+                    // does not reference columns other than the ones already present in the
+                    // table": SQLBI, "Understanding circular dependencies").
+                    | None when table.Columns |> Array.forall (fun c -> not (pending c) || c.Computing) ->
+                        spellOut table rows cfg (fun c -> not (drop c) && not (pending c))
                     | _ ->
                         raise (
                             EngineException(
@@ -317,7 +351,18 @@ module Filters =
             |> List.collect (fun f ->
                 match f with
                 | Rows(table, rows, cfg) when not (obj.ReferenceEquals(cfg, config)) ->
-                    spellOut table rows cfg (fun _ -> true)
+                    // While a calculated column of the table is computed, the columns that aren't
+                    // part of the row yet stay out, as in `without`: the one being computed, and
+                    // with a key the ones not computed yet.
+                    let computing = table.Columns |> Array.exists _.Computing
+
+                    let left (c: BColumn) =
+                        computing
+                        && obj.ReferenceEquals(c.Table, table)
+                        && not c.IsReady
+                        && (c.Computing || table.UniqueColumn.IsSome)
+
+                    spellOut table rows cfg (fun c -> not (left c))
                 | f -> [ f ])
 
         FilterCtx(filters, config, scope)

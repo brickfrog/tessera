@@ -249,6 +249,101 @@ let private staticGates (db: Database) : Dictionary<string, string> =
 
     gates
 
+/// What a calculated column's expression does to the filter of a context transition in it, read
+/// from the expression and the measures and functions it uses: (may narrow it: ALL, ALLEXCEPT,
+/// ALLNOBLANKROW, REMOVEFILTERS, ALLSELECTED, ALLCROSSFILTERED, or a CALCULATE or CALCULATETABLE
+/// filter argument that is not a condition; uses USERELATIONSHIP). "restrict the list of columns
+/// that the calculated column depends on, by using ALLEXCEPT or REMOVEFILTERS" (SQLBI, "Avoiding
+/// circular dependency errors in DAX"); "this optimization is not activated: You use
+/// USERELATIONSHIP in the code of the column" (SQLBI, "Understanding circular dependencies").
+let private transitionTraits (model: Model) (defs: QueryDefs option) (expr: Expr) : bool * bool =
+    let removers =
+        set [
+            "ALL"
+            "ALLEXCEPT"
+            "ALLNOBLANKROW"
+            "REMOVEFILTERS"
+            "ALLSELECTED"
+            "ALLCROSSFILTERED"
+        ]
+
+    let mutable narrows = false
+    let mutable changes = false
+    let seen = HashSet<obj>(HashIdentity.Reference)
+
+    // A filter argument that is a condition replaces the filters of its columns only.
+    let rec condition (e: Expr) =
+        match e.Kind with
+        | Paren inner -> condition inner
+        | Binary _
+        | Unary(UnaryOp.Not, _) -> true
+        | Call(name, [ inner ]) when String.Equals(name.Name, "KEEPFILTERS", StringComparison.OrdinalIgnoreCase) ->
+            condition inner
+        | Call(name, _) ->
+            match name.Name.ToUpperInvariant() with
+            | "USERELATIONSHIP"
+            | "CROSSFILTER" -> true
+            | _ -> false
+        | _ -> false
+
+    let measure (name: string) : BMeasure option =
+        let fromQuery =
+            match defs with
+            | Some d ->
+                match d.Measures.TryGetValue name with
+                | true, m -> Some m
+                | _ -> None
+            | None -> None
+
+        match fromQuery with
+        | Some m -> Some m
+        | None ->
+            match model.Measures.TryGetValue name with
+            | true, m -> Some m
+            | _ -> None
+
+    let rec walk (e: Expr) =
+        Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack()
+
+        match e.Kind with
+        | Call(name, args) ->
+            let upper = name.Name.ToUpperInvariant()
+
+            if removers.Contains upper then
+                narrows <- true
+
+            if upper = "USERELATIONSHIP" then
+                changes <- true
+
+            if
+                (upper = "CALCULATE" || upper = "CALCULATETABLE")
+                && args.Length > 1
+                && not (args.Tail |> List.forall condition)
+            then
+                narrows <- true
+
+            match model.Functions.TryGetValue name.Name with
+            | true, f when seen.Add f ->
+                // What a function does with its arguments can't be told here.
+                narrows <- true
+                walk f.Def.Body
+            | _ -> ()
+        | Bracketed name
+        | Qualified(_, name) ->
+            match measure name with
+            | Some m when seen.Add m ->
+                try
+                    walk m.Expr
+                with EngineException _ ->
+                    ()
+            | _ -> ()
+        | _ -> ()
+
+        List.iter walk (children e)
+
+    walk expr
+    narrows, changes
+
 /// The columns with Group By Columns (a field parameter's display column has them), with why
 /// queries can't use them: "The columns specified in Group By Columns must be present in the
 /// grouping conditions of any query that includes the target column ... otherwise, the query fails
@@ -405,6 +500,9 @@ let private bindWith
 
                 if c.IsKey && declared = DaxType.DateTime then
                     column.DateKey <- (if t.DataCategory = "Time" then 2 else 1)
+
+                if c.IsKey then
+                    table.MarkedKey <- Some column
 
                 columns.Add column
                 table.ColumnByName.[c.Name] <- column
@@ -626,6 +724,17 @@ let private bindWith
                     fail (fun e -> c.Failure <- Some e) (fun () ->
                         let t = c.Table
                         let n = t.RowCount
+
+                        let narrows, changes =
+                            transitionTraits
+                                model
+                                (query |> Option.map _.Defs)
+                                (match c.Parsed with
+                                 | Some parsed -> parsed
+                                 | None -> parseExpression source)
+
+                        c.MayNarrow <- narrows
+                        c.ChangesRelationships <- changes
 
                         // A query column: "populated in an empty filter context before the query
                         // is executed" (dax.guide/st/column), and it "can use any of the defined

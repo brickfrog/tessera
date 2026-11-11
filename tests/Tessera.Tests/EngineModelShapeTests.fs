@@ -578,3 +578,176 @@ let oneToOneTests =
                 "CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Green\", CROSSFILTER ( Product[SKU], ProductCategory[SKU], NONE ) )"
                 2)
     ]
+
+// ---- Which column identifies a row: the key the engine knows ----------------------------------
+
+/// SQLBI, "Understanding circular dependencies": BestProducts, a table not related to anything
+/// whose ProductKey is unique, with the article's two identical columns.
+let private best (calculated: (string * DataType * string) list) (related: bool) : TestModel = {
+    Tables = [
+        table "BestProducts" [ "ProductKey", DataType.Int64; "Product Name", DataType.String ] [
+            [ 1084; "Contoso SLR Camera X143 Grey" ]
+            [ 1085; "Adventure Works Desktop" ]
+            [ 1086; "Contoso Lens" ]
+        ]
+        |> withCalculated calculated
+        table "Sales" [ "ProductKey", DataType.Int64 ] [ [ 1084 ]; [ 1086 ] ]
+    ]
+    Rels =
+        if related then
+            [ rel ("Sales", "ProductKey") ("BestProducts", "ProductKey") ]
+        else
+            []
+    Measures = []
+    Functions = []
+}
+
+let private test1 =
+    "Test1", DataType.Int64, "CALCULATE ( COUNTROWS ( 'BestProducts' ), BestProducts[Product Name] >= \"Contoso\" )"
+
+let private test2 =
+    "Test2", DataType.Int64, "CALCULATE ( COUNTROWS ( 'BestProducts' ), BestProducts[Product Name] >= \"Contoso\" )"
+
+let private prepared (m: TestModel) =
+    let db, store = build m
+    Engine.prepare db store
+
+[<Tests>]
+let keyTests =
+    testList "the key of a context transition" [
+        // "The first calculated column Test1 is created without issues."
+        testCase "one column with a context transition is computed" (fun () ->
+            let p = prepare (best [ test1 ] false)
+            Expect.isEmpty (Engine.failures p) "computed"
+            // Each row: its own row, if its name is >= "Contoso".
+            returns
+                p
+                "EVALUATE SELECTCOLUMNS ( BestProducts, \"K\", BestProducts[ProductKey], \"T\", BestProducts[Test1] )"
+                [ [ 1084; 1 ]; [ 1085; null ]; [ 1086; 1 ] ])
+
+        // "the second calculated column Test2 – despite being identical to the first one – raises the
+        // circular dependency error": ProductKey's values are unique, but no relationship says so.
+        testCase "two of them in a table without a relationship are a circular dependency" (fun () ->
+            match prepared (best [ test1; test2 ] false) with
+            | Error(DaxInvalid(message, _)) -> Expect.stringContains message "circular dependency" "message"
+            | other -> failtestf "%A" other)
+
+        // "You can also obtain the same result if you create a relationship between Sales and
+        // BestProducts based on ProductKey ... the context transition is optimized to rely on that
+        // column, without filtering all the other columns."
+        testCase "the one side of a relationship is the key: both are computed" (fun () ->
+            let p = prepare (best [ test1; test2 ] true)
+            Expect.isEmpty (Engine.failures p) "computed"
+
+            returns
+                p
+                "EVALUATE SELECTCOLUMNS ( BestProducts, \"T1\", BestProducts[Test1], \"T2\", BestProducts[Test2] )"
+                [ [ 1; 1 ]; [ null; null ]; [ 1; 1 ] ]
+
+            // And a column that reads one of them is no cycle either.
+            let p =
+                prepare (best [ test1; "Twice", DataType.Int64, "BestProducts[Test1] * 2" ] true)
+
+            is p "SUM ( BestProducts[Twice] )" 4)
+
+        // "CALCULATE in a calculated column ... makes that column dependent on all the columns in
+        // the table" (SQLBI, "Avoiding circular dependency errors in DAX"): a column that reads it
+        // is a cycle without the key.
+        testCase "without the key, a column that reads the transition's column is a cycle" (fun () ->
+            match prepared (best [ test1; "Twice", DataType.Int64, "BestProducts[Test1] * 2" ] false) with
+            | Error(DaxInvalid(message, _)) -> Expect.stringContains message "circular dependency" "message"
+            | other -> failtestf "%A" other)
+
+        // "By using the previous code based on ALLEXCEPT for both Test1 and Test2 ... The circular
+        // dependency is no longer present": the engine can't tell yet what ALLEXCEPT leaves, so it
+        // refuses rather than call the model invalid.
+        testCase "ALLEXCEPT on the key: no cycle on a server, refused here" (fun () ->
+            let narrowed (name: string) =
+                name,
+                DataType.Int64,
+                "CALCULATE ( COUNTROWS ( 'BestProducts' ), BestProducts[Product Name] >= \"Contoso\", ALLEXCEPT ( BestProducts, BestProducts[ProductKey] ) )"
+
+            match prepared (best [ narrowed "Test1"; narrowed "Test2" ] false) with
+            | Ok p ->
+                match Engine.failures p with
+                | (_, DaxNotSupported(what, _)) :: _ -> Expect.stringContains what "ALLEXCEPT" "what"
+                | other -> failtestf "%A" other
+            | Error e -> failtestf "%A" e
+
+            // With the key, it is computed: each row counts itself.
+            let p = prepare (best [ narrowed "Test1"; narrowed "Test2" ] true)
+            Expect.isEmpty (Engine.failures p) "computed"
+            is p "SUM ( BestProducts[Test2] )" 2)
+
+        // "Here are a couple of scenarios where this optimization is not activated: You use
+        // USERELATIONSHIP in the code of the column."
+        testCase "USERELATIONSHIP in the column turns the key off: a cycle is then refused" (fun () ->
+            let m = {
+                best
+                    [
+                        "U1",
+                        DataType.Int64,
+                        "CALCULATE ( COUNTROWS ( Sales ), USERELATIONSHIP ( Sales[Other], BestProducts[ProductKey] ) )"
+                        "U2", DataType.Int64, "CALCULATE ( COUNTROWS ( 'BestProducts' ) )"
+                    ]
+                    true with
+                    Tables =
+                        (best [] true).Tables
+                        |> List.map (fun t ->
+                            match t.Name with
+                            | "Sales" -> {
+                                t with
+                                    Columns = [ "ProductKey", DataType.Int64; "Other", DataType.Int64 ]
+                                    Rows = [ [ 1084; 1085 ]; [ 1086; 1085 ] ]
+                              }
+                            | _ ->
+                                t
+                                |> withCalculated [
+                                    "U1",
+                                    DataType.Int64,
+                                    "CALCULATE ( COUNTROWS ( Sales ), USERELATIONSHIP ( Sales[Other], BestProducts[ProductKey] ) )"
+                                    "U2", DataType.Int64, "CALCULATE ( COUNTROWS ( 'BestProducts' ) )"
+                                ])
+                    Rels = [
+                        rel ("Sales", "ProductKey") ("BestProducts", "ProductKey")
+                        inactive (rel ("Sales", "Other") ("BestProducts", "ProductKey"))
+                    ]
+            }
+
+            match prepared m with
+            | Ok p ->
+                match Engine.failures p with
+                | (_, DaxNotSupported(what, _)) :: _ -> Expect.stringContains what "depend on each other" "what"
+                | other -> failtestf "%A" other
+            | Error e -> failtestf "%A" e
+
+            // Alone, it is computed: with or without the key, nothing else depends on it.
+            let alone = {
+                m with
+                    Tables =
+                        m.Tables
+                        |> List.map (fun t ->
+                            if t.Name = "BestProducts" then
+                                {
+                                    t with
+                                        Calculated = [ t.Calculated.Head ]
+                                }
+                            else
+                                t)
+            }
+
+            let p = prepare alone
+            Expect.isEmpty (Engine.failures p) "computed"
+            is p "SUM ( BestProducts[U1] )" 2)
+
+        testCase "a column marked as the key, without a relationship: a cycle is refused" (fun () ->
+            let db, store = build (best [ test1; test2 ] false)
+            db.Model.Tables.["BestProducts"].Columns.["ProductKey"].IsKey <- true
+
+            match Engine.prepare db store with
+            | Ok p ->
+                match Engine.failures p with
+                | (_, DaxNotSupported(what, _)) :: _ -> Expect.stringContains what "depend on each other" "what"
+                | other -> failtestf "%A" other
+            | Error e -> failtestf "%A" e)
+    ]

@@ -321,6 +321,13 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     member _.IsReady = not (obj.ReferenceEquals(store, null))
     /// Why queries can't read this column, once the model is prepared (Group By Columns).
     member val Gate: string option = None with get, set
+    /// Set for a calculated column before it is computed, from its expression and the measures
+    /// it uses: whether the filter of a context transition in it may be narrowed (ALL, ALLEXCEPT,
+    /// REMOVEFILTERS, a table as a filter argument), which can take a dependency away.
+    member val MayNarrow = false with get, set
+    /// Likewise: whether it uses USERELATIONSHIP, which may turn off the optimization that makes
+    /// a transition depend on the table's key only (see `BTable.UniqueColumn`).
+    member val ChangesRelationships = false with get, set
 
     member this.SetData(column: StoreColumn) =
         blankId <-
@@ -446,16 +453,37 @@ and [<Sealed; AllowNullLiteral>] BTable(id: int, model: Model, name: string) =
     /// Rows including the blank row.
     member this.Size: int = this.RowCount + (if this.HasBlankRow then 1 else 0)
 
-    /// A column with a different value in every row, if there is one: a row is then its value there.
+    /// The column the table is marked as keyed by (`IsKey`), if any.
+    member val MarkedKey: BColumn option = None with get, set
+
+    /// The table's key as the engine knows it: a column on the one side of a relationship (or
+    /// either side of a one-to-one relationship), active or not, with a different value in every
+    /// row. A row is then its value there, and a context transition in a calculated column
+    /// depends on that column only: "The presence of a relationship forces the DAX engine to
+    /// verify that ProductKey is a column with unique values in BestProducts. If there is a unique
+    /// column in the table, the context transition is optimized to rely on that column, without
+    /// filtering all the other columns" (SQLBI, "Understanding circular dependencies"). Values
+    /// that happen to be unique don't count: the article's unrelated BestProducts, whose
+    /// ProductKey is unique, has the circular dependency. A calculated key column not computed yet
+    /// is computed (the transition depends on it); one being computed is no key.
     member this.UniqueColumn: BColumn option =
         match unique with
         | ValueSome u -> u
         | ValueNone ->
-            let u =
-                this.Columns
-                |> Array.tryFind (fun c -> c.IsReady && c.Data.IsUnique && c.Data.BlankId < 0)
+            let candidates =
+                model.Rels
+                |> Array.collect (fun r ->
+                    if r.Limited then [||]
+                    elif r.OneToOne then [| r.To; r.From |]
+                    else [| r.To |])
+                |> Array.filter (fun c -> obj.ReferenceEquals(c.Table, this))
+                |> Array.distinct
 
-            if this.Columns |> Array.forall _.IsReady then
+            let u =
+                candidates
+                |> Array.tryFind (fun c -> not c.Computing && c.Data.IsUnique && c.Data.BlankId < 0)
+
+            if candidates |> Array.forall (fun c -> not c.Computing) then
                 unique <- ValueSome u
 
             u
