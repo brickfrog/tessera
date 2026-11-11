@@ -1,0 +1,70 @@
+{
+  "title": "TOTALWTD over a calendar, by date within one week, is the running sum from the week's Sunday",
+  "model": "g-calendars",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( 'Date'[Date], TREATAS ( { \"W33-2008\" }, 'Date'[WeekKey] ), \"Sales WTD\", TOTALWTD ( [Total], Weekly ) ) ORDER BY 'Date'[Date]",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Date]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[Sales WTD]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2008-08-10T00:00:00",
+          10
+        ],
+        [
+          "2008-08-11T00:00:00",
+          21
+        ],
+        [
+          "2008-08-12T00:00:00",
+          33
+        ],
+        [
+          "2008-08-13T00:00:00",
+          46
+        ],
+        [
+          "2008-08-14T00:00:00",
+          60
+        ],
+        [
+          "2008-08-15T00:00:00",
+          75
+        ],
+        [
+          "2008-08-16T00:00:00",
+          91
+        ]
+      ]
+    }
+  ],
+  "ordered": true,
+  "source": [
+    {
+      "url": "https://dax.guide/dateswtd/",
+      "quote": "Sales WTD returns the sales from the start of the week",
+      "supports": "the page's query, SUMMARIZECOLUMNS by date with TREATAS on the week, gives running sums from August 10"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/totalwtd-function-dax",
+      "quote": "Evaluates the value of the expression for the week to date, in the current context.",
+      "supports": "TOTALWTD"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Amount is the day of the month. Each row's date is filtered, so DATESWTD ends on it; W33-2008 starts on August 10: 10, 10+11 = 21, 33, 46, 60, 75, 91.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "totalwtd",
+    "summarizecolumns"
+  ]
+}

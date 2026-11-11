@@ -1,0 +1,42 @@
+{
+  "title": "DATESBETWEEN over a calendar from BLANK starts at the calendar's first date",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"first\", MINX ( DATESBETWEEN ( Gregorian, BLANK (), DATE ( 2008, 8, 5 ) ), 'Date'[Date] ), \"last\", MAXX ( DATESBETWEEN ( Gregorian, BLANK (), DATE ( 2008, 8, 5 ) ), 'Date'[Date] ), \"days\", COUNTROWS ( DATESBETWEEN ( Gregorian, BLANK (), DATE ( 2008, 8, 5 ) ) ) ), ALL ( 'Date' ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[first]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[last]",
+          "type": "dateTime"
+        },
+        {
+          "name": "[days]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "2008-07-27T00:00:00",
+          "2008-08-05T00:00:00",
+          10
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datesbetween/",
+    "quote": "With a calendar, it starts from the first value in the column tagged as Day.",
+    "supports": "a BLANK StartDate"
+  },
+  "confidence": "derived",
+  "derivation": "The first date of Date is 2008-07-27: July 27 to August 5, 10 days.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "datesbetween"
+  ]
+}

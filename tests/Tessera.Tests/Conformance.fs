@@ -104,6 +104,15 @@ type CalculationGroupDef = {
     Items: CalculationItemDef list
 }
 
+/// A calendar (calendar-based time intelligence): its categories, each with a primary column and
+/// associated columns, and its time-related columns.
+type CalendarDef = {
+    Name: string
+    Table: string
+    Groups: (TimeUnit * string * string list) list
+    TimeRelated: string list
+}
+
 type ModelDef = {
     Culture: string
     Collation: string option
@@ -112,6 +121,7 @@ type ModelDef = {
     Relationships: RelationshipDef list
     Functions: FunctionDef list
     CalculationGroups: CalculationGroupDef list
+    Calendars: CalendarDef list
 }
 
 /// A model with its data loaded, ready for an engine.
@@ -371,6 +381,39 @@ let private calculationGroupDef (node: JsonNode) : CalculationGroupDef =
                 })
     }
 
+let private calendarDef (node: JsonNode) : CalendarDef =
+    let o = asObject "a calendar" node
+    let name = reqString "a calendar" o "name"
+    let what = $"calendar {name}"
+    known what o [ "name"; "table"; "groups"; "timeRelated" ]
+
+    let strings (owner: JsonObject) (key: string) =
+        items what owner key
+        |> List.map (fun n ->
+            if kindOf n = JsonValueKind.String then
+                n.GetValue<string>()
+            else
+                bad $"{what}: \"{key}\" lists column names")
+
+    {
+        Name = name
+        Table = reqString what o "table"
+        Groups =
+            items what o "groups"
+            |> List.map (fun g ->
+                let g = asObject $"a group of {what}" g
+                known $"a group of {what}" g [ "category"; "primary"; "associated" ]
+                let category = reqString $"a group of {what}" g "category"
+
+                let unit =
+                    match Enum.TryParse<TimeUnit>(category, true) with
+                    | true, u when u <> TimeUnit.Unknown -> u
+                    | _ -> bad $"{what}: unknown category \"{category}\""
+
+                unit, reqString $"a group of {what}" g "primary", strings g "associated")
+        TimeRelated = strings o "timeRelated"
+    }
+
 let private modelKeys = [
     "description"
     "culture"
@@ -380,6 +423,7 @@ let private modelKeys = [
     "relationships"
     "functions"
     "calculationGroups"
+    "calendars"
 ]
 
 let private modelDef (node: JsonNode) : ModelDef =
@@ -394,6 +438,7 @@ let private modelDef (node: JsonNode) : ModelDef =
         Relationships = items "the model" o "relationships" |> List.map relationshipDef
         Functions = items "the model" o "functions" |> List.map functionDef
         CalculationGroups = items "the model" o "calculationGroups" |> List.map calculationGroupDef
+        Calendars = items "the model" o "calendars" |> List.map calendarDef
     }
 
 let private tomType =
@@ -535,6 +580,38 @@ let buildDatabase (name: string) (def: ModelDef) : Database =
 
     for f in def.Functions do
         model.Functions.Add(new Function(Name = f.Name, Expression = f.Expression))
+
+    for c in def.Calendars do
+        if not (model.Tables.ContainsName c.Table) then
+            bad $"calendar {c.Name}: the model has no table '{c.Table}'"
+
+        let table = model.Tables.[c.Table]
+
+        let columnOf (name: string) =
+            if not (table.Columns.ContainsName name) then
+                bad $"calendar {c.Name}: '{c.Table}' has no column '{name}'"
+
+            table.Columns.[name]
+
+        let calendar = new Calendar(Name = c.Name)
+
+        for (unit, primary, associated) in c.Groups do
+            let group = new TimeUnitColumnAssociation(unit, PrimaryColumn = columnOf primary)
+
+            for a in associated do
+                group.AssociatedColumns.Add(columnOf a)
+
+            calendar.CalendarColumnGroups.Add group
+
+        if not c.TimeRelated.IsEmpty then
+            let group = new TimeRelatedColumnGroup()
+
+            for r in c.TimeRelated do
+                group.Columns.Add(columnOf r)
+
+            calendar.CalendarColumnGroups.Add group
+
+        table.Calendars.Add calendar
 
     db
 
@@ -717,6 +794,7 @@ let private overlayKeys = [
     "addRelationships"
     "functions"
     "calculationGroups"
+    "calendars"
     "culture"
     "collation"
 ]
@@ -758,6 +836,7 @@ let private applyOverlay (baseModel: JsonNode) (overlay: JsonObject) : JsonNode 
     appendTo model "calculatedTables" (items "the case's model" overlay "calculatedTables")
     appendTo model "functions" (items "the case's model" overlay "functions")
     appendTo model "calculationGroups" (items "the case's model" overlay "calculationGroups")
+    appendTo model "calendars" (items "the case's model" overlay "calendars")
     appendTo model "relationships" (items "the case's model" overlay "addRelationships")
 
     for key in [ "relationships"; "culture"; "collation" ] do

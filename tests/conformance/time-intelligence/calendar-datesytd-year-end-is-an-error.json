@@ -1,0 +1,20 @@
+{
+  "title": "DATESYTD of a calendar with a year end date is an error",
+  "model": "g-calendars",
+  "query": "EVALUATE DATESYTD ( Gregorian, \"6-30\" )",
+  "expected": {
+    "error": "YearEndDate with a calendar"
+  },
+  "source": {
+    "url": "https://dax.guide/datesytd/",
+    "quote": "With a calendar, DATESYTD returns an error if you use YearEndDate.",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "datesytd",
+    "error"
+  ]
+}

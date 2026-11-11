@@ -1,0 +1,40 @@
+{
+  "title": "A filter on a calendar's year clears the filter on its month",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"t\", CALCULATE ( [Total], 'Date'[Year] = 2008 ) ), 'Date'[YearMonth] = 200807 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[t]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          662
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-time-intelligence",
+      "quote": "Context clearing happens on columns tagged in a calendar or associated sort-by columns regardless if the context is set using time intelligence functions or otherwise.",
+      "supports": "a plain filter clears too"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-time-intelligence",
+      "quote": "All category dependents of both X and its dependencies",
+      "supports": "Year has no dependencies; Month depends on Quarter, which depends on Year (the lattice diagram), so Month is cleared"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Setting Year clears Year's dependents: Quarter, Month, Week, Date. YearMonth is Gregorian's Month, so its filter goes and only Year = 2008 is left: every row, 662.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "context-clearing",
+    "calculate"
+  ]
+}

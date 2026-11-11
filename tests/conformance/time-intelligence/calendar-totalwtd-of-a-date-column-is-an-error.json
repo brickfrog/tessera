@@ -1,0 +1,27 @@
+{
+  "title": "TOTALWTD of a date column is an error",
+  "model": "g-calendars",
+  "query": "EVALUATE ROW ( \"x\", TOTALWTD ( [Total], 'Date'[Date] ) )",
+  "expected": {
+    "error": "week functions need a calendar"
+  },
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/totalwtd-function-dax",
+      "quote": "Week functions only work with calendar based time intelligence.",
+      "supports": "a date column is not a calendar"
+    },
+    {
+      "url": "https://dax.guide/closingbalanceweek/",
+      "quote": "A date column is not valid and returns an error.",
+      "supports": "the same for the week functions"
+    }
+  ],
+  "confidence": "published",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "totalwtd",
+    "error"
+  ]
+}

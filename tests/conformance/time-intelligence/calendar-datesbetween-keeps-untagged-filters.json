@@ -1,0 +1,33 @@
+{
+  "title": "CALCULATE with a calendar's DATESBETWEEN keeps the filter on a column no calendar tags",
+  "model": "g-calendars",
+  "query": "EVALUATE CALCULATETABLE ( ROW ( \"ltd\", CALCULATE ( [Total], DATESBETWEEN ( Gregorian, BLANK (), MAX ( 'Date'[Date] ) ) ) ), 'Date'[DayOfWeek] = \"Sun\", 'Date'[YearMonth] = 200808 )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[ltd]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          112
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://dax.guide/datesbetween/",
+    "quote": "With a calendar, CALCULATE removes only the filters on the columns of the calendar. The filters on the other columns of the date table stay, for example a filter on the day of the week.",
+    "supports": "the rule; the page's Sales LTD Calendar example sums only Sundays"
+  },
+  "confidence": "derived",
+  "derivation": "MAX ( Date[Date] ) of the Sundays of August 2008 is August 31. DATESBETWEEN gives July 27 to August 31; the filter on YearMonth (tagged) is removed, the one on DayOfWeek (untagged) stays: the Sundays July 27, August 3, 10, 17, 24, 31: 27 + 3 + 10 + 17 + 24 + 31 = 112.",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "datesbetween",
+    "calculate"
+  ]
+}

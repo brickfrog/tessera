@@ -1,0 +1,20 @@
+{
+  "title": "DATESWTD of a calendar without the Week category is an error",
+  "model": "g-calendars",
+  "query": "EVALUATE DATESWTD ( Gregorian )",
+  "expected": {
+    "error": "Gregorian tags no week"
+  },
+  "source": {
+    "url": "https://dax.guide/dateswtd/",
+    "quote": "With a date column, or with a calendar that does not tag the Week category, DATESWTD returns an error.",
+    "supports": "stated outright"
+  },
+  "confidence": "published",
+  "tags": [
+    "time-intelligence",
+    "calendar",
+    "dateswtd",
+    "error"
+  ]
+}
