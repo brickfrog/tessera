@@ -2366,9 +2366,11 @@ expressions only, say).
   is closed when a query names it. Active relationships that give two filter paths between two tables. A column
   with Group By Columns (a field parameter's display column): a query that groups by it without them fails on a
   server, so any query that reads it is refused (the table itself is computed, and its other columns work).
-- **One-to-one relationships, by their data:** keys of the `to` table that the `from` table lacks (`from` would
-  need a blank row), more than one unmatched row of `from`, and a blank row either table has from another
-  relationship. `CROSSFILTER` `ONEWAY` on one.
+- **One-to-one relationships, by their data:** keys missing on both sides (both tables would need a blank row),
+  more than one unmatched row on the side with the extra keys, and a blank row either table has from another
+  relationship. The declared direction doesn't matter (a one-to-one relationship filters both ways and its two
+  expanded tables are the same), except for a calculated key column, whose declared `to` table may not have keys
+  the `from` table lacks. `CROSSFILTER` `ONEWAY` on one.
 - **Many-to-many relationships:** a filter that keeps every row of the filtering table (whether it still hides the
   rows that match nothing isn't documented), a BLANK on one side meeting a BLANK on the other, columns of different
   types, `CROSSFILTER` `ONEWAY` ("unclear which side is the lookup side": Learn), and `ALLCROSSFILTERED` in a model

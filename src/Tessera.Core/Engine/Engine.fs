@@ -760,6 +760,20 @@ let private bindWith
     // many-to-many.
     let rels = ResizeArray<BRel>()
 
+    // A one-to-one relationship has no direction: "the cross filter direction is always from both
+    // tables" (Learn, "Model relationships in Power BI Desktop"), and the two expanded tables are
+    // "the same ... joining the columns of two tables into a larger table using a FULL OUTER JOIN"
+    // (SQLBI, "Expanded tables in DAX"). The engine joins the rows of `From` to `To`, which needs
+    // every key of `To` in `From` (`BRel.FromRowOfToRow`); so the ends are taken the way round the
+    // data allows, whichever way the model declares them. Whether a column has a value the other
+    // lacks: only for stored columns of the same type (a calculated key keeps the declared ends).
+    let lacks (a: BColumn) (b: BColumn) =
+        a.IsReady
+        && b.IsReady
+        && a.Stored.DataType = b.Stored.DataType
+        && a.Stored.Values
+           |> Array.exists (fun v -> not (DaxValue.isBlank v) && b.Stored.TryFindId v < 0)
+
     for r in db.Model.Relationships do
         match r with
         | :? SingleColumnRelationship as s when not (isNull s.FromColumn) && not (isNull s.ToColumn) ->
@@ -792,7 +806,12 @@ let private bindWith
 
             match ends with
             | Some(many, one, limited) ->
-                match column many, column one with
+                let ends =
+                    match column many, column one with
+                    | Some f, Some t when oneToOne && lacks t f && not (lacks f t) -> Some t, Some f
+                    | f, t -> f, t
+
+                match ends with
                 | Some f, Some t when f.Table.Gate.IsNone ->
                     let r =
                         BRel(

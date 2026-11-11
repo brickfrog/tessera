@@ -547,18 +547,61 @@ let oneToOneTests =
                 "CALCULATE ( [Units], TREATAS ( { ( \"Green\", \"Clothing\" ), ( \"Blue\", BLANK () ) }, Product[Color], ProductCategory[Category] ) )"
                 5)
 
-        // The engine takes the relationship's from side as the one whose rows are the joined rows:
-        // the same data declared the other way round leaves ProductCategory with keys Product
-        // lacks, which is refused.
-        testCase "the same data declared the other way round is refused" (fun () ->
-            let reversed = {
-                identity with
-                    Rels =
-                        oneToOne (rel ("ProductCategory", "SKU") ("Product", "SKU"))
-                        :: identity.Rels.Tail
-            }
+        // A one-to-one relationship has no direction ("the cross filter direction is always from
+        // both tables", Learn; "you can consider the two expanded tables as being the same", SQLBI):
+        // the same data declared the other way round gives the same answers.
+        testCase "the same data declared the other way round gives the same answers" (fun () ->
+            let reversed =
+                prepare {
+                    identity with
+                        Rels =
+                            oneToOne (rel ("ProductCategory", "SKU") ("Product", "SKU"))
+                            :: identity.Rels.Tail
+                }
 
-            notSupported (prepare reversed) "EVALUATE ROW ( \"x\", COUNTROWS ( ProductCategory ) )" "lacks")
+            is reversed "CALCULATE ( COUNTROWS ( Product ), ProductCategory[Category] = \"Clothing\" )" 1
+            is reversed "CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Blue\" )" 1
+            is reversed "COUNTROWS ( ProductCategory )" 2
+            is reversed "CALCULATE ( [Units], ISBLANK ( ProductCategory[Category] ) )" 3
+
+            returns reversed "EVALUATE VALUES ( ProductCategory[Category] )" [
+                [ "Clothing" ]
+                [ "Accessories" ]
+                [ null ]
+            ]
+
+            returns
+                reversed
+                "EVALUATE ADDCOLUMNS ( ProductCategory, \"P\", RELATED ( Product[Product] ), \"B\", RELATED ( Brand[Brand] ) )"
+                [
+                    [ "CL-01"; "Clothing"; "T-shirt"; "Acme" ]
+                    [ "AC-01"; "Accessories"; "Hat"; "Acme" ]
+                ]
+
+            is reversed "SUMX ( ProductCategory, [Units] )" 7
+
+            // CROSSFILTER names the columns either way round.
+            is
+                reversed
+                "CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Green\", CROSSFILTER ( Product[SKU], ProductCategory[SKU], NONE ) )"
+                2
+
+            // Keys missing on both sides need a blank row on both: refused whichever way.
+            let both =
+                identity
+                |> withRows "ProductCategory" [ [ "CL-01"; "Clothing" ]; [ "ZZ-01"; "Toys" ] ]
+
+            notSupported (prepare both) "EVALUATE VALUES ( Product[Color] )" "lacks"
+
+            notSupported
+                (prepare {
+                    both with
+                        Rels =
+                            oneToOne (rel ("ProductCategory", "SKU") ("Product", "SKU"))
+                            :: identity.Rels.Tail
+                })
+                "EVALUATE VALUES ( Product[Color] )"
+                "lacks")
 
         testCase "what isn't implemented is refused" (fun () ->
             // A category for a product that doesn't exist: Product would need a blank row.
