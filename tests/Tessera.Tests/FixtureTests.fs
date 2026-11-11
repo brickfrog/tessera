@@ -317,6 +317,14 @@ let private generatedIssues (db: Database) (rows: int) (seed: int64) =
     FixtureInit.write db dir { Rows = rows; Seed = seed } false |> ok |> ignore
     issuesOf db dir
 
+/// Windows device names (Microsoft Learn, "Naming Files, Paths, and Namespaces").
+let private devices =
+    set (
+        [ "CON"; "PRN"; "AUX"; "NUL" ]
+        @ [ for d in "0123456789\u00B9\u00B2\u00B3" -> $"COM{d}" ]
+        @ [ for d in "0123456789\u00B9\u00B2\u00B3" -> $"LPT{d}" ]
+    )
+
 let private nameGen =
     Gen.frequency [
         3,
@@ -377,6 +385,10 @@ let tests =
                 Expect.equal (FixtureName.encode " leading.dot") " leading.dot" ""
                 Expect.equal (FixtureName.encode "..") ".%2E" ""
                 Expect.equal (FixtureName.encode "tab\t") "tab%09" ""
+                // Found by the property below (seed 9362418050471032243, 13426991852896579441): the
+                // part before the dot is a space, which is no device name and needs no escape.
+                Expect.equal (FixtureName.encode " .'") " .'" ""
+                Expect.equal (FixtureName.decode " .'") (Some " .'") ""
                 Expect.equal (FixtureName.encode "Ünïcödé 日本語 😀") "Ünïcödé 日本語 😀" "Unicode is kept"
 
             testCase "Windows device names lose their first letter to an escape"
@@ -416,7 +428,11 @@ let tests =
             <| fun () ->
                 Prop.forAll (Arb.fromGen nameGen) (fun name ->
                     let encoded = FixtureName.encode name
-                    let device = FixtureName.encode (encoded.Split('.').[0]) <> encoded.Split('.').[0]
+                    // What Windows reads as a device: the part before the first dot, trailing
+                    // spaces dropped ("CON .x"). Re-encoding that part is no test of it: a part
+                    // that ends in a space is escaped as a last character, device or not (" .'").
+                    let device =
+                        devices.Contains((encoded.Split('.').[0]).TrimEnd(' ').ToUpperInvariant())
 
                     FixtureName.decode encoded = Some(name.Normalize NormalizationForm.FormC)
                     && FixtureName.matches name encoded
@@ -425,8 +441,8 @@ let tests =
                     && not (encoded.EndsWith '.')
                     && not (encoded.EndsWith ' ')
                     && encoded <> ""
-                    // Encoding again changes only the % signs: no device name is left to escape.
-                    && not (device && not (encoded.Contains '%')))
+                    // No device name is left unescaped.
+                    && not device)
 
             testCase "assigning files to tables"
             <| fun () ->
