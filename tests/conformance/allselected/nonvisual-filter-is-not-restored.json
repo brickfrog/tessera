@@ -1,0 +1,43 @@
+{
+  "title": "In SUMMARIZECOLUMNS, ALLSELECTED doesn't restore a NONVISUAL filter: the visual total is every product's",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS (",
+    "    'Product'[Product],",
+    "    NONVISUAL ( TREATAS ( { \"Bike\", \"Lock\" }, 'Product'[Product] ) ),",
+    "    \"Amount\", [Sales Amount],",
+    "    \"Visual Total\", CALCULATE ( [Sales Amount], ALLSELECTED ( 'Product'[Product] ) )",
+    ")",
+    "ORDER BY 'Product'[Product]"
+  ],
+  "ordered": true,
+  "expected": [
+    {
+      "columns": [
+        { "name": "Product[Product]", "type": "string" },
+        { "name": "[Amount]", "type": "decimal" },
+        { "name": "[Visual Total]", "type": "decimal" }
+      ],
+      "rows": [
+        [ "Bike", 400.0, 540.0 ],
+        [ "Lock", 80.0, 540.0 ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/summarizecolumns-function-dax",
+      "quote": "Returns the result where [Visual Total Sales] is the total across all years",
+      "supports": "the page's NONVISUAL example: the filter of the group-by column picks the rows, and CALCULATE ( [Sales], ALLSELECTED ( the column ) ) is the total without that filter; without NONVISUAL it is the total of the selected years"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/nonvisual-function-dax",
+      "quote": "Marks a value filter in SUMMARIZECOLUMNS as not affecting measure values, but only applying to group-by columns.",
+      "supports": "the NONVISUAL filter still picks which products are rows"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The rows are the products the filter leaves: Bike and Lock. Bike: Sales rows 1, 5, 7 = 100 + 200 + 100 = 400. Lock: rows 4, 6 = 50 + 30 = 80. ALLSELECTED removes the filter of the row and, the selection being non-visual, restores no filter on Product: every sale, 540 (as Learn's example gives the total across all years). Compare allselected/visual-total-in-summarizecolumns, 480 without NONVISUAL.",
+  "tags": [ "allselected", "summarizecolumns", "nonvisual", "treatas", "visual-total" ]
+}
