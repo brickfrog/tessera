@@ -766,10 +766,18 @@ let private bindWith
     // (SQLBI, "Expanded tables in DAX"). The engine joins the rows of `From` to `To`, which needs
     // every key of `To` in `From` (`BRel.FromRowOfToRow`); so the ends are taken the way round the
     // data allows, whichever way the model declares them. Whether a column has a value the other
-    // lacks: only for stored columns of the same type (a calculated key keeps the declared ends).
+    // lacks: only for data columns of data tables, of the same type (a calculated key keeps the
+    // declared ends, so that a query that binds the model again, with it computed, keeps them too).
+    let stored (c: BColumn) =
+        c.IsReady
+        && c.Expression.IsNone
+        && c.Parsed.IsNone
+        && c.Table.Expression.IsNone
+        && c.Table.Parsed.IsNone
+
     let lacks (a: BColumn) (b: BColumn) =
-        a.IsReady
-        && b.IsReady
+        stored a
+        && stored b
         && a.Stored.DataType = b.Stored.DataType
         && a.Stored.Values
            |> Array.exists (fun v -> not (DaxValue.isBlank v) && b.Stored.TryFindId v < 0)

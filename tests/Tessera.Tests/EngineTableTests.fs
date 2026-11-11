@@ -127,6 +127,10 @@ let tests =
                     "dax-invalid"
                     "a measure"
 
+                // A table with two columns of that name (CROSSJOIN refuses to make one; SELECTCOLUMNS
+                // refuses too, should one reach it).
+                notSupported (p ()) "EVALUATE SELECTCOLUMNS ( CROSSJOIN ( Product, Customer ), [Name] )" "same name"
+
                 // An outer row context's column is not a column of the iterated table.
                 Expect.equal
                     (queryCode

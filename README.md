@@ -2371,8 +2371,8 @@ expressions only, say).
 - **One-to-one relationships, by their data:** keys missing on both sides (both tables would need a blank row),
   more than one unmatched row on the side with the extra keys, and a blank row either table has from another
   relationship. The declared direction doesn't matter (a one-to-one relationship filters both ways and its two
-  expanded tables are the same), except for a calculated key column, whose declared `to` table may not have keys
-  the `from` table lacks. `CROSSFILTER` `ONEWAY` on one.
+  expanded tables are the same), except for a calculated key column or keys of different types, whose declared
+  `to` table may not have keys the `from` table lacks. `CROSSFILTER` `ONEWAY` on one.
 - **Many-to-many relationships:** a filter that keeps every row of the filtering table (whether it still hides the
   rows that match nothing isn't documented), a BLANK on one side meeting a BLANK on the other, columns of different
   types, `CROSSFILTER` `ONEWAY` ("unclear which side is the lookup side": Learn), and `ALLCROSSFILTERED` in a model

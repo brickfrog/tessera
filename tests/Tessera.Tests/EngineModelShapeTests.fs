@@ -586,6 +586,31 @@ let oneToOneTests =
                 "CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Green\", CROSSFILTER ( Product[SKU], ProductCategory[SKU], NONE ) )"
                 2
 
+            // A calculated key keeps the declared ends (the engine can't see its data when it binds
+            // the relationships), so reversed it is refused, also when a query binds the model
+            // again with the column computed.
+            let calculated =
+                prepare {
+                    identity with
+                        Tables =
+                            identity.Tables
+                            |> List.map (fun t ->
+                                if t.Name = "ProductCategory" then
+                                    t |> withCalculated [ "Key", DataType.String, "ProductCategory[SKU]" ]
+                                else
+                                    t)
+                        Rels =
+                            oneToOne (rel ("ProductCategory", "Key") ("Product", "SKU"))
+                            :: identity.Rels.Tail
+                }
+
+            notSupported calculated "EVALUATE ROW ( \"x\", COUNTROWS ( ProductCategory ) )" "lacks"
+
+            notSupported
+                calculated
+                "DEFINE MEASURE Product[N] = COUNTROWS ( ProductCategory ) EVALUATE ROW ( \"x\", [N] )"
+                "lacks"
+
             // Keys missing on both sides need a blank row on both: refused whichever way.
             let both =
                 identity

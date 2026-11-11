@@ -847,6 +847,12 @@ module TableFunctions =
                             let same (c: ColInfo) =
                                 String.Equals(c.Name, n, StringComparison.OrdinalIgnoreCase)
 
+                            if (table.Cols |> Array.filter same).Length > 1 then
+                                Fail.notSupported
+                                    ctx
+                                    expr.Span
+                                    $"an unnamed SELECTCOLUMNS column [{n}] where the table has several columns of that name"
+
                             match table.Cols |> Array.tryFind same with
                             | Some c when
                                 not (isNull c.Table)
