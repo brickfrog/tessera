@@ -10,6 +10,12 @@ open Tessera.Cli.Output
 
 let private parser = lazy (ArgumentParser.Create<CliArgs>(programName = "tess"))
 
+/// `tess test run ... --watch`.
+let private (|WatchedTestRun|_|) (args: ParseResults<TestCommand.Args>) =
+    match args.TryGetSubCommand() with
+    | Some(TestCommand.Run run) when run.Contains TestCommand.RunArgs.Watch -> Some run
+    | _ -> None
+
 /// Run the CLI with these environment variables, making any server connections through
 /// `connector`. Returns the process exit code.
 let runWithConnector
@@ -59,16 +65,19 @@ let runWithConnector
                 | Some(Diff args) -> DiffCommand.run ctx args
                 | Some(Deps args) -> DepsCommand.run ctx args
                 | Some(Init args) -> InitCommand.run ctx args
+                | Some(Validate args) when args.Contains ValidateCommand.Args.Watch -> WatchCommands.validate ctx args
                 | Some(Validate args) -> ValidateCommand.run ctx args
                 | Some(Rename args) -> RenameCommand.run ctx args
                 | Some(Remove args) -> RemoveCommand.run ctx args
                 | Some(Move args) -> MoveCommand.run ctx args
+                | Some(Bpa args) when args.Contains BpaCommand.Args.Watch -> WatchCommands.bpa ctx args
                 | Some(Bpa args) -> BpaCommand.run ctx args
                 | Some(Set args) -> SetCommand.run ctx args
                 | Some(Add args) -> AddCommand.run ctx args
                 | Some(Translations args) -> TranslationsCommand.run ctx args
                 | Some(Perspective args) -> PerspectiveCommand.run ctx args
                 | Some(Script args) -> ScriptCommand.run ctx args
+                | Some(Lint args) when args.Contains LintCommand.Args.Watch -> WatchCommands.lint ctx args
                 | Some(Lint args) -> LintCommand.run ctx args
                 | Some(Format args) -> FormatCommand.run ctx args
                 | Some(Connect args) -> ConnectCommand.run ctx args
@@ -76,6 +85,7 @@ let runWithConnector
                 | Some(Deploy args) -> DeployCommand.run ctx args
                 | Some(Data args) -> DataCommand.run ctx args
                 | Some(Refresh args) -> RefreshCommand.run ctx args
+                | Some(Test(WatchedTestRun run as args)) -> WatchCommands.testRun ctx args run
                 | Some(Test args) -> TestCommand.run ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 

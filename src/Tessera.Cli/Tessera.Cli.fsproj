@@ -18,6 +18,7 @@
     <Compile Include="Findings.fs" />
     <Compile Include="Changes.fs" />
     <Compile Include="Mutation.fs" />
+    <Compile Include="Watch.fs" />
     <Compile Include="Commands/InfoCommand.fs" />
     <Compile Include="Commands/ListCommand.fs" />
     <Compile Include="Commands/GetCommand.fs" />
@@ -45,6 +46,7 @@
     <Compile Include="Commands/DataCommand.fs" />
     <Compile Include="Commands/RefreshCommand.fs" />
     <Compile Include="Commands/TestCommand.fs" />
+    <Compile Include="Commands/WatchCommands.fs" />
     <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
     <Compile Include="App.fs" />

@@ -20,6 +20,7 @@ type Args =
     | Rule of rules: string
     | Ci of system: string
     | No_Group
+    | Watch
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -33,6 +34,7 @@ type Args =
                 $"only these rules (repeatable or comma-separated): {ids}."
             | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
             | No_Group -> "list every issue on its own, instead of folding issues with one root cause into the first."
+            | Watch -> Tessera.Cli.Watch.usage
 
 /// "2 errors, 1 warning"; zero counts are left out.
 let private summaryText (issues: Issue list) =

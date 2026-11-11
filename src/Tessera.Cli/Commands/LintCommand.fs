@@ -23,6 +23,7 @@ type Args =
     | Force
     | Stat
     | Name_Only
+    | Watch
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -42,6 +43,7 @@ type Args =
             | Force -> "with --fix: " + Mutation.Usage.force
             | Stat -> "with --fix: " + Mutation.Usage.stat
             | Name_Only -> "with --fix: " + Mutation.Usage.nameOnly
+            | Watch -> Tessera.Cli.Watch.usage
 
 /// A lint finding in the shared envelope (see Findings.fs).
 let toFinding (f: Lint.Finding) : Findings.Finding = {

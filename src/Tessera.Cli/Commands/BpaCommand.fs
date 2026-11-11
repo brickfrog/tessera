@@ -31,6 +31,7 @@ type Args =
     | No_Config
     | Allow_External_Rules
     | Path of pattern: string
+    | Watch
     | [<CliPrefix(CliPrefix.None); CustomCommandLine("rules")>] Rules_Cmd of ParseResults<BpaRulesCommand.Args>
 
     interface IArgParserTemplate with
@@ -53,6 +54,7 @@ type Args =
                 "only report findings on objects whose reference matches: a glob (`measure:Sales/*`, `*:Sales/*`) "
                 + "or a prefix (`column:`); repeatable or comma-separated."
             | Rules_Cmd _ -> "list, show, add or remove rules, and ignore rules on objects: `tess bpa rules --help`."
+            | Watch -> Tessera.Cli.Watch.usage
 
 let private severityName (s: int) =
     if s >= 3 then "error"
