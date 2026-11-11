@@ -25,6 +25,8 @@ let runWithConnector
     (err: TextWriter)
     (argv: string array)
     : int =
+    // `tess __complete <words...>` reaches Argu as one argument, so no word is read as an option.
+    let argv = CompletionCommand.packWords argv
     // Decide JSON mode before parsing so usage errors can be reported as JSON too.
     let jsonRequested = argv |> Array.exists (fun a -> a = "--json" || a = "-j")
 
@@ -87,6 +89,8 @@ let runWithConnector
                 | Some(Refresh args) -> RefreshCommand.run ctx args
                 | Some(Test(WatchedTestRun run as args)) -> WatchCommands.testRun ctx args run
                 | Some(Test args) -> TestCommand.run ctx args
+                | Some(Completion args) -> CompletionCommand.run parser.Value ctx args
+                | Some(Complete args) -> CompletionCommand.complete parser.Value ctx args
                 | _ -> UsageError(parser.Value.PrintUsage())
 
             match outcome with

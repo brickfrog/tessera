@@ -33,6 +33,9 @@ type CliArgs =
     | [<CliPrefix(CliPrefix.None)>] Data of ParseResults<DataCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Refresh of ParseResults<RefreshCommand.Args>
     | [<CliPrefix(CliPrefix.None)>] Test of ParseResults<TestCommand.Args>
+    | [<CliPrefix(CliPrefix.None)>] Completion of ParseResults<CompletionCommand.Args>
+    | [<Hidden; CliPrefix(CliPrefix.None); CustomCommandLine("__complete")>] Complete of
+        ParseResults<CompletionCommand.CompleteArgs>
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -65,3 +68,5 @@ type CliArgs =
             | Data _ -> DataCommand.summary
             | Refresh _ -> RefreshCommand.summary
             | Test _ -> TestCommand.summary
+            | Completion _ -> CompletionCommand.summary
+            | Complete _ -> "candidates for the completion scripts."

@@ -47,6 +47,7 @@
     <Compile Include="Commands/RefreshCommand.fs" />
     <Compile Include="Commands/TestCommand.fs" />
     <Compile Include="Commands/WatchCommands.fs" />
+    <Compile Include="Commands/CompletionCommand.fs" />
     <!-- New commands: add Commands/<Name>Command.fs above, a case in Args.fs, a line in App.fs. -->
     <Compile Include="Args.fs" />
     <Compile Include="App.fs" />
