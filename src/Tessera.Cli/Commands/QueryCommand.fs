@@ -31,6 +31,7 @@ type Args =
     | User_Object_Id of id: string
     | User_Culture of culture: string
     | Custom_Data of text: string
+    | Role of name: string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -52,12 +53,20 @@ type Args =
                 "with --data: the date and time TODAY and NOW return, as ISO 8601 (2024-03-05T14:30:00), in "
                 + "the query and in calculated tables and columns. With a UTC offset (...+02:00, ...Z), UTCTODAY "
                 + "and UTCNOW return that instant in UTC; without one, the same as NOW. Default: the machine's clock."
-            | User_Name _ -> "with --data: what USERNAME () returns (refused unless given)."
-            | User_Principal_Name _ -> "with --data: what USERPRINCIPALNAME () returns (refused unless given)."
+            | User_Name _ ->
+                "with --data: what USERNAME () returns (refused unless given). On a server: EffectiveUserName= "
+                + "(whom to impersonate; needs administrator rights there)."
+            | User_Principal_Name _ ->
+                "with --data: what USERPRINCIPALNAME () returns (refused unless given). On a server: "
+                + "EffectiveUserName=, in UPN form (Azure AS, Power BI)."
             | User_Object_Id _ -> "with --data: what USEROBJECTID () returns (refused unless given)."
             | User_Culture _ -> "with --data: what USERCULTURE () returns (refused unless given)."
             | Custom_Data _ ->
-                "with --data: what CUSTOMDATA () returns (BLANK if another identity option is given, else refused)."
+                "what CUSTOMDATA () returns (with --data: BLANK if another identity option is given, else refused). "
+                + "On a server: CustomData=."
+            | Role _ ->
+                "query as a member of this role of the model (repeat for several: what any of them may see). "
+                + "With --data, the role's row filters hide rows; on a server: Roles=."
 
 /// The identity options given, if any: who the local engine says is asking.
 let private identity (args: ParseResults<Args>) : DaxEngine.Identity option =
@@ -70,6 +79,51 @@ let private identity (args: ParseResults<Args>) : DaxEngine.Identity option =
     }
 
     if id = DaxEngine.Identity.none then None else Some id
+
+/// What a server is told for `--role` and the identity options: the connection-string properties
+/// Microsoft Learn documents ("Connection string properties (Analysis Services)": Roles,
+/// EffectiveUserName, CustomData). The others have none, and are refused.
+let private connectionProperties (args: ParseResults<Args>) : Result<(string * string) list, string> =
+    let roles = args.GetResults Args.Role
+    let user = args.TryGetResult Args.User_Name
+    let upn = args.TryGetResult Args.User_Principal_Name
+
+    if args.Contains Args.User_Object_Id || args.Contains Args.User_Culture then
+        Error
+            "--user-object-id and --user-culture are for --data: a server has no connection property for them (it takes them from the signed-in user)"
+    elif user.IsSome && upn.IsSome then
+        Error "on a server, --user-name and --user-principal-name both set EffectiveUserName: give one"
+    else
+        match roles |> List.tryFind (fun r -> r.Contains ',' || String.IsNullOrWhiteSpace r) with
+        | Some bad -> Error $"--role '{bad}': a server takes the roles as a comma-separated list, so a role name can't contain a comma or be empty"
+        | None ->
+            Ok [
+                if not roles.IsEmpty then
+                    "Roles", String.concat "," roles
+
+                match user |> Option.orElse upn with
+                | Some name -> "EffectiveUserName", name
+                | None -> ()
+
+                match args.TryGetResult Args.Custom_Data with
+                | Some text -> "CustomData", text
+                | None -> ()
+            ]
+
+/// The address with those properties added; the address must not already set them.
+let private withProperties (address: XmlaAddress) (extra: (string * string) list) : Result<XmlaAddress, string> =
+    match
+        extra
+        |> List.tryFind (fun (key, _) ->
+            address.Properties
+            |> List.exists (fun (k, _) -> String.Equals(k, key, StringComparison.OrdinalIgnoreCase)))
+    with
+    | Some(key, _) -> Error $"the address already sets {key}=: give it there or with the option, not both"
+    | None ->
+        Ok {
+            address with
+                Properties = address.Properties @ extra
+        }
 
 let private queryJson (source: string) (results: QueryResult list) (elapsed: TimeSpan) =
     obj [
@@ -160,6 +214,7 @@ let private coverage (ctx: Ctx) (source: string) =
             "calculatedColumns", ObjectKind.Column
             "calculatedTables", ObjectKind.Table
             "calculationItems", ObjectKind.CalculationItem
+            "roles", ObjectKind.Role
         ]
 
         if ctx.Json then
@@ -204,6 +259,7 @@ let private coverage (ctx: Ctx) (source: string) =
                     "calculated columns", ObjectKind.Column
                     "calculated tables", ObjectKind.Table
                     "calculation items", ObjectKind.CalculationItem
+                    "roles with row filters", ObjectKind.Role
                 ] do
                 let all = ofKind kind
 
@@ -257,6 +313,7 @@ let private local
                         match identity args with
                         | Some id -> Engine.withIdentity id p
                         | None -> p)
+                    |> Result.bind (Engine.asRoles (args.GetResults Args.Role))
                     |> Result.bind (fun p -> Engine.evaluateQuery p dax)
                 with
                 | Error e -> Failed e
@@ -276,12 +333,21 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | _ when ctx.Json && args.Contains Args.Csv -> UsageError "--json and --csv can't be combined"
     | source :: _ when XmlaAddress.isRemote source && (data.IsSome || args.Contains Args.Coverage) ->
         UsageError "--data and --coverage are for model files: a server model is queried on the server"
-    | source :: _ when
-        (identity args).IsSome
-        && (XmlaAddress.isRemote source || args.Contains Args.Coverage)
+    | _ when
+        ((identity args).IsSome || args.Contains Args.Role)
+        && args.Contains Args.Coverage
         ->
         UsageError
-            "--user-name, --user-principal-name, --user-object-id, --user-culture and --custom-data are for --data: a server takes them from the connection"
+            "--role and the identity options are for running a query: --coverage reports every role's filters"
+    | source :: _ when
+        XmlaAddress.isRemote source
+        && (match connectionProperties args with
+            | Error _ -> true
+            | Ok _ -> false)
+        ->
+        match connectionProperties args with
+        | Error message -> UsageError message
+        | Ok _ -> UsageError "--role"
     | _ when now.IsSome && (data.IsNone || args.Contains Args.Coverage) ->
         UsageError "--now sets the clock of the local engine: it goes with --data and a query"
     | _ when
@@ -319,9 +385,17 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             let clock = Stopwatch.StartNew()
             let limit = if maxRows = 0 then None else Some maxRows
 
-            match
-                XmlaAddress.parse source
-                |> Result.bind (fun address -> Remote.query (Source.access ctx) address dax limit)
-            with
+            let extra =
+                match connectionProperties args with
+                | Ok extra -> extra
+                | Error _ -> []
+
+            match XmlaAddress.parse source with
             | Error e -> Failed e
-            | Ok(address, results) -> render ctx args (XmlaAddress.display address) results clock.Elapsed maxRows
+            | Ok address ->
+                match withProperties address extra with
+                | Error message -> UsageError message
+                | Ok address ->
+                    match Remote.query (Source.access ctx) address dax limit with
+                    | Error e -> Failed e
+                    | Ok(address, results) -> render ctx args (XmlaAddress.display address) results clock.Elapsed maxRows

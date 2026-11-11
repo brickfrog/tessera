@@ -102,6 +102,10 @@ type TessError =
     | FixtureHasErrors of directory: string * errors: int
     /// `test`: no suite files where they were looked for.
     | NoTestSuites of where: string
+    /// The model has no role of this name (`--role`).
+    | RoleNotFound of role: string * existing: string list
+    /// None of these roles (name, permission) may query data.
+    | RoleCannotRead of roles: (string * string) list
 
 module TessError =
 
@@ -167,6 +171,8 @@ module TessError =
         | DaxEvaluation _ -> "dax-error"
         | FixtureHasErrors _ -> "fixture-has-errors"
         | NoTestSuites _ -> "no-test-suites"
+        | RoleNotFound _ -> "role-not-found"
+        | RoleCannotRead _ -> "role-cannot-read"
 
     let rec message =
         function
@@ -308,3 +314,12 @@ module TessError =
             $"The fixture data in {directory} has {errors}; fix them first (`tess data check` lists them)"
         | NoTestSuites where ->
             $"No test suites (*.test.yaml, *.test.yml, *.test.json) found in {where}. `tess test init <model>` writes one to start from."
+        | RoleNotFound(role, existing) ->
+            match existing with
+            | [] -> $"The model has no role '{role}'; it has no roles"
+            | names -> $"The model has no role '{role}'; it has: " + String.concat ", " names
+        | RoleCannotRead roles ->
+            let list =
+                roles |> List.map (fun (name, permission) -> $"'{name}' ({permission})") |> String.concat ", "
+
+            $"Members of {list} can't query data: a role needs the Read, ReadRefresh or Administrator permission"
