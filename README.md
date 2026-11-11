@@ -2060,6 +2060,7 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 | Relationship | `LOOKUPVALUE` `RELATED` `RELATEDTABLE` |
 | Statistical | `GEOMEAN` `GEOMEANX` `MEDIAN` `MEDIANX` `PERCENTILE.EXC` `PERCENTILE.INC` `PERCENTILEX.EXC` `PERCENTILEX.INC` `RANK.EQ` `STDEV.P` `STDEV.S` `STDEVX.P` `STDEVX.S` `VAR.P` `VAR.S` `VARX.P` `VARX.S` |
 | Table manipulation | `ADDCOLUMNS` `CROSSJOIN` `CURRENTGROUP` `DATATABLE` `EXCEPT` `GENERATE` `GENERATEALL` `GROUPBY` `IGNORE` `INTERSECT` `NATURALINNERJOIN` `NATURALLEFTOUTERJOIN` `NONVISUAL` `ROLLUPADDISSUBTOTAL` `ROLLUPGROUP` `ROW` `SELECTCOLUMNS` `SUMMARIZE` `SUMMARIZECOLUMNS` `TOPN` `UNION` |
+| Calculation groups | `ISSELECTEDMEASURE` `SELECTEDMEASURE` `SELECTEDMEASUREFORMATSTRING` `SELECTEDMEASURENAME` |
 | Text | `COMBINEVALUES` `CONCATENATE` `CONTAINSSTRING` `CONTAINSSTRINGEXACT` `EXACT` `FIND` `FIXED` `FORMAT` `LEFT` `LEN` `LOWER` `MID` `REPLACE` `REPT` `RIGHT` `SEARCH` `SUBSTITUTE` `TOCSV` `TOJSON` `TRIM` `UNICHAR` `UNICODE` `UPPER` `VALUE` |
 | Time intelligence | `CLOSINGBALANCEMONTH` `CLOSINGBALANCEQUARTER` `CLOSINGBALANCEYEAR` `DATEADD` `DATESBETWEEN` `DATESINPERIOD` `DATESMTD` `DATESQTD` `DATESYTD` `ENDOFMONTH` `ENDOFQUARTER` `ENDOFYEAR` `FIRSTDATE` `FIRSTNONBLANK` `FIRSTNONBLANKVALUE` `LASTDATE` `LASTNONBLANK` `LASTNONBLANKVALUE` `NEXTDAY` `NEXTMONTH` `NEXTQUARTER` `NEXTYEAR` `OPENINGBALANCEMONTH` `OPENINGBALANCEQUARTER` `OPENINGBALANCEYEAR` `PARALLELPERIOD` `PREVIOUSDAY` `PREVIOUSMONTH` `PREVIOUSQUARTER` `PREVIOUSYEAR` `SAMEPERIODLASTYEAR` `STARTOFMONTH` `STARTOFQUARTER` `STARTOFYEAR` `TOTALMTD` `TOTALQTD` `TOTALYTD` |
 
@@ -2073,6 +2074,38 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   with a group-level filter. `NATURALINNERJOIN` and `NATURALLEFTOUTERJOIN` join tables with no model columns
   (`DATATABLE`, table constructors, computed columns) on their columns of the same name. `FIRSTNONBLANK` and its
   relatives go through the column's values in ascending order.
+
+#### Calculation groups
+
+A calculation group is a table whose rows are its items (its `Name` column holds their names, its `Ordinal`
+column their ordinals), so it is filtered, grouped by and iterated like any table. A measure reference evaluated
+where a group's filter leaves exactly one item visible becomes that item's expression, with `SELECTEDMEASURE ()`
+the measure (after the reference's context transition); nothing else is rewritten, so `CALCULATE ( SUM ( ... ),
+<item> )` is unchanged and every measure reference inside a `CALCULATE` gets the item (SQLBI, "Understanding the
+application of calculation items"). The rules, each cited in `Engine/Functions/CalculationGroups.fs`:
+
+- **Selection.** A group that isn't filtered applies nothing, even with one item. Several items, or none (a filter
+  on a name no item has), leave the measure unchanged; under `selectionExpressionBehavior` Visual several items give
+  BLANK (Learn, "Calculation groups").
+- **Precedence.** The highest group is applied first; the others are applied where its `SELECTEDMEASURE ()` and its
+  other measure references are evaluated, in the filter context there: `( ( 10 ) + 2 ) * 2 = 24`.
+- **Once.** An item in force (the group's filters are the ones it was applied under) is not applied again, also not
+  to the measures the measure refers to, while an item selected later, in a measure or in another item, is: SQLBI's
+  `Just2Times10` gives 25.
+- **Sideways recursion.** A `CALCULATE` in an item that selects another item of its group applies that one (Learn's
+  `YOY%`, `PY YTD`).
+- **The functions** `SELECTEDMEASURE`, `SELECTEDMEASURENAME`, `ISSELECTEDMEASURE` and `SELECTEDMEASUREFORMATSTRING`
+  (the measure's own format string) work in an item's expression. A measure's result type is its values'.
+
+Refused, as the sources leave them open: an item selected again by a filter while it is being applied (itself, a
+cycle, `KEEPFILTERS` over its own filter: "Other types of recursion aren't supported"); `multipleOrEmptySelectionExpression`
+and `noSelectionExpression`; several or no items under `selectionExpressionBehavior` Automatic above compatibility level
+1702 (Learn says Automatic becomes Visual "above a future compatibility level") or no items under Visual; two groups
+with the same precedence; a group with an Ordinal column and items left at ordinal -1; `ROLLUPADDISSUBTOTAL` over a group's column (its subtotals depend on the selection
+behaviour); an item applied in a calculated column or table; these functions outside an item's expression or in a
+function it calls; `SELECTEDMEASUREFORMATSTRING` for a measure with no format string or a dynamic one, or after an item
+with a format string expression was applied to the same measure. Format string expressions are read but not
+evaluated: a query result has no format strings. `--coverage` lists calculation items like measures.
 
 #### Dates, times and the clock
 
@@ -2341,13 +2374,13 @@ compare such results as sets.
 
 #### `--coverage`
 
-`tess query <model> --coverage` reads the model only (no data) and lists every measure, calculated column and
-calculated table that uses something the engine doesn't support, with what; then how many of each kind it can
+`tess query <model> --coverage` reads the model only (no data) and lists every measure, calculated column,
+calculated table and calculation item that uses something the engine doesn't support, with what; then how many of each kind it can
 evaluate, and the unsupported things ranked by how many objects use them. It follows references: a measure that
 calls an unsupported measure or function is unsupported, and so is everything that depends, over relationships, on a
 calculated table or column that can't be computed (a date table that can't be computed closes most of a model).
 `--json` writes `{"command": "query coverage", "source", "summary": {measures, calculatedColumns,
-calculatedTables: {total, supported}}, "objects": [{ref, kind, supported, unsupported: [...]}], "unsupported":
+calculatedTables, calculationItems: {total, supported}}, "objects": [{ref, kind, supported, unsupported: [...]}], "unsupported":
 [{reason, objects}]}`.
 
 Coverage runs each function's static check of its argument forms, the same one the evaluator runs before a call. A

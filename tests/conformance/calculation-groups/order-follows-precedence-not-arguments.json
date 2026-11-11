@@ -1,0 +1,32 @@
+{
+  "title": "Two items in one CALCULATE are applied by precedence: Multiplier (200) first, then Adder, ( 2 + 5 ) * 10 = 70",
+  "model": "f-calcgroup-order",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Just2], Adder[Addend] = \"Plus5\", Multiplier[Factor] = \"Mul10\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          70
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/avoiding-pitfalls-in-calculation-groups-precedence/",
+    "quote": "( [Just2] + 5 ) * 10",
+    "supports": "the second puzzle: the result is 70 and not 25, the expression after both items are applied"
+  },
+  "confidence": "published",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "precedence",
+    "selectedmeasure"
+  ]
+}

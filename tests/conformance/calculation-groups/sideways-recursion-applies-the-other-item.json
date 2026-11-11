@@ -1,0 +1,33 @@
+{
+  "title": "Sideways recursion: CALCULATE selecting another item of the same group inside an item applies that item",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Variant[Variant] = \"Diff\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          -60
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+    "quote": "In this case, both expressions are evaluated separately because they are using different calculate statements.",
+    "supports": "an item may select another item of its group in CALCULATE (YOY uses PY); the CALCULATE applies it to SELECTEDMEASURE ()"
+  },
+  "confidence": "derived",
+  "derivation": "Diff = SELECTEDMEASURE () - CALCULATE ( SELECTEDMEASURE (), Variant[Variant] = \"Double\" ) = 60 - 60 * 2 = -60.",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "selectedmeasure",
+    "sideways-recursion"
+  ]
+}

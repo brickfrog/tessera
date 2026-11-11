@@ -1,0 +1,40 @@
+{
+  "title": "Two items of one group selected at once: the measure is evaluated unchanged (no selection expression, default behaviour)",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Adjust[Adjustment] IN { \"Plus 2\", \"Current\" } ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          60
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "quote": "If this expression has not been defined the calculation group will return the following result if the model's selectionExpressionBehavior setting is set to automatic or nonvisual:",
+      "supports": "the result given is SELECTEDMEASURE(); the corpus model leaves selectionExpressionBehavior at its default, automatic"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-calculation-groups/",
+      "quote": "If the user does not select one value or if the user selects multiple values together, then the engine does not apply any variation to the original measure.",
+      "supports": "several items selected: no item applied"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Two items of Adjust are visible, so no item applies: [Total] = 60 (Plus 2 alone would give 62).",
+  "tags": [
+    "calculation-groups",
+    "selection",
+    "calculate",
+    "in"
+  ]
+}

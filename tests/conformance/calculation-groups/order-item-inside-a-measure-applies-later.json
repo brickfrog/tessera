@@ -1,0 +1,32 @@
+{
+  "title": "An item selected inside a measure is applied when that measure runs, after the item applied to the measure: 2 * 10 + 5 = 25",
+  "model": "f-calcgroup-order",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Just2Times10], Adder[Addend] = \"Plus5\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          25
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/avoiding-pitfalls-in-calculation-groups-precedence/",
+    "quote": "( [Just2] * 10 ) + 5",
+    "supports": "the fourth puzzle: Adder is applied to [Just2Times10], Multiplier only when Just2Times10 is evaluated, and Adder is not applied again to [Just2]; the result is 25"
+  },
+  "confidence": "published",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "precedence",
+    "selectedmeasure"
+  ]
+}

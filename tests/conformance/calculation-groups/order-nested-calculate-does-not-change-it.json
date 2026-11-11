@@ -1,0 +1,33 @@
+{
+  "title": "Nesting the CALCULATE that selects the lower-precedence item outside does not change the order: still 70",
+  "model": "f-calcgroup-order",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( CALCULATE ( [Just2], Multiplier[Factor] = \"Mul10\" ), Adder[Addend] = \"Plus5\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          70
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/avoiding-pitfalls-in-calculation-groups-precedence/",
+    "quote": "Nesting CALCULATE functions is not a way to change the order of application of calculation items, at least not in this example.",
+    "supports": "the third puzzle: the outer Adder item has no effect on the inner CALCULATE and the code is identical to the second puzzle (70)"
+  },
+  "confidence": "derived",
+  "derivation": "The only measure reference, [Just2], is evaluated inside the inner CALCULATE, where both items are selected: Multiplier (200) is applied first, then Adder: ( 2 + 5 ) * 10 = 70. The page's figure with the result is not in its text, hence derived.",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "precedence",
+    "selectedmeasure"
+  ]
+}

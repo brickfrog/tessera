@@ -1,0 +1,31 @@
+{
+  "title": "A calculation group is a table with one row per calculation item",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", COUNTROWS ( Adjust ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          3
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-calculation-groups/",
+    "quote": "Indeed, a calculation item is like one row in the calculation group table.",
+    "supports": "Adjust has three items"
+  },
+  "confidence": "derived",
+  "derivation": "Adjust has the items Current, Plus 2 and Only Total x10: 3 rows.",
+  "tags": [
+    "calculation-groups",
+    "countrows"
+  ]
+}

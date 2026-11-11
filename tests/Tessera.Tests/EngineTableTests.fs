@@ -1279,7 +1279,9 @@ let tests =
                     m
                     "EVALUATE ROW ( \"n\", CALCULATE ( COUNTROWS ( Product ), Sales[Qty] > 0 ) )"
                     "keeps all of its rows")
-            testCase "a calculation group can't be named" (fun () ->
+            // Calculation groups are evaluated now (EngineCalcGroupTests): one with no items is an
+            // empty table that changes no measure.
+            testCase "a calculation group with no items is an empty table" (fun () ->
                 let db, store = build star
                 let cg = new Table(Name = "Time Calc", CalculationGroup = new CalculationGroup())
                 cg.Columns.Add(new DataColumn(Name = "Name", DataType = DataType.String, SourceColumn = "Name"))
@@ -1289,7 +1291,7 @@ let tests =
                 | Error e -> failtestf "%A" e
                 | Ok m ->
                     is m "[Amount]" 625
-                    notSupported m "EVALUATE 'Time Calc'" "calculation groups")
+                    returns m "EVALUATE 'Time Calc'" [])
         ]
 
         testList "coverage" [

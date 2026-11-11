@@ -1,0 +1,38 @@
+{
+  "title": "A calculation group that is not filtered applies nothing, even when it has one item",
+  "model": "f-calcgroup-order",
+  "query": "EVALUATE ROW ( \"r\", [Just2] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "quote": "noSelectionExpression. This selection expression is applied when the calculation group is not filtered.",
+      "supports": "with no selection expression defined, the page's table gives \"Calculation group is not filtered\" for no selection"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "quote": "Calculation groups are only applied if a single calculation item from the calculation group is in filter context.",
+      "supports": "an item is applied only when selected"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Neither Adder nor Multiplier is filtered, so neither item applies: [Just2] = 2 (not 7, 20 or 70).",
+  "tags": [
+    "calculation-groups",
+    "selection"
+  ]
+}

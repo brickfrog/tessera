@@ -1,0 +1,32 @@
+{
+  "title": "ISSELECTEDMEASURE with several measures is TRUE when the measure is any of them",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Count], Info[Info] = \"Is Total or Count\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "boolean"
+        }
+      ],
+      "rows": [
+        [
+          true
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/isselectedmeasure-function-dax",
+    "quote": "A Boolean indicating whether the measure that is currently in context is one of those specified in the list of parameters.",
+    "supports": "the measure is [Count], the second in the list"
+  },
+  "confidence": "derived",
+  "derivation": "ISSELECTEDMEASURE ( [Total], [Count] ) for [Count]: TRUE.",
+  "tags": [
+    "calculation-groups",
+    "isselectedmeasure",
+    "calculate"
+  ]
+}

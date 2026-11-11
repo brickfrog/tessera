@@ -439,6 +439,8 @@ and [<Sealed; AllowNullLiteral>] BTable(id: int, model: Model, name: string) =
     member val Computing = false with get, set
     /// Why queries can't use this table (a relationship or model feature the engine doesn't do).
     member val Gate: string option = None with get, set
+    /// The calculation group this table is, or null.
+    member val CalcGroup: BCalcGroup = null with get, set
     member _.IsReady = rowCount >= 0
     member _.SetRowCount(n: int) = rowCount <- n
 
@@ -924,11 +926,47 @@ and [<Sealed; AllowNullLiteral>] BMeasure(name: string, table: BTable, source: S
     member _.Source = source
     /// The parsed expression; raises `EngineException` for one that doesn't parse.
     member _.Expr: Expr = parsed.Value
+    /// The model's format string for the measure (TOM `FormatString`), or null.
+    member val FormatString: string = null with get, set
+    /// Whether the measure has a dynamic format string (TOM `FormatStringDefinition`).
+    member val HasFormatStringExpression = false with get, set
 
 and [<Sealed; AllowNullLiteral>] BFunction(name: string, source: SourceText, parsed: Lazy<FunctionDef>) =
     member _.Name = name
     member _.Source = source
     member _.Def: FunctionDef = parsed.Value
+
+/// A calculation item: one row of its calculation group's table (`Row`).
+and [<Sealed; AllowNullLiteral>] BCalcItem
+    (group: BCalcGroup, name: string, ordinal: int, row: int, source: SourceText, parsed: Lazy<Expr>) =
+    member _.Group = group
+    member _.Name = name
+    member _.Ordinal = ordinal
+    member _.Row = row
+    member _.Source = source
+    /// The parsed expression; raises `EngineException` for one that doesn't parse.
+    member _.Expr: Expr = parsed.Value
+    /// The text of the item's format string expression, if it has one (never evaluated: a query
+    /// result has no format strings).
+    member val FormatStringExpression: SourceText option = None with get, set
+
+/// A calculation group: a table whose rows are its items.
+and [<Sealed; AllowNullLiteral>] BCalcGroup(name: string, table: BTable, precedence: int) =
+    member _.Name = name
+    member _.Table = table
+    member _.Precedence = precedence
+    /// By row of the table.
+    member val Items: BCalcItem array = [||] with get, set
+    /// Why an evaluation where the group is filtered by several items, or by none that exists,
+    /// is refused (a multipleOrEmptySelectionExpression, a selection behaviour not settled).
+    member val MultipleOrEmpty: string option = None with get, set
+    /// Whether, with no multipleOrEmptySelectionExpression, several items selected give BLANK
+    /// (the model's selectionExpressionBehavior is Visual) rather than the measure unchanged.
+    member val MultipleIsBlank = false with get, set
+    /// Why an evaluation where the group is not filtered is refused (a noSelectionExpression).
+    member val NoSelection: string option = None with get, set
+    /// Why every measure reference is refused, filtered or not (two groups with one precedence).
+    member val Refused: string option = None with get, set
 
 and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     let configs = ConcurrentDictionary<string, RelConfig>()
@@ -958,6 +996,8 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     /// The model's culture name ("en-US"), or "" when it has none: how text is read as a date, and
     /// what FORMAT and number-to-text follow (see `Culture`).
     member val Culture: string = "" with get, set
+    /// The calculation groups, highest precedence first (the order they are applied in).
+    member val CalcGroups: BCalcGroup array = [||] with get, set
 
     member this.Config(active: bool array, both: bool array) : RelConfig =
         let c = RelConfig(this, active, both)
@@ -1126,6 +1166,30 @@ type QueryDefs() =
     member val MeasureTypes = Dictionary<BMeasure, StaticType>(HashIdentity.Reference) with get
     member val Functions = Dictionary<string, BFunction>(StringComparer.OrdinalIgnoreCase) with get
 
+/// A calculation item applied to a measure reference (see Functions/CalculationGroups.fs).
+type ItemApplication = {
+    Item: BCalcItem
+    /// The measure SELECTEDMEASURE () stands for.
+    Measure: BMeasure
+    /// The filters on the group's table when the item was applied: while these same filters are
+    /// in force, the item is not applied again.
+    GroupFilters: Filter list
+    /// The user-defined functions being called when the item was applied: SELECTEDMEASURE ()
+    /// inside one the item's expression calls is refused.
+    Functions: BFunction list
+}
+
+/// Which calculation items are in force.
+type ItemCtx = {
+    /// Applied to the measure references being evaluated, innermost first.
+    Applied: ItemApplication list
+    /// The item whose expression is being evaluated (not inside a measure it refers to).
+    Current: ItemApplication option
+}
+
+module ItemCtx =
+    let none = { Applied = []; Current = None }
+
 /// The evaluation context.
 type Ctx = {
     Model: Model
@@ -1145,6 +1209,8 @@ type Ctx = {
     CallerRows: bool
     /// Who is asking (see `Identity`): None unless the caller said (`Engine.withIdentity`).
     Identity: Identity option
+    /// The calculation items in force (see `ItemCtx`).
+    Items: ItemCtx
 }
 
 type Call = {
@@ -1172,6 +1238,8 @@ type IEval =
     abstract TryModelTable: Ctx * Expr -> BTable option
     /// A scalar from an already computed table (one column, at most one row).
     abstract ScalarOfTable: Ctx * Span * TableVal -> DaxValue
+    /// A reference to a measure: what `[Measure]` evaluates to here, calculation items included.
+    abstract Measure: Ctx * Span * BMeasure -> DaxValue
 
 [<RequireQualifiedAccess>]
 type Returns =

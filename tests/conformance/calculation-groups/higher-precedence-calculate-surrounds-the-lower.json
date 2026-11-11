@@ -1,0 +1,42 @@
+{
+  "title": "The higher-precedence item's CALCULATE surrounds the lower item's whole expression: DIVIDE runs inside ALL ( T )",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], T[Item] = \"A\", Spread[Spread] = \"All Rows\", Per[Per] = \"Per Row\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          20.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "quote": "CALCULATE(DIVIDE(SELECTEDMEASURE(), COUNTROWS(DimDate)), DATESYTD(DimDate[Date]))",
+      "supports": "with YTD (precedence 20) above Daily Average (10), the combined expression is the lower item inside the higher item's CALCULATE, not DIVIDE(CALCULATE(SELECTEDMEASURE(), DATESYTD(DimDate[Date])), COUNTROWS(DimDate))"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-calculation-group-precedence/",
+      "quote": "The calculation group with the highest value is applied first; then the other calculation groups are applied according to their Precedence value in a descending order.",
+      "supports": "Spread (300) is applied before Per (5)"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Spread first: CALCULATE ( SELECTEDMEASURE (), ALL ( T ) ), then Per inside it: CALCULATE ( DIVIDE ( [Total], COUNTROWS ( T ) ), ALL ( T ) ) = 60 / 3 = 20 (a double: DIVIDE). The other nesting, DIVIDE ( CALCULATE ( [Total], ALL ( T ) ), COUNTROWS ( T ) ) under T[Item] = \"A\", would give 60 / 1 = 60.",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "precedence",
+    "selectedmeasure",
+    "all",
+    "divide"
+  ]
+}

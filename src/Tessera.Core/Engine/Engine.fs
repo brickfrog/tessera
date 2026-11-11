@@ -245,11 +245,6 @@ let private staticGates (db: Database) : Dictionary<string, string> =
                 then
                     gates.[t.Name] <- why
 
-        // A calculation group only matters to a query that names it.
-        for t in db.Model.Tables do
-            if not (isNull t.CalculationGroup) then
-                gates.[t.Name] <- $"calculation groups (table '{t.Name}')"
-
     gates
 
 /// What a calculated column's expression does to the filter of a context transition in it, read
@@ -405,6 +400,159 @@ let private isCircular (e: TessError) =
     match e with
     | DaxInvalid(message, _) -> message.StartsWith("circular dependency", StringComparison.Ordinal)
     | _ -> false
+
+// ---- Calculation groups ------------------------------------------------------------------------
+
+/// Why every measure reference in the model is refused, filtered or not: two groups with the same
+/// precedence ("There cannot be two calculation groups in a model with the same Precedence": SQLBI,
+/// "Understanding calculation group precedence").
+let private duplicatePrecedence (db: Database) : string list = [
+    let groups =
+        db.Model.Tables
+        |> Seq.filter (fun t -> not (isNull t.CalculationGroup))
+        |> List.ofSeq
+
+    for (precedence, same) in groups |> List.groupBy (fun t -> t.CalculationGroup.Precedence) do
+        if same.Length > 1 then
+            let names = same |> List.map (fun t -> $"'{t.Name}'") |> String.concat ", "
+            $"calculation groups with the same precedence ({precedence}): {names}"
+]
+
+/// Why a measure reference where the group is not filtered is refused: its noSelectionExpression.
+let private noSelection (t: Table) : string option =
+    if isNull t.CalculationGroup.NoSelectionExpression then
+        None
+    else
+        Some $"the noSelectionExpression of calculation group '{t.Name}'"
+
+/// For coverage: what refuses a model's measure references whatever is filtered, or whenever a
+/// group is not (which is most of the time).
+let private calculationGroupProblems (db: Database) : string list =
+    duplicatePrecedence db
+    @ [
+        for t in db.Model.Tables do
+            if not (isNull t.CalculationGroup) then
+                match noSelection t with
+                | Some why -> why
+                | None -> ()
+    ]
+
+/// Why an evaluation where the group is filtered by several items, or by none, is refused.
+let private multipleOrEmpty (db: Database) (t: Table) : string option =
+    let behavior =
+        try
+            db.Model.SelectionExpressionBehavior
+        with _ ->
+            SelectionExpressionBehaviorType.Automatic
+
+    if not (isNull t.CalculationGroup.MultipleOrEmptySelectionExpression) then
+        Some $"the multipleOrEmptySelectionExpression of calculation group '{t.Name}'"
+    elif
+        behavior = SelectionExpressionBehaviorType.Automatic
+        && db.CompatibilityLevel > 1702
+    then
+        // "Automatic. This is the default value and is the same as nonvisual ... Models above a
+        // future compatibility level set to automatic will use visual instead" (Learn).
+        Some
+            $"several or no items of calculation group '{t.Name}' selected, with selectionExpressionBehavior Automatic at compatibility level {db.CompatibilityLevel} (Learn: Automatic becomes Visual above a future compatibility level)"
+    else
+        None
+
+/// Calculation groups: each table's rows are its items, ordered by ordinal; its column with
+/// source column Name holds their names, the one with source column Ordinal their ordinals.
+let private bindCalculationGroups (db: Database) (store: DataStore) (model: Tessera.DaxEngine.Model) =
+    let refused = duplicatePrecedence db |> List.tryHead
+    let groups = ResizeArray<BCalcGroup>()
+
+    let visual =
+        try
+            db.Model.SelectionExpressionBehavior = SelectionExpressionBehaviorType.Visual
+        with _ ->
+            false
+
+    for t in db.Model.Tables do
+        if not (isNull t.CalculationGroup) then
+            let table = model.TableByName.[t.Name]
+            let g = BCalcGroup(t.Name, table, t.CalculationGroup.Precedence)
+
+            let items =
+                t.CalculationGroup.CalculationItems
+                |> Seq.mapi (fun i ci -> i, ci)
+                |> Seq.sortBy (fun (i, ci) -> ci.Ordinal, i)
+                |> Seq.map snd
+                |> Array.ofSeq
+
+            g.Items <-
+                items
+                |> Array.mapi (fun row ci ->
+                    let source = {
+                        Label = $"calculation item '{t.Name}'[{ci.Name}]"
+                        Text = (if isNull ci.Expression then "" else ci.Expression)
+                    }
+
+                    let item =
+                        BCalcItem(g, ci.Name, ci.Ordinal, row, source, lazy (parseExpression source))
+
+                    if not (isNull ci.FormatStringDefinition) then
+                        item.FormatStringExpression <-
+                            Some {
+                                Label = $"format string of calculation item '{t.Name}'[{ci.Name}]"
+                                Text =
+                                    (if isNull ci.FormatStringDefinition.Expression then
+                                         ""
+                                     else
+                                         ci.FormatStringDefinition.Expression)
+                            }
+
+                    item)
+
+            g.MultipleOrEmpty <- multipleOrEmpty db t
+            g.MultipleIsBlank <- visual
+
+            g.NoSelection <- noSelection t
+            g.Refused <- refused
+
+            for c in table.Columns do
+                let source =
+                    match t.Columns.Find c.Name with
+                    | :? DataColumn as d when not (isNull d.SourceColumn) -> d.SourceColumn
+                    | _ -> ""
+
+                let builder = ColumnBuilder(c.Name, c.DataType, store.Collation)
+
+                match source.ToUpperInvariant(), c.DataType with
+                | "NAME", DaxType.String ->
+                    for ci in items do
+                        builder.AddString ci.Name
+
+                    c.SetData(builder.Build())
+                | "ORDINAL", DaxType.Integer ->
+                    for ci in items do
+                        builder.AddInteger(int64 ci.Ordinal)
+
+                    c.SetData(builder.Build())
+
+                    // "Calculation items with the default -1 aren't included in the ordering" (Learn):
+                    // what the Ordinal column holds for them is not documented.
+                    if items |> Array.exists (fun ci -> ci.Ordinal < 0) && table.Gate.IsNone then
+                        table.Gate <-
+                            Some
+                                $"the Ordinal column of calculation group '{t.Name}', which has items with no ordinal (-1)"
+                | _ ->
+                    if table.Gate.IsNone then
+                        table.Gate <-
+                            Some
+                                $"column '{t.Name}'[{c.Name}] of a calculation group, which is not its text Name column or its whole-number Ordinal column"
+
+                    if c.Parsed.IsNone && c.Expression.IsNone then
+                        c.SetData(StoreColumn.blank store.Collation c.Name c.DataType items.Length)
+
+            table.SetRowCount items.Length
+            table.SetBlankRow false
+            table.CalcGroup <- g
+            groups.Add g
+
+    model.CalcGroups <- groups |> Seq.sortByDescending _.Precedence |> Array.ofSeq
 
 // ---- prepare -----------------------------------------------------------------------------------
 
@@ -604,6 +752,7 @@ let private bindWith
     | None -> ()
 
     model.Tables <- tables.ToArray()
+    bindCalculationGroups db store model
 
     // Relationships the engine does: single column, many-to-one (either way round), one-to-one and
     // many-to-many.
@@ -672,6 +821,9 @@ let private bindWith
 
             model.Measures.[m.Name] <-
                 BMeasure(m.Name, model.TableByName.[t.Name], source, lazy (parseExpression source))
+
+            model.Measures.[m.Name].FormatString <- m.FormatString
+            model.Measures.[m.Name].HasFormatStringExpression <- not (isNull m.FormatStringDefinition)
 
     for f in db.Model.Functions do
         let source = {
@@ -1613,10 +1765,29 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
 
             own @ used |> List.distinct
 
+        // What refuses every measure reference: it is reported for each measure and item.
+        let modelWide = calculationGroupProblems db
+
         [
             for t in db.Model.Tables do
                 for m in t.Measures do
-                    yield ObjectRef.inTable ObjectKind.Measure t.Name m.Name, ofMeasure m.Name
+                    yield
+                        ObjectRef.inTable ObjectKind.Measure t.Name m.Name,
+                        modelWide @ ofMeasure m.Name |> List.distinct
+
+                // A calculation item is reported like a measure: what its expression uses (its format
+                // string expression is never evaluated).
+                if not (isNull t.CalculationGroup) then
+                    for ci in t.CalculationGroup.CalculationItems do
+                        let selection =
+                            if isNull t.CalculationGroup.MultipleOrEmptySelectionExpression then
+                                []
+                            else
+                                [ $"the multipleOrEmptySelectionExpression of calculation group '{t.Name}'" ]
+
+                        yield
+                            ObjectRef.inTable ObjectKind.CalculationItem t.Name ci.Name,
+                            modelWide @ selection @ ofText t.Name ci.Expression |> List.distinct
 
                 for c in t.Columns do
                     match c with

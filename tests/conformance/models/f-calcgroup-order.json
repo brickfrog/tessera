@@ -1,0 +1,49 @@
+{
+ "description": "For the order calculation items are applied in (SQLBI, \"Avoiding pitfalls in calculation groups precedence\"). One table with no rows. Measures: [Just2] = 2, [Just2Times10] = CALCULATE ( [Just2], Multiplier[Factor] = \"Mul10\" ). Calculation groups: Adder[Addend] (precedence 100) with Plus5 = SELECTEDMEASURE () + 5; Multiplier[Factor] (precedence 200) with Mul10 = SELECTEDMEASURE () * 10.",
+ "tables": [
+  {
+   "name": "M",
+   "columns": [
+    {
+     "name": "k",
+     "type": "int64"
+    }
+   ],
+   "measures": [
+    {
+     "name": "Just2",
+     "expression": "2"
+    },
+    {
+     "name": "Just2Times10",
+     "expression": "CALCULATE ( [Just2], Multiplier[Factor] = \"Mul10\" )"
+    }
+   ],
+   "rows": []
+  }
+ ],
+ "calculationGroups": [
+  {
+   "name": "Adder",
+   "column": "Addend",
+   "precedence": 100,
+   "items": [
+    {
+     "name": "Plus5",
+     "expression": "SELECTEDMEASURE () + 5"
+    }
+   ]
+  },
+  {
+   "name": "Multiplier",
+   "column": "Factor",
+   "precedence": 200,
+   "items": [
+    {
+     "name": "Mul10",
+     "expression": "SELECTEDMEASURE () * 10"
+    }
+   ]
+  }
+ ]
+}

@@ -1,16 +1,23 @@
 {
- "description": "For calculation groups. T has three rows: Qty A 10, B 20, C 30. Measures: [Total] = SUM ( T[Qty] ) = 60, [Count] = COUNTROWS ( T ) = 3, [Ten] = 10. Calculation groups: Adjust[Adjustment] (precedence 100) with Current = SELECTEDMEASURE (), Plus 2 = SELECTEDMEASURE () + 2 and Only Total x10 (multiplies by 10 when the measure is [Total], otherwise leaves it); Scale[Scaling] (precedence 200) with Times 2 = SELECTEDMEASURE () * 2; Info[Info] (precedence 50) with Name = SELECTEDMEASURENAME ().",
+ "description": "For calculation groups. T has three rows: Qty A 10, B 20, C 30. Measures: [Total] = SUM ( T[Qty] ) = 60 (format string \"#,0\"), [Count] = COUNTROWS ( T ) = 3, [Ten] = 10. Calculation groups: Adjust[Adjustment] (precedence 100) with Current = SELECTEDMEASURE (), Plus 2 = SELECTEDMEASURE () + 2 and Only Total x10 (multiplies by 10 when the measure is [Total], otherwise leaves it); Scale[Scaling] (precedence 200) with Times 2 = SELECTEDMEASURE () * 2, Plus Count = SELECTEDMEASURE () + [Count] and Plus Rows = SELECTEDMEASURE () + COUNTROWS ( T ); Info[Info] (precedence 50) with Name = SELECTEDMEASURENAME (), Format = SELECTEDMEASUREFORMATSTRING (), Selected = SELECTEDVALUE ( Info[Info] ) and Is Total or Count = ISSELECTEDMEASURE ( [Total], [Count] ); Variant[Variant] (precedence 10) with Base = SELECTEDMEASURE (), Double = SELECTEDMEASURE () * 2, Diff = SELECTEDMEASURE () - CALCULATE ( SELECTEDMEASURE (), Variant[Variant] = \"Double\" ) and Ratio = DIVIDE ( CALCULATE ( SELECTEDMEASURE (), Variant[Variant] = \"Diff\" ), CALCULATE ( SELECTEDMEASURE (), Variant[Variant] = \"Double\" ) ). Spread[Spread] (precedence 300) with All Rows = CALCULATE ( SELECTEDMEASURE (), ALL ( T ) ); Per[Per] (precedence 5) with Per Row = DIVIDE ( SELECTEDMEASURE (), COUNTROWS ( T ) ).",
  "tables": [
   {
    "name": "T",
    "columns": [
-    { "name": "Item", "type": "string" },
-    { "name": "Qty", "type": "int64" }
+    {
+     "name": "Item",
+     "type": "string"
+    },
+    {
+     "name": "Qty",
+     "type": "int64"
+    }
    ],
    "measures": [
     {
      "name": "Total",
-     "expression": "SUM ( T[Qty] )"
+     "expression": "SUM ( T[Qty] )",
+     "formatString": "#,0"
     },
     {
      "name": "Count",
@@ -65,6 +72,14 @@
     {
      "name": "Times 2",
      "expression": "SELECTEDMEASURE () * 2"
+    },
+    {
+     "name": "Plus Count",
+     "expression": "SELECTEDMEASURE () + [Count]"
+    },
+    {
+     "name": "Plus Rows",
+     "expression": "SELECTEDMEASURE () + COUNTROWS ( T )"
     }
    ]
   },
@@ -76,6 +91,63 @@
     {
      "name": "Name",
      "expression": "SELECTEDMEASURENAME ()"
+    },
+    {
+     "name": "Format",
+     "expression": "SELECTEDMEASUREFORMATSTRING ()"
+    },
+    {
+     "name": "Selected",
+     "expression": "SELECTEDVALUE ( Info[Info] )"
+    },
+    {
+     "name": "Is Total or Count",
+     "expression": "ISSELECTEDMEASURE ( [Total], [Count] )"
+    }
+   ]
+  },
+  {
+   "name": "Variant",
+   "column": "Variant",
+   "precedence": 10,
+   "items": [
+    {
+     "name": "Base",
+     "expression": "SELECTEDMEASURE ()"
+    },
+    {
+     "name": "Double",
+     "expression": "SELECTEDMEASURE () * 2"
+    },
+    {
+     "name": "Diff",
+     "expression": "SELECTEDMEASURE () - CALCULATE ( SELECTEDMEASURE (), Variant[Variant] = \"Double\" )"
+    },
+    {
+     "name": "Ratio",
+     "expression": "DIVIDE ( CALCULATE ( SELECTEDMEASURE (), Variant[Variant] = \"Diff\" ), CALCULATE ( SELECTEDMEASURE (), Variant[Variant] = \"Double\" ) )"
+    }
+   ]
+  },
+  {
+   "name": "Spread",
+   "column": "Spread",
+   "precedence": 300,
+   "items": [
+    {
+     "name": "All Rows",
+     "expression": "CALCULATE ( SELECTEDMEASURE (), ALL ( T ) )"
+    }
+   ]
+  },
+  {
+   "name": "Per",
+   "column": "Per",
+   "precedence": 5,
+   "items": [
+    {
+     "name": "Per Row",
+     "expression": "DIVIDE ( SELECTEDMEASURE (), COUNTROWS ( T ) )"
     }
    ]
   }

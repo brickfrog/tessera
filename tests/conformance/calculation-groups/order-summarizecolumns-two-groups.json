@@ -1,0 +1,42 @@
+{
+  "title": "Grouping by both calculation group columns applies both items to the measure by precedence: 70",
+  "model": "f-calcgroup-order",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Adder[Addend], Multiplier[Factor], \"v\", [Just2] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Adder[Addend]",
+          "type": "string"
+        },
+        {
+          "name": "Multiplier[Factor]",
+          "type": "string"
+        },
+        {
+          "name": "[v]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Plus5",
+          "Mul10",
+          70
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/avoiding-pitfalls-in-calculation-groups-precedence/",
+    "quote": "DAX applies the calculation items according to the precedence of the corresponding calculation groups and the result is 70.",
+    "supports": "the second EVALUATE of the page's query, grouped by Adder[Addend] and Multiplier[Factor]"
+  },
+  "confidence": "published",
+  "tags": [
+    "calculation-groups",
+    "summarizecolumns",
+    "precedence",
+    "selectedmeasure"
+  ]
+}

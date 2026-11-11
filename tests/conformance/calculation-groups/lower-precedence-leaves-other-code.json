@@ -1,0 +1,34 @@
+{
+  "title": "The lower-precedence item does not touch code of the higher item that is not a measure reference: ( 60 + 2 ) + 3 = 65",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Scale[Scaling] = \"Plus Rows\", Adjust[Adjustment] = \"Plus 2\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          65
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-calculation-group-precedence/",
+    "quote": "The application of YTD rewrites the only measure reference in the formula, which is Sales Amount.",
+    "supports": "COUNTROWS ( 'Date' ) in Daily AVG is not rewritten: only measure references are"
+  },
+  "confidence": "derived",
+  "derivation": "Scale (200) first: SELECTEDMEASURE () + COUNTROWS ( T ) = [Total] + COUNTROWS ( T ). Plus 2 rewrites [Total] only: ( 60 + 2 ) + 3 = 65.",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "precedence",
+    "selectedmeasure",
+    "countrows"
+  ]
+}
