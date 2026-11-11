@@ -129,8 +129,9 @@ let tests =
             testCase "a modifier removes what context transition added" (fun () ->
                 // Each of the 4 products sees all 17 units.
                 is (p ()) "SUMX ( Product, CALCULATE ( SUM ( Sales[Qty] ), ALL ( Product ) ) )" 68)
-            testCase "ALLSELECTED is not supported" (fun () ->
-                isError "not-supported" "CALCULATE ( [Amount], ALLSELECTED ( Product ) )")
+            // ALLSELECTED: see EngineAllSelectedTests. Under KEEPFILTERS it is refused.
+            testCase "KEEPFILTERS ( ALLSELECTED ( ... ) ) is not supported" (fun () ->
+                isError "not-supported" "CALCULATE ( [Amount], KEEPFILTERS ( ALLSELECTED ( Product ) ) )")
         ]
 
         testList "row context and context transition" [
