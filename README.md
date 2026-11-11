@@ -2310,7 +2310,9 @@ tess query 'xmla:<server>;<database>' --role Europe --role Asia --custom-data 7 
 On a server the roles become the connection's `Roles=` and the identity options `EffectiveUserName=` and
 `CustomData=` ("Connection string properties (Analysis Services)" on Learn; `EffectiveUserName` needs administrator
 rights on the server). Nothing else changes: the connection is the one the address already asked for. A role name
-with a comma, or an address that already sets one of those properties, is a usage error.
+with a comma, or an address that already sets one of those properties, is a usage error. Learn's note for Power BI:
+"If specifying roles when connecting to a Power BI Premium workspace, use workspace roles from the Power BI security
+model."
 
 Over fixture data, the engine follows what Microsoft Learn ("Roles in Analysis Services tabular models",
 "Row-level security (RLS) with Power BI", "RLS guidance") and SQLBI ("Computing accurate percentages with row-level

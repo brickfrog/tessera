@@ -470,4 +470,175 @@ let securityTests =
             Expect.isFalse
                 (coverage.ContainsKey(ObjectRef.modelLevel ObjectKind.Role "Everyone"))
                 "no filters, no entry")
+
+        testCase "the secured model answers as the same model with the hidden rows deleted" (fun () ->
+            // No calculated objects, no unmatched keys: then nothing but the rows differs.
+            let plain = {
+                shop with
+                    Tables =
+                        shop.Tables
+                        |> List.filter (fun t -> t.Expression.IsNone)
+                        |> List.map (fun t -> { t with Calculated = [] })
+                    Functions = []
+            }
+
+            let keep (table: string) (keepRow: obj list -> bool) (m: TestModel) = {
+                m with
+                    Tables =
+                        m.Tables
+                        |> List.map (fun t ->
+                            if t.Name = table then
+                                {
+                                    t with
+                                        Rows = t.Rows |> List.filter keepRow
+                                }
+                            else
+                                t)
+            }
+
+            let secured =
+                prepareWith plain (fun db ->
+                    role db "North" ModelPermission.Read [ "Region", "Region[Name] = \"North\"" ]
+                    |> ignore)
+                |> asRoles [ "North" ]
+
+            let deleted =
+                plain
+                |> keep "Region" (fun r -> r.[1] = box "North")
+                |> keep "Customer" (fun r -> r.[2] = box 1)
+                |> keep "Sales" (fun r -> List.contains r.[1] [ box 1; box 2 ])
+                |> prepare
+
+            for q in
+                [
+                    "EVALUATE SUMMARIZECOLUMNS ( Customer[Name], Product[Name], \"a\", [Amount], \"n\", [Customers] )"
+                    "EVALUATE ADDCOLUMNS ( VALUES ( Product[Name] ), \"a\", [Amount], \"all\", CALCULATE ( [Amount], ALL ( Sales ) ) )"
+                    "EVALUATE ROW ( \"c\", COUNTROWS ( Customer ), \"r\", COUNTROWS ( ALL ( Region ) ), \"d\", DISTINCTCOUNT ( Sales[CustomerKey] ) )"
+                    "EVALUATE FILTER ( Customer, CALCULATE ( [Amount] ) > 50 )"
+                    "EVALUATE TOPN ( 2, Sales, Sales[Amount], DESC, Sales[Id], ASC )"
+                ] do
+                Expect.equal (sortedRows secured q) (sortedRows deleted q) q)
+
+        testCase "a filter that doesn't parse, and one that is a DAX error" (fun () ->
+            let p =
+                prepareWith shop (fun db ->
+                    role db "Broken" ModelPermission.Read [ "Region", "Region[Name] = = 1" ]
+                    |> ignore
+
+                    role db "Fails" ModelPermission.Read [ "Region", "VALUE ( Region[Name] ) = 1" ]
+                    |> ignore)
+
+            match asRolesError [ "Broken" ] p with
+            | DaxSyntax(source, _, _, _) -> Expect.stringContains source "Broken" "where"
+            | other -> failtestf "%A" other
+
+            match asRolesError [ "Fails" ] p with
+            | DaxEvaluation _ -> ()
+            | other -> failtestf "%A" other)
+
+        testCase "a filter on a calculated table; a filter on a calculation group is refused" (fun () ->
+            let p =
+                prepareWith shop (fun db ->
+                    role db "NoTotals" ModelPermission.Read [ "Totals", "Totals[Total] > 1000" ]
+                    |> ignore
+
+                    let group =
+                        new Table(Name = "Calc", CalculationGroup = new CalculationGroup(Precedence = 0))
+
+                    group.Columns.Add(
+                        new DataColumn(Name = "Item", DataType = DataType.String, SourceColumn = "Name")
+                    )
+
+                    group.CalculationGroup.CalculationItems.Add(
+                        new CalculationItem(Name = "Same", Expression = "SELECTEDMEASURE ()")
+                    )
+
+                    group.Partitions.Add(new Partition(Name = "Calc", Source = new CalculationGroupSource()))
+                    db.Model.Tables.Add group
+
+                    role db "Items" ModelPermission.Read [ "Calc", "Calc[Item] = \"Same\"" ]
+                    |> ignore)
+
+            let noTotals = asRoles [ "NoTotals" ] p
+            is noTotals "COUNTROWS ( Totals )" null
+            is noTotals "SUM ( Sales[Amount] )" 280
+            asRolesError [ "Items" ] p |> refusedMentioning "calculation group")
+
+        testCase "a filter reaching a one-to-one relationship, or two paths, is refused" (fun () ->
+            let oneToOne = {
+                shop with
+                    Tables =
+                        shop.Tables
+                        @ [
+                            table "Info" [ "CustomerKey", DataType.Int64; "Vip", DataType.Boolean ] [
+                                [ 1; true ]
+                                [ 2; false ]
+                                [ 3; false ]
+                                [ 4; true ]
+                            ]
+                        ]
+                    Rels =
+                        shop.Rels
+                        @ [
+                            {
+                                (rel ("Info", "CustomerKey") ("Customer", "CustomerKey")) with
+                                    FromCardinality = RelationshipEndCardinality.One
+                                    Both = true
+                            }
+                        ]
+            }
+
+            asRolesError [ "North" ] (prepareWith oneToOne withRoles)
+            |> refusedMentioning "one-to-one"
+
+            // Region filters Sales through Customer and directly.
+            let diamond = {
+                shop with
+                    Tables =
+                        shop.Tables
+                        |> List.map (fun t ->
+                            if t.Name = "Sales" then
+                                {
+                                    t with
+                                        Columns = t.Columns @ [ "RegionKey", DataType.Int64 ]
+                                        Rows = t.Rows |> List.map (fun r -> r @ [ box 1 ])
+                                }
+                            else
+                                t)
+                    Rels = shop.Rels @ [ rel ("Sales", "RegionKey") ("Region", "RegionKey") ]
+            }
+
+            match asRolesError [ "North" ] (prepareWith diamond withRoles) with
+            | DaxNotSupported _ -> ()
+            | other -> failtestf "%A" other)
+
+        testCase "a calculation item with USERELATIONSHIP refuses only queries that refer to a measure" (fun () ->
+            let p =
+                prepareWith shop (fun db ->
+                    withRoles db
+
+                    let group =
+                        new Table(Name = "Calc", CalculationGroup = new CalculationGroup(Precedence = 0))
+
+                    group.Columns.Add(
+                        new DataColumn(Name = "Item", DataType = DataType.String, SourceColumn = "Name")
+                    )
+
+                    group.CalculationGroup.CalculationItems.Add(
+                        new CalculationItem(
+                            Name = "Crossed",
+                            Expression =
+                                "CALCULATE ( SELECTEDMEASURE (), CROSSFILTER ( Sales[CustomerKey], Customer[CustomerKey], BOTH ) )"
+                        )
+                    )
+
+                    group.Partitions.Add(new Partition(Name = "Calc", Source = new CalculationGroupSource()))
+                    db.Model.Tables.Add group)
+
+            let north = asRoles [ "North" ] p
+            is north "SUM ( Sales[Amount] )" 135
+
+            match scalarError north "[Amount]" with
+            | DaxNotSupported(what, _) -> Expect.stringContains what "CROSSFILTER" "why"
+            | other -> failtestf "%A" other)
     ]

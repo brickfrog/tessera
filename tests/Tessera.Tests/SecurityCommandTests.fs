@@ -327,3 +327,34 @@ tests:
 
             Expect.stringContains r.Out "no connection property" "user_culture is skipped on a server")
     ]
+
+[<Tests>]
+let suiteTests =
+    testList "test suites: roles and identity" [
+        testCase "roles: a name or a list; identity: known keys only" (fun () ->
+            let parse (yaml: string) = TestSuite.parse "s.test.yaml" yaml
+
+            match
+                parse
+                    "roles: [ A, B ]\nidentity: { custom_data: x }\ntests:\n  - name: t\n    roles: C\n    expression: 1\n    expect: 1\n  - name: u\n    expression: 1\n    expect: 1\n"
+            with
+            | Ok s ->
+                Expect.equal (s.Tests |> List.map _.Roles) [ [ "C" ]; [ "A"; "B" ] ] "the test's replace the suite's"
+
+                Expect.equal
+                    (s.Tests |> List.map (fun t -> t.Identity |> Option.bind _.CustomData))
+                    [ Some "x"; Some "x" ]
+                    "identity"
+            | Error issues -> failtestf "%A" issues
+
+            for bad, mentions in
+                [
+                    "tests:\n  - name: t\n    roles: { a: 1 }\n    expression: 1\n    expect: 1\n", "roles"
+                    "tests:\n  - name: t\n    roles: [ \"\" ]\n    expression: 1\n    expect: 1\n", "empty"
+                    "tests:\n  - name: t\n    identity: { user: x }\n    expression: 1\n    expect: 1\n", "user"
+                    "identity: x\ntests:\n  - name: t\n    expression: 1\n    expect: 1\n", "identity"
+                ] do
+                match parse bad with
+                | Ok _ -> failtestf "should not parse:\n%s" bad
+                | Error issues -> Expect.exists issues (fun i -> i.Message.Contains mentions) $"{bad}: {issues}")
+    ]

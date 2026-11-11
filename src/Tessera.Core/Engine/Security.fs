@@ -685,14 +685,15 @@ module Security =
     // ---- USERELATIONSHIP and CROSSFILTER under a role ------------------------------------------------
 
     /// Where a query's evaluation may reach USERELATIONSHIP or CROSSFILTER: the query's expressions,
-    /// the measures and functions they name (the model's and the query's), and every calculation
-    /// item. "The UseRelationship() and CrossFilter() functions may not be used when querying
+    /// the measures and functions they name (the model's and the query's), and, once a measure is
+    /// referred to, every calculation item (an item applies to measure references). "The UseRelationship() and CrossFilter() functions may not be used when querying
     /// 'Sales' because it is constrained by row-level security" (the error SQLBI quotes in "DAX
     /// limitations with inactive relationships and row-level security (RLS)"): exactly when isn't
     /// spelled out, so under a role that filters anything the engine refuses both.
     let relationshipFunction (model: Model) (defs: QueryDefs) (exprs: Expr list) : string option =
         let seen = HashSet<obj>(HashIdentity.Reference)
         let mutable found = None
+        let mutable measures = false
 
         let measure (name: string) =
             match (if isNull defs then None else Some defs) with
@@ -730,8 +731,18 @@ module Security =
                     | _ -> ()
                 | Bracketed name
                 | Qualified(_, name) ->
-                    match measure name with
+                    let column =
+                        match e.Kind with
+                        | Qualified(t, _) ->
+                            match model.TableByName.TryGetValue t.Name with
+                            | true, bt -> bt.ColumnByName.ContainsKey name
+                            | _ -> false
+                        | _ -> false
+
+                    match (if column then None else measure name) with
                     | Some m when seen.Add m ->
+                        measures <- true
+
                         try
                             walk m.Source.Label m.Expr
                         with EngineException _ ->
@@ -744,7 +755,7 @@ module Security =
         for e in exprs do
             walk "the query" e
 
-        for g in model.CalcGroups do
+        for g in (if measures then model.CalcGroups else [||]) do
             for item in g.Items do
                 try
                     walk item.Source.Label item.Expr
