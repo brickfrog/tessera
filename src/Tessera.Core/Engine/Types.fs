@@ -768,6 +768,8 @@ and [<Sealed; AllowNullLiteral>] BCalcGroup(name: string, table: BTable, precede
     member val MultipleIsBlank = false with get, set
     /// Why an evaluation where the group is not filtered is refused (a noSelectionExpression).
     member val NoSelection: string option = None with get, set
+    /// Why every measure reference is refused, filtered or not (two groups with one precedence).
+    member val Refused: string option = None with get, set
 
 and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     let configs = ConcurrentDictionary<string, RelConfig>()

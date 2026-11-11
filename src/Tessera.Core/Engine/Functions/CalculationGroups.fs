@@ -78,6 +78,11 @@ module CalculationItems =
     /// What a reference to `m` becomes in `ctx` (already after its context transition).
     let next (ctx: Ctx) (span: Span) (m: BMeasure) : NextItem =
         let groups = ctx.Model.CalcGroups
+
+        match groups |> Array.tryPick _.Refused with
+        | Some why -> Fail.notSupported ctx span why
+        | None -> ()
+
         let mutable result = ValueNone
         let mutable i = 0
 

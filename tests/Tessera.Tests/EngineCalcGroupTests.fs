@@ -179,6 +179,30 @@ let tests =
                         db.Model.Tables.["Adjust"].CalculationGroup.Precedence <- 300)
 
                 is swapped "CALCULATE ( [Ten], Adjust[Adjustment] = \"Plus 2\", Scale[Scaling] = \"Times 2\" )" 22
+
+            // "CALCULATE(DIVIDE(SELECTEDMEASURE(), COUNTROWS(DimDate)), DATESYTD(DimDate[Date]))", "Not
+            // this expression: DIVIDE(CALCULATE(SELECTEDMEASURE(), DATESYTD(DimDate[Date])),
+            // COUNTROWS(DimDate)))" (Learn, precedence with averages): the lower item is evaluated
+            // in the filter context the higher item's CALCULATE makes.
+            testCase "the lower item runs in the filter context of the higher item's CALCULATE"
+            <| fun () ->
+                let spread (outer: int) (inner: int) =
+                    prepareWith baseModel (fun db ->
+                        addGroup db "Spread" "Spread" outer [
+                            item "All Rows" "CALCULATE ( SELECTEDMEASURE (), ALL ( T ) )"
+                        ]
+                        |> ignore
+
+                        addGroup db "Per" "Per" inner [
+                            item "Per Row" "DIVIDE ( SELECTEDMEASURE (), COUNTROWS ( T ) )"
+                        ]
+                        |> ignore)
+
+                let q =
+                    "CALCULATE ( [Total], T[Item] = \"A\", Spread[Spread] = \"All Rows\", Per[Per] = \"Per Row\" )"
+
+                is (spread 300 5) q 20.0 // CALCULATE ( DIVIDE ( 60, 3 ), ALL ( T ) )
+                is (spread 5 300) q 60.0 // DIVIDE ( CALCULATE ( 60, ALL ( T ) ), 1 )
         ]
 
         testList "recursion" [
@@ -234,6 +258,8 @@ let tests =
                             new CalculationGroupExpression(Expression = "BLANK ()"))
 
                 notSupported defined (r "[Total]") "noSelectionExpression"
+                // Filtered, the group's item applies, whatever the other groups are.
+                is defined "CALCULATE ( [Ten], Adjust[Adjustment] = \"Plus 2\" )" 12
 
             // "There cannot be two calculation groups in a model with the same Precedence" (SQLBI).
             testCase "two groups with the same precedence are refused"
@@ -244,6 +270,20 @@ let tests =
                         db.Model.Tables.["Adjust"].CalculationGroup.Precedence <- 200)
 
                 notSupported same (r "[Ten]") "same precedence"
+
+                notSupported
+                    same
+                    (r "CALCULATE ( [Ten], Adjust[Adjustment] = \"Plus 2\", Scale[Scaling] = \"Times 2\" )")
+                    "same precedence"
+
+            testCase "items with no ordinal (-1) close the group: what its Ordinal column holds is not documented"
+            <| fun () ->
+                let unordered =
+                    prepareWith baseModel (fun db ->
+                        standard db
+                        db.Model.Tables.["Scale"].CalculationGroup.CalculationItems.["Times 2"].Ordinal <- -1)
+
+                notSupported unordered "EVALUATE Scale" "no ordinal"
 
             testCase "ROLLUPADDISSUBTOTAL over a calculation group's column is refused"
             <| fun () ->

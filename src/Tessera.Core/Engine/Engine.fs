@@ -255,23 +255,39 @@ let private isCircular (e: TessError) =
 
 // ---- Calculation groups ------------------------------------------------------------------------
 
-/// Why every measure reference in the model is refused, whatever the filters: a calculation
-/// group's noSelectionExpression, two groups with the same precedence.
-let private calculationGroupProblems (db: Database) : string list = [
+/// Why every measure reference in the model is refused, filtered or not: two groups with the same
+/// precedence ("There cannot be two calculation groups in a model with the same Precedence": SQLBI,
+/// "Understanding calculation group precedence").
+let private duplicatePrecedence (db: Database) : string list = [
     let groups =
         db.Model.Tables
         |> Seq.filter (fun t -> not (isNull t.CalculationGroup))
         |> List.ofSeq
-
-    for t in groups do
-        if not (isNull t.CalculationGroup.NoSelectionExpression) then
-            $"the noSelectionExpression of calculation group '{t.Name}'"
 
     for (precedence, same) in groups |> List.groupBy (fun t -> t.CalculationGroup.Precedence) do
         if same.Length > 1 then
             let names = same |> List.map (fun t -> $"'{t.Name}'") |> String.concat ", "
             $"calculation groups with the same precedence ({precedence}): {names}"
 ]
+
+/// Why a measure reference where the group is not filtered is refused: its noSelectionExpression.
+let private noSelection (t: Table) : string option =
+    if isNull t.CalculationGroup.NoSelectionExpression then
+        None
+    else
+        Some $"the noSelectionExpression of calculation group '{t.Name}'"
+
+/// For coverage: what refuses a model's measure references whatever is filtered, or whenever a
+/// group is not (which is most of the time).
+let private calculationGroupProblems (db: Database) : string list =
+    duplicatePrecedence db
+    @ [
+        for t in db.Model.Tables do
+            if not (isNull t.CalculationGroup) then
+                match noSelection t with
+                | Some why -> why
+                | None -> ()
+    ]
 
 /// Why an evaluation where the group is filtered by several items, or by none, is refused.
 let private multipleOrEmpty (db: Database) (t: Table) : string option =
@@ -297,7 +313,7 @@ let private multipleOrEmpty (db: Database) (t: Table) : string option =
 /// Calculation groups: each table's rows are its items, ordered by ordinal; its column with
 /// source column Name holds their names, the one with source column Ordinal their ordinals.
 let private bindCalculationGroups (db: Database) (store: DataStore) (model: Tessera.DaxEngine.Model) =
-    let problems = calculationGroupProblems db
+    let refused = duplicatePrecedence db |> List.tryHead
     let groups = ResizeArray<BCalcGroup>()
 
     let visual =
@@ -345,9 +361,8 @@ let private bindCalculationGroups (db: Database) (store: DataStore) (model: Tess
             g.MultipleOrEmpty <- multipleOrEmpty db t
             g.MultipleIsBlank <- visual
 
-            match problems with
-            | why :: _ -> g.NoSelection <- Some why
-            | [] -> ()
+            g.NoSelection <- noSelection t
+            g.Refused <- refused
 
             for c in table.Columns do
                 let source =
@@ -368,6 +383,13 @@ let private bindCalculationGroups (db: Database) (store: DataStore) (model: Tess
                         builder.AddInteger(int64 ci.Ordinal)
 
                     c.SetData(builder.Build())
+
+                    // "Calculation items with the default -1 aren't included in the ordering" (Learn):
+                    // what the Ordinal column holds for them is not documented.
+                    if items |> Array.exists (fun ci -> ci.Ordinal < 0) && table.Gate.IsNone then
+                        table.Gate <-
+                            Some
+                                $"the Ordinal column of calculation group '{t.Name}', which has items with no ordinal (-1)"
                 | _ ->
                     if table.Gate.IsNone then
                         table.Gate <-
