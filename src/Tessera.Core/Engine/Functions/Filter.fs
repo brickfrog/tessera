@@ -312,6 +312,129 @@ module Filter =
         walk Set.empty e
         List.ofSeq found
 
+    /// Functions whose value is a function of their arguments' values alone (and of what is fixed
+    /// for a model: the clock, the culture, the collation): no filter context, no row context.
+    let private pureFunctions =
+        HashSet<string>(
+            [
+                "DATE"
+                "TIME"
+                "YEAR"
+                "MONTH"
+                "DAY"
+                "HOUR"
+                "MINUTE"
+                "SECOND"
+                "QUARTER"
+                "WEEKDAY"
+                "WEEKNUM"
+                "EOMONTH"
+                "EDATE"
+                "TODAY"
+                "NOW"
+                "UTCTODAY"
+                "UTCNOW"
+                "ABS"
+                "ROUND"
+                "ROUNDUP"
+                "ROUNDDOWN"
+                "INT"
+                "TRUNC"
+                "MOD"
+                "DIVIDE"
+                "POWER"
+                "SQRT"
+                "SIGN"
+                "IF"
+                "AND"
+                "OR"
+                "NOT"
+                "TRUE"
+                "FALSE"
+                "BLANK"
+                "ISBLANK"
+                "LEFT"
+                "RIGHT"
+                "MID"
+                "LEN"
+                "UPPER"
+                "LOWER"
+                "TRIM"
+                "CONTAINSSTRING"
+                "CONTAINSSTRINGEXACT"
+                "SEARCH"
+                "FIND"
+                "SUBSTITUTE"
+                "CONCATENATE"
+                "EXACT"
+                "COALESCE"
+            ],
+            StringComparer.OrdinalIgnoreCase
+        )
+
+    /// The variables of the context a predicate reads, when it reads nothing else than the columns
+    /// `cols` (of the row it is evaluated on), constants, its own variables, and pure functions of
+    /// those: then its value on a row depends only on the row and those variables' values.
+    let private closedVariables (ev: IEval) (ctx: Ctx) (cols: BColumn array) (e: Expr) : string array option =
+        let read = ResizeArray<string>()
+
+        let isFunction (name: string) =
+            (not (isNull ctx.Query) && ctx.Query.Functions.ContainsKey name)
+            || ctx.Model.Functions.ContainsKey name
+
+        let rec closed (locals: Set<string>) (e: Expr) : bool =
+            match e.Kind with
+            | IntegerLiteral _
+            | NumberLiteral _
+            | StringLiteral _
+            | BooleanLiteral _
+            | DateLiteral _ -> true
+            | Identifier name ->
+                let name = name.ToUpperInvariant()
+
+                if locals.Contains name then
+                    true
+                else
+                    match ctx.Scope.Vars.TryFind name with
+                    | Some(Val(_, false, _)) ->
+                        if not (read.Contains name) then
+                            read.Add name
+
+                        true
+                    | _ -> false
+            | Qualified(table, _) ->
+                // Not a table named by a variable or a parameter: the same expression could name
+                // another column elsewhere.
+                (table.Quoted
+                 || not (
+                     locals.Contains(table.Name.ToUpperInvariant())
+                     || ctx.Scope.Vars.ContainsKey(table.Name.ToUpperInvariant())
+                 ))
+                && (match ev.TryColumn(ctx, e) with
+                    | Some c -> cols |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
+                    | None -> false)
+            | Call(fn, args) ->
+                pureFunctions.Contains fn.Name
+                && not (isFunction fn.Name)
+                && args |> List.forall (closed locals)
+            | Unary(_, x)
+            | Paren x -> closed locals x
+            | Binary(_, a, b) -> closed locals a && closed locals b
+            | TableConstructor items
+            | Tuple items -> items |> List.forall (closed locals)
+            | VarBlock(vars, body) ->
+                let mutable inner = locals
+                let mutable ok = true
+
+                for v in vars do
+                    ok <- ok && closed inner v.Value
+                    inner <- inner.Add(v.Name.Name.ToUpperInvariant())
+
+                ok && closed inner body
+            | _ -> false
+
+        if closed Set.empty e then Some(read.ToArray()) else None
+
     /// A True/False filter argument as the table it stands for: "table[column] = 10" is "FILTER (
     /// ALL ( table[column] ), table[column] = 10 )" (dax.guide/calculate), and a predicate over
     /// several columns of one table is FILTER over ALL of those columns (SQLBI, "Specifying
@@ -332,22 +455,62 @@ module Filter =
                 "The expression contains columns from multiple tables, but only columns from a single table can be used in a True/False expression that is used as a table filter expression."
 
         let t = cols.[0].Table
-        let all = combinations cols (allRows t true)
 
-        // It stands for FILTER over ALL; whether that iteration leaves a shadow filter context for an
-        // ALLSELECTED in the predicate is not documented.
-        let all =
-            Shadows.notAnIteration "the rows of a True/False filter argument of CALCULATE" all
+        let compute () =
+            let all = combinations cols (allRows t true)
 
-        let keep = [|
-            for row in 0 .. all.Count - 1 do
-                let v = ev.Scalar(Context.pushRow ctx all row, e)
+            // It stands for FILTER over ALL; whether that iteration leaves a shadow filter context for an
+            // ALLSELECTED in the predicate is not documented.
+            let all =
+                Shadows.notAnIteration "the rows of a True/False filter argument of CALCULATE" all
 
-                if Fail.dax ctx e.Span (DaxValue.toBoolean v) then
-                    row
-        |]
+            let keep = [|
+                for row in 0 .. all.Count - 1 do
+                    let v = ev.Scalar(Context.pushRow ctx all row, e)
 
-        Filters.ofTable ctx e.Span (Tables.select all keep)
+                    if Fail.dax ctx e.Span (DaxValue.toBoolean v) then
+                        row
+            |]
+
+            Filters.ofTable ctx e.Span (Tables.select all keep)
+
+        // A predicate that reads nothing but its columns, constants and variables gives the same
+        // filter wherever the variables have the same values: computed once per query.
+        match closedVariables ev ctx cols e with
+        | Some names when ctx.Model.Computing.Count = 0 && not (isNull ctx.Query) ->
+            let values =
+                names
+                |> Array.map (fun (name: string) ->
+                    match ctx.Scope.Vars.TryFind name with
+                    | Some(Val(value, _, _)) ->
+                        // Evaluated here rather than at the first row: an error falls back to the
+                        // evaluation below, which meets it where it would have.
+                        match
+                            (try
+                                Some value.Value
+                             with _ ->
+                                 None)
+                        with
+                        | Some(Value.Scalar v) -> Some v
+                        | _ -> None
+                    | _ -> None)
+
+            if values |> Array.forall Option.isSome then
+                let key = PredicateKey(e, ctx.Model, cols, values |> Array.map Option.get)
+
+                match ctx.Query.Predicates.TryGetValue key with
+                | true, filters -> filters
+                | _ ->
+                    let filters = compute ()
+
+                    if ctx.Query.Predicates.Count >= QueryCache.limit then
+                        ctx.Query.Predicates.Clear()
+
+                    ctx.Query.Predicates.[key] <- filters
+                    filters
+            else
+                compute ()
+        | _ -> compute ()
 
     // ---- ALLSELECTED ------------------------------------------------------------------------------
     //

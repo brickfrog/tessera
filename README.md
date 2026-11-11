@@ -2627,6 +2627,24 @@ the fact about 0.15 s, `CALCULATE` with two filters under 0.01 s, `SUMMARIZECOLU
 measure 0.1 to 0.2 s (by two dimensions with a filter 0.35 s), a measure per row of the fact (100,000 context
 transitions) 0.35 s.
 
+#### Caches and the benchmark
+
+An iterator's context transitions build a new filter context per row, so the engine shares work between filter
+contexts with the same filters (`Engine/Caching.fs`): the rows a table shows (per model and relationship set-up,
+keyed on the filters that can reach the table), and, for one query, the value of a measure reference and the filter
+a True/False filter argument stands for. Every key holds everything the result is computed from, compared by content;
+a measure that reads anything else of the context (ALLSELECTED, ISINSCOPE, ISFILTERED, ISCROSSFILTERED,
+HASONEFILTER, through the measures and functions it names) is never shared, and nothing is shared while a
+calculated column or table is being computed or when the model has calculation groups. The rules this sets for
+function authors are in the header of `Engine/Types.fs`.
+
+`bench/` is a benchmark on the spaceparts sample model (every measure at the total and by each dimension, the
+Station matrix of `[CF - Bar Chart X Min]` / `Max`, coverage), not part of the tests or CI; it fingerprints every
+answer so two runs can be compared. On 200 rows the Station matrix (200 stations, each a MINX over all of them under
+ALLSELECTED) went from more than 30 minutes to about 2 s. `bench/RESULTS.md` has the numbers at 200, 2,000 and 20,000
+rows, and what is still slow: each context transition still computes the fact table's visible rows from scratch, so
+an iterator over a dimension with a measure per row costs about (dimension rows x fact rows).
+
 ### Testing a model (`test`)
 
 `tess test` runs DAX assertion tests for a model. On model files it evaluates them with

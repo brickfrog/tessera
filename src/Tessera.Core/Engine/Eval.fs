@@ -76,6 +76,23 @@ module Variables =
                         name.Span
                         $"the variable {name.Name}, which raises an error ({text}) although the result doesn't need its value (the engine raises that error unless it can tell before running that the variable is not used; it can't be told here which)"
 
+/// A function's `Check` is a function of the argument trees alone (see the author's guide in
+/// Types.fs), so its answer for a call of parsed code is kept with the call's arguments: an
+/// iterator calls the same call once per row, and some checks (FORMAT's) parse text.
+module private Checks =
+    let private answers = ConditionalWeakTable<Expr list, DaxFunction * string option>()
+
+    let check (fn: DaxFunction) (args: Expr list) : string option =
+        match args with
+        | [] -> fn.Check args
+        | _ ->
+            match answers.TryGetValue args with
+            | true, (f, answer) when obj.ReferenceEquals(f, fn) -> answer
+            | _ ->
+                let answer = fn.Check args
+                answers.AddOrUpdate(args, (fn, answer))
+                answer
+
 [<Sealed>]
 type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
     let ev = this :> IEval
@@ -209,11 +226,44 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
 
             ev.Scalar(inner, m.Expr)
 
+        // Shared with other filter contexts with the same filters, for a measure that reads
+        // nothing else of the context (Caching.fs).
+        let shared () =
+            if
+                not (isNull ctx.Query)
+                && ctx.Model.CalcGroups.Length = 0
+                && not moved.CallerRows
+                && ctx.Model.Computing.Count = 0
+                && MeasureCache.scopeBlind ctx.Model ctx.Query m
+            then
+                let key =
+                    MeasureKey(
+                        m,
+                        ctx.Model,
+                        moved.Filter.Config,
+                        Array.ofList moved.Filter.Filters,
+                        ctx.Measures,
+                        ctx.Functions
+                    )
+
+                match ctx.Query.Results.TryGetValue key with
+                | true, v -> v
+                | _ ->
+                    let v = body ()
+
+                    if ctx.Query.Results.Count >= QueryCache.limit then
+                        ctx.Query.Results.Clear()
+
+                    ctx.Query.Results.[key] <- v
+                    v
+            else
+                body ()
+
         let cached () =
             match moved.Filter.Measures.TryGetValue(m :> obj) with
             | true, v -> v
             | _ ->
-                let v = body ()
+                let v = shared ()
                 moved.Filter.Measures.[m :> obj] <- v
                 v
 
@@ -383,7 +433,7 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
 
             Fail.invalid ctx call.Span $"{fn.Name} takes {expected} arguments, {n} were given"
 
-        match fn.Check call.Args with
+        match Checks.check fn call.Args with
         | Some why -> Fail.notSupported ctx call.Span why
         | None -> ()
 

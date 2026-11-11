@@ -55,6 +55,7 @@
     <Compile Include="FixtureEmbed.fs" />
     <Compile Include="Engine/Types.fs" />
     <Compile Include="Engine/CalendarModel.fs" />
+    <Compile Include="Engine/Caching.fs" />
     <Compile Include="Engine/Context.fs" />
     <Compile Include="Engine/Calendars.fs" />
     <Compile Include="Engine/Culture.fs" />
