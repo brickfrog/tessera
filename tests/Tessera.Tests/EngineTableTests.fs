@@ -96,6 +96,48 @@ let tests =
                     [ "Bob!" ]
                     [ "Cy!" ]
                 ])
+            // "The <Name> argument can be skipped if the correspondent <Expression> argument is a
+            // simple column reference of the iterated table" (dax.guide, SELECTCOLUMNS); Learn's
+            // OFFSET example selects an unqualified [CurrentYearSales] this way.
+            testCase "SELECTCOLUMNS takes an unnamed [Column] of the iterated table" (fun () ->
+                let added =
+                    "ADDCOLUMNS ( VALUES ( Customer[Country] ), \"N\", COUNTROWS ( Sales ) )"
+
+                Expect.equal
+                    (columns (query (p ()) $"EVALUATE SELECTCOLUMNS ( {added}, [N] )"))
+                    [ "[N]", "int64" ]
+                    "an extension column keeps its name"
+
+                returns (p ()) $"EVALUATE SELECTCOLUMNS ( {added}, [N] )" [ [ 7 ]; [ 7 ] ]
+
+                Expect.equal
+                    (columns (query (p ()) "EVALUATE SELECTCOLUMNS ( Product, [Color] )"))
+                    [ "Product[Color]", "string" ]
+                    "a model column keeps its name"
+
+                // ... and its lineage: red products are 1 and 2, 570.
+                returns
+                    (p ())
+                    "EVALUATE ROW ( \"x\", CALCULATE ( [Amount], SELECTCOLUMNS ( FILTER ( Product, Product[Color] = \"Red\" ), [ProductKey] ) ) )"
+                    [ [ 570 ] ]
+
+                // A measure's name is an expression, which needs a name.
+                Expect.equal
+                    (queryCode (p ()) "EVALUATE SELECTCOLUMNS ( Product, [Amount] )")
+                    "dax-invalid"
+                    "a measure"
+
+                // A table with two columns of that name (CROSSJOIN refuses to make one; SELECTCOLUMNS
+                // refuses too, should one reach it).
+                notSupported (p ()) "EVALUATE SELECTCOLUMNS ( CROSSJOIN ( Product, Customer ), [Name] )" "same name"
+
+                // An outer row context's column is not a column of the iterated table.
+                Expect.equal
+                    (queryCode
+                        (p ())
+                        "EVALUATE ADDCOLUMNS ( SELECTCOLUMNS ( { 1 }, \"K\", [Value] ), \"x\", COUNTROWS ( SELECTCOLUMNS ( Product, [K] ) ) )")
+                    "dax-invalid"
+                    "an outer column")
             testCase "a column name used twice is an error" (fun () ->
                 Expect.equal
                     (queryCode (p ()) "EVALUATE ADDCOLUMNS ( Customer, \"Name\", 1, \"name\", 2 )")
@@ -491,7 +533,7 @@ let tests =
 
                 notSupported
                     (p ())
-                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ), \"A\", [Amount] )"
+                    "EVALUATE SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Customer[Country] ) ), \"A\", [Amount] )"
                     "NONVISUAL"
 
                 notSupported
@@ -1208,9 +1250,12 @@ let tests =
                     }
 
                 notSupported m "EVALUATE ROW ( \"v\", [Amount] )" "repeat")
-            // The sources say an invalid relationship adds the blank row, not whether an inactive
-            // one does.
-            testCase "keys without a match on an inactive relationship only" (fun () ->
+            // "Inactive relationships are also expanded, even when the relationship isn't used by a
+            // calculation ... When a matching value from the "many" to the "one" side doesn't
+            // exist, a blank virtual row is added to the "one" side table" (Learn, "Model
+            // relationships in Power BI Desktop"). Filters still go through the active one: F's
+            // row 2 (B = 7) reaches the blank row only under USERELATIONSHIP.
+            testCase "keys without a match on an inactive relationship only give the blank row" (fun () ->
                 let m =
                     prepare {
                         Tables = [
@@ -1222,8 +1267,17 @@ let tests =
                         Functions = []
                     }
 
-                notSupported m "EVALUATE VALUES ( D[K] )" "blank row"
-                notSupported m "EVALUATE ROW ( \"n\", COUNTROWS ( F ) )" "blank row")
+                returns m "EVALUATE VALUES ( D[K] )" [ [ 1 ]; [ 2 ]; [ null ] ]
+                returns m "EVALUATE DISTINCT ( D[K] )" [ [ 1 ]; [ 2 ] ]
+                is m "COUNTROWS ( F )" 2
+                is m "COUNTROWS ( ALL ( D ) )" 3
+                is m "CALCULATE ( COUNTROWS ( F ), ISBLANK ( D[K] ) )" (null: obj)
+                is m "CALCULATE ( COUNTROWS ( F ), ISBLANK ( D[K] ), USERELATIONSHIP ( F[B], D[K] ) )" 1
+                is m "CALCULATE ( COUNTROWS ( F ), D[K] = 1, USERELATIONSHIP ( F[B], D[K] ) )" 1
+                is m "CALCULATE ( COUNTROWS ( F ), D[K] = 2, USERELATIONSHIP ( F[B], D[K] ) )" (null: obj)
+
+                // RELATED reads the active relationship (SQLBI, "Expanded tables in DAX").
+                returns m "EVALUATE ADDCOLUMNS ( F, \"R\", RELATED ( D[K] ) )" [ [ 1; 1; 1 ]; [ 2; 7; 2 ] ])
             // Sales -> Product -> Category with a sale of a product that doesn't exist: whether
             // Category gets a blank row of its own is not documented.
             testCase "a blank row at the start of a chain of relationships" (fun () ->
@@ -1351,8 +1405,8 @@ let tests =
                     "CALCULATE ( [Amount], CROSSFILTER ( Sales[ProductKey], Product[ProductKey], ONEWAY_LEFTFILTERSRIGHT ) )",
                     "CROSSFILTER direction"
                     "CALCULATE ( [Amount], ALLSELECTED (), ALL ( Product ) )", "ALLSELECTED together with"
-                    "COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ) ) )",
-                    "NONVISUAL"
+                    "COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], KEEPFILTERS ( NONVISUAL ( VALUES ( Product[Color] ) ) ) ) )",
+                    "NONVISUAL together with KEEPFILTERS"
                 ]
 
                 let model = {

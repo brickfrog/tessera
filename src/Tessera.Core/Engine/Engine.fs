@@ -385,7 +385,7 @@ let private groupedBy (db: Database) : Dictionary<string, string> =
                         |> String.concat ", "
 
                     found.[t.Name + "\u0000" + c.Name] <-
-                        $"'{t.Name}'[{c.Name}], which has Group By Columns ({by}): a query that groups by it without them fails, and which queries those are is not implemented"
+                        $"'{t.Name}'[{c.Name}], which has Group By Columns ({by}): a query that groups by it without them fails; the engine reads it only where SUMMARIZECOLUMNS groups by it together with all of them"
 
     found
 
@@ -760,6 +760,28 @@ let private bindWith
     // many-to-many.
     let rels = ResizeArray<BRel>()
 
+    // A one-to-one relationship has no direction: "the cross filter direction is always from both
+    // tables" (Learn, "Model relationships in Power BI Desktop"), and the two expanded tables are
+    // "the same ... joining the columns of two tables into a larger table using a FULL OUTER JOIN"
+    // (SQLBI, "Expanded tables in DAX"). The engine joins the rows of `From` to `To`, which needs
+    // every key of `To` in `From` (`BRel.FromRowOfToRow`); so the ends are taken the way round the
+    // data allows, whichever way the model declares them. Whether a column has a value the other
+    // lacks: only for data columns of data tables, of the same type (a calculated key keeps the
+    // declared ends, so that a query that binds the model again, with it computed, keeps them too).
+    let stored (c: BColumn) =
+        c.IsReady
+        && c.Expression.IsNone
+        && c.Parsed.IsNone
+        && c.Table.Expression.IsNone
+        && c.Table.Parsed.IsNone
+
+    let lacks (a: BColumn) (b: BColumn) =
+        stored a
+        && stored b
+        && a.Stored.DataType = b.Stored.DataType
+        && a.Stored.Values
+           |> Array.exists (fun v -> not (DaxValue.isBlank v) && b.Stored.TryFindId v < 0)
+
     for r in db.Model.Relationships do
         match r with
         | :? SingleColumnRelationship as s when not (isNull s.FromColumn) && not (isNull s.ToColumn) ->
@@ -792,7 +814,12 @@ let private bindWith
 
             match ends with
             | Some(many, one, limited) ->
-                match column many, column one with
+                let ends =
+                    match column many, column one with
+                    | Some f, Some t when oneToOne && lacks t f && not (lacks f t) -> Some t, Some f
+                    | f, t -> f, t
+
+                match ends with
                 | Some f, Some t when f.Table.Gate.IsNone ->
                     let r =
                         BRel(
@@ -1060,7 +1087,13 @@ let private bindWith
                             r.OneToOne
                             && (obj.ReferenceEquals(r.From.Table, t) || obj.ReferenceEquals(r.To.Table, t)))
 
-                    if incoming |> Array.exists (fun r -> r.IsActive && r.OrphanFromRows.Length > 0) then
+                    // An inactive relationship counts as an active one does: "Inactive relationships
+                    // are also expanded, even when the relationship isn't used by a calculation ...
+                    // When a matching value from the "many" to the "one" side doesn't exist, a blank
+                    // virtual row is added to the "one" side table" (Learn, "Model relationships in
+                    // Power BI Desktop"). Which relationships filter and what RELATED reads still
+                    // follow the active ones (SQLBI, "Expanded tables in DAX").
+                    if incoming |> Array.exists (fun r -> r.OrphanFromRows.Length > 0) then
                         match oneToOne with
                         | Some o when
                             incoming
@@ -1075,15 +1108,6 @@ let private bindWith
                         // row in DAX").
                         t.SetBlankRow true
                     else
-                        match
-                            incoming
-                            |> Array.tryFind (fun r -> not r.IsActive && r.OrphanFromRows.Length > 0)
-                        with
-                        | Some r ->
-                            refuse
-                                $"the blank row of '{t.Name}': only the inactive relationship from '{r.From.Table.Name}'[{r.From.Name}] has keys without a match, and the sources don't say whether an inactive relationship adds the blank row"
-                        | None -> ()
-
                         match
                             incoming
                             |> Array.tryFind (fun r ->
@@ -1134,7 +1158,29 @@ let private bindWith
     for t in model.Tables do
         for c in t.Columns do
             match grouped.TryGetValue(t.Name + "\u0000" + c.Name) with
-            | true, why -> c.Gate <- Some why
+            | true, why ->
+                c.Gate <- Some why
+
+                // Its Group By Columns, as the engine's columns; one the engine doesn't have
+                // leaves the column gated everywhere.
+                let source = db.Model.Tables.[t.Name].Columns.[c.Name]
+
+                let by =
+                    source.RelatedColumnDetails.GroupByColumns
+                    |> Seq.map (fun g ->
+                        if isNull g.GroupingColumn then
+                            None
+                        else
+                            match model.TableByName.TryGetValue g.GroupingColumn.Table.Name with
+                            | true, bt ->
+                                match bt.ColumnByName.TryGetValue g.GroupingColumn.Name with
+                                | true, bc -> Some bc
+                                | _ -> None
+                            | _ -> None)
+                    |> Array.ofSeq
+
+                if by |> Array.forall Option.isSome then
+                    c.GroupBy <- by |> Array.choose id
             | _ -> ()
 
     model, List.ofSeq failures

@@ -327,6 +327,18 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     member _.IsReady = not (obj.ReferenceEquals(store, null))
     /// Why queries can't read this column, once the model is prepared (Group By Columns).
     member val Gate: string option = None with get, set
+    /// The column's Group By Columns (TOM's RelatedColumnDetails), once the model is prepared.
+    member val GroupBy: BColumn array = [||] with get, set
+
+    /// Whether these columns include all of this column's Group By Columns: what lets a query
+    /// group by it ("never group by this column without also grouping by these other columns":
+    /// SQLBI, "Understanding Group By Columns in Power BI"). Only SUMMARIZECOLUMNS grouping (and
+    /// the filter of one of its groups) reads the column through this; `Data` stays gated.
+    member this.GroupedWith(cols: BColumn array) : bool =
+        this.GroupBy.Length > 0
+        && this.GroupBy
+           |> Array.forall (fun g -> cols |> Array.exists (fun c -> obj.ReferenceEquals(c, g)))
+
     /// Set for a calculated column before it is computed, from its expression and the measures
     /// it uses: whether the filter of a context transition in it may be narrowed (ALL, ALLEXCEPT,
     /// REMOVEFILTERS, a table as a filter argument), which can take a dependency away.
@@ -378,6 +390,20 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     member this.ValueOfId(id: int) : DaxValue =
         let v = this.Data.Values
         if id < v.Length then v.[id] else DaxValue.Blank
+
+    /// `IdAt` whatever the `Gate`: for grouping a column with its Group By Columns (`GroupedWith`).
+    member this.StoredIdAt(row: int) : int =
+        let d = this.Stored
+        if row >= d.RowCount then this.BlankId else d.ValueIds.[row]
+
+    /// `ValueAt` whatever the `Gate`: for grouping a column with its Group By Columns.
+    member this.StoredValueAt(row: int) : DaxValue =
+        let d = this.Stored
+
+        if row >= d.RowCount then
+            DaxValue.Blank
+        else
+            d.Values.[d.ValueIds.[row]]
 
     /// The value of a row; the blank row (row = RowCount) is BLANK.
     member this.ValueAt(row: int) : DaxValue =

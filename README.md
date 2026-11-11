@@ -2016,7 +2016,9 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 - **Relationships:** many-to-one, single column. Filters travel from the one side; both ways where the model says
   so or under `CROSSFILTER`; inactive relationships under `USERELATIONSHIP`; expanded tables (a table used as a
   filter filters the tables it relates to, and `ALL ( Sales )` removes filters from them); the blank row for keys
-  with no match (`VALUES` and `ALL` have it, `DISTINCT`, `ALLNOBLANKROW` and a plain table reference don't).
+  with no match (`VALUES` and `ALL` have it, `DISTINCT`, `ALLNOBLANKROW` and a plain table reference don't), on an
+  inactive relationship too ("Inactive relationships are also expanded": Learn), though filters and `RELATED` go
+  through the active one.
 - **`CALCULATE` / `CALCULATETABLE`:** the documented order (filter arguments in the original context, context
   transition, modifiers, then the filters); True/False filters over one or several columns of a table; table
   filters; `KEEPFILTERS`; `ALL`, `ALLEXCEPT`, `ALLNOBLANKROW`, `REMOVEFILTERS`, `ALLCROSSFILTERED`,
@@ -2035,10 +2037,13 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   with no key. The key is what the engine knows to be unique: a column on the one side of a relationship (either
   side of a one-to-one), not one whose values happen to be unique ("The presence of a relationship forces the DAX
   engine to verify that ProductKey is a column with unique values": SQLBI, "Understanding circular
-  dependencies"). With a key, a context transition depends on it alone, so several such columns are fine. Without
-  one, a cycle that `ALLEXCEPT`, `REMOVEFILTERS` or a table filter could take away, or that a column marked as the
-  key or `USERELATIONSHIP` (which may turn the optimization off) might change, is refused rather than called
-  circular. A calculated column or table that uses something unsupported doesn't stop the rest: only the queries
+  dependencies"). With a key, a context transition depends on it alone, so several such columns are fine.
+  `ALLEXCEPT`, `ALL` or `REMOVEFILTERS` in the same `CALCULATE` take the transition down to the columns they keep,
+  key or not ("The technique using ALLEXCEPT relies on the semantics of the DAX language. As such, it works in any
+  scenario": SQLBI), so `CALCULATE ( ..., ALLEXCEPT ( T, T[Key] ) )` in two columns of a table with no relationship
+  is no cycle. Without a key, a cycle that another narrowing (a table filter argument, a modifier in a measure)
+  could take away, or that a column marked as the key or `USERELATIONSHIP` (which may turn the optimization off)
+  might change, is refused rather than called circular. A calculated column or table that uses something unsupported doesn't stop the rest: only the queries
   that read it fail, with its error.
 - **Relationships:** many-to-one either way round, single or both directions, active or not; **one-to-one**
   (filters both ways, and each table's expanded table holds the other: "you can consider the two expanded tables as
@@ -2070,8 +2075,11 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
   measure. Existing combinations for columns of one table; group-by tables that a filter table spans together are
   grouped by the combinations it has, the others cross joined; the blank row is a group; rows whose expressions are
   all BLANK (except `IGNORE`d ones) are dropped. `ROLLUPADDISSUBTOTAL` (with `ROLLUPGROUP` and its flag columns) adds
-  the subtotal rows, and `ISINSCOPE` tells them apart. Not `ROLLUP`, `ROLLUPISSUBTOTAL`, `NONVISUAL`, nor a rollup
-  with a group-level filter. `NATURALINNERJOIN` and `NATURALLEFTOUTERJOIN` join tables with no model columns
+  the subtotal rows, and `ISINSCOPE` tells them apart. `NONVISUAL ( filter )` on group-by columns of the same call:
+  it picks the groups, and `ALLSELECTED` in a row doesn't restore it ("NONVISUAL marks a SUMMARIZECOLUMNS filter so
+  that it does not affect measures using ALLSELECTED": dax.guide). Not `ROLLUP`, `ROLLUPISSUBTOTAL`, nor a rollup
+  with a group-level filter; nor `NONVISUAL` on other columns (whether it then changes the measures' values isn't
+  documented), with `ROLLUPADDISSUBTOTAL` or `KEEPFILTERS`, or on a column the outer context already filters. `NATURALINNERJOIN` and `NATURALLEFTOUTERJOIN` join tables with no model columns
   (`DATATABLE`, table constructors, computed columns) on their columns of the same name. `FIRSTNONBLANK` and its
   relatives go through the column's values in ascending order.
 
@@ -2323,7 +2331,8 @@ It refuses what the sources leave open:
 - row contexts that aren't an iterator's: a calculated column, `ORDER BY`, a True/False filter argument, a wider
   `SUMMARIZE`, `GROUPBY`, a function called from a row context.
 
-`NONVISUAL` stays refused.
+A `NONVISUAL` filter argument of `SUMMARIZECOLUMNS` is not restored (see `SUMMARIZECOLUMNS` above for the shapes
+implemented).
 
 
 #### Window functions
@@ -2365,18 +2374,24 @@ expressions only, say).
   Dual tables: every table connected to one is closed to queries, the rest of the model works. A calculation group
   is closed when a query names it. Active relationships that give two filter paths between two tables. A column
   with Group By Columns (a field parameter's display column): a query that groups by it without them fails on a
-  server, so any query that reads it is refused (the table itself is computed, and its other columns work).
-- **One-to-one relationships, by their data:** keys of the `to` table that the `from` table lacks (`from` would
-  need a blank row), more than one unmatched row of `from`, and a blank row either table has from another
-  relationship. `CROSSFILTER` `ONEWAY` on one.
+  server, so a query that reads it is refused (the table itself is computed, and its other columns work), except
+  `SUMMARIZECOLUMNS` grouping by it together with all of its Group By Columns, as Power BI queries a field
+  parameter ("The columns specified in Group By Columns must be present in the grouping conditions of any query
+  that includes the target column": SQLBI, "Understanding Group By Columns in Power BI"). Under such a group,
+  measures see the group's row; reading the column there (`SELECTEDVALUE`, `VALUES`), filtering it alone, a context
+  transition over the result, and `SUMMARIZE`, `ALL` and `TREATAS` over it are still refused.
+- **One-to-one relationships, by their data:** keys missing on both sides (both tables would need a blank row),
+  more than one unmatched row on the side with the extra keys, and a blank row either table has from another
+  relationship. The declared direction doesn't matter (a one-to-one relationship filters both ways and its two
+  expanded tables are the same), except for a calculated key column or keys of different types, whose declared
+  `to` table may not have keys the `from` table lacks. `CROSSFILTER` `ONEWAY` on one.
 - **Many-to-many relationships:** a filter that keeps every row of the filtering table (whether it still hides the
   rows that match nothing isn't documented), a BLANK on one side meeting a BLANK on the other, columns of different
   types, `CROSSFILTER` `ONEWAY` ("unclear which side is the lookup side": Learn), and `ALLCROSSFILTERED` in a model
   with one.
 - **Where the sources don't say what the engine does,** for instance:
   - a one-side key that repeats or is BLANK;
-  - keys with no match on an inactive relationship only, or at the start of a chain of relationships (whether the
-    blank row exists);
+  - keys with no match at the start of a chain of relationships (whether the blank row exists);
   - a filter that crosses a both-directions relationship while keeping every row of the many side;
   - `TOPN` without an order-by on more rows than asked for, and `CONCATENATEX` without one over different texts
     (the engine defines no order), and sorting where BLANK meets zero or negative values, or values of different

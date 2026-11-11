@@ -533,11 +533,22 @@ module Filters =
 
                             let buffer = Array.zeroCreate<int> columns.Length
 
+                            // A column with Group By Columns is read here when they are all in the
+                            // same filter: the group of a SUMMARIZECOLUMNS that groups by them all
+                            // (SQLBI, "Understanding Group By Columns in Power BI": the columns
+                            // "must be part of the same table").
+                            let grouped = columns |> Array.map (fun c -> c.Gate.IsSome && c.GroupedWith columns)
+
                             set <-
                                 set.Where(fun row ->
                                     for i in 0 .. columns.Length - 1 do
                                         let r = if isNull maps.[i] then row else maps.[i].[row]
-                                        buffer.[i] <- columns.[i].IdAt r
+
+                                        buffer.[i] <-
+                                            if grouped.[i] then
+                                                columns.[i].StoredIdAt r
+                                            else
+                                                columns.[i].IdAt r
 
                                     projected.Contains buffer)
                 | Rows(x, rows, _) ->
@@ -1085,15 +1096,51 @@ module Context =
     }
 
     /// The filters one row context becomes: every column being iterated, at the row's value.
-    let rowFilters (ctx: Ctx) (span: Span) (rc: RowCtx) : Filter list =
+    /// `drop` names the columns a modifier of the same CALCULATE removes next (see `transitionDropping`).
+    let private rowFiltersDropping (ctx: Ctx) (span: Span) (drop: (BColumn -> bool) option) (rc: RowCtx) : Filter list =
         let t = rc.Table
 
         if t.IsPureBase then
+            let b = t.BaseTable
+            let row = t.BaseRows.[rc.Row]
+
             // "all the columns of the expanded table will be part of the newly-created filter
             // context" (SQLBI, "Understanding context transition in DAX").
-            [
-                Rows(t.BaseTable, Filters.closeRows t.BaseTable [| t.BaseRows.[rc.Row] |], t.Config)
-            ]
+            let narrowed =
+                match drop with
+                | None -> None
+                | Some drop ->
+                    let expanded = Filters.expandedColumns t.Config b
+
+                    let kept (c: BColumn) =
+                        not (drop c) && obj.ReferenceEquals(c.Table, b)
+
+                    // A kept column being computed is a dependency on itself: `closeRows` tells a
+                    // cycle.
+                    if
+                        expanded |> Array.exists drop
+                        && not (expanded |> Array.exists (fun c -> kept c && c.Computing))
+                    then
+                        Some(expanded |> Array.filter kept)
+                    else
+                        None
+
+            match narrowed with
+            | Some kept ->
+                // A modifier then removes some of those columns, which leaves the filter on the
+                // others (`Filters.remove`): the values this row has in them. The rows equal to it
+                // in every column (`closeRows`) have those same values, so the row alone gives the
+                // same filter without reading the dropped columns. That is how ALLEXCEPT keeps a
+                // calculated column's transition to the key: "By using ALLEXCEPT, we have removed
+                // all filters except for the one on ProductKey ... The circular dependency is no
+                // longer present" (SQLBI, "Understanding circular dependencies"). The kept columns
+                // of the table not computed yet are computed, as `closeRows` would.
+                for c in kept do
+                    if not c.IsReady then
+                        c.Data |> ignore
+
+                [ Rows(b, RowSet.One(b.Size, row), t.Config) ]
+            | None -> [ Rows(b, Filters.closeRows b [| row |], t.Config) ]
         else
             if not (isNull t.BaseTable) && (t.Config.Expanded t.BaseTable).Length > 1 then
                 Fail.notSupported
@@ -1111,9 +1158,14 @@ module Context =
                         | id -> OnColumn(c, RowSet.One(c.IdCount, id))
             ]
 
+    let rowFilters (ctx: Ctx) (span: Span) (rc: RowCtx) : Filter list = rowFiltersDropping ctx span None rc
+
     /// Context transition: every row context becomes filters, outermost first, each replacing the
-    /// filters on its columns; no row context is left (dax.guide/calculate, steps 2 and 3).
-    let transition (ctx: Ctx) (span: Span) : Ctx =
+    /// filters on its columns; no row context is left (dax.guide/calculate, steps 2 and 3). `drop`
+    /// names the columns whose filters the caller removes right after, before anything reads the
+    /// context (CALCULATE's ALL, ALLEXCEPT, REMOVEFILTERS...): a transition filter is exact only
+    /// once those are gone.
+    let private transitionWith (ctx: Ctx) (span: Span) (drop: (BColumn -> bool) option) : Ctx =
         if ctx.CallerRows then
             Fail.notSupported
                 ctx
@@ -1130,7 +1182,7 @@ module Context =
                 // Sales table" (SQLBI, "The definitive guide to ALLSELECTED"): it stays when the
                 // row context becomes filters.
                 fc <- Filters.mark fc (Shadow rc.Table)
-                let filters = rowFilters ctx span rc
+                let filters = rowFiltersDropping ctx span drop rc
                 DateTable.onTransition ctx span fc filters
                 fc <- Filters.add fc filters false
                 let t = rc.Table
@@ -1153,6 +1205,14 @@ module Context =
                 fc <- Filters.mark fc scope
 
             { ctx with Filter = fc; Rows = [] }
+
+    /// Context transition (see `transitionWith`).
+    let transition (ctx: Ctx) (span: Span) : Ctx = transitionWith ctx span None
+
+    /// Context transition followed at once by the removal of the filters on the columns `drop`
+    /// names (CALCULATE with ALL, ALLEXCEPT, REMOVEFILTERS...): the caller removes them.
+
+    let transitionDropping (ctx: Ctx) (span: Span) (drop: BColumn -> bool) : Ctx = transitionWith ctx span (Some drop)
 
     /// The value a row context has for a model column: the innermost row context that has it,
     /// skipping `skip` of them (EARLIER).

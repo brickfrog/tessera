@@ -208,6 +208,98 @@ let nameofTests =
                  |> String.concat "; ")
                 "Group By Columns"
                 "coverage names the column")
+
+        // "The DAX query generated for the report ... contains Customer[State] and Customer[Country]
+        // in all the functions that participate in the groupby condition"; "The columns specified
+        // in Group By Columns must be present in the grouping conditions of any query that includes
+        // the target column ... otherwise, the query fails with an error" (SQLBI, "Understanding
+        // Group By Columns in Power BI"). Power BI queries a field parameter that way.
+        testCase "a column with Group By Columns can be grouped by SUMMARIZECOLUMNS with them all" (fun () ->
+            let m = {
+                star with
+                    Tables =
+                        star.Tables
+                        @ [
+                            calculatedTable
+                                "Metric"
+                                [
+                                    "Value1", DataType.String
+                                    "Value2", DataType.String
+                                    "Value3", DataType.Int64
+                                ]
+                                "{ (\"Amount\", NAMEOF ( 'Sales'[Amount] ), 0), (\"Units\", NAMEOF ( 'Sales'[Units] ), 1) }"
+                        ]
+                    Measures = star.Measures @ [ "Sales", "Picked", "SELECTEDVALUE ( Metric[Value3] )" ]
+            }
+
+            let db, store = build m
+            let metric = db.Model.Tables.["Metric"]
+            let details = new RelatedColumnDetails()
+            details.GroupByColumns.Add(new GroupByColumn(GroupingColumn = metric.Columns.["Value2"]))
+            metric.Columns.["Value1"].RelatedColumnDetails <- details
+
+            let p =
+                match Engine.prepare db store with
+                | Ok p -> p
+                | Error e -> failtestf "%s" (TessError.message e)
+
+            returns p "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], Metric[Value3] )" [
+                [ "Amount"; "'Sales'[Amount]"; 0 ]
+                [ "Units"; "'Sales'[Units]"; 1 ]
+            ]
+
+            // The group's filter is one filter on all of them: a measure under it sees its row.
+            returnsInOrder
+                p
+                "EVALUATE SUMMARIZECOLUMNS ( Metric[Value3], Metric[Value2], Metric[Value1], \"P\", [Picked], \"N\", COUNTROWS ( Metric ) ) ORDER BY Metric[Value3] DESC"
+                [
+                    [ 1; "'Sales'[Units]"; "Units"; 1; 1 ]
+                    [ 0; "'Sales'[Amount]"; "Amount"; 0; 1 ]
+                ]
+
+            // The shape of SQLBI's Power BI query: TOPN and ORDER BY over the result, by the column.
+            returnsInOrder
+                p
+                "DEFINE VAR __Core = SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], \"P\", [Picked] ) VAR __Windowed = TOPN ( 502, __Core, Metric[Value1], 0, Metric[Value2], 1 ) EVALUATE __Windowed ORDER BY Metric[Value1] DESC, Metric[Value2]"
+                [ [ "Units"; "'Sales'[Units]"; 1 ]; [ "Amount"; "'Sales'[Amount]"; 0 ] ]
+
+            // With a filter table on the group-by column, as Power BI sends a slicer's selection.
+            returns
+                p
+                "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], TREATAS ( { \"'Sales'[Units]\" }, Metric[Value2] ), \"P\", [Picked] )"
+                [ [ "Units"; "'Sales'[Units]"; 1 ] ]
+
+            // A query with definitions binds the model again.
+            returns
+                p
+                "DEFINE MEASURE Sales[C] = COUNTROWS ( Metric ) EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], \"C\", [C] )"
+                [ [ "Amount"; "'Sales'[Amount]"; 1 ]; [ "Units"; "'Sales'[Units]"; 1 ] ]
+
+            // Everything else is still refused: grouping without the group-by column...
+            notSupported p "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1] )" "Group By Columns"
+            notSupported p "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value3] )" "Group By Columns"
+            // ... in another call than the one that groups by it ...
+            notSupported
+                p
+                "EVALUATE SUMMARIZECOLUMNS ( Metric[Value2], \"X\", COUNTROWS ( SUMMARIZECOLUMNS ( Metric[Value1] ) ) )"
+                "Group By Columns"
+            // ... reading its value under the group ("the same restrictions apply to ...
+            // HASONEVALUE and SELECTEDVALUE") ...
+            notSupported
+                p
+                "DEFINE MEASURE Sales[S] = SELECTEDVALUE ( Metric[Value1] ) EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], \"S\", [S] )"
+                "Group By Columns"
+            // ... a filter on it alone ...
+            notSupported
+                p
+                "EVALUATE SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], TREATAS ( { \"Units\" }, Metric[Value1] ) )"
+                "Group By Columns"
+            // ... and a context transition over the result ("The context transition too should
+            // include the three columns").
+            notSupported
+                p
+                "EVALUATE ADDCOLUMNS ( SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2] ), \"P\", [Picked] )"
+                "Group By Columns")
     ]
 
 // ---- Limited (many-to-many cardinality) relationships -------------------------------------------
@@ -547,18 +639,86 @@ let oneToOneTests =
                 "CALCULATE ( [Units], TREATAS ( { ( \"Green\", \"Clothing\" ), ( \"Blue\", BLANK () ) }, Product[Color], ProductCategory[Category] ) )"
                 5)
 
-        // The engine takes the relationship's from side as the one whose rows are the joined rows:
-        // the same data declared the other way round leaves ProductCategory with keys Product
-        // lacks, which is refused.
-        testCase "the same data declared the other way round is refused" (fun () ->
-            let reversed = {
-                identity with
-                    Rels =
-                        oneToOne (rel ("ProductCategory", "SKU") ("Product", "SKU"))
-                        :: identity.Rels.Tail
-            }
+        // A one-to-one relationship has no direction ("the cross filter direction is always from
+        // both tables", Learn; "you can consider the two expanded tables as being the same", SQLBI):
+        // the same data declared the other way round gives the same answers.
+        testCase "the same data declared the other way round gives the same answers" (fun () ->
+            let reversed =
+                prepare {
+                    identity with
+                        Rels =
+                            oneToOne (rel ("ProductCategory", "SKU") ("Product", "SKU"))
+                            :: identity.Rels.Tail
+                }
 
-            notSupported (prepare reversed) "EVALUATE ROW ( \"x\", COUNTROWS ( ProductCategory ) )" "lacks")
+            is reversed "CALCULATE ( COUNTROWS ( Product ), ProductCategory[Category] = \"Clothing\" )" 1
+            is reversed "CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Blue\" )" 1
+            is reversed "COUNTROWS ( ProductCategory )" 2
+            is reversed "CALCULATE ( [Units], ISBLANK ( ProductCategory[Category] ) )" 3
+
+            returns reversed "EVALUATE VALUES ( ProductCategory[Category] )" [
+                [ "Clothing" ]
+                [ "Accessories" ]
+                [ null ]
+            ]
+
+            returns
+                reversed
+                "EVALUATE ADDCOLUMNS ( ProductCategory, \"P\", RELATED ( Product[Product] ), \"B\", RELATED ( Brand[Brand] ) )"
+                [
+                    [ "CL-01"; "Clothing"; "T-shirt"; "Acme" ]
+                    [ "AC-01"; "Accessories"; "Hat"; "Acme" ]
+                ]
+
+            is reversed "SUMX ( ProductCategory, [Units] )" 7
+
+            // CROSSFILTER names the columns either way round.
+            is
+                reversed
+                "CALCULATE ( COUNTROWS ( ProductCategory ), Product[Color] = \"Green\", CROSSFILTER ( Product[SKU], ProductCategory[SKU], NONE ) )"
+                2
+
+            // A calculated key keeps the declared ends (the engine can't see its data when it binds
+            // the relationships), so reversed it is refused, also when a query binds the model
+            // again with the column computed.
+            let calculated =
+                prepare {
+                    identity with
+                        Tables =
+                            identity.Tables
+                            |> List.map (fun t ->
+                                if t.Name = "ProductCategory" then
+                                    t |> withCalculated [ "Key", DataType.String, "ProductCategory[SKU]" ]
+                                else
+                                    t)
+                        Rels =
+                            oneToOne (rel ("ProductCategory", "Key") ("Product", "SKU"))
+                            :: identity.Rels.Tail
+                }
+
+            notSupported calculated "EVALUATE ROW ( \"x\", COUNTROWS ( ProductCategory ) )" "lacks"
+
+            notSupported
+                calculated
+                "DEFINE MEASURE Product[N] = COUNTROWS ( ProductCategory ) EVALUATE ROW ( \"x\", [N] )"
+                "lacks"
+
+            // Keys missing on both sides need a blank row on both: refused whichever way.
+            let both =
+                identity
+                |> withRows "ProductCategory" [ [ "CL-01"; "Clothing" ]; [ "ZZ-01"; "Toys" ] ]
+
+            notSupported (prepare both) "EVALUATE VALUES ( Product[Color] )" "lacks"
+
+            notSupported
+                (prepare {
+                    both with
+                        Rels =
+                            oneToOne (rel ("ProductCategory", "SKU") ("Product", "SKU"))
+                            :: identity.Rels.Tail
+                })
+                "EVALUATE VALUES ( Product[Color] )"
+                "lacks")
 
         testCase "what isn't implemented is refused" (fun () ->
             // A category for a product that doesn't exist: Product would need a blank row.
@@ -680,20 +840,76 @@ let keyTests =
             | other -> failtestf "%A" other)
 
         // "By using the previous code based on ALLEXCEPT for both Test1 and Test2 ... The circular
-        // dependency is no longer present": the engine can't tell yet what ALLEXCEPT leaves, so it
-        // refuses rather than call the model invalid.
-        testCase "ALLEXCEPT on the key: no cycle on a server, refused here" (fun () ->
+        // dependency is no longer present ... The technique using ALLEXCEPT relies on the semantics
+        // of the DAX language. As such, it works in any scenario, regardless of any optimization"
+        // (SQLBI, "Understanding circular dependencies"). Each row counts the rows with its
+        // ProductKey and a name >= "Contoso": 1084 and 1086.
+        testCase "ALLEXCEPT on the key: no cycle, with or without a relationship" (fun () ->
             let narrowed (name: string) =
                 name,
                 DataType.Int64,
                 "CALCULATE ( COUNTROWS ( 'BestProducts' ), BestProducts[Product Name] >= \"Contoso\", ALLEXCEPT ( BestProducts, BestProducts[ProductKey] ) )"
 
-            match prepared (best [ narrowed "Test1"; narrowed "Test2" ] false) with
-            | Ok p ->
-                match Engine.failures p with
-                | (_, DaxNotSupported(what, _)) :: _ -> Expect.stringContains what "ALLEXCEPT" "what"
-                | other -> failtestf "%A" other
-            | Error e -> failtestf "%A" e
+            let p = prepare (best [ narrowed "Test1"; narrowed "Test2" ] false)
+            Expect.isEmpty (Engine.failures p) "computed"
+
+            returns
+                p
+                "EVALUATE SELECTCOLUMNS ( BestProducts, \"K\", BestProducts[ProductKey], \"T1\", BestProducts[Test1], \"T2\", BestProducts[Test2] )"
+                [ [ 1084; 1; 1 ]; [ 1085; null; null ]; [ 1086; 1; 1 ] ]
+
+            // ALLEXCEPT keeping a column that isn't unique: the rows with the same name.
+            let byName (name: string) =
+                name,
+                DataType.Int64,
+                "CALCULATE ( COUNTROWS ( 'BestProducts' ), ALLEXCEPT ( BestProducts, BestProducts[Product Name] ) )"
+
+            let p = prepare (best [ byName "N1"; byName "N2" ] false)
+            Expect.isEmpty (Engine.failures p) "computed"
+            is p "SUM ( BestProducts[N2] )" 3
+
+            // REMOVEFILTERS ( the table ) leaves no transition filter at all: every row counts 3.
+            let all (name: string) =
+                name, DataType.Int64, "CALCULATE ( COUNTROWS ( 'BestProducts' ), REMOVEFILTERS ( BestProducts ) )"
+
+            let p = prepare (best [ all "A1"; all "A2" ] false)
+            Expect.isEmpty (Engine.failures p) "computed"
+            is p "SUM ( BestProducts[A1] ) + SUM ( BestProducts[A2] )" 18
+
+            // One column narrowed and one not: the plain one depends on every column, the narrowed
+            // one on ProductKey only, so there is no cycle either.
+            let p =
+                prepare (
+                    best
+                        [
+                            narrowed "Test1"
+                            "Plain", DataType.Int64, "CALCULATE ( COUNTROWS ( 'BestProducts' ) )"
+                        ]
+                        false
+                )
+
+            Expect.isEmpty (Engine.failures p) "computed"
+            is p "SUM ( BestProducts[Plain] )" 3
+            is p "SUM ( BestProducts[Test1] )" 2
+
+            // Keeping a calculated column of the table still depends on it: two such columns are
+            // still a cycle.
+            match
+                prepared (
+                    best
+                        [
+                            "C1",
+                            DataType.Int64,
+                            "CALCULATE ( COUNTROWS ( 'BestProducts' ), ALLEXCEPT ( BestProducts, BestProducts[C2] ) )"
+                            "C2",
+                            DataType.Int64,
+                            "CALCULATE ( COUNTROWS ( 'BestProducts' ), ALLEXCEPT ( BestProducts, BestProducts[C1] ) )"
+                        ]
+                        false
+                )
+            with
+            | Ok p -> Expect.isNonEmpty (Engine.failures p) "not computed"
+            | Error _ -> ()
 
             // With the key, it is computed: each row counts itself.
             let p = prepare (best [ narrowed "Test1"; narrowed "Test2" ] true)

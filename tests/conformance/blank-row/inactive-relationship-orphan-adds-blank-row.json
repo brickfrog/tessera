@@ -1,0 +1,59 @@
+{
+  "title": "A key with no match on an inactive relationship gives the one side the blank row",
+  "model": {
+    "base": "sales",
+    "rows": {
+      "Sales": [
+        [ 1, 1, 1, "2023-01-15T00:00:00", "2023-02-10T00:00:00", 1, 100.0 ],
+        [ 2, 2, 1, "2023-01-15T00:00:00", "2023-01-15T00:00:00", 2, 40.0 ],
+        [ 3, 2, 2, "2023-02-10T00:00:00", "2023-12-31T00:00:00", 1, 20.0 ],
+        [ 4, 3, 2, "2023-12-31T00:00:00", "2024-01-05T00:00:00", 5, 50.0 ],
+        [ 5, 1, 3, "2024-01-05T00:00:00", "2024-02-20T00:00:00", 2, 200.0 ],
+        [ 6, 3, 3, "2024-02-20T00:00:00", "2024-03-01T00:00:00", 3, 30.0 ],
+        [ 7, 1, 1, "2024-03-01T00:00:00", "2024-04-15T00:00:00", 1, 100.0 ]
+      ]
+    }
+  },
+  "query": [
+    "EVALUATE",
+    "ROW (",
+    "    \"Values\", COUNTROWS ( VALUES ( 'Date'[Date] ) ),",
+    "    \"Distinct\", COUNTROWS ( DISTINCT ( 'Date'[Date] ) ),",
+    "    \"On the blank row\", CALCULATE ( [Sales Amount], ISBLANK ( 'Date'[Date] ) ),",
+    "    \"Delivered on the blank row\", CALCULATE ( [Sales Amount], ISBLANK ( 'Date'[Date] ), USERELATIONSHIP ( Sales[DeliveryDate], 'Date'[Date] ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        { "name": "[Values]", "type": "int64" },
+        { "name": "[Distinct]", "type": "int64" },
+        { "name": "[On the blank row]", "type": "decimal" },
+        { "name": "[Delivered on the blank row]", "type": "decimal" }
+      ],
+      "rows": [ [ 7, 6, null, 100.0 ] ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "Inactive relationships are also expanded, even when the relationship isn't used by a calculation.",
+      "supports": "an inactive relationship is expanded like an active one"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/power-bi/transform-model/desktop-relationships-understand",
+      "quote": "When a matching value from the \"many\" to the \"one\" side doesn't exist, a blank virtual row is added to the \"one\" side table.",
+      "supports": "the expansion adds the blank row for a key with no match"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/blank-row-in-dax/",
+      "quote": "The blank row is a special row added to a table, in case the table is on the one-side of a strong relationship and the relationship is invalid.",
+      "supports": "VALUES counts the blank row and DISTINCT doesn't"
+    }
+  ],
+  "confidence": "derived",
+  "uncertain": true,
+  "alternative": "If an inactive relationship adds no blank row (Learn's note read as about the stored join only), 'Date' has none: Values 6, Distinct 6, and the last two BLANK.",
+  "derivation": "Sale 7 is delivered on 2024-04-15, which 'Date' lacks; its order date 2024-03-01 is there, so the active relationship has no orphan. By Learn's note the inactive relationship Sales[DeliveryDate] -> 'Date'[Date] is expanded too, so 'Date' gets the blank row: VALUES has the 6 dates and the blank row (7), DISTINCT the 6 dates. Through the active relationship no sale reaches the blank row: BLANK. With USERELATIONSHIP on the delivery date, sale 7 (100) lands on it.",
+  "tags": [ "blank-row", "inactive-relationship", "values", "distinct", "userelationship" ]
+}

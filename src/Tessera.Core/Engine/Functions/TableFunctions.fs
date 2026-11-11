@@ -21,6 +21,13 @@ module TableFunctions =
         | _ -> false
 
     /// An expression evaluated for every row of a table: its declared type and its values.
+    /// Whether `[name]` is a measure here (what an unqualified bracketed name resolves to first).
+    let private isMeasureName (ctx: Ctx) (name: string) =
+        (ctx.Scope.InQuery
+         && not (isNull ctx.Query)
+         && ctx.Query.Measures.ContainsKey name)
+        || ctx.Model.Measures.ContainsKey name
+
     let private extensionColumn (ev: IEval) (ctx: Ctx) (table: TableVal) (expr: Expr) : DaxType * DaxValue array =
         let values =
             Array.init table.Count (fun row -> ev.Scalar(Context.pushRow ctx table row, expr))
@@ -358,6 +365,10 @@ module TableFunctions =
         /// The levels of one ROLLUPADDISSUBTOTAL: the columns of each, and its subtotal column's name.
         | RollUp of (BColumn array * string) list
         | FilterTable of Expr * keep: bool
+        /// NONVISUAL ( filter ): "Marks a value filter in SUMMARIZECOLUMNS as not affecting measure
+        /// values, but only applying to group-by columns" (Learn); "it does not affect measures
+        /// using ALLSELECTED as part of their calculation" (dax.guide/nonvisual).
+        | NonVisual of Expr
 
     let private callTo (name: string) (e: Expr) : Expr list option =
         match (Fn.unparen e).Kind with
@@ -392,10 +403,39 @@ module TableFunctions =
                     Some "ROLLUPADDISSUBTOTAL with a filter for the grand total or for a level"
             | None -> None
 
-        args
-        |> List.tryPick (fun a ->
-            helper [ "ROLLUP"; "ROLLUPGROUP"; "ROLLUPISSUBTOTAL"; "NONVISUAL"; "ISSUBTOTAL" ] a
-            |> Option.orElseWith (fun () -> rollupFilters a))
+        // NONVISUAL forms the sources don't show (see `NonVisual`); which columns it filters needs
+        // the values.
+        let nonVisual =
+            let isNonVisual (a: Expr) = (callTo "NONVISUAL" a).IsSome
+
+            if
+                args
+                |> List.exists (fun a ->
+                    match callTo "KEEPFILTERS" a, callTo "NONVISUAL" a with
+                    | Some [ inner ], _ -> isNonVisual inner
+                    | _, Some [ inner ] -> (callTo "KEEPFILTERS" inner).IsSome
+                    | _ -> false)
+            then
+                Some "NONVISUAL together with KEEPFILTERS in SUMMARIZECOLUMNS"
+            elif
+                args |> List.exists isNonVisual
+                && args |> List.exists (fun a -> (callTo "ROLLUPADDISSUBTOTAL" a).IsSome)
+            then
+                Some "NONVISUAL together with ROLLUPADDISSUBTOTAL (what the subtotals show is not documented)"
+            elif
+                args |> List.exists isNonVisual
+                && args |> List.exists (fun a -> (callTo "KEEPFILTERS" a).IsSome)
+            then
+                Some "SUMMARIZECOLUMNS with NONVISUAL and KEEPFILTERS filters"
+            else
+                None
+
+        nonVisual
+        |> Option.orElseWith (fun () ->
+            args
+            |> List.tryPick (fun a ->
+                helper [ "ROLLUP"; "ROLLUPGROUP"; "ROLLUPISSUBTOTAL"; "ISSUBTOTAL" ] a
+                |> Option.orElseWith (fun () -> rollupFilters a)))
 
     /// A helper that only means something as an argument of another function.
     let private onlyInside (name: string) (host: string) : DaxFunction = {
@@ -417,6 +457,7 @@ module TableFunctions =
         (ctx: Ctx)
         (call: Call)
         (filtered: FilterCtx)
+        (visual: FilterCtx)
         (groupCols: BColumn array)
         (exprs: (Expr * bool) array)
         : (DaxValue array * DaxValue array) array =
@@ -505,9 +546,20 @@ module TableFunctions =
                             let maps = tables |> Array.map (fun t -> t.Id, cfg.RowMap(x, t)) |> dict
                             rows.Length, (fun (t: BTable) (p: int) -> maps.[t.Id].[rows.[p]])
 
+                // A column with Group By Columns is grouped with them all here, or not at all
+                // (`BColumn.GroupedWith`; it is then read through its gate, which refuses).
+                let grouped (c: BColumn) = c.Gate.IsSome && c.GroupedWith mine
+
                 let keys =
                     mine
-                    |> Array.map (fun c -> Array.init count (fun p -> c.ValueAt(rowOf c.Table p)))
+                    |> Array.map (fun c ->
+                        if grouped c then
+                            Array.init count (fun p -> c.StoredValueAt(rowOf c.Table p))
+                        else
+                            Array.init count (fun p -> c.ValueAt(rowOf c.Table p)))
+
+                let idAt (c: BColumn) (row: int) =
+                    if grouped c then c.StoredIdAt row else c.IdAt row
 
                 let groups =
                     groupRows ctx.Model keys count
@@ -516,7 +568,7 @@ module TableFunctions =
                             HashSet<int array>(IntArrayComparer.Instance :> IEqualityComparer<int array>)
 
                         for p in positions do
-                            tuples.Add(cols |> Array.map (fun c -> c.IdAt(rowOf c.Table p))) |> ignore
+                            tuples.Add(cols |> Array.map (fun c -> idAt c (rowOf c.Table p))) |> ignore
 
                         let filter =
                             if cols.Length = 1 then
@@ -566,7 +618,7 @@ module TableFunctions =
                 Context.withFilter ctx (Filters.mark (Filters.add baseCtx fs true) (Grouped groupCols))
 
             // For ALLSELECTED: the filters the groups were computed under, and this row's group.
-            let inner = Shadows.inGroup inner filtered groupCols fs
+            let inner = Shadows.inGroup inner visual groupCols fs
 
             let values = exprs |> Array.map (fun (expr, _) -> ev.Scalar(inner, expr))
 
@@ -640,12 +692,20 @@ module TableFunctions =
             |> List.map (fun a ->
                 match callTo "ROLLUPADDISSUBTOTAL" a, callTo "KEEPFILTERS" a with
                 | Some items, _ -> rollup a items
+                | None, Some [ inner ] when (callTo "NONVISUAL" inner).IsSome ->
+                    Fail.notSupported ctx a.Span "KEEPFILTERS ( NONVISUAL ( ... ) ) in SUMMARIZECOLUMNS"
                 | None, Some [ inner ] -> FilterTable(inner, true)
                 | None, Some _ -> Fail.invalid ctx a.Span "KEEPFILTERS takes one argument"
                 | None, None ->
                     match (Fn.unparen a).Kind with
                     | Qualified _ when (ev.TryColumn(ctx, a)).IsSome -> GroupBy (ev.TryColumn(ctx, a)).Value
-                    | _ -> FilterTable(a, false))
+                    | _ ->
+                        match callTo "NONVISUAL" a with
+                        | Some [ inner ] when (callTo "KEEPFILTERS" inner).IsSome ->
+                            Fail.notSupported ctx a.Span "NONVISUAL ( KEEPFILTERS ( ... ) ) in SUMMARIZECOLUMNS"
+                        | Some [ inner ] -> NonVisual inner
+                        | Some _ -> Fail.invalid ctx a.Span "NONVISUAL takes one argument"
+                        | None -> FilterTable(a, false))
 
         // Every group-by column, in the order the query names them.
         let groupCols =
@@ -654,7 +714,8 @@ module TableFunctions =
                 match a with
                 | GroupBy c -> [ c ]
                 | RollUp levels -> levels |> List.collect (fun (cols, _) -> List.ofArray cols)
-                | FilterTable _ -> [])
+                | FilterTable _
+                | NonVisual _ -> [])
             |> Array.ofList
 
         if (groupCols |> Array.distinctBy _.Id).Length <> groupCols.Length then
@@ -681,16 +742,76 @@ module TableFunctions =
             (flagNames @ (added |> List.map (fun (name, _, _) -> name)))
 
         // The filter tables, each evaluated on its own in the context of the call.
+        let filterOf (e: Expr) =
+            if not (ev.IsTable(ctx, e)) then
+                Fail.invalid ctx e.Span "a filter argument of SUMMARIZECOLUMNS is a table expression"
+
+            Filters.ofTable ctx e.Span (ev.Table(ctx, e))
+
         let filters =
             arguments
             |> List.choose (fun a ->
                 match a with
-                | FilterTable(e, keep) ->
-                    if not (ev.IsTable(ctx, e)) then
-                        Fail.invalid ctx e.Span "a filter argument of SUMMARIZECOLUMNS is a table expression"
-
-                    Some(Filters.ofTable ctx e.Span (ev.Table(ctx, e)), keep)
+                | FilterTable(e, keep) -> Some(filterOf e, keep)
                 | _ -> None)
+
+        // The non-visual filters: as the others for the groups, and left out of what ALLSELECTED
+        // restores in a row. Implemented where the sources show it, a filter on group-by columns
+        // of this call (Learn's and dax.guide's examples filter the column grouped by): each row's
+        // own group then filters those columns, so whether the filter reaches the measures doesn't
+        // change their values.
+        let nonVisual =
+            arguments
+            |> List.collect (fun a ->
+                match a with
+                | NonVisual e ->
+                    let fs = filterOf e
+
+                    let grouped (c: BColumn) =
+                        groupCols |> Array.exists (fun g -> obj.ReferenceEquals(g, c))
+
+                    let refuse (what: string) : unit =
+                        Fail.notSupported
+                            ctx
+                            e.Span
+                            $"NONVISUAL over {what} (whether a non-visual filter changes the values of measures is not documented)"
+
+                    if not rollups.IsEmpty then
+                        Fail.notSupported
+                            ctx
+                            e.Span
+                            "NONVISUAL together with ROLLUPADDISSUBTOTAL (what the subtotals show is not documented)"
+
+                    for f in fs do
+                        let cols =
+                            match f with
+                            | OnColumn(c, _) -> [| c |]
+                            | Tuples(cols, _) -> cols
+                            | Rows(t, _, _) ->
+                                refuse $"the rows of table '{t.Name}'"
+                                [||]
+
+                        for c in cols do
+                            if not (grouped c) then
+                                refuse
+                                    $"'{c.Table.Name}'[{c.Name}], which is not a group-by column of the same SUMMARIZECOLUMNS"
+
+                            // A filter it replaces: whether ALLSELECTED then restores that one is
+                            // not documented.
+                            let outer =
+                                ctx.Filter.Filters
+                                |> List.exists (fun o ->
+                                    match o with
+                                    | OnColumn(x, _) -> obj.ReferenceEquals(x, c)
+                                    | Tuples(xs, _) -> xs |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
+                                    | Rows(t, _, cfg) -> cfg.IsExpanded(t, c.Table))
+
+                            if outer then
+                                refuse
+                                    $"'{c.Table.Name}'[{c.Name}], which the context SUMMARIZECOLUMNS is evaluated in filters already"
+
+                    fs
+                | _ -> [])
 
         if filters |> List.exists snd && filters |> List.exists (fun (_, keep) -> not keep) then
             // "SummarizeColumns filters with keepfilters behavior and overridefilters behavior are
@@ -701,11 +822,26 @@ module TableFunctions =
                 call.Span
                 "SUMMARIZECOLUMNS with some filters under KEEPFILTERS and some not (use KEEPFILTERS on all of them or on none)"
 
-        let filtered =
+        if not nonVisual.IsEmpty && filters |> List.exists snd then
+            Fail.notSupported ctx call.Span "SUMMARIZECOLUMNS with NONVISUAL and KEEPFILTERS filters"
+
+        // What ALLSELECTED restores in a row: the caller's filters and the visual filter arguments.
+        let visual =
             Filters.add
                 (Filters.add ctx.Filter (filters |> List.filter (fun (_, keep) -> not keep) |> List.collect fst) false)
                 (filters |> List.filter snd |> List.collect fst)
                 true
+
+        // What the groups are computed under: the non-visual filters too.
+        let filtered =
+            if nonVisual.IsEmpty then
+                visual
+            else
+                Filters.add
+                    ctx.Filter
+                    ((filters |> List.filter (fun (_, keep) -> not keep) |> List.collect fst)
+                     @ nonVisual)
+                    false
 
         let exprs =
             added |> List.map (fun (_, expr, ignored) -> expr, ignored) |> Array.ofList
@@ -743,7 +879,7 @@ module TableFunctions =
             let active = groupCols |> Array.filter (fun c -> not (rolled.Contains c.Id))
             let flags = flags.ToArray()
 
-            for (key, values) in summarizeGroups ev ctx call filtered active exprs do
+            for (key, values) in summarizeGroups ev ctx call filtered visual active exprs do
                 let mutable next = 0
 
                 let full =
@@ -828,7 +964,37 @@ module TableFunctions =
                         | Qualified _ -> ev.TryColumn(at, expr)
                         | _ -> None
 
+                    // "The <Name> argument can be skipped if the correspondent <Expression>
+                    // argument is a simple column reference of the iterated table" (dax.guide,
+                    // SELECTCOLUMNS): an unqualified [Column] of the table keeps that column, its
+                    // name and its lineage (Learn's OFFSET example selects [CurrentYearSales], a
+                    // column SUMMARIZECOLUMNS added). Not when the name is a measure's, or when
+                    // an outer row context's extension column of that name is what it reads.
+                    let ofTable =
+                        match name, (Fn.unparen expr).Kind with
+                        | None, Bracketed n when not (isMeasureName ctx n) ->
+                            let same (c: ColInfo) =
+                                String.Equals(c.Name, n, StringComparison.OrdinalIgnoreCase)
+
+                            if (table.Cols |> Array.filter same).Length > 1 then
+                                Fail.notSupported
+                                    ctx
+                                    expr.Span
+                                    $"an unnamed SELECTCOLUMNS column [{n}] where the table has several columns of that name"
+
+                            match table.Cols |> Array.tryFind same with
+                            | Some c when
+                                not (isNull c.Table)
+                                && ctx.Rows
+                                   |> List.exists (fun rc ->
+                                       rc.Table.Cols |> Array.exists (fun o -> isNull o.Table && same o))
+                                ->
+                                None
+                            | found -> found
+                        | _ -> None
+
                     match name, source with
+                    | None, _ when ofTable.IsSome -> { ofTable.Value with Type = t }, values
                     | Some n, Some c ->
                         {
                             Name = n

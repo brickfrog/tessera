@@ -815,19 +815,27 @@ module Filter =
 
                     Some(filter, keep))
 
-        // 2 and 3. The row contexts become filters; none is left.
-        let moved = Context.transition ctx call.Span
-
-        // 4. The modifiers: first the relationships, then the filters to remove.
+        // 4 (worked out first). The modifiers: first the relationships, then the filters to
+        // remove. The transition doesn't change which relationships are in force.
         let config =
             args
             |> List.choose (isCallTo relationshipModifiers)
-            |> List.fold (fun cfg m -> reconfigure ev ctx cfg m) moved.Filter.Config
+            |> List.fold (fun cfg m -> reconfigure ev ctx cfg m) ctx.Filter.Config
+
+        let removals =
+            args |> List.choose (isCallTo removers) |> List.map (removal ev ctx config)
+
+        // 2 and 3. The row contexts become filters; none is left. The removals come next, so the
+        // transition need not spell out what they remove (`Context.transitionDropping`).
+        let moved =
+            match removals with
+            | [] -> Context.transition ctx call.Span
+            | _ -> Context.transitionDropping ctx call.Span (fun c -> removals |> List.exists (fun drop -> drop c))
 
         let mutable fc = Filters.withConfig moved.Filter config
 
-        for m in args |> List.choose (isCallTo removers) do
-            fc <- Filters.remove fc (removal ev ctx config m)
+        for drop in removals do
+            fc <- Filters.remove fc drop
 
         // ALLSELECTED is not a table here: it restores filters (`allSelectedModifier`).
         for m in args |> List.choose (isCallTo [ "ALLSELECTED" ]) do
