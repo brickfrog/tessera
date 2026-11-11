@@ -16,6 +16,10 @@ namespace Tessera.DaxEngine
 //     being computed (the rows then depend on what is computed so far), nor for a set-up whose
 //     relationships let a table's rows depend on themselves (then the order of evaluation decides
 //     what is refused). Bounded by size; cleared when full.
+//   - `PredicateKey` (in `QueryDefs.Predicates`, so for one query): the filter a True/False filter
+//     argument of CALCULATE stands for, when the predicate reads nothing but its own columns,
+//     constants, variables and pure functions (`closedVariables` in Functions/Filter.fs). Keyed on
+//     the expression, the model, the columns and the values of the variables it reads.
 //
 // Everything else a result reads is fixed for the model or the query: the data, the clock, the
 // identity, the query's definitions, roles (a role's model is another model).
@@ -271,4 +275,68 @@ type VisCache(config: RelConfig) =
 
     /// How many entries there are (for tests).
     member _.Count = entries.Count
+
+/// Values as keys: the same case and the same bits (so 0.0 and -0.0 differ, as they can in DAX).
+module ValueKey =
+    let same (a: DaxValue) (b: DaxValue) : bool =
+        match a, b with
+        | DaxValue.Blank, DaxValue.Blank -> true
+        | DaxValue.Integer x, DaxValue.Integer y -> x = y
+        | DaxValue.Decimal x, DaxValue.Decimal y -> BitConverter.DoubleToInt64Bits x = BitConverter.DoubleToInt64Bits y
+        | DaxValue.Currency x, DaxValue.Currency y -> x = y
+        | DaxValue.String x, DaxValue.String y -> String.Equals(x, y, StringComparison.Ordinal)
+        | DaxValue.Boolean x, DaxValue.Boolean y -> x = y
+        | DaxValue.DateTime x, DaxValue.DateTime y ->
+            BitConverter.DoubleToInt64Bits x = BitConverter.DoubleToInt64Bits y
+        | _ -> false
+
+    let hash (v: DaxValue) : int =
+        match v with
+        | DaxValue.Blank -> 1
+        | DaxValue.Integer x -> HashCode.Combine(2, x)
+        | DaxValue.Decimal x -> HashCode.Combine(3, BitConverter.DoubleToInt64Bits x)
+        | DaxValue.Currency x -> HashCode.Combine(4, x)
+        | DaxValue.String x -> HashCode.Combine(5, StringComparer.Ordinal.GetHashCode x)
+        | DaxValue.Boolean x -> HashCode.Combine(6, x)
+        | DaxValue.DateTime x -> HashCode.Combine(7, BitConverter.DoubleToInt64Bits x)
+
+/// The key of a True/False filter argument's filter in `QueryDefs.Predicates`: the expression, the
+/// model, the columns it filters, and the values of the variables it reads (see `predicateFilter` in Functions/Filter.fs).
+[<Sealed; AllowNullLiteral>]
+type PredicateKey(expr: Expr, model: Model, columns: BColumn array, values: DaxValue array) =
+    let hash =
+        let mutable h =
+            HashCode.Combine(RuntimeHelpers.GetHashCode expr, RuntimeHelpers.GetHashCode model)
+
+        for c in columns do
+            h <- h * 31 + RuntimeHelpers.GetHashCode c
+
+        for v in values do
+            h <- h * 31 + ValueKey.hash v
+
+        h
+
+    member _.Expr = expr
+    member _.Model = model
+    member _.Columns = columns
+    member _.Values = values
+    override _.GetHashCode() = hash
+
+    override this.Equals(o: obj) =
+        match o with
+        | :? PredicateKey as k ->
+            obj.ReferenceEquals(this, k)
+            || (hash = k.GetHashCode()
+                && obj.ReferenceEquals(expr, k.Expr)
+                && obj.ReferenceEquals(model, k.Model)
+                && columns.Length = k.Columns.Length
+                && Array.forall2 (fun (a: BColumn) b -> obj.ReferenceEquals(a, b)) columns k.Columns
+                && values.Length = k.Values.Length
+                && Array.forall2 ValueKey.same values k.Values)
+        | _ -> false
+
+/// The most entries a per-query cache (`QueryDefs.Predicates`, `QueryDefs.Results`) keeps: it is
+/// emptied when full.
+module QueryCache =
+    let limit = 200_000
 
