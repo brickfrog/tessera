@@ -628,3 +628,50 @@ let tests =
                 Expect.equal coverage.Code ExitCode.usage coverage.Err
         ]
     ]
+
+/// Optional: the dynamic format strings of a real model (TESSERA_SAMPLE_MODEL).
+[<Tests>]
+let sampleTests =
+    testList "engine: format strings on a sample model (TESSERA_SAMPLE_MODEL)" [
+        match System.Environment.GetEnvironmentVariable "TESSERA_SAMPLE_MODEL" with
+        | null
+        | "" ->
+            testCase "not configured"
+            <| fun () -> skiptest "TESSERA_SAMPLE_MODEL is not set"
+        | path ->
+            // Every measure's format string at the grand total is either told, or refused: never
+            // another error, and the values are those of the query without --formatted.
+            testCase "each measure's format string is told or refused"
+            <| fun () ->
+                let ok =
+                    function
+                    | Ok v -> v
+                    | Error e -> failtestf "%s" (TessError.message e)
+
+                use t = new TempDir()
+                let _, db = ModelIO.loadPath path |> ok
+                let fixture = t.Combine "fixture"
+                FixtureInit.write db fixture { Rows = 200; Seed = 1L } false |> ok |> ignore
+                let loaded, _ = Fixture.loadAndCheck db fixture |> ok
+                let p = Engine.prepare db loaded.Store |> ok
+                let mutable told = 0
+
+                for table in db.Model.Tables do
+                    for m in table.Measures do
+                        let name = table.Name.Replace("'", "''")
+                        let measure = m.Name.Replace("]", "]]")
+                        let q = $"EVALUATE ROW ( \"v\", '{name}'[{measure}] )"
+
+                        match Engine.evaluateQueryFormatted p q, Engine.evaluateQuery p q with
+                        | Ok [ f ], Ok [ r ] ->
+                            Expect.equal f.Result r q
+
+                            match f.Cells with
+                            | [ [| Some _ |] ] -> told <- told + 1
+                            | _ -> ()
+                        | Error(DaxNotSupported _), _
+                        | _, Error _ -> ()
+                        | other, _ -> failtestf "%s: %A" q other
+
+                Expect.isGreaterThan told 0 "some measure's format string is told"
+    ]
