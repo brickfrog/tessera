@@ -2131,23 +2131,29 @@ tess query ./Sales.pbip --data ./fixtures --formatted "EVALUATE SUMMARIZECOLUMNS
   that work with calculation groups also work in dynamic format strings for measures": Learn). A measure with a
   static format string has no internal measure, and a `DEFINE MEASURE` has no format string at all.
 - **Calculation items.** An item with a format string expression gives its result, evaluated where the item is
-  applied; an item without one leaves the measure's ("all the calculation items except YOY% should use the format of
-  the current measure in context": Learn). `SELECTEDMEASUREFORMATSTRING ()` in an item is the measure's format
+  applied; an item without one leaves the measure's static one ("all the calculation items except YOY% should use the
+  format of the current measure in context": Learn). `SELECTEDMEASUREFORMATSTRING ()` in an item is the measure's format
   string, a dynamic one evaluated there.
 - **`--formatted`** gives format strings to the columns of a top-level `SUMMARIZECOLUMNS`, `ADDCOLUMNS` or `ROW`
   whose expression is a measure reference (`[Sales]`, `'Sales'[Sales]`, `IGNORE ( [Sales] )`), as Power BI asks
   for them: one hidden column per measure, `IGNORE`d, so `SUMMARIZECOLUMNS` keeps the same rows. Each value is
   formatted as `FORMAT ( <value>, <format string> )` is, with everything [FORMAT](#text-functions-and-format)
   refuses refused here too (other cultures among it); BLANK is the empty text. The rows and values are the same as
-  without the flag. Other columns, and the columns of other table expressions (`TOPN ( ... )`, a model table),
-  have none. Text and CSV output show the formatted values; JSON adds them (see [`query`](#query)).
+  without the flag. Other columns, and the columns of other table expressions (`TOPN ( ... )`, a model table, a
+  variable: `DEFINE VAR v = SUMMARIZECOLUMNS ( ... ) EVALUATE v`), are not told: they get no format string, whatever
+  the measure's. A format string and the formatted value come together: a value FORMAT can't format refuses the
+  query, also where its format string is known. Text and CSV output show the formatted values; JSON adds them (see
+  [`query`](#query)). An error in a row the result doesn't keep (one `SUMMARIZECOLUMNS` drops, one `START AT`
+  skips) doesn't count.
 - **Local only.** A server's DAX query result carries no format strings, so `--formatted` is refused with
   `xmla:` models.
 
 Refused, as the sources leave them open or disagree: two calculation items with format string expressions that could
 both be applied to one measure (Learn: "The highest precedence calculation group dynamic format string is the only
 one applied"; SQLBI: `SELECTEDMEASUREFORMATSTRING` in the lower one sees "the one already modified by another
-calculation item"), and an item without one whose expression may select one of a lower group; a measure reference,
+calculation item"), and an item without one whose expression may select one of a lower group; a measure's dynamic
+format string (other than a text constant) under an item without a format string expression (Learn: it is "a lower
+precedence to any calculation group", and where that is evaluated inside the item is not said); a measure reference,
 `SELECTEDMEASURE` or a user-defined function in a format string evaluated under a calculation item (whether the item
 applies to them there); the internal `_<measure> FormatString` measure in a model with calculation groups; a format
 string expression that returns BLANK, an empty text or something that is not text; `SELECTEDMEASUREFORMATSTRING` for

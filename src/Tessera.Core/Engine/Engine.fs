@@ -1367,54 +1367,43 @@ let private evaluateOne (ctx: Ctx) (e: Evaluate) : QueryResult = evaluateTable c
 
 /// One EVALUATE with the format strings of its measure columns (see `evaluateQueryFormatted`).
 let private evaluateFormatted (ctx: Ctx) (e: Evaluate) : FormattedResult =
-    let expr, probes = Functions.FormatStrings.withProbes e.Table
+    let expr, probes, pairs = Functions.FormatStrings.withProbes e.Table
     let table, order = evaluateTable ctx { e with Table = expr }
 
-    let indexOf (name: string) =
-        table.Cols |> Array.findIndex (fun c -> isNull c.Table && c.Name = name)
-
-    let hidden = probes |> List.map (fun p -> indexOf p.Hidden) |> Set.ofList
-
-    let keep =
-        [| 0 .. table.Cols.Length - 1 |]
-        |> Array.filter (fun i -> not (hidden.Contains i))
+    // The hidden columns are the last ones, after the name/expression pairs.
+    let shownCount = table.Cols.Length - probes.Length
+    let firstPair = shownCount - pairs
 
     let shown =
         TableVal(
-            keep |> Array.map (fun i -> table.Cols.[i]),
+            Array.sub table.Cols 0 shownCount,
             table.Count,
             table.BaseTable,
             table.BaseRows,
-            keep |> Array.map (fun i -> table.Data.[i]),
+            Array.sub table.Data 0 shownCount,
             table.Config
         )
 
     let probeOf =
-        keep
-        |> Array.map (fun i ->
+        Array.init shownCount (fun i ->
             probes
-            |> List.tryFind (fun p -> indexOf p.Column = i)
-            |> Option.map (fun p -> p, indexOf p.Hidden))
+            |> List.tryFindIndex (fun p -> firstPair + p.Pair = i)
+            |> Option.map (fun k -> probes.[k], shownCount + k))
 
     {
         Result = toResult shown order
         Cells = [
             for row in order ->
                 probeOf
-                |> Array.mapi (fun k probe ->
+                |> Array.mapi (fun c probe ->
                     match probe with
                     | Some(p, h) ->
-                        match table.Get(h, row) with
+                        match Functions.FormatStrings.probeValue (table.Get(h, row)) with
                         | DaxValue.String f ->
                             Some {
                                 FormatString = f
                                 Text =
-                                    Functions.FormatStrings.render
-                                        ctx
-                                        p.Reference.Span
-                                        p.Column
-                                        f
-                                        (table.Get(keep.[k], row))
+                                    Functions.FormatStrings.render ctx p.Reference.Span p.Column f (table.Get(c, row))
                             }
                         | _ -> None
                     | None -> None)

@@ -44,6 +44,8 @@ let private baseModel = {
         "T", "BadEmpty", "1"
         "T", "OwnSmfs", "1"
         "T", "Unformattable", "1"
+        "T", "Sparse", "IF ( SUM ( T[Qty] ) > 15, SUM ( T[Qty] ) )"
+        "T", "LowRefuses", "SUM ( T[Qty] )"
     ]
     Functions = []
 }
@@ -65,6 +67,9 @@ let private formats (db: Database) =
     dynamic "BadEmpty" "\"\""
     dynamic "OwnSmfs" "SELECTEDMEASUREFORMATSTRING ()"
     dynamic "Unformattable" "\"c\""
+    // BLANK (refused) where the measure is BLANK or small.
+    dynamic "Sparse" "IF ( ISBLANK ( SELECTEDMEASURE () ), BLANK (), \"0.0\" )"
+    dynamic "LowRefuses" "IF ( SELECTEDMEASURE () < 15, BLANK (), \"0.0\" )"
 
 let private prepareWith (m: TestModel) (change: Database -> unit) : Engine.Prepared =
     let db, store = build m
@@ -357,6 +362,60 @@ let tests =
             <| fun () ->
                 refused (plain.Value) (r "[OwnSmfs]") "SELECTEDMEASUREFORMATSTRING in the dynamic format string"
 
+            testCase "a refusal in a row the result doesn't keep doesn't count"
+            <| fun () ->
+                // SUMMARIZECOLUMNS drops A, whose value is BLANK (and whose format string is refused).
+                let f = formatted (plain.Value) (summarize "[Sparse]")
+                Expect.equal (byKey f 1) [ some "0.0" "20.0"; some "0.0" "30.0" ] "A dropped"
+
+                refused (plain.Value) "EVALUATE ADDCOLUMNS ( VALUES ( T[Item] ), \"v\", [Sparse] )" "returns BLANK"
+
+                // START AT skips A.
+                let f =
+                    formatted
+                        (plain.Value)
+                        "EVALUATE SUMMARIZECOLUMNS ( T[Item], \"v\", [LowRefuses] ) ORDER BY T[Item] START AT \"B\""
+
+                Expect.equal (column f 1) [ some "0.0" "20.0"; some "0.0" "30.0" ] "A skipped"
+
+                refused
+                    (plain.Value)
+                    "EVALUATE SUMMARIZECOLUMNS ( T[Item], \"v\", [LowRefuses] ) ORDER BY T[Item]"
+                    "returns BLANK"
+
+            testCase "columns are matched by position, whatever their names"
+            <| fun () ->
+                for q in
+                    [
+                        "EVALUATE ROW ( \"T[x]\", [Total], \"[y]\", [Dyn] )"
+                        "EVALUATE ROW ( \"Total\", [Plain], \"x\", [Total] )"
+                        "EVALUATE SUMMARIZECOLUMNS ( T[Item], \"Item\", [Total] )"
+                    ] do
+                    match Engine.evaluateQueryFormatted (plain.Value) q, Engine.evaluateQuery (plain.Value) q with
+                    | Ok [ f ], Ok [ r ] ->
+                        Expect.equal f.Result r q
+                        let last = f.Result.Columns.Length - 1
+
+                        Expect.isTrue
+                            (f.Cells |> List.forall (fun row -> row.[last].IsSome))
+                            $"the last column has its format string: {q}"
+
+                        Expect.isTrue
+                            (f.Cells |> List.forall (fun row -> row.[0].IsNone || last = 1))
+                            $"the first column has none: {q}"
+                    | Error a, Error b -> Expect.equal a b q
+                    | a, b -> failtestf "%A\n%A\n%s" a b q
+
+            testCase "a model in another culture is refused"
+            <| fun () ->
+                let p =
+                    prepareWith baseModel (fun db ->
+                        formats db
+                        db.Model.Culture <- "de-DE")
+
+                refused p (r "[Total]") "de-DE"
+                Expect.equal (rows p (r "[Total]")) [ [ QueryValue.Int64 60L ] ] "without the flag it works"
+
             testCase "a format string FORMAT doesn't implement is refused"
             <| fun () -> refused (plain.Value) (r "[Unformattable]") "formatting [r]"
         ]
@@ -433,7 +492,7 @@ let tests =
                 notSupported (grouped.Value) (r "CALCULATE ( [Dyn], High[High] = \"Smfs\" )") "SELECTEDMEASURE ()"
                 notSupported (grouped.Value) (r "CALCULATE ( [Self], High[High] = \"Smfs\" )") "the measure [Self]"
 
-            testCase "a dynamic format string under an item without one: only if it evaluates no measure"
+            testCase "a dynamic format string under an item without one: only a text constant"
             <| fun () ->
                 let f =
                     formatted
@@ -442,10 +501,11 @@ let tests =
 
                 Expect.equal (column f 0) [ some "0.0" "120.0" ] ""
 
-                refused
-                    (grouped.Value)
-                    "EVALUATE SUMMARIZECOLUMNS ( TREATAS ( { \"Same\" }, High[High] ), \"v\", [Dyn] )"
-                    "under the calculation item 'High'[Same]"
+                for m in [ "Dyn"; "ByItem" ] do
+                    refused
+                        (grouped.Value)
+                        $"EVALUATE SUMMARIZECOLUMNS ( TREATAS ( {{ \"Same\" }}, High[High] ), \"v\", [{m}] )"
+                        "under the calculation item 'High'[Same], which has no format string expression"
 
             // The sources disagree (FormatStrings.fs): Learn has the highest one "the only one
             // applied", SQLBI the lower one see the higher one's.
@@ -501,6 +561,18 @@ let tests =
                     (grouped.Value)
                     (r "CALCULATE ( [Total], High[High] = \"Smfs\", Low[Low] = \"Lower Pct\" )")
                     "the sources disagree"
+
+            testCase "a cell made BLANK by several items under Visual is refused"
+            <| fun () ->
+                let p =
+                    prepareWith baseModel (fun db ->
+                        withGroups db
+                        db.Model.SelectionExpressionBehavior <- SelectionExpressionBehaviorType.Visual)
+
+                refused
+                    p
+                    "EVALUATE SUMMARIZECOLUMNS ( T[Item], TREATAS ( { \"Pct\", \"Same\" }, High[High] ), \"v\", [Total], \"n\", COUNTROWS ( T ) )"
+                    "selectionExpressionBehavior Visual"
 
             testCase "the internal measure is refused in a model with calculation groups"
             <| fun () -> notSupported (grouped.Value) (r "T[_Dyn FormatString]") "calculation groups"

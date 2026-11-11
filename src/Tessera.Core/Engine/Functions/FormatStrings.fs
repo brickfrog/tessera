@@ -41,6 +41,9 @@ namespace Tessera.DaxEngine.Functions
 //     Learn has the highest one "the only one applied", and nests the lower item inside it;
 //   - an item with no format string expression above one that has one (where the lower item's
 //     format string expression is evaluated, inside the higher item's expression, is not said);
+//   - a measure's dynamic format string (other than a text constant) under an item with no format
+//     string expression: it is "a lower precedence to any calculation group" (Learn), and where it
+//     is evaluated inside the item's expression is not said either;
 //   - a measure reference, SELECTEDMEASURE or a user-defined function in a format string evaluated
 //     under a calculation item (whether the item applies to them there is not said), and the
 //     internal `_<measure> FormatString` measure in a model with calculation groups (whether items
@@ -53,6 +56,7 @@ namespace Tessera.DaxEngine.Functions
 
 open System
 open System.Collections.Concurrent
+open System.Runtime.CompilerServices
 open Tessera
 open Tessera.DaxAst
 open Tessera.DaxEngine
@@ -91,11 +95,11 @@ module FormatStrings =
     /// SELECTEDMEASURE () in it is the measure (`CalculationGroups.current`).
     let private ownGroup = BCalcGroup("", null, Int32.MinValue)
 
-    let private ownItems =
-        ConcurrentDictionary<BMeasure, BCalcItem>(HashIdentity.Reference)
+    // Weak: a bound model (one per DEFINE COLUMN / TABLE query) must not live as long as the process.
+    let private ownItems = ConditionalWeakTable<BMeasure, BCalcItem>()
 
     let private ownItem (m: BMeasure) (source: SourceText) : BCalcItem =
-        ownItems.GetOrAdd(m, fun m -> BCalcItem(ownGroup, m.Name, 0, -1, source, lazy (parse source)))
+        ownItems.GetValue(m, fun m -> BCalcItem(ownGroup, m.Name, 0, -1, source, lazy (parse source)))
 
     /// Whether this is a measure's own dynamic format string being evaluated, not a calculation item.
     let isOwn (app: ItemApplication) =
@@ -335,6 +339,22 @@ module FormatStrings =
                             (ev.Scalar(inner, expr))
                     )
                 | None ->
+                    // "If a measure itself has a dynamic format string, it's considered as a lower
+                    // precedence to any calculation group in the model" (Learn): where it is
+                    // evaluated inside the item's expression is not said (a text constant is the
+                    // same everywhere).
+                    match m.FormatStringSource with
+                    | Some source when
+                        (match (Fn.unparen (parse source)).Kind with
+                         | StringLiteral _ -> false
+                         | _ -> true)
+                        ->
+                        Fail.notSupported
+                            ctx
+                            span
+                            $"the dynamic format string of [{m.Name}] under the calculation item {itemName item}, which has no format string expression (where the measure's is evaluated inside the item is not documented)"
+                    | _ -> ()
+
                     let inner = {
                         moved with
                             Items = {
@@ -347,8 +367,7 @@ module FormatStrings =
 
     /// The internal measure `Table[_<measure> FormatString]` of a measure with a dynamic format
     /// string, if that is what `table[name]` names.
-    let private internalMeasures =
-        ConcurrentDictionary<BMeasure, BMeasure>(HashIdentity.Reference)
+    let private internalMeasures = ConditionalWeakTable<BMeasure, BMeasure>()
 
     let internalMeasure (ctx: Ctx) (table: BTable) (name: string) : BMeasure option =
         let suffix = " FormatString"
@@ -363,24 +382,14 @@ module FormatStrings =
             match ctx.Model.Measures.TryGetValue measureName with
             | true, m when obj.ReferenceEquals(m.Table, table) && m.FormatStringSource.IsSome ->
                 Some(
-                    internalMeasures.GetOrAdd(
+                    internalMeasures.GetValue(
                         m,
                         fun m ->
                             let source = m.FormatStringSource.Value
                             let at: Span = { Start = 0; Length = 0 }
 
-                            let reference: Expr = {
-                                Kind =
-                                    Qualified(
-                                        {
-                                            Name = m.Table.Name
-                                            Quoted = true
-                                            Span = at
-                                        },
-                                        m.Name
-                                    )
-                                Span = at
-                            }
+                            // Bracketed: Table[Name] would be a column of the same name.
+                            let reference: Expr = { Kind = Bracketed m.Name; Span = at }
 
                             let body: Expr = {
                                 Kind = Call({ Name = ownName; Span = at }, [ reference ])
@@ -400,13 +409,18 @@ module FormatStrings =
         Column: string
         Hidden: string
         Reference: Expr
+        /// Which name/expression pair it is, counting every pair of the call from 0.
+        Pair: int
     }
 
     /// The query's table expression with a hidden column per measure column (a name/expression pair
     /// whose expression is a measure reference) of a top-level SUMMARIZECOLUMNS, ADDCOLUMNS or ROW,
     /// holding the cell's format string. As Power BI asks for a dynamic format string: "\"v_Sales_Amount_FormatString\",
     /// IGNORE ( 'Sales'[_Sales Amount FormatString] )" (SQLBI), so SUMMARIZECOLUMNS keeps the same rows.
-    let withProbes (table: Expr) : Expr * Probe list =
+    ///
+    /// Also returns the number of name/expression pairs: they are the last columns of the result,
+    /// before the hidden ones.
+    let withProbes (table: Expr) : Expr * Probe list * int =
         let e = Fn.unparen table
 
         match e.Kind with
@@ -426,7 +440,7 @@ module FormatStrings =
                 | _ -> None
 
             match start with
-            | None -> table, []
+            | None -> table, [], 0
             | Some start ->
                 let args = Array.ofList args
 
@@ -434,6 +448,8 @@ module FormatStrings =
                     match (Fn.unparen x).Kind with
                     | Call(n, [ inner ]) when fn = "SUMMARIZECOLUMNS" && n.Name.ToUpperInvariant() = "IGNORE" -> inner
                     | _ -> x
+
+                let mutable pairs = 0
 
                 let probes = [
                     let mutable i = start
@@ -447,14 +463,17 @@ module FormatStrings =
                                 Column = column
                                 Hidden = $"\u0001format string {i}"
                                 Reference = reference
+                                Pair = pairs
                             }
                         | _ -> ()
 
+                        pairs <- pairs + 1
                         i <- i + 2
                 ]
 
-                if probes.IsEmpty then
-                    table, []
+                // Anything after the pairs (a malformed call) and the evaluator's own error.
+                if probes.IsEmpty || start + 2 * pairs <> args.Length then
+                    table, [], 0
                 else
                     let extra =
                         probes
@@ -488,8 +507,26 @@ module FormatStrings =
                         e with
                             Kind = Call(name, List.ofArray args @ extra)
                     },
-                    probes
-        | _ -> table, []
+                    probes,
+                    pairs
+        | _ -> table, [], 0
+
+    let private deferMark = "\u0000"
+
+    /// An error of the probe as a value: kind, message and place.
+    let private defer (kind: string) (what: string) (at: string) =
+        String.Join(deferMark, [| ""; kind; what; at |])
+
+    /// A probe's value, with an error it returned raised.
+    let probeValue (v: DaxValue) : DaxValue =
+        match v with
+        | DaxValue.String s when s.StartsWith(deferMark, StringComparison.Ordinal) ->
+            match s.Split deferMark with
+            | [| _; "n"; what; at |] -> raise (EngineException(DaxNotSupported(what, at)))
+            | [| _; "i"; what; at |] -> raise (EngineException(DaxInvalid(what, at)))
+            | [| _; _; what; at |] -> raise (DaxRuntimeException(what, at))
+            | _ -> invalidOp "a malformed deferred error"
+        | v -> v
 
     /// A cell's value formatted with its format string, as FORMAT would (BLANK is "").
     let render (ctx: Ctx) (span: Span) (column: string) (formatString: string) (v: DaxValue) : string =
@@ -550,13 +587,20 @@ module FormatStrings =
                         call.Span
                         $"SELECTEDMEASUREFORMATSTRING of [{m.Name}], which has no format string")
 
-        // The cell probe of `--formatted`: unreachable from DAX.
+        // The cell probe of `--formatted`: unreachable from DAX. An error is returned as a value
+        // (`deferred`): it is raised only for a row the result keeps (SUMMARIZECOLUMNS computes
+        // rows it then drops, START AT skips some).
         Fn.scalar probeName internalFamily (1, 1) (Fn.typeIs DaxType.String) (fun ev ctx call ->
             match measureNamed ctx call.Args.[0] with
             | Some m ->
-                match atReference ev ctx call.Args.[0].Span m with
-                | Some f -> DaxValue.String f
-                | None -> DaxValue.Blank
+                try
+                    match atReference ev ctx call.Args.[0].Span m with
+                    | Some f -> DaxValue.String f
+                    | None -> DaxValue.Blank
+                with
+                | EngineException(DaxNotSupported(what, at)) -> DaxValue.String(defer "n" what at)
+                | EngineException(DaxInvalid(what, at)) -> DaxValue.String(defer "i" what at)
+                | DaxRuntimeException(what, at) -> DaxValue.String(defer "r" what at)
             | None -> DaxValue.Blank)
 
         // The body of `Table[_<measure> FormatString]`: unreachable from DAX.
