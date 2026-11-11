@@ -1312,7 +1312,9 @@ let tests =
                                 @ [
                                     "Sales", "Formatted", "PATHITEM ( [Amount], 1 )"
                                     "Sales", "Uses Formatted", "[Formatted] & \"!\""
-                                    "Sales", "Selected", "CALCULATE ( [Amount], ALLSELECTED ( Product ) )"
+                                    "Sales",
+                                    "Selected",
+                                    "CALCULATE ( [Amount], KEEPFILTERS ( ALLSELECTED ( Product ) ) )"
                                     "Sales", "Rolled", "COUNTROWS ( SUMMARIZE ( Sales, ROLLUP ( Sales[Qty] ) ) )"
                                     "Sales", "By Label", "CALCULATE ( [Amount], Customer[Label] = \"ANN\" )"
                                     "Sales", "Via Function", "Shout ( \"a\" )"
@@ -1328,7 +1330,12 @@ let tests =
                 Expect.equal coverage.["measure:Sales/Amount"] [] "supported"
                 Expect.equal coverage.["measure:Sales/Formatted"] [ "PATHITEM" ] "a function"
                 Expect.equal coverage.["measure:Sales/Uses Formatted"] [ "PATHITEM" ] "through a measure"
-                Expect.equal coverage.["measure:Sales/Selected"] [ "ALLSELECTED" ] "an argument form"
+
+                Expect.equal
+                    coverage.["measure:Sales/Selected"]
+                    [ "KEEPFILTERS ( ALLSELECTED ( ... ) )" ]
+                    "an argument form"
+
                 Expect.equal coverage.["measure:Sales/Rolled"] [ "ROLLUP in SUMMARIZE"; "ROLLUP" ] "a helper"
                 Expect.equal coverage.["measure:Sales/By Label"] [ "PATHITEM" ] "through a calculated column"
                 Expect.equal coverage.["measure:Sales/Via Function"] [ "PATHITEM" ] "through a function"
@@ -1341,7 +1348,7 @@ let tests =
                     "COUNTROWS ( GROUPBY ( Sales ) )", "GROUPBY without a group-by column"
                     "CALCULATE ( [Amount], CROSSFILTER ( Sales[ProductKey], Product[ProductKey], ONEWAY_LEFTFILTERSRIGHT ) )",
                     "CROSSFILTER direction"
-                    "CALCULATE ( [Amount], ALLSELECTED () )", "ALLSELECTED"
+                    "CALCULATE ( [Amount], ALLSELECTED (), ALL ( Product ) )", "ALLSELECTED together with"
                     "COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], NONVISUAL ( VALUES ( Product[Color] ) ) ) )",
                     "NONVISUAL"
                 ]

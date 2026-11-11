@@ -334,6 +334,11 @@ module Filter =
         let t = cols.[0].Table
         let all = combinations cols (allRows t true)
 
+        // It stands for FILTER over ALL; whether that iteration leaves a shadow filter context for an
+        // ALLSELECTED in the predicate is not documented.
+        let all =
+            Shadows.notAnIteration "the rows of a True/False filter argument of CALCULATE" all
+
         let keep = [|
             for row in 0 .. all.Count - 1 do
                 let v = ev.Scalar(Context.pushRow ctx all row, e)
@@ -343,6 +348,434 @@ module Filter =
         |]
 
         Filters.ofTable ctx e.Span (Tables.select all keep)
+
+    // ---- ALLSELECTED ------------------------------------------------------------------------------
+    //
+    // "ALLSELECTED can either return a table or it can remove filters and restore a previous filter
+    // context. In both cases, it does so by accessing and using the last shadow filter context left
+    // by an iterator on the stack of filter contexts" (SQLBI, "The definitive guide to ALLSELECTED",
+    // quoted as "the guide" below). The rules followed:
+    //
+    // - Every iteration leaves a shadow filter context holding the table it iterates ("containing
+    //   the result of the table expression being iterated"). A row context becomes one when it
+    //   becomes filters (`Context.transition`); one that hasn't yet is read from `Ctx.Rows`.
+    // - Per column, the LAST shadow filter context that filters the column is restored: "ALLSELECTED
+    //   restores the last shadow filter context on all the columns that have a shadow filter
+    //   context, maintaining the explicit filter, if any, on the other columns"; with no arguments
+    //   it does so "for each column". With a column it "returns the values of the column considering
+    //   only the last shadow filter, if any", "ignoring any cross-filter".
+    // - Inside SUMMARIZECOLUMNS with no iteration since its row: "ALLSELECTED removes filters for the
+    //   currently-iterated group-by column, restoring the original filter set by SUMMARIZECOLUMNS
+    //   itself" (SQLBI, "ALLSELECTED best practices"); inside an iteration in such a row, "the old
+    //   mechanism takes effect", the shadow filter contexts.
+    //
+    // Refused, as the sources don't settle them: a column with a filter of its own and no shadow
+    // filter context, for the column forms ("ALLSELECTED returns all column values if no shadow
+    // filter context exists" is only shown for a column that is cross-filtered); the shadow of an
+    // iteration over a table restoring the columns of the tables that table expands to; a
+    // group-by column of SUMMARIZECOLUMNS that an iteration since doesn't iterate (the two
+    // mechanisms "work together" in ways not described); SUMMARIZECOLUMNS inside an iteration or
+    // inside another's row; anything that changed a SUMMARIZECOLUMNS row's filters before
+    // ALLSELECTED; row contexts that are not an iterator's (`Shadows.notAnIteration`); KEEPFILTERS
+    // around it and other modifiers next to it in one CALCULATE.
+
+    type private Targets =
+        | Everything
+        | OfTable of BTable
+        | OfColumns of BColumn array
+
+    let private targetsOf (ev: IEval) (ctx: Ctx) (call: Call) : Targets =
+        match call.Args with
+        | [] -> Everything
+        | [ single ] when (ev.TryModelTable(ctx, single)).IsSome -> OfTable (ev.TryModelTable(ctx, single)).Value
+        | args ->
+            // "ALLSELECTED arguments must be a base table or base columns. You cannot use a table
+            // expression or a column expression" (dax.guide/allselected).
+            let cols =
+                args
+                |> List.map (fun a ->
+                    match ev.TryColumn(ctx, a) with
+                    | Some c -> c
+                    | None ->
+                        Fail.invalid
+                            ctx
+                            a.Span
+                            "the arguments of ALLSELECTED are the name of a model table or columns of one model table, not an expression")
+                |> Array.ofList
+
+            sameTable ctx call.Span "ALLSELECTED" cols |> ignore
+            OfColumns cols
+
+    type private Entry =
+        | Iterated of TableVal
+        | Group of SelectionMark
+
+    /// The shadow filter contexts and the SUMMARIZECOLUMNS rows, newest first.
+    let private entries (ctx: Ctx) : Entry list = [
+        for rc in ctx.Rows -> Iterated rc.Table
+        for m in ctx.Filter.Scope do
+            match m with
+            | Shadow t -> yield Iterated t
+            | Selection s -> yield Group s
+            | _ -> ()
+    ]
+
+    type private Cover =
+        | Own
+        | Related
+        | NotCovered
+
+    /// Whether the shadow filter context of an iteration over `t` filters the column: one of the
+    /// table's columns, or a column of a table its rows reach over relationships.
+    let private cover (t: TableVal) (c: BColumn) : Cover =
+        if t.IsPureBase then
+            if obj.ReferenceEquals(c.Table, t.BaseTable) then Own
+            elif t.Config.IsExpanded(t.BaseTable, c.Table) then Related
+            else NotCovered
+        elif t.Cols |> Array.exists (fun x -> obj.ReferenceEquals(x.Lineage, c)) then
+            Own
+        elif
+            not (isNull t.BaseTable)
+            && (t.Config.Expanded t.BaseTable).Length > 1
+            && t.Config.IsExpanded(t.BaseTable, c.Table)
+        then
+            Related
+        else
+            NotCovered
+
+    let private has (cols: BColumn array) (c: BColumn) =
+        cols |> Array.exists (fun x -> obj.ReferenceEquals(x, c))
+
+    let private describe (c: BColumn) = $"'{c.Table.Name}'[{c.Name}]"
+
+    /// Whether a filter of the context is on the column itself (not a cross-filter).
+    let private filtersDirectly (fc: FilterCtx) (c: BColumn) : bool =
+        fc.Filters
+        |> List.exists (fun f ->
+            match f with
+            | OnColumn(x, _) -> obj.ReferenceEquals(x, c)
+            | Tuples(cols, _) -> has cols c
+            | Rows(t, _, cfg) -> cfg.IsExpanded(t, c.Table))
+
+    /// What ALLSELECTED does in a context.
+    type private Plan = {
+        /// The shadow filter contexts to restore, each with the columns it gives back.
+        Shadows: (TableVal * BColumn array) list
+        /// Inside a SUMMARIZECOLUMNS row with no iteration since: the row, and the group-by
+        /// columns whose filter is removed.
+        Selection: (SelectionMark * BColumn array) option
+    }
+
+    let private plan (ctx: Ctx) (span: Span) (targets: Targets) : Plan =
+        if ctx.CallerRows then
+            Fail.notSupported
+                ctx
+                span
+                "ALLSELECTED inside a function that was called from a row context (whether the caller's row context is a shadow filter context there is not documented)"
+
+        if not (isNull ctx.Group) then
+            Fail.invalid ctx span "ALLSELECTED can't be used inside GROUPBY"
+
+        let all = entries ctx
+
+        for e in all do
+            match e with
+            | Iterated t ->
+                match Shadows.whyNot t with
+                | Some what ->
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"ALLSELECTED under {what} (it is not an iterator's, and whether it leaves a shadow filter context is not documented)"
+                | None -> ()
+            | Group _ -> ()
+
+        let groups =
+            all
+            |> List.indexed
+            |> List.choose (fun (i, e) ->
+                match e with
+                | Group s -> Some(i, s)
+                | Iterated _ -> None)
+
+        let selection, shadows =
+            match groups with
+            | [] ->
+                None,
+                all
+                |> List.choose (fun e ->
+                    match e with
+                    | Iterated t -> Some t
+                    | Group _ -> None)
+            | [ (i, s) ] ->
+                if all.Length > i + 1 then
+                    Fail.notSupported
+                        ctx
+                        span
+                        "ALLSELECTED inside SUMMARIZECOLUMNS that is evaluated inside an iteration (how the rows of SUMMARIZECOLUMNS and the shadow filter context of the iteration combine is not documented)"
+
+                Some s,
+                all
+                |> List.take i
+                |> List.choose (fun e ->
+                    match e with
+                    | Iterated t -> Some t
+                    | Group _ -> None)
+            | _ ->
+                Fail.notSupported
+                    ctx
+                    span
+                    "ALLSELECTED inside a SUMMARIZECOLUMNS evaluated in a row of another SUMMARIZECOLUMNS"
+
+        // Only the SUMMARIZECOLUMNS mechanism: no iteration since the row.
+        let summarizing = selection.IsSome && shadows.IsEmpty
+        let fc = ctx.Filter
+        let cfg = fc.Config
+
+        let columns =
+            match targets with
+            | Everything -> ctx.Model.Tables |> Array.collect _.Columns
+            | OfTable t -> Filters.expandedColumns cfg t
+            | OfColumns cols -> cols
+
+        let restored = Dictionary<TableVal, ResizeArray<BColumn>>(HashIdentity.Reference)
+        let order = ResizeArray<TableVal>()
+        let released = ResizeArray<BColumn>()
+
+        for c in columns do
+            let found =
+                shadows
+                |> List.tryPick (fun t ->
+                    match cover t c with
+                    | NotCovered -> None
+                    | how -> Some(t, how))
+
+            match found with
+            | Some(t, Related) ->
+                Fail.notSupported
+                    ctx
+                    span
+                    $"ALLSELECTED of {describe c} under the shadow filter context of an iteration over '{t.BaseTable.Name}', a table related to '{c.Table.Name}' (whether the shadow of a table filters the columns of the tables it expands to is not documented)"
+            | Some(t, _) ->
+                match restored.TryGetValue t with
+                | true, cols -> cols.Add c
+                | _ ->
+                    restored.[t] <- ResizeArray [ c ]
+                    order.Add t
+            | None ->
+                match selection with
+                | Some s when has s.Groups c ->
+                    if not summarizing then
+                        Fail.notSupported
+                            ctx
+                            span
+                            $"ALLSELECTED of {describe c}, a group-by column of SUMMARIZECOLUMNS, inside an iteration that does not iterate it (how the SUMMARIZECOLUMNS mechanism and shadow filter contexts combine is not documented)"
+
+                    released.Add c
+                | _ ->
+                    match targets with
+                    | OfColumns _ when not summarizing && filtersDirectly fc c ->
+                        Fail.notSupported
+                            ctx
+                            span
+                            $"ALLSELECTED of {describe c} while {describe c} has a filter of its own and no iteration has a shadow filter context on it (the sources show the column form only for a column that is cross-filtered)"
+                    | _ -> ()
+
+        match targets with
+        | OfTable t ->
+            let outside =
+                Seq.append (restored.Values |> Seq.concat) released
+                |> Seq.tryFind (fun c -> not (obj.ReferenceEquals(c.Table, t)))
+
+            match outside with
+            | Some c ->
+                Fail.notSupported
+                    ctx
+                    span
+                    $"ALLSELECTED ( '{t.Name}' ) where what it restores is on {describe c}, a column of a table related to it (whether the table's argument covers the tables it expands to is not documented)"
+            | None -> ()
+        | _ -> ()
+
+        {
+            Shadows = [ for t in order -> t, restored.[t].ToArray() ]
+            Selection =
+                if summarizing then
+                    Some(selection.Value, released.ToArray())
+                else
+                    None
+        }
+
+    /// The filter context once ALLSELECTED has restored what the plan says.
+    let private restore (ctx: Ctx) (span: Span) (p: Plan) : FilterCtx =
+        let fc = ctx.Filter
+
+        match p.Selection with
+        | Some(s, _) when not (obj.ReferenceEquals(fc.Filters, s.Row)) ->
+            Fail.notSupported
+                ctx
+                span
+                "ALLSELECTED inside SUMMARIZECOLUMNS after the filters of the row were changed (by CALCULATE): what is restored then is not documented"
+        | Some(_, [||]) -> fc
+        | Some(s, released) ->
+            // The filters the groups were computed under, with the group of the row on the
+            // group-by columns that keep it.
+            let kept = s.Groups |> Array.filter (fun c -> not (has released c))
+            let keys = s.Keys |> List.collect (Filters.project (has kept))
+            let before = Filters.add (Filters.build fc.Config s.Before) keys true
+            Filters.buildWith (Unfiltered(has released) :: fc.Scope) fc.Config before.Filters
+        | None ->
+            match p.Shadows with
+            | [] -> fc
+            | parts ->
+                let all = parts |> List.collect (fun (_, cols) -> List.ofArray cols) |> Array.ofList
+                let cleared = Filters.remove fc (has all)
+
+                // A filter on the date column of a date table removes the filters on the rest of the
+                // table when CALCULATE applies it (see `DateTable`); whether a restored one does is
+                // not documented.
+                for c in all do
+                    if DateTable.standing cleared.Config c <> DateTable.No then
+                        let others =
+                            cleared.Filters
+                            |> List.exists (fun f ->
+                                let on (x: BColumn) =
+                                    cleared.Config.IsExpanded(c.Table, x.Table) && not (has all x)
+
+                                match f with
+                                | OnColumn(x, _) -> on x
+                                | Tuples(cols, _) -> cols |> Array.exists on
+                                | Rows(t, _, cfg) -> Filters.expandedColumns cfg t |> Array.exists on)
+
+                        if others then
+                            Fail.notSupported
+                                ctx
+                                span
+                                $"ALLSELECTED restoring a filter on the date column {describe c} while other columns of '{c.Table.Name}' are filtered (whether the date-table rule applies to it is not documented)"
+
+                let filters =
+                    parts
+                    |> List.collect (fun (t, cols) ->
+                        Filters.ofTable ctx span t |> List.collect (Filters.project (has cols)))
+
+                Filters.mark (Filters.add cleared filters false) (Restored all)
+
+    /// ALLSELECTED as a filter argument of CALCULATE: "This function removes the corresponding
+    /// filters from the filter context, restoring the last shadow filter context. It does not
+    /// materialize the resulting table when called directly in a filter argument of CALCULATE or
+    /// CALCULATETABLE" (dax.guide/allselected).
+    let private allSelectedModifier (ev: IEval) (ctx: Ctx) (call: Call) : FilterCtx =
+        restore ctx call.Span (plan ctx call.Span (targetsOf ev ctx call))
+
+    /// The values of some columns in the rows of an iterated table, as a table of those columns.
+    let private valuesIn (ctx: Ctx) (span: Span) (t: TableVal) (cols: BColumn array) : TableVal =
+        if t.IsPureBase then
+            combinations cols t.BaseRows
+        else
+            for c in cols do
+                if
+                    t.Cols
+                    |> Array.filter (fun x -> obj.ReferenceEquals(x.Lineage, c))
+                    |> Array.length
+                        >
+                        1
+                then
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"ALLSELECTED of {describe c} under the shadow of a table with two columns of {describe c}"
+
+            let positions = cols |> Array.map (Tables.columnIndexOfLineage t)
+            let distinct = Tables.distinct ctx.Model (Tables.project t positions)
+
+            Tables.ofColumns
+                (cols |> Array.map Tables.modelColumn)
+                (Array.init cols.Length distinct.Column)
+                distinct.Count
+
+    /// ALLSELECTED as a table: "With a column, ALLSELECTED returns the values of the column
+    /// considering only the last shadow filter, if any. ALLSELECTED returns all column values if no
+    /// shadow filter context exists. With a table, ALLSELECTED returns a table containing all the
+    /// rows remaining after applying the last shadow filter on any column that has a shadow filter;
+    /// or, ALLSELECTED returns the last explicit filter context if no shadow filter context is
+    /// available" (the guide).
+    let private allSelectedTable (ev: IEval) (ctx: Ctx) (call: Call) : TableVal =
+        let span = call.Span
+
+        match targetsOf ev ctx call with
+        | Everything ->
+            // "ALLSELECTED without arguments can be used only as a CALCULATE or CALCULATETABLE
+            // modifier" (dax.guide/allselected).
+            Fail.invalid
+                ctx
+                span
+                "ALLSELECTED () with no argument can only be used as a filter argument of CALCULATE or CALCULATETABLE"
+        | OfTable t as targets ->
+            let fc = restore ctx span (plan ctx span targets)
+            Tables.ofBase fc.Config t (Filters.visible fc t).Rows
+        | OfColumns cols as targets ->
+            let p = plan ctx span targets
+
+            match p.Selection, p.Shadows with
+            | Some _, _ ->
+                if cols.Length > 1 then
+                    Fail.notSupported ctx span "ALLSELECTED of several columns as a table inside SUMMARIZECOLUMNS"
+
+                let c = cols.[0]
+                let fc = restore ctx span p
+                let seen = Filters.idsIn c (Filters.visible fc c.Table) true
+
+                // The guide's column form ignores cross-filters; what SUMMARIZECOLUMNS restores is a
+                // filter context, which a cross-filter is part of. Answered when the two agree.
+                let own =
+                    Filters.build
+                        fc.Config
+                        (fc.Filters
+                         |> List.collect (Filters.project (fun x -> obj.ReferenceEquals(x, c))))
+
+                if Filters.idsIn c (Filters.visible own c.Table) true <> seen then
+                    Fail.notSupported
+                        ctx
+                        span
+                        $"ALLSELECTED ( {describe c} ) as a table inside SUMMARIZECOLUMNS while other filters cross-filter {describe c} (whether they count is not documented)"
+
+                Tables.ofColumns [| Tables.modelColumn c |] [| seen |> Array.map c.ValueOfId |] seen.Length
+            | None, [] ->
+                if cols.Length > 1 then
+                    Fail.notSupported
+                        ctx
+                        span
+                        "ALLSELECTED of several columns as a table with no shadow filter context on them (whether that is every combination, or the combinations under the filters of their table, is not documented)"
+
+                // No filter of its own (`plan` refused that), no shadow: every value.
+                let c = cols.[0]
+                let ids = Filters.idsIn c (RowSet.All c.Table.Size) true
+                Tables.ofColumns [| Tables.modelColumn c |] [| ids |> Array.map c.ValueOfId |] ids.Length
+            | None, [ (t, restored) ] when restored.Length = cols.Length -> valuesIn ctx span t cols
+            | None, _ ->
+                Fail.notSupported
+                    ctx
+                    span
+                    "ALLSELECTED of several columns as a table, when not one shadow filter context holds them all"
+
+    /// The columns whose filter ALLSELECTED restored from a shadow filter context, and that nothing
+    /// has replaced since: whether such a filter counts as filtering the column (ISFILTERED,
+    /// ISCROSSFILTERED) is not documented.
+    let private restoredFilter (fc: FilterCtx) (c: BColumn) : bool =
+        let rec go (marks: ScopeMark list) =
+            match marks with
+            | [] -> false
+            | Restored cols :: rest -> has cols c || go rest
+            | Unfiltered gone :: rest -> not (gone c) && go rest
+            | _ :: rest -> go rest
+
+        go fc.Scope
+
+    let private anyRestored (fc: FilterCtx) : bool =
+        fc.Scope
+        |> List.exists (fun m ->
+            match m with
+            | Restored cols -> cols |> Array.exists (restoredFilter fc)
+            | _ -> false)
 
     /// CALCULATE's context: dax.guide/calculate, steps 1 to 5.
     let private calculateContext (ev: IEval) (ctx: Ctx) (call: Call) : Ctx =
@@ -359,7 +792,11 @@ module Filter =
         let filters =
             args
             |> List.choose (fun a ->
-                if (isCallTo removers a).IsSome || (isCallTo relationshipModifiers a).IsSome then
+                if
+                    (isCallTo removers a).IsSome
+                    || (isCallTo relationshipModifiers a).IsSome
+                    || (isCallTo [ "ALLSELECTED" ] a).IsSome
+                then
                     None
                 else
                     let inner, keep =
@@ -392,6 +829,10 @@ module Filter =
         for m in args |> List.choose (isCallTo removers) do
             fc <- Filters.remove fc (removal ev ctx config m)
 
+        // ALLSELECTED is not a table here: it restores filters (`allSelectedModifier`).
+        for m in args |> List.choose (isCallTo [ "ALLSELECTED" ]) do
+            fc <- allSelectedModifier ev { moved with Filter = fc } m
+
         // A filter on the date column of a date table first removes the filters on that table.
         fc <- DateTable.onFilterArguments ctx call.Span fc filters
 
@@ -401,11 +842,37 @@ module Filter =
         { moved with Filter = fc }
 
     let private checkCalculate (args: Expr list) : string option =
-        args
-        |> List.tryPick (fun a ->
-            match (Fn.unparen a).Kind with
-            | Call(fn, _) when fn.Name.ToUpperInvariant() = "ALLSELECTED" -> Some "ALLSELECTED"
-            | _ -> None)
+        let filters = args |> List.skip (min 1 args.Length)
+        let named (names: string list) (a: Expr) = (isCallTo names a).IsSome
+        let selected = filters |> List.filter (named [ "ALLSELECTED" ])
+
+        let others = [
+            "ALL"
+            "REMOVEFILTERS"
+            "ALLEXCEPT"
+            "ALLCROSSFILTERED"
+            "ALLNOBLANKROW"
+            "USERELATIONSHIP"
+            "CROSSFILTER"
+        ]
+
+        let underKeep =
+            filters
+            |> List.exists (fun a ->
+                match isCallTo [ "KEEPFILTERS" ] a with
+                | Some k -> k.Args |> List.exists (named [ "ALLSELECTED" ])
+                | None -> false)
+
+        if underKeep then
+            // KEEPFILTERS changes how a filter is added; ALLSELECTED here is no filter to add.
+            Some "KEEPFILTERS ( ALLSELECTED ( ... ) )"
+        elif selected.Length > 1 then
+            Some "more than one ALLSELECTED in one CALCULATE (in which order they restore is not documented)"
+        elif not selected.IsEmpty && filters |> List.exists (named others) then
+            Some
+                "ALLSELECTED together with another filter-removing or relationship modifier in one CALCULATE (in which order they apply is not documented)"
+        else
+            None
 
     /// The visible values of a column: VALUES counts the blank row, DISTINCT doesn't ("DISTINCT
     /// never returns the blank row": SQLBI, "Blank row in DAX").
@@ -427,6 +894,16 @@ module Filter =
                 EngineException(
                     DaxNotSupported(
                         $"whether '{c.Table.Name}'[{c.Name}] is filtered while it is not computed yet and another calculated column of '{c.Table.Name}' is being computed",
+                        ""
+                    )
+                )
+            )
+
+        if restoredFilter ctx.Filter c then
+            raise (
+                EngineException(
+                    DaxNotSupported(
+                        $"whether {describe c} is filtered by the filter ALLSELECTED restored from a shadow filter context is not documented",
                         ""
                     )
                 )
@@ -493,6 +970,9 @@ module Filter =
         }
 
         Fn.table "ALL" "Filter" (0, -1) (allTable "ALL" true)
+
+        // ALLSELECTED: see `allSelectedTable` and `allSelectedModifier`.
+        Fn.table "ALLSELECTED" "Filter" (0, -1) allSelectedTable
         Fn.table "ALLNOBLANKROW" "Filter" (1, -1) (allTable "ALLNOBLANKROW" false)
 
         // FILTER: the rows of the table for which the condition is true, in a row context each.
@@ -575,6 +1055,12 @@ module Filter =
                 | Some t -> t
                 | None -> (ev.Column(ctx, call.Args.[0])).Table
 
+            if anyRestored ctx.Filter then
+                Fail.notSupported
+                    ctx
+                    call.Span
+                    "ISCROSSFILTERED under a filter ALLSELECTED restored from a shadow filter context (whether it counts is not documented)"
+
             if not (Filters.visible ctx.Filter t).IsAll then
                 DaxValue.Boolean true
             else
@@ -641,6 +1127,9 @@ module Filter =
                     else
                         inScope rest
                 | Unfiltered gone :: rest -> not (gone c) && inScope rest
+                // A filter ALLSELECTED put back is not a grouping or a context transition.
+                | Restored cols :: rest -> not (has cols) && inScope rest
+                | (Shadow _ | Selection _) :: rest -> inScope rest
 
             DaxValue.Boolean(inScope ctx.Filter.Scope))
 

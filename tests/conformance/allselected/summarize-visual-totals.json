@@ -1,0 +1,54 @@
+{
+  "title": "In SUMMARIZE over a CROSSJOIN of its group-by columns, ALLSELECTED gives the visual totals and keeps a filter on another table",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "CALCULATETABLE (",
+    "    SUMMARIZE (",
+    "        CROSSJOIN ( DISTINCT ( 'Product'[Category] ), DISTINCT ( 'Date'[Year] ) ),",
+    "        'Product'[Category],",
+    "        'Date'[Year],",
+    "        \"Amount\", [Sales Amount],",
+    "        \"Visual Total\", CALCULATE ( [Sales Amount], ALLSELECTED () ),",
+    "        \"All Years\", CALCULATE ( [Sales Amount], ALLSELECTED ( 'Date'[Year] ) ),",
+    "        \"All Categories\", CALCULATE ( [Sales Amount], ALLSELECTED ( 'Product'[Category] ) )",
+    "    ),",
+    "    Customer[Country] = \"US\"",
+    ")",
+    "ORDER BY 'Product'[Category], 'Date'[Year]"
+  ],
+  "ordered": true,
+  "expected": [
+    {
+      "columns": [
+        { "name": "Product[Category]", "type": "string" },
+        { "name": "Date[Year]", "type": "int64" },
+        { "name": "[Amount]", "type": "decimal" },
+        { "name": "[Visual Total]", "type": "decimal" },
+        { "name": "[All Years]", "type": "decimal" },
+        { "name": "[All Categories]", "type": "decimal" }
+      ],
+      "rows": [
+        [ "Accessories", 2023, 110.0, 310.0, 110.0, 210.0 ],
+        [ "Accessories", 2024, null, 310.0, 110.0, 100.0 ],
+        [ "Vehicles", 2023, 100.0, 310.0, 200.0, 210.0 ],
+        [ "Vehicles", 2024, 100.0, 310.0, 200.0, 100.0 ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/allselected-function-dax",
+      "quote": "This function can be used to obtain visual totals in queries.",
+      "supports": "the page's example has this shape (CALCULATETABLE over SUMMARIZE of a CROSSJOIN of two DISTINCT columns, with ALLSELECTED (), ALLSELECTED of one group-by column and of the other) and shows the visual total on every row, the total for all years constant per category and the total for all categories constant per year, with the CALCULATETABLE filters kept"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/the-definitive-guide-to-allselected/",
+      "quote": "ALLSELECTED restores the last shadow filter context on all the columns that have a shadow filter context, maintaining the explicit filter, if any, on the other columns",
+      "supports": "the filter on Customer[Country] is not on a column the iteration has, so it stays"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "US customers are Ann (1) and Bob (2): Sales rows 1 (Bike, Vehicles, 2023, 100), 2 (Helmet, Accessories, 2023, 40), 3 (Helmet, 2023, 20), 4 (Lock, Accessories, 2023-12-31, 50) and 7 (Bike, 2024, 100). The CROSSJOIN has 2 categories x 2 years. Amount: Accessories 2023 = 40 + 20 + 50 = 110, Accessories 2024 none, Vehicles 2023 = 100, Vehicles 2024 = 100. Visual Total restores the iterated combinations (all four) and keeps Country = US: 310. All Years restores every year and keeps the row's category: Accessories 110, Vehicles 200. All Categories keeps the row's year: 2023 = 110 + 100 = 210, 2024 = 100.",
+  "tags": [ "allselected", "summarize", "crossjoin", "calculatetable", "visual-total", "shadow-filter-context" ]
+}

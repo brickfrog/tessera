@@ -2259,9 +2259,42 @@ tess query model.bim --data fixture "EVALUATE { USERNAME () }" --user-name 'CONT
 with `--user-name`, `--user-principal-name`, `--user-object-id`, `--user-culture` and `--custom-data` (for `--data`
 only: a server takes them from the connection).
 
+#### ALLSELECTED
+
+`ALLSELECTED ()`, `ALLSELECTED ( table )` and `ALLSELECTED ( column, ... )`, as a filter argument of `CALCULATE` /
+`CALCULATETABLE` and (with an argument) as a table. They follow two mechanisms the sources describe:
+
+- **Shadow filter contexts** (SQLBI, "The definitive guide to ALLSELECTED"). Every iterator leaves one, holding the
+  table it iterates. For each column, ALLSELECTED restores the last one that filters it. As a modifier with a
+  table or no argument, the explicit filters on the other columns stay. As a table, a column gives its values in
+  that shadow, or every value when no shadow filters it. A cross-filter doesn't count.
+- **SUMMARIZECOLUMNS rows** (SQLBI, "ALLSELECTED best practices"). With no iteration since the row, ALLSELECTED
+  removes the filter of the group-by columns it names. They get back the filters SUMMARIZECOLUMNS was evaluated
+  under: its filter arguments and the caller's. These are a visual's totals. Inside an iteration in the row, the
+  shadow filter contexts apply.
+
+`SUMMARIZE` over a table with no columns but its group-by columns (Microsoft Learn's visual-totals example) counts
+as an iteration over the groups.
+
+It refuses what the sources leave open:
+- a column form on a column that has a filter of its own but no shadow (shown only for a cross-filtered column);
+- the shadow of an iteration over a table restoring a column of a table it expands to (`SUMX ( Sales, ... )` with
+  `ALLSELECTED ( Product[Color] )` or `ALLSELECTED ()`);
+- a group-by column of SUMMARIZECOLUMNS inside an iteration that doesn't iterate it;
+- a SUMMARIZECOLUMNS row whose filters a CALCULATE changed first;
+- SUMMARIZECOLUMNS inside an iteration or inside another's row;
+- `KEEPFILTERS ( ALLSELECTED ( ... ) )`, or more than one ALLSELECTED, or another removing or relationship
+  modifier next to it in one `CALCULATE`;
+- several columns as a table unless one shadow holds them all;
+- `ISFILTERED`, `ISCROSSFILTERED` and `HASONEFILTER` of a filter restored from a shadow;
+- row contexts that aren't an iterator's: a calculated column, `ORDER BY`, a True/False filter argument, a wider
+  `SUMMARIZE`, `GROUPBY`, a function called from a row context.
+
+`NONVISUAL` stays refused.
+
 #### What it refuses
 
-- **Not implemented yet:** `ALLSELECTED`, calendar-based time intelligence, the trigonometric functions, window
+- **Not implemented yet:** calendar-based time intelligence, the trigonometric functions, window
   functions (`OFFSET`, `INDEX`, `WINDOW`, `RANK`, `ROWNUMBER`), visual calculations,
   query parameters, detail rows, KPIs, natural joins of tables with model columns (joined over their expanded
   tables). Row-level and object-level
