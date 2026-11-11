@@ -96,6 +96,44 @@ let tests =
                     [ "Bob!" ]
                     [ "Cy!" ]
                 ])
+            // "The <Name> argument can be skipped if the correspondent <Expression> argument is a
+            // simple column reference of the iterated table" (dax.guide, SELECTCOLUMNS); Learn's
+            // OFFSET example selects an unqualified [CurrentYearSales] this way.
+            testCase "SELECTCOLUMNS takes an unnamed [Column] of the iterated table" (fun () ->
+                let added =
+                    "ADDCOLUMNS ( VALUES ( Customer[Country] ), \"N\", COUNTROWS ( Sales ) )"
+
+                Expect.equal
+                    (columns (query (p ()) $"EVALUATE SELECTCOLUMNS ( {added}, [N] )"))
+                    [ "[N]", "int64" ]
+                    "an extension column keeps its name"
+
+                returns (p ()) $"EVALUATE SELECTCOLUMNS ( {added}, [N] )" [ [ 7 ]; [ 7 ] ]
+
+                Expect.equal
+                    (columns (query (p ()) "EVALUATE SELECTCOLUMNS ( Product, [Color] )"))
+                    [ "Product[Color]", "string" ]
+                    "a model column keeps its name"
+
+                // ... and its lineage: red products are 1 and 2, 570.
+                returns
+                    (p ())
+                    "EVALUATE ROW ( \"x\", CALCULATE ( [Amount], SELECTCOLUMNS ( FILTER ( Product, Product[Color] = \"Red\" ), [ProductKey] ) ) )"
+                    [ [ 570 ] ]
+
+                // A measure's name is an expression, which needs a name.
+                Expect.equal
+                    (queryCode (p ()) "EVALUATE SELECTCOLUMNS ( Product, [Amount] )")
+                    "dax-invalid"
+                    "a measure"
+
+                // An outer row context's column is not a column of the iterated table.
+                Expect.equal
+                    (queryCode
+                        (p ())
+                        "EVALUATE ADDCOLUMNS ( SELECTCOLUMNS ( { 1 }, \"K\", [Value] ), \"x\", COUNTROWS ( SELECTCOLUMNS ( Product, [K] ) ) )")
+                    "dax-invalid"
+                    "an outer column")
             testCase "a column name used twice is an error" (fun () ->
                 Expect.equal
                     (queryCode (p ()) "EVALUATE ADDCOLUMNS ( Customer, \"Name\", 1, \"name\", 2 )")

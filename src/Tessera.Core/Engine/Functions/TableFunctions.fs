@@ -21,6 +21,13 @@ module TableFunctions =
         | _ -> false
 
     /// An expression evaluated for every row of a table: its declared type and its values.
+    /// Whether `[name]` is a measure here (what an unqualified bracketed name resolves to first).
+    let private isMeasureName (ctx: Ctx) (name: string) =
+        (ctx.Scope.InQuery
+         && not (isNull ctx.Query)
+         && ctx.Query.Measures.ContainsKey name)
+        || ctx.Model.Measures.ContainsKey name
+
     let private extensionColumn (ev: IEval) (ctx: Ctx) (table: TableVal) (expr: Expr) : DaxType * DaxValue array =
         let values =
             Array.init table.Count (fun row -> ev.Scalar(Context.pushRow ctx table row, expr))
@@ -828,7 +835,31 @@ module TableFunctions =
                         | Qualified _ -> ev.TryColumn(at, expr)
                         | _ -> None
 
+                    // "The <Name> argument can be skipped if the correspondent <Expression>
+                    // argument is a simple column reference of the iterated table" (dax.guide,
+                    // SELECTCOLUMNS): an unqualified [Column] of the table keeps that column, its
+                    // name and its lineage (Learn's OFFSET example selects [CurrentYearSales], a
+                    // column SUMMARIZECOLUMNS added). Not when the name is a measure's, or when
+                    // an outer row context's extension column of that name is what it reads.
+                    let ofTable =
+                        match name, (Fn.unparen expr).Kind with
+                        | None, Bracketed n when not (isMeasureName ctx n) ->
+                            let same (c: ColInfo) =
+                                String.Equals(c.Name, n, StringComparison.OrdinalIgnoreCase)
+
+                            match table.Cols |> Array.tryFind same with
+                            | Some c when
+                                not (isNull c.Table)
+                                && ctx.Rows
+                                   |> List.exists (fun rc ->
+                                       rc.Table.Cols |> Array.exists (fun o -> isNull o.Table && same o))
+                                ->
+                                None
+                            | found -> found
+                        | _ -> None
+
                     match name, source with
+                    | None, _ when ofTable.IsSome -> { ofTable.Value with Type = t }, values
                     | Some n, Some c ->
                         {
                             Name = n
