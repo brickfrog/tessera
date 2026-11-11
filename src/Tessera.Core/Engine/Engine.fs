@@ -672,6 +672,8 @@ let private bindWith
                 if c.IsKey then
                     table.MarkedKey <- Some column
 
+                column.IsDeclaredUnique <- c.IsKey || c.IsUnique
+
                 columns.Add column
                 table.ColumnByName.[c.Name] <- column
 

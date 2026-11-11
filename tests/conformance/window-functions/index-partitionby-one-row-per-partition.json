@@ -1,0 +1,50 @@
+{
+  "title": "INDEX with PARTITIONBY and no current partition returns the row at the position in every partition",
+  "model": "sales",
+  "query": "EVALUATE INDEX ( 1, ALL ( 'Product'[Category], 'Product'[Product], 'Product'[Price] ), ORDERBY ( 'Product'[Price], DESC ), PARTITIONBY ( 'Product'[Category] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Category]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "Product[Price]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          "Vehicles",
+          "Bike",
+          100.0
+        ],
+        [
+          "Accessories",
+          "Helmet",
+          20.0
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/introducing-window-functions-in-dax/",
+    "quote": "The result of the query contains the best-selling brand for each category.",
+    "supports": "INDEX ( 1, ..., ORDERBY ( [@Sales], DESC ), KEEP, PARTITIONBY ( 'Product'[Category] ) ) at the top of a query returns one row per category"
+  },
+  "confidence": "derived",
+  "derivation": "Vehicles by price descending: Bike 100, Scooter 50; Accessories: Helmet 20, Lock 10. The first of each: Bike and Helmet.",
+  "tags": [
+    "window-functions",
+    "index",
+    "orderby",
+    "partitionby",
+    "all",
+    "apply-semantics"
+  ]
+}

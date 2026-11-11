@@ -51,3 +51,4 @@ text-functions/rept-zero-times	not-supported
 udf/expr-parameter-and-the-row-context-of-the-caller	not-supported
 udf/untyped-parameter-type-check-with-isstring	not-supported
 variables/var-referenced-error-is-raised-even-in-untaken-branch	not-supported
+window-functions/offset-previous-row	error

@@ -2325,10 +2325,39 @@ It refuses what the sources leave open:
 
 `NONVISUAL` stays refused.
 
+
+#### Window functions
+
+`INDEX`, `OFFSET`, `WINDOW`, `RANK` and `ROWNUMBER`, with `ORDERBY` (ASC/DESC, `BLANKS DEFAULT`/`FIRST`/`LAST`),
+the blanks argument (`DEFAULT`, `KEEP`, `FIRST`, `LAST`), `PARTITIONBY` and `MATCHBY`. The header of
+`Engine/Functions/Window.fs` has the sources and the rules.
+
+- **The current row** is found by apply semantics (SQLBI): each model column of the relation takes its value from
+  the row context, or, when no row context has it, its values in the filter context (all combinations, no
+  auto-exist); every matching row of the relation is a current row, and the results are put together without
+  repeats (SQLBI's DISTINCT; Learn says only "a union"). `RANK` with more than one current row (a total) is BLANK;
+  `ROWNUMBER` then is refused. In a calculated column of the relation's table, the columns not computed yet are
+  left out when a computed unique column identifies the rows.
+- **Ties.** Rows that tie on every `ORDERBY` key are fine for `RANK`. For the others the engine adds columns in a way
+  no source documents, so a result that depends on how ties are broken is refused; a relation whose rows nothing
+  can tell apart is the documented error ("…'s Relation parameter may have duplicate rows, which isn't allowed"),
+  and so is a model table whose order ties and that has no unique column at all. A model table counts as
+  identified by a column the model declares its key or unique (TOM `IsKey`/`IsUnique`); one whose values just
+  happen to be unique is refused when the order ties.
+- An omitted `ORDERBY` orders by the relation's other columns; since the order they are added in is not
+  guaranteed, every order is tried and the call is refused if they disagree.
+
+Refused: an omitted relation (it is `ALLSELECTED` of the `ORDERBY` and `PARTITIONBY` columns), `reset` and axes
+(visual calculations), a column two nested row contexts both have (Learn: an error; SQLBI: the innermost),
+`RELATED` and related tables' columns in `PARTITIONBY`/`MATCHBY`, an `ORDERBY` column that is not the relation's,
+BLANK next to zero or negatives and mixed types in a key (as everywhere), a BLANK or fractional delta or bound, a
+model table with no declared key or unique column whose order happens not to tie, and calls where the sources' readings of
+which columns identify the current row (Learn, DAX Guide, SQLBI) give different results (`RANK` ordered by
+expressions only, say).
+
 #### What it refuses
 
-- **Not implemented yet:** calendar-based time intelligence, the trigonometric functions, window
-  functions (`OFFSET`, `INDEX`, `WINDOW`, `RANK`, `ROWNUMBER`), visual calculations,
+- **Not implemented yet:** calendar-based time intelligence, the trigonometric functions, visual calculations,
   query parameters, detail rows, KPIs, natural joins of tables with model columns (joined over their expanded
   tables). Row-level and object-level
   security are not applied (a query runs as an administrator's would).

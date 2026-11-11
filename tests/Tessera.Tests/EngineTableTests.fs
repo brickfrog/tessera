@@ -976,7 +976,7 @@ let tests =
             testCase "what a query can't have yet" (fun () ->
                 notSupported (p ()) "EVALUATE ROW ( \"v\", @p )" "@p"
                 notSupported (p ()) "EVALUATE ROW ( \"v\", PATHITEM ( 1, 1 ) )" "PATHITEM"
-                notSupported (p ()) "EVALUATE ADDCOLUMNS ( Customer, \"r\", ROWNUMBER () )" "ROWNUMBER")
+                notSupported (p ()) "EVALUATE INDEX ( 1, ROWS )" "visual")
             testCase "a syntax error in a query" (fun () ->
                 match queryError (p ()) "EVALUATE FILTER ( Sales, " with
                 | DaxSyntax("query", 1, _, _) -> ()

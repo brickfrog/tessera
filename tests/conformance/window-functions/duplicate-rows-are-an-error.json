@@ -1,0 +1,22 @@
+{
+  "title": "A relation with rows that no columns can tell apart is an error",
+  "model": "sales",
+  "query": "EVALUATE OFFSET ( 1, UNION ( VALUES ( 'Product'[Color] ), VALUES ( 'Product'[Color] ) ), ORDERBY ( 'Product'[Color], ASC ) )",
+  "expected": {
+    "error": "every color is in the relation twice, and the two rows are equal in every column"
+  },
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/best-practices/dax-understand-orderby",
+    "quote": "If the columns in ORDERBY and PARTITIONBY can’t uniquely identify each row, additional columns can be added to the ORDERBY clause if those extra columns allow each row to be uniquely identified. If that's not possible, an error is returned.",
+    "supports": "no column tells the two copies of a row apart"
+  },
+  "confidence": "derived",
+  "derivation": "UNION keeps duplicate rows: Red, Blue, Green twice each, in the one column. ORDERBY ( Color ) ties each pair, and there is no other column to add.",
+  "tags": [
+    "window-functions",
+    "offset",
+    "orderby",
+    "union",
+    "error"
+  ]
+}
