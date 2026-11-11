@@ -104,6 +104,7 @@
     <Compile Include="EngineFormatStringTests.fs" />
     <Compile Include="EngineSampleTests.fs" />
     <Compile Include="EnginePerfTests.fs" />
+    <Compile Include="EngineCacheTests.fs" />
     <Compile Include="TestSuiteTests.fs" />
     <Compile Include="TestCommandTests.fs" />
     <Compile Include="Main.fs" />
