@@ -1,0 +1,30 @@
+{
+  "title": "With no measure reference in CALCULATE, no calculation item is applied: CALCULATE ( 2, ... ) is 2",
+  "model": "f-calcgroup-order",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( 2, Adder[Addend] = \"Plus5\", Multiplier[Factor] = \"Mul10\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          2
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/avoiding-pitfalls-in-calculation-groups-precedence/",
+    "quote": "Because the first argument of CALCULATE is just a constant value, the calculation items are not applied at all.",
+    "supports": "the first puzzle: the result is 2"
+  },
+  "confidence": "published",
+  "tags": [
+    "calculation-groups",
+    "calculate"
+  ]
+}

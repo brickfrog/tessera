@@ -159,6 +159,7 @@ let private coverage (ctx: Ctx) (source: string) =
             "measures", ObjectKind.Measure
             "calculatedColumns", ObjectKind.Column
             "calculatedTables", ObjectKind.Table
+            "calculationItems", ObjectKind.CalculationItem
         ]
 
         if ctx.Json then
@@ -202,6 +203,7 @@ let private coverage (ctx: Ctx) (source: string) =
                     "measures", ObjectKind.Measure
                     "calculated columns", ObjectKind.Column
                     "calculated tables", ObjectKind.Table
+                    "calculation items", ObjectKind.CalculationItem
                 ] do
                 let all = ofKind kind
 

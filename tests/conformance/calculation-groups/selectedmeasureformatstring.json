@@ -1,0 +1,32 @@
+{
+  "title": "SELECTEDMEASUREFORMATSTRING () in an item is the format string of the measure",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Info[Info] = \"Format\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "#,0"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/selectedmeasureformatstring-function-dax",
+    "quote": "A string holding the format string of the measure that is currently in context when the calculation item is evaluated.",
+    "supports": "[Total] has the format string #,0"
+  },
+  "confidence": "derived",
+  "derivation": "The measure is [Total], whose format string is #,0.",
+  "tags": [
+    "calculation-groups",
+    "selectedmeasureformatstring",
+    "calculate"
+  ]
+}

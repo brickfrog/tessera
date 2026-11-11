@@ -935,6 +935,7 @@ module Context =
         Group = null
         CallerRows = false
         Identity = None
+        Items = ItemCtx.none
     }
 
     /// A row context on top of the others.

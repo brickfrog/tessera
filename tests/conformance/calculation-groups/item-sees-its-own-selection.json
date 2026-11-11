@@ -1,0 +1,41 @@
+{
+  "title": "An item's expression sees the filter that selected it",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Info[Info] = \"Selected\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Selected"
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "quote": "Here, we select two items on the calculation group, \"item1\" and \"item2\".",
+      "supports": "the page's multipleOrEmptySelectionExpression reads FILTERS ( 'MyCalcGroup'[Name] ) and returns \"Filters: item1, item2\": code applied for a selection still sees the filter on the group"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/controlling-format-strings-in-calculation-groups/",
+      "quote": "For this reason it is possible to retrieve the current selection of Metric[Metric] from the filter context.",
+      "supports": "a filter on a calculation group stays in the filter context while items are applied"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "The item is SELECTEDVALUE ( Info[Info] ); the filter Info[Info] = \"Selected\" is still in the filter context, so the value is \"Selected\".",
+  "uncertain": true,
+  "alternative": "If applying an item removed its own group's filter from the context its expression sees, SELECTEDVALUE ( Info[Info] ) would be BLANK (the group has four items).",
+  "tags": [
+    "calculation-groups",
+    "selectedvalue",
+    "calculate"
+  ]
+}

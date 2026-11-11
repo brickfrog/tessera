@@ -1,0 +1,37 @@
+{
+  "title": "Grouping by Adder evaluates [Just2Times10] with Plus5 applied to it: 25",
+  "model": "f-calcgroup-order",
+  "query": "EVALUATE SUMMARIZECOLUMNS ( Adder[Addend], \"v\", [Just2Times10] )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Adder[Addend]",
+          "type": "string"
+        },
+        {
+          "name": "[v]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          "Plus5",
+          25
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/avoiding-pitfalls-in-calculation-groups-precedence/",
+    "quote": "The result produced by the Just2Times10 measure reference is 25, as in our last puzzle.",
+    "supports": "the first EVALUATE of the page's query, grouped by Adder[Addend]"
+  },
+  "confidence": "published",
+  "tags": [
+    "calculation-groups",
+    "summarizecolumns",
+    "precedence",
+    "selectedmeasure"
+  ]
+}

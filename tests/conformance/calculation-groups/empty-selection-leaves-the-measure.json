@@ -1,0 +1,34 @@
+{
+  "title": "A filter on an item that doesn't exist selects no item: the measure is evaluated unchanged",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Adjust[Adjustment] = \"Nope\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          60
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+      "quote": "This is an example of an empty selection, as \"item4\" does not exist on this calculation group.",
+      "supports": "a filter on a name no item has is an empty selection; with no multipleOrEmptySelectionExpression the page's table gives \"Calculation group is not filtered\" for it"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "No item of Adjust is visible, so none applies: [Total] = 60.",
+  "tags": [
+    "calculation-groups",
+    "selection",
+    "calculate"
+  ]
+}

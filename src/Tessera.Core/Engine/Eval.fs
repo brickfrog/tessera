@@ -174,6 +174,12 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
 
     let evalMeasure (ctx: Ctx) (span: Span) (m: BMeasure) : DaxValue =
         if ctx.Measures |> List.exists (fun x -> obj.ReferenceEquals(x, m)) then
+            if not ctx.Items.Applied.IsEmpty then
+                Fail.notSupported
+                    ctx
+                    span
+                    $"measure [{m.Name}] evaluated again inside itself, through a calculation item"
+
             Fail.invalid ctx span $"circular dependency: measure [{m.Name}] refers to itself"
 
         if not (isNull ctx.Group) then
@@ -184,9 +190,7 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
         // then the expression with no row context and none of the caller's variables.
         let moved = Context.transition ctx span
 
-        match moved.Filter.Measures.TryGetValue(m :> obj) with
-        | true, v -> v
-        | _ ->
+        let body () =
             let inner = {
                 moved with
                     Scope = {
@@ -196,11 +200,45 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                     }
                     Measures = m :: ctx.Measures
                     Group = null
+                    Items = { moved.Items with Current = None }
             }
 
-            let v = ev.Scalar(inner, m.Expr)
-            moved.Filter.Measures.[m :> obj] <- v
-            v
+            ev.Scalar(inner, m.Expr)
+
+        let cached () =
+            match moved.Filter.Measures.TryGetValue(m :> obj) with
+            | true, v -> v
+            | _ ->
+                let v = body ()
+                moved.Filter.Measures.[m :> obj] <- v
+                v
+
+        if ctx.Model.CalcGroups.Length = 0 then
+            cached ()
+        else
+            // The measure reference may become a calculation item (Functions/CalculationGroups.fs).
+            match Functions.CalculationItems.next moved span m with
+            | Functions.NextItem.Item app ->
+                let inner = {
+                    moved with
+                        Scope = {
+                            Vars = Map.empty
+                            Source = app.Item.Source
+                            InQuery = false
+                        }
+                        Group = null
+                        Items = {
+                            Applied = app :: moved.Items.Applied
+                            Current = Some app
+                        }
+                }
+
+                ev.Scalar(inner, app.Item.Expr)
+            | Functions.NextItem.Blank -> DaxValue.Blank
+            | Functions.NextItem.Measure ->
+                // A value computed under an item in force depends on more than the filter
+                // context: only the plain measure is kept with it.
+                if moved.Items.Applied.IsEmpty then cached () else body ()
 
     /// Convert a VAL argument to the type its parameter asks for ("Value types ... support implicit
     /// type casting": Microsoft Learn, "DAX user-defined functions").
@@ -511,6 +549,8 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
 
     interface IEval with
 
+        member _.Measure(ctx, span, m) = evalMeasure ctx span m
+
         member _.ScalarOfTable(ctx, span, t) =
             if t.Cols.Length <> 1 then
                 Fail.invalid ctx span "a table of several columns was given where a single value is needed"
@@ -816,6 +856,10 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
                 | _ -> None
 
         match cached with
+        // "As soon as a calculation group is added to a semantic model, Power BI reports will use
+        // the variant data type for all measures" (Learn, "Calculation groups"): an item can make a
+        // measure return anything, so its type is the values'.
+        | _ when ctx.Model.CalcGroups.Length > 0 -> StaticType.Unknown
         | Some t -> t
         | None when ctx.Measures |> List.exists (fun x -> obj.ReferenceEquals(x, m)) ->
             // A measure that refers to itself: evaluating it is the error.

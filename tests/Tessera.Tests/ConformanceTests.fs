@@ -25,6 +25,7 @@ let private expectedUnsupported: Set<string> =
         "format"
         "time-intelligence"
         "math-functions"
+        "calculation-groups"
     ]
 
 /// Which of the engine's errors mean "not implemented" (see `RunConfig.defaults`).

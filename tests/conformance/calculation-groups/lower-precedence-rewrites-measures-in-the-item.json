@@ -1,0 +1,33 @@
+{
+  "title": "The lower-precedence item is applied to every measure reference the higher one produced: ( 60 + 2 ) + ( 3 + 2 ) = 67",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Scale[Scaling] = \"Plus Count\", Adjust[Adjustment] = \"Plus 2\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          67
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-calculation-group-precedence/",
+    "quote": "The application of YTD rewrites the only measure reference in the formula, which is Sales Amount.",
+    "supports": "after the higher-precedence item is applied, the next one rewrites the measure references of the result"
+  },
+  "confidence": "derived",
+  "derivation": "Scale (200) first: SELECTEDMEASURE () + [Count] = [Total] + [Count]. Adjust's Plus 2 then rewrites both measure references: ( 60 + 2 ) + ( 3 + 2 ) = 67.",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "precedence",
+    "selectedmeasure"
+  ]
+}

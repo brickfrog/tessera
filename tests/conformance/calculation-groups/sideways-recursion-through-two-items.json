@@ -1,0 +1,34 @@
+{
+  "title": "Sideways recursion two levels deep, as YOY% uses YOY and PY",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", CALCULATE ( [Total], Variant[Variant] = \"Ratio\" ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "double"
+        }
+      ],
+      "rows": [
+        [
+          -0.5
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/analysis-services/tabular-models/calculation-groups",
+    "quote": "For example, YOY% references both YOY and PY.",
+    "supports": "an item may refer to items that refer to others of the same group"
+  },
+  "confidence": "derived",
+  "derivation": "Ratio = DIVIDE ( Diff, Double ) = DIVIDE ( -60, 120 ) = -0.5. DIVIDE returns a decimal number (double).",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "selectedmeasure",
+    "sideways-recursion",
+    "divide"
+  ]
+}

@@ -614,6 +614,17 @@ module TableFunctions =
 
             match read items with
             | [] -> Fail.invalid ctx a.Span "ROLLUPADDISSUBTOTAL takes a column and the name of its subtotal column"
+            // "Nonvisual ... when the measure is grouped by the calculation group, subtotal values
+            // are hidden"; "Visual ... subtotal values are determined by evaluating the selected
+            // measure in the context of the calculation group" (Learn, "Calculation groups").
+            | levels when
+                levels
+                |> List.exists (fun (cols, _) -> cols |> Array.exists (fun c -> not (isNull c.Table.CalcGroup)))
+                ->
+                Fail.notSupported
+                    ctx
+                    a.Span
+                    "ROLLUPADDISSUBTOTAL over a calculation group's column (what its subtotals show depends on the model's selectionExpressionBehavior)"
             | levels -> RollUp levels
 
         let arguments =

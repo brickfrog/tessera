@@ -1,0 +1,40 @@
+{
+  "title": "SUMX over the items: the measure reference's context transition selects each item in turn",
+  "model": "f-calcgroup",
+  "query": "EVALUATE ROW ( \"r\", SUMX ( VALUES ( Adjust[Adjustment] ), [Total] ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          722
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-calculation-groups/",
+      "quote": "The application of a calculation item replaces a measure reference with the expression of the calculation item, still applying an implicit context transition.",
+      "supports": "the measure reference in the row context of an item is evaluated with that item selected"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-calculation-groups/",
+      "quote": "There is nothing magical about calculation groups: They are tables, and as such they can be filtered by CALCULATE like any other table.",
+      "supports": "the context transition filters the calculation group table like any other"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Current 60 + Only Total x10 600 + Plus 2 62 = 722.",
+  "tags": [
+    "calculation-groups",
+    "sumx",
+    "context-transition",
+    "selectedmeasure"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "title": "An item is applied to a measure reference once: not again to the measures that measure refers to",
+  "model": "f-calcgroup",
+  "query": [
+    "DEFINE MEASURE T[Plus One] = [Total] + 1",
+    "EVALUATE ROW ( \"r\", CALCULATE ( [Plus One], Adjust[Adjustment] = \"Plus 2\" ) )"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]",
+          "type": "int64"
+        }
+      ],
+      "rows": [
+        [
+          63
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/using-calculation-groups-to-selectively-replace-measures-in-dax-expressions/",
+    "quote": "The calculation item is applied only once at the top-level calculation and never again.",
+    "supports": "the reference to [Total] inside [Plus One] is not replaced"
+  },
+  "confidence": "derived",
+  "derivation": "[Plus One] becomes [Plus One] + 2 = ( 60 + 1 ) + 2 = 63; applying Plus 2 to [Total] as well would give 65.",
+  "tags": [
+    "calculation-groups",
+    "calculate",
+    "selectedmeasure",
+    "define-measure"
+  ]
+}
