@@ -77,6 +77,60 @@ namespace Tessera.DaxEngine
 //     filters, the relationships, the model and the query, must go into the keys in Caching.fs.
 //   - The row sets and arrays a function gets from the context (`Filters.visible`,
 //     `Filters.visibleStored`) are shared between contexts and threads: never modify them.
+//
+// ---- Incremental filter contexts -----------------------------------------------------------------
+//
+// An iterator with a measure per row makes a filter context per row that differs from its
+// neighbours' in one filter, and each needs the fact table's visible rows. A context made by
+// `Filters.add` keeps the context of the filters it kept (`FilterCtx.Base`: the parent less what the
+// new filters replace, the same object for every row of an iteration), and its rows of a table are
+// worked out from that context's rows: `Filters.compute` over the added filters alone, starting from
+// the base's rows instead of all of them. For a transition on a dimension row that is the fact rows
+// of one key (an index lookup) instead of a scan. `mark`, `remove` and `withConfig` keep a chain of
+// bases (each through the same change), up to a few deep.
+//
+// Why it is exact. Write V(L, t) for the rows of table t that `compute` gives under the filter list
+// L. Each of its steps on t is one of: an intersection with what one filter allows of t's rows (a
+// filter on t's columns, a table filter on t or on a table whose expanded table holds t, a filter
+// pairing columns of several tables, tested row by row), or, for a regular many-to-one relationship
+// t -> d, the preimage of V(L, d) under the row map. A preimage distributes over intersections
+// (f^-1(A n B) = f^-1(A) n f^-1(B)), and V(L, d) is itself such an intersection, so by induction
+// over the relationships (acyclic: `VisCache.Usable`) V(L, t) is the intersection over the filters f
+// of L of V([f], t): for any split of L into A @ B, V(A @ B, t) = V(A, t) n V(B, t), and starting
+// `compute` over B from V(A, t) instead of all rows gives exactly that. `IsAll` agrees too: it is
+// set only where no step applied, and a step applies under A @ B exactly when it does under A or B.
+// The members are a set, so the order of the intersections doesn't matter.
+//
+// What breaks it, and falls back to the full computation (`VisCache.Intersective`, per table: none
+// of the tables reached from it over regular many-to-one relationships may have any of these):
+//   - a relationship that filters both ways, and a limited (many-to-many) one: their step takes
+//     the IMAGE of the other table's rows, and an image does not distribute over intersections
+//     (f(A n B) can be smaller than f(A) n f(B)); they also refuse a filter by whether it keeps
+//     every row, which depends on all the filters together;
+//   - a one-to-one relationship (it filters both ways);
+//   - anything being computed (`VisCache.Usable`: a calculated table's rows are skipped while it is
+//     computed and nothing at all is filtered, which depends on the whole list).
+// KEEPFILTERS and a filter the new ones replace need no fallback: the base is the context of the
+// filters KEPT, whatever was removed, and KEEPFILTERS only intersects. Roles need none either: a
+// role's model is another prepared model, with its rows already deleted (`Engine.asRoles`).
+//
+// Errors: the two computations don't read the same things (the incremental one may apply a filter
+// to fewer rows, or to none), so one could raise where the other doesn't. It is used only where
+// nothing it or the full computation reads can raise (`VisCache.Safe`): every relationship in
+// force builds, the tables reached have their rows and blank row decided, and the columns the
+// filters name are computed, none of them failed or gated. (`compute` reads no other column: a
+// table filter is read through the relationships' row maps.) If it raises all the same, the attempt is thrown away and the full
+// computation runs, so what is raised is always what the full computation raises.
+//
+// Check mode (`IncrementalStats.Check`, for one model or for the process through
+// `IncrementalStats.Global`; `TESSERA_CHECK_INCREMENTAL=1` for the test suite, `--check` for the
+// benchmark) recomputes every incremental result in full, without caches or shortcuts, and counts
+// and raises on a difference. What it asks of an engine author:
+//   - A new step in `compute` that is not an intersection with what one filter allows, or the
+//     preimage of a related table's rows over a regular relationship, must make
+//     `VisCache.Intersective` false for the tables it applies to.
+//   - A filter context with the same filters as another may share its `FilterCtx.State` (the rows
+//     it shows); one with different filters never.
 
 open System
 open System.Collections.Concurrent
@@ -290,6 +344,30 @@ type RowSet private (size: int, isAll: bool, rows: int array, bits: uint64 array
         else
             other.Intersect this
 
+/// Arrays as keys: the same objects in the same order.
+type ReferenceArrayComparer() =
+    static member val Instance = ReferenceArrayComparer()
+
+    interface IEqualityComparer<obj array> with
+        member _.Equals(a, b) =
+            a.Length = b.Length
+            && (let mutable same = true
+                let mutable i = 0
+
+                while same && i < a.Length do
+                    same <- obj.ReferenceEquals(a.[i], b.[i])
+                    i <- i + 1
+
+                same)
+
+        member _.GetHashCode a =
+            let mutable h = 17
+
+            for x in a do
+                h <- h * 31 + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode x
+
+            h
+
 type IntArrayComparer() =
     static member val Instance = IntArrayComparer()
 
@@ -349,6 +427,38 @@ type StaticType =
     | Unknown
 
 // ---- The bound model ---------------------------------------------------------------------------
+
+/// What the incremental filter contexts did (`Filters` in Context.fs; "Incremental filter
+/// contexts" in the author's guide): per model, and for the process (`Global`). For tests and the
+/// benchmark; nothing an answer depends on.
+[<Sealed; AllowNullLiteral>]
+type IncrementalStats() =
+    /// Rows of a table worked out from a context's shared part and its added filters.
+    [<DefaultValue>]
+    val mutable Applied: int64
+
+    /// Attempts that raised, after which the rows were worked out in full.
+    [<DefaultValue>]
+    val mutable Errors: int64
+
+    /// Results recomputed in full and compared (`Check`).
+    [<DefaultValue>]
+    val mutable Checked: int64
+
+    /// Results that differed from the full computation: must stay 0.
+    [<DefaultValue>]
+    val mutable Mismatched: int64
+
+    /// By table name, the results `Applied` counts, while `Check` is set on this one.
+    member val AppliedTo = ConcurrentDictionary<string, int64>(StringComparer.Ordinal) with get
+
+    /// Whether incremental contexts are used at all (both this and `Global`'s must be set).
+    member val Enabled = true with get, set
+    /// Recompute every incremental result in full, without caches, and compare (slow; for tests).
+    /// A difference counts in `Mismatched` and raises.
+    member val Check = false with get, set
+    static member val Global = IncrementalStats() with get
+
 
 /// A column of a model table, bound to its data. A calculated column has no data until `prepare`
 /// has computed it; reading one that is being computed is a circular dependency.
@@ -1087,6 +1197,8 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     member val Culture: string = "" with get, set
     /// The calculation groups, highest precedence first (the order they are applied in).
     member val CalcGroups: BCalcGroup array = [||] with get, set
+    /// See `IncrementalStats`.
+    member val Incremental = IncrementalStats() with get
 
     member this.Config(active: bool array, both: bool array) : RelConfig =
         let c = RelConfig(this, active, both)
@@ -1218,18 +1330,74 @@ and SelectionMark = {
     Keys: Filter list
 }
 
+/// The caches of a filter context that depend on its filters and relationships alone (see
+/// `FilterCtx.State`), made when first used.
+[<Sealed; AllowNullLiteral>]
+type FilterState() =
+    let mutable visible: Dictionary<int, RowSet> = null
+    let mutable inProgress: HashSet<int> = null
+    let mutable bases: Dictionary<obj array, obj> = null
+
+    member _.Visible: Dictionary<int, RowSet> =
+        if isNull visible then
+            visible <- Dictionary<int, RowSet>()
+
+        visible
+
+    member _.InProgress: HashSet<int> =
+        if isNull inProgress then
+            inProgress <- HashSet<int>()
+
+        inProgress
+
+    /// What `Filters.add` kept of these filters, by what the filters added replace.
+    member _.Bases: Dictionary<obj array, obj> =
+        if isNull bases then
+            bases <- Dictionary<obj array, obj>(ReferenceArrayComparer.Instance)
+
+        bases
+
 /// A filter context: filters, and the relationships in force. Immutable; the caches belong to one
 /// evaluation (one thread).
 [<Sealed; AllowNullLiteral>]
-type FilterCtx(filters: Filter list, config: RelConfig, scope: ScopeMark list) =
-    new(filters: Filter list, config: RelConfig) = FilterCtx(filters, config, [])
+type FilterCtx(filters: Filter list, config: RelConfig, scope: ScopeMark list, state: FilterState) =
+    let mutable measures: Dictionary<obj, DaxValue> = null
+
+    new(filters: Filter list, config: RelConfig, scope: ScopeMark list) =
+        FilterCtx(filters, config, scope, FilterState())
+
+    new(filters: Filter list, config: RelConfig) = FilterCtx(filters, config, [], FilterState())
     member _.Filters = filters
     member _.Config = config
     /// See `ScopeMark`. Part of the context: a measure's value may depend on it.
     member _.Scope = scope
-    member val Visible = Dictionary<int, RowSet>() with get
-    member val InProgress = HashSet<int>() with get
-    member val Measures = Dictionary<obj, DaxValue>(HashIdentity.Reference) with get
+    /// What depends on the filters and relationships alone, shared with the context's marked
+    /// copies (`Filters.mark`).
+    member _.State = state
+    member _.Visible = state.Visible
+    member _.InProgress = state.InProgress
+
+    /// A context of the first filters of this one: the context it was made from by `Filters.add`
+    /// (less what the new filters replaced), whose rows the incremental computation starts from;
+    /// null if none. See "Incremental filter contexts" in the author's guide.
+    [<DefaultValue>]
+    val mutable Base: FilterCtx
+
+    /// The other filters, once needed (`Private`).
+    [<DefaultValue>]
+    val mutable Added: FilterCtx
+
+    /// Not shared through `VisCache` and never incremental: the added part of an incremental
+    /// computation, and the full computation check mode compares with.
+    member val Private = false with get, set
+    /// The full computation check mode compares with (`Private`, and without shortcuts).
+    member val Reference = false with get, set
+
+    member _.Measures: Dictionary<obj, DaxValue> =
+        if isNull measures then
+            measures <- Dictionary<obj, DaxValue>(HashIdentity.Reference)
+
+        measures
 
 /// One level of row context: a row of a table.
 type RowCtx = { Table: TableVal; Row: int }
