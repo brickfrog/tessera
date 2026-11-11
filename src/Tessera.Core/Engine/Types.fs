@@ -319,6 +319,8 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
     /// See `DateTable` in Context.fs.
     member val DateKey = 0 with get, set
     member _.IsReady = not (obj.ReferenceEquals(store, null))
+    /// Why queries can't read this column, once the model is prepared (Group By Columns).
+    member val Gate: string option = None with get, set
 
     member this.SetData(column: StoreColumn) =
         blankId <-
@@ -334,7 +336,9 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
         if obj.ReferenceEquals(store, null) then
             table.Model.ForceColumn this
 
-        store
+        match this.Gate with
+        | Some why -> raise (EngineException(DaxNotSupported(why, "")))
+        | None -> store
 
     /// The id BLANK has in this column: the stored one, or one past the stored ids when no row is
     /// BLANK (the blank row's value still needs an id).

@@ -246,6 +246,36 @@ let private staticGates (db: Database) : Dictionary<string, string> =
 
     gates
 
+/// The columns with Group By Columns (a field parameter's display column has them), with why
+/// queries can't use them: "The columns specified in Group By Columns must be present in the
+/// grouping conditions of any query that includes the target column ... otherwise, the query fails
+/// with an error", and "SUMMARIZE, SUMMARIZECOLUMNS, DISTINCT, and VALUES are all going to fail"
+/// without them (SQLBI, "Understanding Group By Columns in Power BI"). Which queries those are
+/// isn't implemented, so any that reads the column is refused.
+let private groupedBy (db: Database) : Dictionary<string, string> =
+    let found = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+
+    if not (isNull db.Model) then
+        for t in db.Model.Tables do
+            for c in t.Columns do
+                if
+                    not (isNull c.RelatedColumnDetails)
+                    && c.RelatedColumnDetails.GroupByColumns.Count > 0
+                then
+                    let by =
+                        c.RelatedColumnDetails.GroupByColumns
+                        |> Seq.choose (fun g ->
+                            if isNull g.GroupingColumn then
+                                None
+                            else
+                                Some $"'{g.GroupingColumn.Table.Name}'[{g.GroupingColumn.Name}]")
+                        |> String.concat ", "
+
+                    found.[t.Name + "\u0000" + c.Name] <-
+                        $"'{t.Name}'[{c.Name}], which has Group By Columns ({by}): a query that groups by it without them fails, and which queries those are is not implemented"
+
+    found
+
 let private calculatedTableExpression (t: Table) : string option =
     t.Partitions
     |> Seq.tryPick (fun p ->
@@ -759,6 +789,15 @@ let private bindWith
         if t.Gate.IsNone then
             attempt (ObjectRef.table t.Name) (fun () -> t.HasBlankRow |> ignore)
 
+    // Computed, but not to be read by queries (see `groupedBy`).
+    let grouped = groupedBy db
+
+    for t in model.Tables do
+        for c in t.Columns do
+            match grouped.TryGetValue(t.Name + "\u0000" + c.Name) with
+            | true, why -> c.Gate <- Some why
+            | _ -> ()
+
     model, List.ofSeq failures
 
 /// Bind a model to its data and compute its calculated columns and tables, in dependency order.
@@ -1172,6 +1211,7 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
         []
     else
         let gates = staticGates db
+        let grouped = groupedBy db
         let tables = HashSet<string>(StringComparer.OrdinalIgnoreCase)
         let measures = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         let udfs = Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -1246,6 +1286,10 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
                 | Qualified(t, name) ->
                     table t.Name
 
+                    match grouped.TryGetValue(t.Name + "\u0000" + name) with
+                    | true, why -> found.Add why
+                    | _ -> ()
+
                     match calculatedColumns.TryGetValue(t.Name + "\u0000" + name) with
                     | true, text -> found.AddRange(ofCalculated ("c\u0000" + t.Name + "\u0000" + name) text)
                     | _ ->
@@ -1253,6 +1297,14 @@ let private coverageOf (db: Database) : (ObjectRef * string list) list =
                             found.AddRange(ofMeasure name)
                 | Bracketed name when measures.ContainsKey name -> found.AddRange(ofMeasure name)
                 | QueryParameter name -> found.Add $"the query parameter @{name}"
+                // NAMEOF names its argument without evaluating it: what the object uses is not used.
+                | Call(name, args) when String.Equals(name.Name, "NAMEOF", StringComparison.OrdinalIgnoreCase) ->
+                    match Registry.byName.TryGetValue name.Name with
+                    | true, fn ->
+                        match fn.Check args with
+                        | Some why -> found.Add why
+                        | None -> ()
+                    | _ -> ()
                 | Call(name, args) ->
                     match Registry.byName.TryGetValue name.Name with
                     | true, fn ->

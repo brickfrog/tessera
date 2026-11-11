@@ -2,7 +2,7 @@ namespace Tessera.DaxEngine.Functions
 
 // Information functions: the type tests (ISNUMBER, ISTEXT, ISNONTEXT, ISLOGICAL), ISEVEN, ISODD,
 // ISEMPTY, CONTAINS, and the functions that return who is asking (USERNAME, USERPRINCIPALNAME,
-// USEROBJECTID, USERCULTURE, CUSTOMDATA). ISBLANK, ISERROR and CONTAINSROW are in Logical.fs.
+// USEROBJECTID, USERCULTURE, CUSTOMDATA), and NAMEOF. ISBLANK, ISERROR and CONTAINSROW are in Logical.fs.
 //
 // Sources: the function pages of dax.guide and of Microsoft Learn, quoted at each function.
 
@@ -144,6 +144,155 @@ module Information =
         identity "USEROBJECTID" (fun i -> i.UserObjectId)
         // "The culture code as a string, such as "en-US"" (dax.guide/userculture).
         identity "USERCULTURE" (fun i -> i.UserCulture)
+
+        // "Returns the name of a table, column, measure, or calendar as a text string"; with only
+        // the object it is "a fully qualified, escaped name": 'TableName'[ColumnName],
+        // 'TableName'[MeasureName], 'TableName'; the names are the model's ("NAMEOF (
+        // 'Sales'[ORDER QUANTITY] )" returns "'Sales'[Order Quantity]"). Within delimiters "A
+        // literal single quote ... is escaped as two single quotes" and "A literal closing bracket
+        // ... is escaped as ]]" (Microsoft Learn, NAMEOF; dax.guide/nameof). The argument is a
+        // reference, never evaluated. Refused: calendars, a column given without its table, the
+        // combinations the pages call errors (what kind of error isn't said), UNESCAPED and
+        // MINIMALLYESCAPED for a name with a quote or a bracket (the pages' examples of those are
+        // garbled), and MINIMALLYESCAPED for a name that starts with a digit or has a letter
+        // outside A-Z (what "simple letters" covers isn't said).
+        Fn.scalar "NAMEOF" "Information" (1, 3) (Fn.typeIs DaxType.String) (fun _ ctx call ->
+            let refuse (what: string) : 'a = Fail.notSupported ctx call.Span what
+
+            let tableNamed (name: string) =
+                match ctx.Model.TableByName.TryGetValue name with
+                | true, t -> Some t
+                | _ -> None
+
+            let measureNamed (name: string) =
+                let fromQuery =
+                    if isNull ctx.Query || not ctx.Scope.InQuery then
+                        None
+                    else
+                        match ctx.Query.Measures.TryGetValue name with
+                        | true, m -> Some m
+                        | _ -> None
+
+                match fromQuery with
+                | Some m -> Some m
+                | None ->
+                    match ctx.Model.Measures.TryGetValue name with
+                    | true, m -> Some m
+                    | _ -> None
+
+            // (parent table, own name): a table has no parent; `child` says whether the own name
+            // is a column's or a measure's.
+            let parent, own, kind =
+                match (Fn.unparen call.Args.[0]).Kind with
+                | Identifier name
+                | QuotedTable name ->
+                    match tableNamed name with
+                    | Some t -> None, t.Name, "table"
+                    | None -> Fail.invalid ctx call.Args.[0].Span $"there is no table '{name}'"
+                | Qualified(table, name) ->
+                    match tableNamed table.Name with
+                    | None -> Fail.invalid ctx call.Args.[0].Span $"there is no table '{table.Name}'"
+                    | Some t ->
+                        match t.ColumnByName.TryGetValue name with
+                        | true, c -> Some t.Name, c.Name, "column"
+                        | _ ->
+                            match measureNamed name with
+                            | Some m when obj.ReferenceEquals(m.Table, t) -> Some t.Name, m.Name, "measure"
+                            | Some m ->
+                                refuse
+                                    $"NAMEOF of the measure [{m.Name}] given with the table '{t.Name}', which is not its own"
+                            | None ->
+                                Fail.invalid ctx call.Args.[0].Span $"there is no column or measure '{t.Name}'[{name}]"
+                | Bracketed name ->
+                    match measureNamed name with
+                    | Some m -> Some m.Table.Name, m.Name, "measure"
+                    | None -> refuse $"NAMEOF ( [{name}] ) of something that is not a measure"
+                | _ ->
+                    Fail.invalid
+                        ctx
+                        call.Args.[0].Span
+                        "the argument of NAMEOF must be a table, column or measure reference (variables and expressions are not allowed)"
+
+            let word (i: int) (allowed: string list) (byDefault: string) =
+                if call.Args.Length <= i || Fn.isOmitted call.Args.[i] then
+                    byDefault
+                else
+                    match Fn.keyword call.Args.[i] with
+                    | Some k when allowed |> List.contains k -> k
+                    | _ ->
+                        let list = String.concat ", " allowed
+                        Fail.invalid ctx call.Args.[i].Span $"NAMEOF's argument {i + 1} must be one of {list}"
+
+            let part =
+                word 1 [ "TABLE"; "COLUMN"; "MEASURE"; "CALENDAR"; "FULL"; "SELF"; "PARENT" ] "FULL"
+
+            let escaping = word 2 [ "ESCAPED"; "UNESCAPED"; "MINIMALLYESCAPED" ] "ESCAPED"
+
+            let error () : 'a =
+                refuse $"NAMEOF of a {kind} with {part}, which the documentation calls an error (what kind isn't said)"
+
+            // The parts asked for: (table name, child name), either may be missing.
+            let tablePart, childPart =
+                match part, parent, kind with
+                | "FULL", Some p, _ -> Some p, Some own
+                | "FULL", None, _ -> Some own, None
+                | "SELF", Some _, _ -> None, Some own
+                | "SELF", None, _ -> Some own, None
+                | "TABLE", Some p, _ -> Some p, None
+                | "TABLE", None, _ -> Some own, None
+                | "PARENT", Some p, _ -> Some p, None
+                | "COLUMN", _, "column" -> None, Some own
+                | "MEASURE", _, "measure" -> None, Some own
+                | _ -> error ()
+
+            let quoted (name: string) = "'" + name.Replace("'", "''") + "'"
+            let bracketed (name: string) = "[" + name.Replace("]", "]]") + "]"
+
+            let plain (name: string) =
+                if name.Contains '\'' || name.Contains ']' then
+                    refuse $"NAMEOF {escaping} of a name with a quote or a closing bracket ('{name}')"
+
+            let minimal (name: string) (escape: string -> string) =
+                plain name
+
+                if name.Length > 0 && Char.IsAsciiDigit name.[0] then
+                    refuse $"NAMEOF MINIMALLYESCAPED of a name that starts with a digit ('{name}')"
+
+                if name |> Seq.exists (fun c -> c > '\u007f') then
+                    refuse $"NAMEOF MINIMALLYESCAPED of a name with a letter outside A-Z ('{name}')"
+
+                if
+                    name.Length > 0
+                    && name |> Seq.forall (fun c -> Char.IsAsciiLetterOrDigit c || c = '_')
+                then
+                    name
+                else
+                    escape name
+
+            let text =
+                match escaping, tablePart, childPart with
+                | "ESCAPED", Some t, Some c -> quoted t + bracketed c
+                | "ESCAPED", Some t, None -> quoted t
+                | "ESCAPED", None, Some c -> bracketed c
+                | "UNESCAPED", Some _, Some _ ->
+                    refuse "NAMEOF UNESCAPED of a fully qualified name, which the documentation calls an error"
+                | "UNESCAPED", Some name, None
+                | "UNESCAPED", None, Some name ->
+                    plain name
+                    name
+                // A qualified name keeps the brackets of its child: 'Sales'[m1] is Sales[m1].
+                | _, Some t, Some c ->
+                    plain c
+                    minimal t quoted + bracketed c
+                | _, Some t, None -> minimal t quoted
+                | _, None, Some c -> minimal c bracketed
+                | _ -> error ()
+
+            DaxValue.String text)
+        |> Fn.withCheck (fun args ->
+            match args with
+            | _ :: c :: _ when Fn.keyword c = Some "CALENDAR" -> Some "NAMEOF with CALENDAR (calendars)"
+            | _ -> None)
 
         // "The content of the CustomData property in the connection string. Blank, if CustomData
         // property was not defined at connection time" (Microsoft Learn, CUSTOMDATA): BLANK once

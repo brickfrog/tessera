@@ -1,0 +1,31 @@
+{
+  "title": "NAMEOF with PARENT, MINIMALLYESCAPED gives a simple table name without quotes",
+  "model": "sales",
+  "query": "EVALUATE { NAMEOF ( 'Sales'[Amount], PARENT, MINIMALLYESCAPED ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Sales"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/nameof-function-dax",
+    "quote": "Names that contain only simple letters, digits, and underscores are returned without delimiters",
+    "supports": "example 5 of the page: NAMEOF ( 'Sales'[Sales Amount], PARENT, MINIMALLYESCAPED ) returns Sales"
+  },
+  "confidence": "derived",
+  "tags": [
+    "nameof",
+    "table-constructor"
+  ],
+  "derivation": "Example 5 uses Sales[Sales Amount]; here Sales[Amount]. The parent of a column is its table; Sales has only letters, so no quotes."
+}

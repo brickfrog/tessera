@@ -1,0 +1,31 @@
+{
+  "title": "NAMEOF with TABLE gives the table of a column",
+  "model": "sales",
+  "query": "EVALUATE { NAMEOF ( 'Sales'[Amount], TABLE ) }",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[Value]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "'Sales'"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/nameof-function-dax",
+    "quote": "Returns the table name",
+    "supports": "example 3 of the page: NAMEOF ( 'Sales'[Sales Amount], TABLE ) returns 'Sales'"
+  },
+  "confidence": "derived",
+  "tags": [
+    "nameof",
+    "table-constructor"
+  ],
+  "derivation": "Example 3 uses the column Sales[Sales Amount]; this model's column is Sales[Amount]. The component TABLE of a column is its table, escaped: 'Sales'."
+}
