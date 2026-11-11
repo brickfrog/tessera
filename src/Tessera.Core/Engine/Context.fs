@@ -466,7 +466,27 @@ module Filters =
             if not (fc.InProgress.Add key) then
                 gate $"filters that reach table '{t.Name}' again over relationships that filter both ways"
 
-            let set = compute fc t via
+            // Shared with other filter contexts with the same filters on what the rows depend on
+            // (Caching.fs).
+            let shared = VisCache.Of fc.Config
+
+            let set =
+                if shared.Usable then
+                    let k = shared.Key(fc.Filters, t, via)
+                    let mutable found = null
+
+                    if shared.TryGet(k, &found) then
+                        found
+                    else
+                        let set = compute fc t via
+
+                        if shared.Usable then
+                            shared.Add(k, set)
+
+                        set
+                else
+                    compute fc t via
+
             fc.InProgress.Remove key |> ignore
             fc.Visible.[key] <- set
             set

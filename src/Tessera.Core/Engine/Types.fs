@@ -121,6 +121,8 @@ exception DaxRuntimeException of text: string * at: string
 type RowSet private (size: int, isAll: bool, rows: int array, bits: uint64 array, count: int) =
     let mutable rows = rows
     let mutable bits = bits
+    // 0 until computed (a computed hash of 0 is stored as 1): one write, safe to race.
+    let mutable hash = 0
 
     static let extract (size: int) (bits: uint64 array) (count: int) =
         let out = Array.zeroCreate<int> count
@@ -182,6 +184,39 @@ type RowSet private (size: int, isAll: bool, rows: int array, bits: uint64 array
         else
             let b = this.Bits
             i >= 0 && i < size && ((b.[i >>> 6] >>> (i &&& 63)) &&& 1UL) <> 0UL
+
+    /// A hash of the members (and of `Size` and `IsAll`), for keys of caches (see Caching.fs).
+    /// Up to 32 members it is of the members, above of the words of `Bits`.
+    member this.ContentHash: int =
+        if hash = 0 then
+            let mutable h = HashCode.Combine(size, isAll, count)
+
+            if not isAll then
+                if count <= 32 then
+                    for i in this.Rows do
+                        h <- h * 31 + i
+                else
+                    let b = this.Bits
+
+                    for w in 0 .. b.Length - 1 do
+                        h <- h * 31 + b.[w].GetHashCode()
+
+            hash <- if h = 0 then 1 else h
+
+        hash
+
+    /// The same members, the same `Size`, and both or neither `IsAll`.
+    member this.SameAs(other: RowSet) : bool =
+        obj.ReferenceEquals(this, other)
+        || (size = other.Size
+            && isAll = other.IsAll
+            && count = other.Count
+            && (isAll
+                || (this.ContentHash = other.ContentHash
+                    && (if count <= 32 then
+                            ReadOnlySpan<int>(this.Rows).SequenceEqual(ReadOnlySpan<int>(other.Rows))
+                        else
+                            ReadOnlySpan<uint64>(this.Bits).SequenceEqual(ReadOnlySpan<uint64>(other.Bits))))))
 
     static member All(size: int) = RowSet(size, true, null, null, size)
     static member Empty(size: int) = RowSet(size, false, [||], null, 0)
@@ -850,6 +885,10 @@ and [<Sealed; AllowNullLiteral>] RelConfig(model: Model, active: bool array, bot
                  flags))
 
     let rowMaps = ConcurrentDictionary<struct (int * int), int array>()
+
+    /// The `VisCache` of this set-up (Caching.fs), once made.
+    [<DefaultValue>]
+    val mutable VisCache: obj
 
     member _.Model = model
     member _.Active = active
