@@ -37,14 +37,14 @@ let private products = [
 
 let private shop: TestModel = {
     Tables = [
-        table
-            "Product"
-            [ "Product", DataType.String; "Brand", DataType.String; "Color", DataType.String ]
-            [ for (p, b, c, _) in products -> [ box p; box b; box c ] ]
-        table
-            "Sales"
-            [ "Product", DataType.String; "Qty", DataType.Int64 ]
-            [ for (p, _, _, q) in products -> [ box p; box q ] ]
+        table "Product" [
+            "Product", DataType.String
+            "Brand", DataType.String
+            "Color", DataType.String
+        ] [ for (p, b, c, _) in products -> [ box p; box b; box c ] ]
+        table "Sales" [ "Product", DataType.String; "Qty", DataType.Int64 ] [
+            for (p, _, _, q) in products -> [ box p; box q ]
+        ]
     ]
     Rels = [ rel ("Sales", "Product") ("Product", "Product") ]
     Measures = [
@@ -66,7 +66,9 @@ let private ranked =
                     |> List.map (fun t ->
                         if t.Name = "Product" then
                             t
-                            |> withCalculated [ "Rank", DataType.Int64, "COUNTROWS ( ALLSELECTED ( Product[Brand] ) )" ]
+                            |> withCalculated [
+                                "Rank", DataType.Int64, "COUNTROWS ( ALLSELECTED ( Product[Brand] ) )"
+                            ]
                         else
                             t)
         })
@@ -78,7 +80,9 @@ let private outer (inner: string) =
 let private list (table: string) (column: string) =
     $"CONCATENATEX ( {table}, {column}, \", \", {column}, ASC )"
 
-let private selectedProducts = list "ALLSELECTED ( Product[Product] )" "Product[Product]"
+let private selectedProducts =
+    list "ALLSELECTED ( Product[Product] )" "Product[Product]"
+
 let private visibleProducts = list "VALUES ( Product[Product] )" "Product[Product]"
 let private selectedBrands = list "ALLSELECTED ( Product[Brand] )" "Product[Brand]"
 let private productsOfTable = list "ALLSELECTED ( 'Product' )" "Product[Product]"
@@ -95,36 +99,31 @@ let tests =
             // "There is no active iteration when we call ALLSELECTED ... all the product names are
             // returned because neither Color nor Brand filter the Product[Product] column".
             testCase "a column with no iteration: every value, cross-filters ignored" (fun () ->
-                returns
-                    p.Value
-                    (outer $"ROW ( \"Products\", {selectedProducts} )")
+                returns p.Value (outer $"ROW ( \"Products\", {selectedProducts} )") [
                     [
-                        [ "Bike, Helmet, Keyboard, Motorbike, Piano, Robot, Rollerblades, Shirt, Shoes" ]
-                    ])
+                        "Bike, Helmet, Keyboard, Motorbike, Piano, Robot, Rollerblades, Shirt, Shoes"
+                    ]
+                ])
             // "it is VALUES that analyzes the products visible in the current context ...
             // ALLSELECTED did not contribute to the filtering in any way".
             testCase "as a modifier with no iteration, a cross-filtered column stays cross-filtered" (fun () ->
                 returns
                     p.Value
-                    (outer
-                        $"ROW ( \"Products\", CALCULATE ( {visibleProducts}, ALLSELECTED ( Product[Product] ) ) )")
+                    (outer $"ROW ( \"Products\", CALCULATE ( {visibleProducts}, ALLSELECTED ( Product[Product] ) ) )")
                     [ [ "Helmet, Keyboard, Piano, Shoes" ] ])
             // "ADDCOLUMNS ... generates a shadow filter context containing the iterated table": the
             // two brands VALUES returns, then all three when it iterates ALL.
             testCase "inside ADDCOLUMNS: the iterated values" (fun () ->
-                returns
-                    p.Value
-                    (outer $"ADDCOLUMNS ( VALUES ( Product[Brand] ), \"Brands\", {selectedBrands} )")
-                    [ [ "Contoso"; "Contoso, Fabrikam" ]; [ "Fabrikam"; "Contoso, Fabrikam" ] ]
+                returns p.Value (outer $"ADDCOLUMNS ( VALUES ( Product[Brand] ), \"Brands\", {selectedBrands} )") [
+                    [ "Contoso"; "Contoso, Fabrikam" ]
+                    [ "Fabrikam"; "Contoso, Fabrikam" ]
+                ]
 
-                returns
-                    p.Value
-                    (outer $"ADDCOLUMNS ( ALL ( Product[Brand] ), \"Brands\", {selectedBrands} )")
-                    [
-                        [ "Contoso"; "Contoso, Fabrikam, Litware" ]
-                        [ "Fabrikam"; "Contoso, Fabrikam, Litware" ]
-                        [ "Litware"; "Contoso, Fabrikam, Litware" ]
-                    ])
+                returns p.Value (outer $"ADDCOLUMNS ( ALL ( Product[Brand] ), \"Brands\", {selectedBrands} )") [
+                    [ "Contoso"; "Contoso, Fabrikam, Litware" ]
+                    [ "Fabrikam"; "Contoso, Fabrikam, Litware" ]
+                    [ "Litware"; "Contoso, Fabrikam, Litware" ]
+                ])
             // "The result is the list of brands iterated in the nearest shadow filter context".
             testCase "two iterations on the column: the nearest one" (fun () ->
                 let nested (outerTable: string) (innerTable: string) (column: string) =
@@ -150,7 +149,9 @@ let tests =
                 // ALLSELECTED simply returns all the product names".
                 Expect.equal
                     (column (nested values all "Product[Product]"))
-                    [ qv "Bike, Helmet, Keyboard, Motorbike, Piano, Robot, Rollerblades, Shirt, Shoes" ]
+                    [
+                        qv "Bike, Helmet, Keyboard, Motorbike, Piano, Robot, Rollerblades, Shirt, Shoes"
+                    ]
                     "a column no iteration filters")
             // "save the ALLSELECTED values of Product[Brand] in a variable before the innermost
             // shadow filter context kicks in": the outer brands.
@@ -162,10 +163,9 @@ let tests =
                 Expect.equal (column dax) [ qv "Contoso, Fabrikam" ] dax)
             // "ALLSELECTED with a table used the explicit column filters created by CALCULATETABLE".
             testCase "a table with no iteration: the explicit filters" (fun () ->
-                returns
-                    p.Value
-                    (outer $"ROW ( \"Products\", {productsOfTable} )")
-                    [ [ "Helmet, Keyboard, Piano, Shoes" ] ])
+                returns p.Value (outer $"ROW ( \"Products\", {productsOfTable} )") [
+                    [ "Helmet, Keyboard, Piano, Shoes" ]
+                ])
             // "the filter on Color is replaced, the filter on Brand is not": Contoso or Fabrikam,
             // any color.
             testCase "a table inside an iteration over one of its columns" (fun () ->
@@ -184,7 +184,9 @@ let tests =
 
                 Expect.equal
                     (column dax)
-                    [ qv "Bike, Helmet, Keyboard, Motorbike, Piano, Robot, Rollerblades, Shirt, Shoes" ]
+                    [
+                        qv "Bike, Helmet, Keyboard, Motorbike, Piano, Robot, Rollerblades, Shirt, Shoes"
+                    ]
                     dax)
             // "ALLSELECTED will activate the last shadow filter context on each column ... the outer
             // shadow filter context is not activated".
@@ -274,11 +276,7 @@ let tests =
                 returns
                     p.Value
                     "EVALUATE SUMMARIZECOLUMNS ( ROLLUPADDISSUBTOTAL ( Product[Brand], \"Total\" ), TREATAS ( { \"Contoso\", \"Fabrikam\" }, Product[Brand] ), \"Sel\", [TotalSel] )"
-                    [
-                        [ "Contoso"; false; 330 ]
-                        [ "Fabrikam"; false; 330 ]
-                        [ null; true; 330 ]
-                    ])
+                    [ [ "Contoso"; false; 330 ]; [ "Fabrikam"; false; 330 ]; [ null; true; 330 ] ])
             // ALLSELECTED as a table in SUMMARIZECOLUMNS: "ALLSELECTED returns the values of the
             // brands selected in the visual filter context" (SQLBI, "ALLSELECTED best practices";
             // the MINX over ALLSELECTED of "Introducing ALLSELECTED in DAX").
@@ -296,7 +294,11 @@ let tests =
                 returns
                     p.Value
                     "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], \"Wrong\", SUMX ( 'Product', [TotalSel] ), \"Correct\", VAR TotalSales = [TotalSel] RETURN SUMX ( 'Product', TotalSales ) )"
-                    [ [ "Contoso"; 330; 1350 ]; [ "Fabrikam"; 660; 1350 ]; [ "Litware"; 360; 1350 ] ])
+                    [
+                        [ "Contoso"; 330; 1350 ]
+                        [ "Fabrikam"; 660; 1350 ]
+                        [ "Litware"; 360; 1350 ]
+                    ])
             // The guide's AllSelSumX in a matrix by brand: the shadows of both SUMX hold the one
             // brand and its three colors. Contoso 3 x 110, Fabrikam 3 x 220.
             testCase "iterations inside a row: the shadows" (fun () ->
@@ -389,12 +391,14 @@ let tests =
                     "EVALUATE ADDCOLUMNS ( VALUES ( Product[Brand] ), \"f\", CALCULATE ( ISCROSSFILTERED ( Product ), ALLSELECTED ( Product[Brand] ) ) )"
                     "ISCROSSFILTERED")
             testCase "forms coverage reports" (fun () ->
-                for dax, what in [
-                    "CALCULATE ( [Qty], KEEPFILTERS ( ALLSELECTED ( Product[Brand] ) ) )", "KEEPFILTERS ( ALLSELECTED"
-                    "CALCULATE ( [Qty], ALLSELECTED ( Product[Brand] ), ALLSELECTED ( Product[Color] ) )",
-                    "more than one ALLSELECTED"
-                    "CALCULATE ( [Qty], ALLSELECTED (), ALL ( Sales ) )", "together with another"
-                ] do
+                for dax, what in
+                    [
+                        "CALCULATE ( [Qty], KEEPFILTERS ( ALLSELECTED ( Product[Brand] ) ) )",
+                        "KEEPFILTERS ( ALLSELECTED"
+                        "CALCULATE ( [Qty], ALLSELECTED ( Product[Brand] ), ALLSELECTED ( Product[Color] ) )",
+                        "more than one ALLSELECTED"
+                        "CALCULATE ( [Qty], ALLSELECTED (), ALL ( Sales ) )", "together with another"
+                    ] do
                     notSupported p.Value $"EVALUATE ROW ( \"x\", {dax} )" what)
             testCase "ALLSELECTED () as a table is invalid DAX" (fun () ->
                 Expect.equal
@@ -404,7 +408,9 @@ let tests =
 
                 Expect.equal
                     (TessError.code (
-                        queryError p.Value "EVALUATE ROW ( \"x\", COUNTROWS ( ALLSELECTED ( VALUES ( Product[Brand] ) ) ) )"
+                        queryError
+                            p.Value
+                            "EVALUATE ROW ( \"x\", COUNTROWS ( ALLSELECTED ( VALUES ( Product[Brand] ) ) ) )"
                     ))
                     "dax-invalid"
                     "an expression")

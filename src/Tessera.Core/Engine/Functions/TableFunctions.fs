@@ -291,7 +291,9 @@ module TableFunctions =
                         ]
 
                     let blanks =
-                        Shadows.notAnIteration "the row of BLANKs GENERATE uses to find the columns of its second table" blanks
+                        Shadows.notAnIteration
+                            "the row of BLANKs GENERATE uses to find the columns of its second table"
+                            blanks
 
                     try
                         ev.Table(Context.pushRow ctx blanks 0, call.Args.[1])

@@ -1072,14 +1072,14 @@ module Shadows =
     /// restored as a shadow filter context. Over a wider table, whether the shadow holds the table
     /// or the groups is not documented.
     let summarized (table: TableVal) (groups: TableVal) : TableVal =
-        let lineage (t: TableVal) = t.Cols |> Array.map (fun c -> c.Lineage)
+        let lineage (t: TableVal) =
+            t.Cols |> Array.map (fun c -> c.Lineage)
 
         let same =
             lineage table |> Array.forall (fun c -> not (isNull c))
             && lineage groups |> Array.forall (fun c -> not (isNull c))
-            && (lineage table |> Array.distinctBy _.Id |> Array.map _.Id |> Array.sort) = (lineage groups
-                                                                                           |> Array.map _.Id
-                                                                                           |> Array.sort)
+            && (lineage table |> Array.distinctBy _.Id |> Array.map _.Id |> Array.sort) =
+                (lineage groups |> Array.map _.Id |> Array.sort)
 
         if same then
             groups

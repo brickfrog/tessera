@@ -1,0 +1,38 @@
+{
+  "title": "ALLSELECTED of a table inside an iteration over one of its columns: that column's filter is replaced by the iterated values, the filter on another column stays",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "CALCULATETABLE (",
+    "    ADDCOLUMNS (",
+    "        ALL ( 'Product'[Color] ),",
+    "        \"Products\", CONCATENATEX ( ALLSELECTED ( 'Product' ), 'Product'[Product], \", \", 'Product'[Product], ASC )",
+    "    ),",
+    "    'Product'[Color] IN { \"Red\", \"Blue\" },",
+    "    'Product'[Category] = \"Accessories\"",
+    ")",
+    "ORDER BY 'Product'[Color]"
+  ],
+  "ordered": true,
+  "expected": [
+    {
+      "columns": [
+        { "name": "Product[Color]", "type": "string" },
+        { "name": "[Products]", "type": "string" }
+      ],
+      "rows": [
+        [ "Blue", "Helmet, Lock" ],
+        [ "Green", "Helmet, Lock" ],
+        [ "Red", "Helmet, Lock" ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/the-definitive-guide-to-allselected/",
+    "quote": "the filter on Color is replaced, the filter on Brand is not",
+    "supports": "the article runs this shape (ADDCOLUMNS over ALL of the color inside CALCULATETABLE filtering color and brand, with CONCATENATEX over ALLSELECTED of the table) and states the rule; Category plays the part of Brand here"
+  },
+  "confidence": "derived",
+  "derivation": "ADDCOLUMNS iterates ALL ( Product[Color] ): Blue, Green, Red, and its shadow filter context holds all three. ALLSELECTED ( Product ) restores it on Color and keeps the explicit filter Category = Accessories. Accessories of any color: Helmet (Red) and Lock (Blue), on every row.",
+  "tags": [ "allselected", "addcolumns", "all", "concatenatex", "calculatetable", "shadow-filter-context" ]
+}

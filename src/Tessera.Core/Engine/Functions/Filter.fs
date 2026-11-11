@@ -493,7 +493,13 @@ module Filter =
 
         let selection, shadows =
             match groups with
-            | [] -> None, all |> List.choose (fun e -> match e with Iterated t -> Some t | Group _ -> None)
+            | [] ->
+                None,
+                all
+                |> List.choose (fun e ->
+                    match e with
+                    | Iterated t -> Some t
+                    | Group _ -> None)
             | [ (i, s) ] ->
                 if all.Length > i + 1 then
                     Fail.notSupported
@@ -504,7 +510,10 @@ module Filter =
                 Some s,
                 all
                 |> List.take i
-                |> List.choose (fun e -> match e with Iterated t -> Some t | Group _ -> None)
+                |> List.choose (fun e ->
+                    match e with
+                    | Iterated t -> Some t
+                    | Group _ -> None)
             | _ ->
                 Fail.notSupported
                     ctx
@@ -699,7 +708,10 @@ module Filter =
                 // The guide's column form ignores cross-filters; what SUMMARIZECOLUMNS restores is a
                 // filter context, which a cross-filter is part of. Answered when the two agree.
                 let own =
-                    Filters.build fc.Config (fc.Filters |> List.collect (Filters.project (fun x -> obj.ReferenceEquals(x, c))))
+                    Filters.build
+                        fc.Config
+                        (fc.Filters
+                         |> List.collect (Filters.project (fun x -> obj.ReferenceEquals(x, c))))
 
                 if Filters.idsIn c (Filters.visible own c.Table) true <> seen then
                     Fail.notSupported
@@ -719,8 +731,7 @@ module Filter =
                 let c = cols.[0]
                 let ids = Filters.idsIn c (RowSet.All c.Table.Size) true
                 Tables.ofColumns [| Tables.modelColumn c |] [| ids |> Array.map c.ValueOfId |] ids.Length
-            | None, [ (t, restored) ] when restored.Length = cols.Length ->
-                valuesIn ctx t cols
+            | None, [ (t, restored) ] when restored.Length = cols.Length -> valuesIn ctx t cols
             | None, _ ->
                 Fail.notSupported
                     ctx
@@ -816,8 +827,15 @@ module Filter =
         let named (names: string list) (a: Expr) = (isCallTo names a).IsSome
         let selected = filters |> List.filter (named [ "ALLSELECTED" ])
 
-        let others =
-            [ "ALL"; "REMOVEFILTERS"; "ALLEXCEPT"; "ALLCROSSFILTERED"; "ALLNOBLANKROW"; "USERELATIONSHIP"; "CROSSFILTER" ]
+        let others = [
+            "ALL"
+            "REMOVEFILTERS"
+            "ALLEXCEPT"
+            "ALLCROSSFILTERED"
+            "ALLNOBLANKROW"
+            "USERELATIONSHIP"
+            "CROSSFILTER"
+        ]
 
         let underKeep =
             filters
@@ -832,7 +850,8 @@ module Filter =
         elif selected.Length > 1 then
             Some "more than one ALLSELECTED in one CALCULATE (in which order they restore is not documented)"
         elif not selected.IsEmpty && filters |> List.exists (named others) then
-            Some "ALLSELECTED together with another filter-removing or relationship modifier in one CALCULATE (in which order they apply is not documented)"
+            Some
+                "ALLSELECTED together with another filter-removing or relationship modifier in one CALCULATE (in which order they apply is not documented)"
         else
             None
 

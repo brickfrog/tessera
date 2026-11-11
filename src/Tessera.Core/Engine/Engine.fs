@@ -587,8 +587,7 @@ let private bindWith
 
                         let table = Tables.ofBase model.DefaultConfig t (Array.init n id)
 
-                        let table =
-                            Shadows.notAnIteration "the row context of a calculated column" table
+                        let table = Shadows.notAnIteration "the row context of a calculated column" table
 
                         let values =
                             Array.init n (fun row -> ev.Scalar(Context.pushRow ctx table row, expr))

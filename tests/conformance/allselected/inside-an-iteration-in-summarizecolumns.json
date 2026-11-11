@@ -1,0 +1,42 @@
+{
+  "title": "In SUMMARIZECOLUMNS, ALLSELECTED inside an iteration restores the iteration's shadow; outside it, the selection",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS (",
+    "    'Product'[Category],",
+    "    \"Wrong\", SUMX ( 'Product', CALCULATE ( [Sales Amount], ALLSELECTED () ) ),",
+    "    \"Correct\", VAR Total = CALCULATE ( [Sales Amount], ALLSELECTED () ) RETURN SUMX ( 'Product', Total )",
+    ")",
+    "ORDER BY 'Product'[Category]"
+  ],
+  "ordered": true,
+  "expected": [
+    {
+      "columns": [
+        { "name": "Product[Category]", "type": "string" },
+        { "name": "[Wrong]", "type": "decimal" },
+        { "name": "[Correct]", "type": "decimal" }
+      ],
+      "rows": [
+        [ "Accessories", 280.0, 1080.0 ],
+        [ "Vehicles", 800.0, 1080.0 ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/allselected-best-practices/",
+      "quote": "Because SUMX iterates over the products of the given brand, TotalSales calculates the sales of all products in the currently-displayed brand.",
+      "supports": "the Wrong column: inside SUMX over Product, ALLSELECTED restores the products the iteration iterates"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/allselected-best-practices/",
+      "quote": "It removes the filter over Product[Brand], making all products visible",
+      "supports": "the Correct column: outside the iteration, ALLSELECTED removes the group-by filter"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Accessories: Helmet (60) and Lock (80), 140; Vehicles: Bike (400) and Scooter (no sales), 400; total 540. Wrong: for each of a category's two products, ALLSELECTED restores the iterated products of the category: Accessories 2 x 140 = 280, Vehicles 2 x 400 = 800. Correct: the variable is the total with the category's filter removed, 540, summed over two products: 1080.",
+  "tags": [ "allselected", "summarizecolumns", "sumx", "variables", "shadow-filter-context" ]
+}
