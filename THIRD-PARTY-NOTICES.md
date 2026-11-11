@@ -10,10 +10,11 @@ package also contain third-party components, which are licensed to you under the
 reserved.
 
 This component is licensed under the **Microsoft Software License Terms for Microsoft Analysis Management
-Objects (AMO)**: <https://go.microsoft.com/fwlink/?linkid=852989>. tessera redistributes it, unmodified and in
-object code form, as distributable code under section 2 of those terms. By using tessera's binaries you agree to
-those terms for that component. In particular, you may not reverse engineer, decompile or disassemble it, and
-you may not remove Microsoft's notices from it.
+Objects (AMO)**. The full text is in `licenses/Microsoft-AMO-license-terms.rtf`, as Microsoft publishes it at
+<https://go.microsoft.com/fwlink/?linkid=852989>. tessera includes the component unmodified, in object code
+form. By using tessera's binaries you agree to those terms for that component. In particular, you may not
+reverse engineer, decompile or disassemble it, you may not remove Microsoft's notices from it, and you may not
+redistribute it except as those terms allow.
 
 ## Microsoft ADOMD.NET
 
@@ -21,9 +22,18 @@ you may not remove Microsoft's notices from it.
 Corporation. All rights reserved.
 
 This component is licensed under the **Microsoft Software License Terms for Microsoft Analysis Services
-ADOMD.NET**: <https://go.microsoft.com/fwlink/?linkid=852895>. tessera redistributes it, unmodified and in object
-code form, as distributable code under section 2 of those terms. By using tessera's binaries you agree to those
-terms for that component.
+ADOMD.NET**. The full text is in `licenses/Microsoft-ADOMD.NET-license-terms.rtf`, as Microsoft publishes it at
+<https://go.microsoft.com/fwlink/?linkid=852895>. tessera includes the component unmodified, in object code
+form. By using tessera's binaries you agree to those terms for that component, on the same points as for AMO
+above.
+
+### Data collection
+
+Both sets of Microsoft terms say the software "may collect information about you and your use of the software
+and send that to Microsoft". tessera turns on no such feature. It makes no network connection unless you ask
+for one: the commands that work on model files and fixture data (`query --data`, `bpa`, `validate`, and the
+others) open no network socket at all, and connected mode (`xmla:` sources, `connect`, `deploy`, `refresh`)
+talks only to the server you name.
 
 ## Components under the MIT license
 
@@ -59,8 +69,8 @@ The MIT license text:
 |---|---|
 | System.Linq.Dynamic.Core (<https://dynamic-linq.net/>) | © ZZZ Projects |
 
-Licensed under the Apache License, Version 2.0: <https://www.apache.org/licenses/LICENSE-2.0>. Distributed
-unmodified.
+Licensed under the Apache License, Version 2.0; the full text is in `licenses/Apache-2.0.txt`
+(<https://www.apache.org/licenses/LICENSE-2.0>). Distributed unmodified.
 
 ## Not affiliated
 

@@ -78,6 +78,7 @@
     <!-- Ship licensing in the tool package: our MIT license and the bundled components' terms. -->
     <None Include="../../LICENSE" Pack="true" PackagePath="/" Visible="false" />
     <None Include="../../THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="/" Visible="false" />
+    <None Include="../../licenses/*" Pack="true" PackagePath="licenses/" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

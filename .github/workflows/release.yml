@@ -113,6 +113,7 @@ jobs:
             chmod +x "dist/$name/tess"
           fi
           cp LICENSE README.md THIRD-PARTY-NOTICES.md "dist/$name/"
+          cp -r licenses "dist/$name/"
           cd dist
           if [[ "$RID" == win-* ]]; then
             7z a -tzip "$name.zip" "$name" > /dev/null
