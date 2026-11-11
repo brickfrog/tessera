@@ -20,6 +20,7 @@ type Args =
     | Rule of rules: string
     | Ci of system: string
     | No_Group
+    | Sarif of file: string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -33,6 +34,7 @@ type Args =
                 $"only these rules (repeatable or comma-separated): {ids}."
             | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
             | No_Group -> "list every issue on its own, instead of folding issues with one root cause into the first."
+            | Sarif _ -> Tessera.Cli.Sarif.usage
 
 /// "2 errors, 1 warning"; zero counts are left out.
 let private summaryText (issues: Issue list) =
@@ -204,6 +206,14 @@ let ciArg (value: string option) =
         |> Option.map Ok
         |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
 
+/// The validate rules, for SARIF.
+let sarifRules: Sarif.Rule list = [ for id, description in rules -> Sarif.Rule.simple id description ]
+
+/// Write `issues` as SARIF to `path`, located in the model's files.
+let writeSarif (path: string) (modelPath: string) (source: ModelSource) (rules: Sarif.Rule list) (findings: Findings.Finding list) =
+    let index = SourceLocations.build source
+    Sarif.write path (Sarif.log (Sarif.rootFor modelPath) rules (Sarif.modelItems index findings) [])
+
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let modelPath = args.GetResult Args.Model
     let selected = parseList (args.GetResults Args.Rule)
@@ -227,17 +237,30 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | Ok(minimum, failOn), Ok ci ->
         let clock = Diagnostics.Stopwatch.StartNew()
 
-        match Source.load ctx modelPath with
+        let validated =
+            Source.load ctx modelPath
+            |> Result.bind (fun (source, db) ->
+                let g = Deps.build db
+
+                let issues =
+                    validateGraph g db
+                    |> List.filter (fun i -> selected.IsEmpty || List.contains i.Rule selected)
+
+                let shown = issues |> List.filter (fun i -> Severity.atLeast minimum i.Severity)
+
+                let ruleSet =
+                    sarifRules
+                    |> List.filter (fun r -> selected.IsEmpty || List.contains r.Id selected)
+
+                match args.TryGetResult Args.Sarif with
+                | Some path ->
+                    writeSarif path modelPath source ruleSet (shown |> List.map toFinding)
+                    |> Result.map (fun () -> g, issues, shown)
+                | None -> Ok(g, issues, shown))
+
+        match validated with
         | Error e -> Failed e
-        | Ok(_, db) ->
-            let g = Deps.build db
-
-            let issues =
-                validateGraph g db
-                |> List.filter (fun i -> selected.IsEmpty || List.contains i.Rule selected)
-
-            let shown = issues |> List.filter (fun i -> Severity.atLeast minimum i.Severity)
-
+        | Ok(g, issues, shown) ->
             if args.Contains Args.No_Group then
                 if ctx.Json then
                     writeJson ctx.Out (validateJson clock.Elapsed shown)

@@ -2997,6 +2997,56 @@ How the fields work:
 `##vso[task.logissue ...]` lines, with info findings as plain lines so info-only runs stay green. Each line carries
 the code as its title.
 
+### SARIF (`--sarif`)
+
+`validate`, `bpa`, `lint` and `data check` take `--sarif <file>`: they also write their findings as a
+[SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log, the format code scanning
+UIs (GitHub's among them) read. Like `--trx`, it replaces the file, and it is written on a clean run too (with no
+results). It doesn't change the command's own output or exit code.
+
+- **One run, one result per finding**, in the command's own order (`validate` lists every issue, not just the root
+  causes). `level` is `error`, `warning` or `note` (for info). `message` starts with the object's reference.
+- **Rules** (`tool.driver.rules`): the rules that ran, with their description and, for `bpa` and `lint`, their
+  severity and category (as a tag). `helpUri` only where the rule itself has a URL (a BPA rule's `LearnMoreUrl`);
+  tess adds none.
+- **Locations:** the file and line where the object is declared: the TMDL file and the line of `measure 'X'`, or
+  the line of the object's `"name"` in a .bim. A `data check` issue in a fixture file points at its line there.
+  Each result also has a logical location whose `fullyQualifiedName` is the object's tessera reference. When the
+  declaration can't be found (or a name is declared twice), the result points at the nearest enclosing object (a
+  measure's table), else line 1 of the model file, and its `properties.exactLocation` is `false`. A remote
+  (`xmla:`) model has no files, so its results have only the logical location.
+- **Paths** are relative to the repository root (the nearest folder above the model that holds `.git`, else the
+  current folder), with `/` and percent-encoding, under `uriBaseId` `SRCROOT`; a file outside that folder gets an
+  absolute `file:` URI. No machine-specific paths otherwise.
+- **Deterministic:** no timestamps or machine names; the same model gives the same bytes. Each result's
+  `partialFingerprints["tesseraFinding/v1"]` is a hash of the rule, the object and the property (not the line), so
+  an alert keeps its identity when lines move.
+- `bpa`: findings an object's ignore annotation hides are results with an `inSource` suppression; rules that
+  couldn't run are `toolConfigurationNotifications`. `properties` on a result carry `objectType`, `fixable` and,
+  where known, `expressionPosition`.
+
+tess only writes the file; uploading it is your CI's job. With GitHub Actions (tess exits 1 on errors, so the upload
+step runs `if: always()`):
+
+```yaml
+permissions:
+  contents: read
+  security-events: write   # to upload code scanning results
+
+jobs:
+  model-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: dotnet tool install --global tessera
+      - run: tess bpa "Sales.SemanticModel" --sarif bpa.sarif
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: bpa.sarif
+          category: tess-bpa   # one category per command, if you upload several
+```
+
 ### JSON and exit codes
 
 `--json` (or `-j`) writes one JSON document to stdout, errors included (`{"error": {"code", "message"}}`).

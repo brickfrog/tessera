@@ -25,6 +25,7 @@ type Args =
     | [<AltCommandLine("-c")>] Category of category: string
     | List_Rules
     | Trx of path: string
+    | Sarif of file: string
     | Fail_On of level: string
     | Ci of system: string
     | Builtin_Only
@@ -44,6 +45,7 @@ type Args =
             | Category _ -> "only run rules in this category (repeatable or comma-separated)."
             | List_Rules -> "list the rules that would run, and whether each is supported, instead of running them."
             | Trx _ -> "also write the results as a VSTest .trx file (one test per rule), e.g. for Azure DevOps."
+            | Sarif _ -> Tessera.Cli.Sarif.usage
             | Fail_On _ -> "exit 1 if any finding is this severe or more: error, warning or info (default: error)."
             | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
             | Builtin_Only -> BpaRulesCommand.SourceUsage.builtinOnly
@@ -384,6 +386,53 @@ let trx (modelPath: string) (started: DateTime) (results: Bpa.RuleResult list) =
 
     doc.Declaration.ToString() + "\n" + doc.ToString()
 
+/// The results as SARIF: the rules that ran, every finding, the findings ignored by annotations
+/// as suppressed results, and the rules that couldn't run as notifications.
+let sarif (modelPath: string) (source: ModelSource) (results: Bpa.RuleResult list) =
+    let index = SourceLocations.build source
+
+    let rules = [
+        for r in results ->
+            let rule = r.Rule
+
+            {
+                Sarif.Rule.Id = rule.Id
+                Sarif.Rule.ShortDescription = rule.Name
+                Sarif.Rule.FullDescription =
+                    rule.Description |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                Sarif.Rule.Level = Some(severityOf rule.Severity)
+                Sarif.Rule.HelpUri = Sarif.helpUri rule.LearnMoreUrl
+                Sarif.Rule.Category = Option.ofObj rule.Category
+            }
+    ]
+
+    let findings = (summarize results).Findings |> List.map toFinding
+
+    let ignored =
+        results
+        |> List.collect (fun r -> r.Ignored)
+        |> List.map toFinding
+        |> Sarif.modelItems index
+        |> List.map (fun i -> {
+            i with
+                Suppressed = Some "ignored by the object's BestPracticeAnalyzer_IgnoreRules annotation"
+        })
+
+    let notifications = [
+        for rule, stage, error in problems results ->
+            {
+                Sarif.Notification.RuleId = rule.Id
+                Sarif.Notification.Level = Findings.Severity.Warning
+                Sarif.Notification.Message =
+                    if stage = "compile" then
+                        $"rule not supported: {error}"
+                    else
+                        $"rule failed: {error}"
+            }
+    ]
+
+    Sarif.log (Sarif.rootFor modelPath) rules (Sarif.modelItems index findings @ ignored) notifications
+
 /// A --path pattern: a glob (* and ?) over the whole reference, or else a prefix of it.
 /// Case-insensitive, like names in Tabular.
 let private pathMatcher (pattern: string) : ObjectRef -> bool =
@@ -455,10 +504,10 @@ let private analyze (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
 
         match
             Source.load ctx modelPath
-            |> Result.bind (fun (source, db) -> Bpa.collectRules source db opts |> Result.map (fun x -> db, x))
+            |> Result.bind (fun (source, db) -> Bpa.collectRules source db opts |> Result.map (fun x -> (source, db), x))
         with
         | Error e -> Failed e
-        | Ok(db, collected) ->
+        | Ok((source, db), collected) ->
             BpaRulesCommand.reportCollected ctx "bpa" collected
             let rules = collected.Effective |> List.filter selected
 
@@ -489,6 +538,13 @@ let private analyze (ctx: Ctx) (args: ParseResults<Args>) (modelPath: string) =
                             Ok()
                         with e ->
                             Error(SaveFailed(path, e.Message))
+
+                let written =
+                    written
+                    |> Result.bind (fun () ->
+                        match args.TryGetResult Args.Sarif with
+                        | None -> Ok()
+                        | Some path -> Sarif.write path (sarif modelPath source results))
 
                 match written with
                 | Error e -> Failed e

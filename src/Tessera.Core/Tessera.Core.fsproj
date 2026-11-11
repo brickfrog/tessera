@@ -82,6 +82,7 @@
     <Compile Include="Engine/Engine.fs" />
     <Compile Include="TestSuite.fs" />
     <Compile Include="TestRun.fs" />
+    <Compile Include="SourceLocations.fs" />
   </ItemGroup>
 
   <ItemGroup>

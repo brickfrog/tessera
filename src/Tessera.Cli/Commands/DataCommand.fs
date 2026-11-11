@@ -35,11 +35,13 @@ type CheckArgs =
     | Fail_On of level: string
     | Rule of rules: string
     | Ci of system: string
+    | Sarif of file: string
 
     interface IArgParserTemplate with
         member this.Usage =
             match this with
             | Target _ -> "the model, and the fixture directory."
+            | Sarif _ -> Tessera.Cli.Sarif.usage
             | Min_Severity _ -> "only show issues this severe or more: error, warning or info (default: info)."
             | Fail_On _ ->
                 "exit 1 if any issue is this severe or more, shown or not: error, warning or info (default: error)."
@@ -244,6 +246,32 @@ let checkText (out: TextWriter) (issues: FixtureIssue list) =
 
     out.WriteLine(if summary = "" then "No issues." else summary)
 
+/// The issues as SARIF: an issue in a fixture file points at its line there; any other at the
+/// model object it is about.
+let private checkSarif (model: string) (source: ModelSource) (selected: string list) (shown: FixtureIssue list) =
+    let index = SourceLocations.build source
+
+    let items = [
+        for i in shown ->
+            let finding = fst (toFinding i)
+
+            match i.File with
+            | Some file -> {
+                Sarif.Item.Finding = finding
+                Sarif.Item.Location = Some({ SourceLocations.File = file; SourceLocations.Line = i.Line }, i.Line.IsSome)
+                Sarif.Item.Suppressed = None
+              }
+            | None -> List.head (Sarif.modelItems index [ finding ])
+    ]
+
+    let rules = [
+        for id, description in Fixture.rules do
+            if selected.IsEmpty || List.contains id selected then
+                Sarif.Rule.simple id description
+    ]
+
+    Sarif.log (Sarif.rootFor model) rules items []
+
 let private check (ctx: Ctx) (args: ParseResults<CheckArgs>) =
     let model, directory = args.GetResult CheckArgs.Target
     let selected = parseList (args.GetResults CheckArgs.Rule)
@@ -268,15 +296,25 @@ let private check (ctx: Ctx) (args: ParseResults<CheckArgs>) =
 
         match ModelIO.loadPath model with
         | Error e -> Failed e
-        | Ok(_, db) ->
-            match Fixture.loadAndCheck db directory with
-            | Error e -> Failed e
-            | Ok(loaded, issues) ->
-                let issues =
-                    issues
-                    |> List.filter (fun i -> selected.IsEmpty || List.contains i.Rule selected)
+        | Ok(source, db) ->
+            let checkedData =
+                Fixture.loadAndCheck db directory
+                |> Result.bind (fun (loaded, issues) ->
+                    let issues =
+                        issues
+                        |> List.filter (fun i -> selected.IsEmpty || List.contains i.Rule selected)
 
-                let shown = issues |> List.filter (fun i -> Severity.atLeast minimum i.Severity)
+                    let shown = issues |> List.filter (fun i -> Severity.atLeast minimum i.Severity)
+
+                    match args.TryGetResult CheckArgs.Sarif with
+                    | Some path ->
+                        Sarif.write path (checkSarif model source selected shown)
+                        |> Result.map (fun () -> loaded, issues, shown)
+                    | None -> Ok(loaded, issues, shown))
+
+            match checkedData with
+            | Error e -> Failed e
+            | Ok(loaded, issues, shown) ->
 
                 if ctx.Json then
                     writeJson ctx.Out (checkJson clock.Elapsed loaded issues shown)

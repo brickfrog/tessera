@@ -23,6 +23,7 @@ type Args =
     | Force
     | Stat
     | Name_Only
+    | Sarif of file: string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -42,6 +43,7 @@ type Args =
             | Force -> "with --fix: " + Mutation.Usage.force
             | Stat -> "with --fix: " + Mutation.Usage.stat
             | Name_Only -> "with --fix: " + Mutation.Usage.nameOnly
+            | Sarif _ -> Tessera.Cli.Sarif.usage
 
 /// A lint finding in the shared envelope (see Findings.fs).
 let toFinding (f: Lint.Finding) : Findings.Finding = {
@@ -50,6 +52,22 @@ let toFinding (f: Lint.Finding) : Findings.Finding = {
         RuleName = Some f.Rule.Name
         Category = Some f.Rule.Category
         Fixable = Lint.Finding.fixable f
+}
+
+/// A lint rule, for SARIF.
+let sarifRule (r: Lint.Rule) : Sarif.Rule = {
+    Id = r.Id
+    ShortDescription = r.Name
+    FullDescription = Some r.Description
+    Level =
+        Some(
+            match r.Severity with
+            | Validate.Severity.Error -> Findings.Severity.Error
+            | Validate.Severity.Warning -> Findings.Severity.Warning
+            | Validate.Severity.Info -> Findings.Severity.Info
+        )
+    HelpUri = None
+    Category = Some r.Category
 }
 
 let private plural n (word: string) =
@@ -146,6 +164,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | Ok _ when not fixing && editSwitches -> UsageError "--save, --save-to, --force, --stat and --name-only need --fix"
     | Ok _ when fixing && (args.Contains Args.Fail_On || args.Contains Args.Ci) ->
         UsageError "--fail-on and --ci report findings; they don't combine with --fix"
+    | Ok _ when fixing && args.Contains Args.Sarif -> UsageError "--sarif reports findings; it doesn't combine with --fix"
     | Ok(selected, minimum, _, _) when fixing ->
         let opts =
             Mutation.options
@@ -167,14 +186,29 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
     | Ok(selected, minimum, failOn, ci) ->
         let clock = Diagnostics.Stopwatch.StartNew()
 
-        match Source.load ctx modelPath with
-        | Error e -> Failed e
-        | Ok(_, db) ->
-            let findings = Lint.lint db |> List.filter (isSelected selected)
+        let linted =
+            Source.load ctx modelPath
+            |> Result.bind (fun (source, db) ->
+                let findings = Lint.lint db |> List.filter (isSelected selected)
 
-            let shown =
-                findings
-                |> List.filter (fun f -> Validate.Severity.atLeast minimum f.Rule.Severity)
+                let shown =
+                    findings
+                    |> List.filter (fun f -> Validate.Severity.atLeast minimum f.Rule.Severity)
+
+                match args.TryGetResult Args.Sarif with
+                | Some path ->
+                    let ruleSet =
+                        Lint.rules
+                        |> List.filter (fun r -> selected.IsEmpty || selected.Contains r.Id)
+                        |> List.map sarifRule
+
+                    ValidateCommand.writeSarif path modelPath source ruleSet (shown |> List.map toFinding)
+                    |> Result.map (fun () -> findings, shown)
+                | None -> Ok(findings, shown))
+
+        match linted with
+        | Error e -> Failed e
+        | Ok(findings, shown) ->
 
             if ctx.Json then
                 writeJson ctx.Out (lintJson clock.Elapsed shown)

@@ -72,6 +72,14 @@ The MIT license text:
 Licensed under the Apache License, Version 2.0; the full text is in `licenses/Apache-2.0.txt`
 (<https://www.apache.org/licenses/LICENSE-2.0>). Distributed unmodified.
 
+## Used only by the tests (not shipped)
+
+`tests/Tessera.Tests/sarif/sarif-schema-2.1.0.json` is the OASIS SARIF 2.1.0 (errata 01) JSON schema, copied
+unmodified from <https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json>.
+Copyright © OASIS Open 2023. All Rights Reserved. The tests use it to check the SARIF `tess` writes; it is not in
+the binaries or the package. OASIS's notice, which permits copies that keep it, is next to the file in
+`tests/Tessera.Tests/sarif/NOTICE.txt`.
+
 ## Not affiliated
 
 tessera is an independent project. It is not affiliated with, endorsed by or sponsored by Microsoft or Tabular

@@ -107,7 +107,14 @@
     <Compile Include="EngineCacheTests.fs" />
     <Compile Include="TestSuiteTests.fs" />
     <Compile Include="TestCommandTests.fs" />
+    <Compile Include="JsonSchema.fs" />
+    <Compile Include="SarifTests.fs" />
     <Compile Include="Main.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The OASIS SARIF 2.1.0 schema, unmodified (see sarif/NOTICE.txt): the SARIF tests check against it. -->
+    <EmbeddedResource Include="sarif/sarif-schema-2.1.0.json" LogicalName="sarif-schema-2.1.0.json" />
   </ItemGroup>
 
   <ItemGroup>
