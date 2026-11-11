@@ -109,6 +109,7 @@
     <Compile Include="TestCommandTests.fs" />
     <Compile Include="JsonSchema.fs" />
     <Compile Include="SarifTests.fs" />
+    <Compile Include="JsonNullTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

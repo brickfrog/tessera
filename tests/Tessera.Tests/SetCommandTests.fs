@@ -159,7 +159,7 @@ let tests =
             Expect.equal (prop.GetProperty("property").GetString()) "sortByColumn" ""
             Expect.equal (prop.GetProperty("after").GetString()) "DateKey" ""
             Expect.equal (root.GetProperty("notes").[0].GetString()) "Set sortByColumn on column:Date/Month" ""
-            Expect.equal (root.GetProperty("saved").ValueKind) JsonValueKind.Null ""
+            Expect.isFalse (root.TryGetProperty "saved" |> fst) ""
 
         testCase "the error gate: broken DAX is refused without --force, saved with it"
         <| fun () ->

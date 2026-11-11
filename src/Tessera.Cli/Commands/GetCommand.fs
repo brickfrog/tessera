@@ -52,7 +52,8 @@ let private valueJson (v: SetProperty.PropertyValue) : JsonNode =
 let catalogJson (descriptors: SetProperty.Descriptor list) =
     arr [
         for d in descriptors ->
-            obj [
+            // "value" is null for a property with no value: null is the value there, so it stays.
+            objWithNulls [
                 "property", str d.Path
                 "type", str (SetProperty.PropertyType.token d.Type)
                 "writable", bool d.Writable

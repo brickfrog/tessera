@@ -92,15 +92,16 @@ let private resultJson
     o.["warnings"] <- arr (applied.Effect.Warnings |> List.map str)
     o.["notes"] <- arr (applied.Effect.Notes |> List.map str)
 
-    o.["saved"] <-
-        match saved with
-        | Some s ->
+    // Left out on a dry run (absent rather than null, like every optional key).
+    match saved with
+    | Some s ->
+        o.["saved"] <-
             obj [
                 "format", str (ModelIO.OutputFormat.token s.Format)
                 "path", str s.Path
                 "eol", str (ModelIO.Eol.token s.Eol)
             ]
-        | None -> null
+    | None -> ()
 
     o
 

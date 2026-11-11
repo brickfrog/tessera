@@ -182,11 +182,11 @@ let tests =
             Expect.equal (root.GetProperty("type").GetString()) "automatic" ""
             Expect.isTrue (root.GetProperty("dryRun").GetBoolean()) ""
             Expect.isFalse (root.GetProperty("refreshed").GetBoolean()) ""
-            Expect.equal (root.GetProperty("applyRefreshPolicy").ValueKind) JsonValueKind.Null "not asked for"
-            Expect.equal (root.GetProperty("effectiveDate").ValueKind) JsonValueKind.Null ""
+            Expect.isFalse (root.TryGetProperty "applyRefreshPolicy" |> fst) "not asked for"
+            Expect.isFalse (root.TryGetProperty "effectiveDate" |> fst) ""
             Expect.equal (root.GetProperty("maxParallelism").GetInt32()) 3 ""
-            Expect.equal (root.GetProperty("durationMs").ValueKind) JsonValueKind.Null ""
-            Expect.equal (root.GetProperty("traceError").ValueKind) JsonValueKind.Null ""
+            Expect.isFalse (root.TryGetProperty "durationMs" |> fst) ""
+            Expect.isFalse (root.TryGetProperty "traceError" |> fst) ""
             Expect.equal (root.GetProperty("progress").GetArrayLength()) 0 ""
 
             Expect.equal
@@ -266,7 +266,7 @@ let tests =
             Expect.equal (progress.[1].GetProperty("objectPath").GetString()) "Model.Sales" ""
             Expect.equal (progress.[1].GetProperty("integerData").GetInt64()) 2500L ""
             Expect.equal (progress.[1].GetProperty("durationMs").GetInt64()) 1500L ""
-            Expect.equal (progress.[0].GetProperty("integerData").ValueKind) JsonValueKind.Null ""
+            Expect.isFalse (progress.[0].TryGetProperty "integerData" |> fst) ""
             Expect.equal server.Executed.Length 1 ""
 
         testCase "--progress: all shows every progress event, none doesn't trace"

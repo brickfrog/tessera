@@ -213,7 +213,7 @@ let tests =
             Expect.equal (summary.GetProperty("moved").GetInt32()) 1 ""
             Expect.equal (summary.GetProperty("modified").GetInt32()) 1 ""
             Expect.equal (root.GetProperty("introducedErrors").GetArrayLength()) 0 ""
-            Expect.equal (root.GetProperty("saved").ValueKind) System.Text.Json.JsonValueKind.Null ""
+            Expect.isFalse (root.TryGetProperty "saved" |> fst) ""
 
             let real = tess [ "rename"; t.Path; "[Total]"; "Total Sales"; "--json"; "--save" ]
             Expect.equal real.Code ExitCode.ok real.Err

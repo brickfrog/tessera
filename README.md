@@ -432,7 +432,7 @@ set of conventions, the same as the Tabular Editor CLI's.
 - `--name-only` prints just the changed references.
 - Notes and warnings go to stderr, so stdout is only the change.
 - `--json` writes the change set (see `diff`) plus `dryRun`, `introducedErrors` (findings), `warnings`, `notes`,
-  `saved` (the format and path written, or `null`) and `files` (report files `rename` and `move` change, see
+  `saved` (the format and path written; left out on a dry run) and `files` (report files `rename` and `move` change, see
   [Reports](#reports-pbir)).
 
 **Safety:** a change that introduces new errors is shown, but `--save` refuses it (exit 1) unless `--force`.
@@ -3050,6 +3050,11 @@ jobs:
 ### JSON and exit codes
 
 `--json` (or `-j`) writes one JSON document to stdout, errors included (`{"error": {"code", "message"}}`).
+
+A key with no value is left out rather than written as `null`, in every command (as in the Tabular Editor CLI's
+findings): `list`'s `table`, `hidden` and `detail`, `deps --unused`'s `note`, `info`'s `semanticModelFolder`, an
+edit's `saved` on a dry run, and so on. `null` appears only where it is itself the value: a property that holds
+nothing (`get --properties`'s `value`, a change's `before` / `after`) and a BLANK cell in `query` results.
 
 | Code | Meaning |
 |---|---|

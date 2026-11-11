@@ -14,12 +14,26 @@ let str (s: string) : JsonNode = JsonValue.Create s
 let num (n: int) : JsonNode = JsonValue.Create n
 let bool (b: bool) : JsonNode = JsonValue.Create b
 
+/// An optional string: absent (a null node, which `obj` leaves out) when None.
 let optStr =
     function
     | Some s -> str s
     | None -> null
 
+/// A JSON object. A key whose value is null is left out: tess (like the Tabular Editor CLI) omits
+/// absent values rather than writing `null`. Where null is itself the value, use objWithNulls.
 let obj (props: (string * JsonNode) list) : JsonNode =
+    let o = JsonObject()
+
+    for k, v in props do
+        if not (isNull v) then
+            o.[k] <- v
+
+    o
+
+/// A JSON object that keeps null values: for a property that holds no value (`get --properties`,
+/// a change's before/after), where `null` is the value rather than a missing one.
+let objWithNulls (props: (string * JsonNode) list) : JsonNode =
     let o = JsonObject()
 
     for k, v in props do
