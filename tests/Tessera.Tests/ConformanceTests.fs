@@ -19,7 +19,13 @@ let private engine: Evaluate option =
 /// unless it passes; remove a tag here when its area is implemented.
 let private expectedUnsupported: Set<string> =
     set laterAreas
-    - set [ "date-functions"; "text-functions"; "format"; "time-intelligence" ]
+    - set [
+        "date-functions"
+        "text-functions"
+        "format"
+        "time-intelligence"
+        "math-functions"
+    ]
 
 /// Which of the engine's errors mean "not implemented" (see `RunConfig.defaults`).
 let private engineConfig = RunConfig.defaults
@@ -68,6 +74,20 @@ let assumptions = [
     "text-to-number-separators",
     "text with spaces, thousands separators or a currency symbol read as a number is refused"
 ]
+
+/// The assumptions that are no longer made: `DaxValue.fs` now follows a source that settles
+/// them, or refuses (`Unsettled`) where none does. Their cases stay, with their tags.
+let resolvedAssumptions =
+    set [
+        "currency-rounding" // half away from zero (CURRENCY page, SQLBI's 0.6173); near-ties refused
+        "exact-number-comparison" // the documentation's comparison table: as floats
+        "integer-overflow" // wraps around (SQLBI, "Rounding errors with different data types in DAX")
+        "date-multiplication" // the documentation's multiplication table; the rest refused
+        "integer-divided-by-currency" // a decimal number (SQLBI's table and example, Microsoft's sentence)
+        "power-result-type" // POWER returns "A decimal number", and ^ is POWER
+        "convert-integer-rounding" // away from zero (dax.guide/convert)
+        "text-to-number-separators" // refused
+    ]
 
 let private corpus =
     lazy
@@ -130,7 +150,7 @@ let corpusTests =
 
                 Expect.equal
                     marked
-                    assumptions.Length
+                    (assumptions.Length - resolvedAssumptions.Count)
                     "DaxValue.fs has a different number of ASSUMPTION markers than the list in ConformanceTests.fs: update the list, and give a new one a case"
 
             let tags = c.Cases |> List.collect _.Tags |> set

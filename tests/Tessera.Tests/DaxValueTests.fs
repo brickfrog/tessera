@@ -279,18 +279,27 @@ let tests =
                 Expect.equal (V.compare ci (date 2024 1 15) (dec 45306.5) |> ok) -1 ""
                 Expect.equal (V.compare ci (int' 2) (cur 1.9999m) |> ok) 1 ""
 
-            testCase "integers above 2^53: exact against integers, unsettled where rounding to a decimal number matters"
+            // "DAX does implicit conversions for numeric or date/time types as the following table
+            // describes": INTEGER with REAL compares as REAL, INTEGER with INTEGER as INTEGER,
+            // INTEGER with CURRENCY as CURRENCY (Microsoft Learn, "Data types in Power BI Desktop").
+            testCase "an integer and a decimal number compare as floats; two integers exactly"
             <| fun () ->
                 let big = DaxValue.Integer 9007199254740993L
+                Expect.equal (V.compare ci big (dec 9007199254740992.0) |> ok) 0 "2^53 + 1 has no float"
                 Expect.equal (V.compare ci big (DaxValue.Integer 9007199254740992L) |> ok) 1 ""
-                // Exactly, 2^53 + 1 is above 2^53; as decimal numbers the two are equal.
-                Expect.isTrue
-                    (match V.compare ci big (dec 9007199254740992.0) with
-                     | Error(Unsettled _) -> true
-                     | _ -> false)
-                    "the two readings differ"
-
                 Expect.equal (V.compare ci big (dec 9007199254740000.0) |> ok) 1 "the two readings agree"
+                Expect.equal (V.compare ci (DaxValue.Integer Int64.MaxValue) (dec 9223372036854775808.0) |> ok) 0 ""
+                Expect.equal (V.compare ci (int' 3) (cur 2.9999m) |> ok) 1 ""
+
+                match V.compare ci (DaxValue.Integer Int64.MaxValue) (cur 1m) with
+                | Error(Unsettled _) -> ()
+                | other -> failtestf "an Integer too large to be a Currency: %A" other
+
+                // Grouping and sorting stay exact.
+                Expect.equal (V.sortCompare ci big (dec 9007199254740992.0)) 1 ""
+                Expect.isFalse (V.comparesOneToOne DaxType.Integer (dec 1e16)) ""
+                Expect.isTrue (V.comparesOneToOne DaxType.Integer (dec 1e15)) ""
+                Expect.isFalse (V.comparesOneToOne DaxType.Currency (dec 6e11)) ""
 
                 Expect.equal
                     (V.compare ci (DaxValue.Integer Int64.MinValue) (dec -9223372036854775808.0)
@@ -478,8 +487,27 @@ let tests =
             testCase "subtraction: the docs' result-type table"
             <| fun () -> checkTable "-" V.subtract [ [ I; C; R; R ]; [ C; C; R; R ]; [ R; R; R; R ]; [ D; D; D; D ] ]
 
-            testCase "multiplication: the docs' and SQLBI's table (a date multiplies as a Decimal)"
-            <| fun () -> checkTable "*" V.multiply [ [ I; C; R; R ]; [ C; R; C; C ]; [ R; C; R; R ]; [ R; C; R; R ] ]
+            // Microsoft's Multiplication table: INTEGER x Date/time = INTEGER, CURRENCY x Date/time
+            // = REAL, REAL x Date/time = REAL; it has no row for a date on the left.
+            testCase "multiplication: the docs' and SQLBI's table"
+            <| fun () ->
+                for l, row in List.zip [ I; C; R ] [ [ I; C; R; I ]; [ C; R; C; R ]; [ R; C; R; R ] ] do
+                    for r, expected in List.zip numericTypes row do
+                        Expect.equal
+                            (V.multiply (sample l) (sample r) |> ok |> V.typeOf)
+                            (Some expected)
+                            $"{DaxType.name l} * {DaxType.name r}"
+
+                for right in [ int' 2; cur 2m; dec 2.0; date 2024 1 15 ] do
+                    match V.multiply (date 2024 1 15) right with
+                    | Error(Unsettled _) -> ()
+                    | other -> failtestf "a date on the left of *: %A" other
+
+                Expect.equal (V.multiply (int' 2) (date 1900 1 1) |> ok) (int' 4) "1900-01-01 is day 2"
+
+                match V.multiply (int' 2) (V.ofDateTime (DateTime(2020, 10, 23, 12, 0, 0))) with
+                | Error(Unsettled _) -> ()
+                | other -> failtestf "an integer times a date with a time: %A" other
 
             testCase "division: SQLBI's table (dates as in the docs: always Decimal)"
             <| fun () -> checkTable "/" V.divide [ [ R; R; R; R ]; [ C; R; C; R ]; [ R; R; R; R ]; [ R; R; R; R ] ]
@@ -615,7 +643,48 @@ let tests =
                     (Error(CannotConvert("abc", DaxType.String, DaxType.Decimal)))
                     ""
 
-            prop "addition commutes; multiplication commutes; neither throws"
+            testCase "what the sources leave open about overflow is unsettled, not an error"
+            <| fun () ->
+                let unsettled what (r: Result<DaxValue, DaxError>) =
+                    match r with
+                    | Error(Unsettled _) -> ()
+                    | other -> failtestf "%s: %A" what other
+
+                let max = DaxValue.Integer Int64.MaxValue
+                // 2^63 - 1 and -2^63 are documented as outside the range, and as synonyms of null.
+                unsettled "a result of -2^63" (V.add max (int' 1))
+                unsettled "a result of 2^63 - 1" (V.add (DaxValue.Integer(Int64.MaxValue - 1L)) (int' 1))
+                unsettled "negating -2^63" (V.negate (DaxValue.Integer Int64.MinValue))
+                unsettled "an Integer too large for a Currency" (V.add max (cur 1m))
+                // "it might result in an inaccurate number".
+                unsettled "currency x integer out of range" (V.multiply (cur 5e14m) (int' 10))
+
+                // "A multiplication between a currency and a floating point produces an overflow error".
+                Expect.equal
+                    (V.multiply (cur 1e14m) (dec 100.0))
+                    (Error(Overflow("multiplication", DaxType.Currency)))
+                    ""
+
+            // SQLBI's published results, "Rounding errors with different data types in DAX".
+            testCase "currency products and quotients as SQLBI publishes them"
+            <| fun () ->
+                Expect.equal (V.multiply (cur 1.2345m) (dec 0.1) |> ok) (cur 0.1235m) ""
+                Expect.equal (V.divide (cur 1.2345m) (int' 2) |> ok) (cur 0.6173m) ""
+                Expect.equal (V.divide (cur 1.2345m) (dec 2.0) |> ok) (cur 0.6173m) ""
+
+                match V.divide (cur 1.2345m) (cur 2m) |> ok with
+                | DaxValue.Decimal d -> Expect.floatClose Accuracy.veryHigh d 0.61725 ""
+                | other -> failtestf "%A" other
+
+                match V.multiply (cur 1.2345m) (cur 0.1m) |> ok with
+                | DaxValue.Decimal d -> Expect.floatClose Accuracy.veryHigh d 0.12345 ""
+                | other -> failtestf "%A" other
+
+                match V.divide (dec 1.2345) (cur 2m) |> ok with
+                | DaxValue.Decimal d -> Expect.floatClose Accuracy.veryHigh d 0.61725 ""
+                | other -> failtestf "%A" other
+
+            prop "addition commutes; multiplication commutes unless a date is in it; neither throws"
             <| fun (a: DaxValue, b: DaxValue) ->
                 let same x y =
                     match x, y with
@@ -623,7 +692,18 @@ let tests =
                     | Error _, Error _ -> true
                     | _ -> false
 
-                same (V.add a b) (V.add b a) && same (V.multiply a b) (V.multiply b a)
+                let isDate v =
+                    match v with
+                    | DaxValue.DateTime _ -> true
+                    // Text can read as a date.
+                    | DaxValue.String _ -> true
+                    | _ -> false
+
+                // The documentation's table has a date on the right of * only.
+                let product = V.multiply a b
+                let swapped = V.multiply b a
+
+                same (V.add a b) (V.add b a) && (isDate a || isDate b || same product swapped)
 
             prop "a - b = a + (-b) wherever both are defined, up to the type of a date result"
             <| fun (a: DaxValue, b: DaxValue) ->

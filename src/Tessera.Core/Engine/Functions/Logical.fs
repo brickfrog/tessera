@@ -216,23 +216,34 @@ module Logical =
         Fn.scalar "ISBLANK" "Information" (1, 1) (Fn.typeIs DaxType.Boolean) (fun ev ctx call ->
             DaxValue.Boolean(DaxValue.isBlank (ev.Scalar(ctx, call.Args.[0]))))
 
-        // "A single decimal value": the division, or the alternate result (BLANK by default) "in
-        // case there is a division by zero" (dax.guide/divide). A BLANK denominator is zero; a
-        // BLANK numerator gives BLANK, as with `/`.
+        // The division, or the alternate result (BLANK by default) "in case there is a division by
+        // zero" (dax.guide/divide). A BLANK denominator is zero; a BLANK numerator gives BLANK, as
+        // with `/`. The result type is that of `/`: "The division (/) operator displays the same
+        // behavior as the DIVIDE function. The result is always decimal, unless a currency is
+        // divided by an integer or by a decimal; in this case, the result is currency" (SQLBI,
+        // "Understanding numeric data type conversions in DAX", whose table is headed DIVIDE and
+        // /). The function pages' "A decimal number" doesn't single out the Currency case.
         Fn.scalar
             "DIVIDE"
             "Math"
             (2, 3)
             (fun ev ctx args ->
-                match List.tryItem 2 args with
-                | Some alt when not (Fn.isOmitted alt) ->
-                    Typing.unify (StaticType.Known DaxType.Decimal) (ev.TypeOf(ctx, alt))
-                | _ -> StaticType.Known DaxType.Decimal)
+                match ev.TypeOf(ctx, args.[0]) with
+                // A Currency numerator: a Currency or a Decimal, as the values decide.
+                | StaticType.Known DaxType.Currency
+                | StaticType.Variant
+                | StaticType.Unknown -> StaticType.Unknown
+                | _ ->
+                    match List.tryItem 2 args with
+                    | Some alt when not (Fn.isOmitted alt) ->
+                        Typing.unify (StaticType.Known DaxType.Decimal) (ev.TypeOf(ctx, alt))
+                    | _ -> StaticType.Known DaxType.Decimal)
             (fun ev ctx call ->
                 let number (e: Expr) =
                     match ev.Scalar(ctx, e) with
                     | DaxValue.Blank -> DaxValue.Blank
                     | DaxValue.DateTime _ -> Fail.notSupported ctx e.Span "DIVIDE of dates"
+                    | DaxValue.Currency _ as v -> v
                     | v -> Fail.dax ctx e.Span (DaxValue.convertTo DaxType.Decimal v)
 
                 let n = number call.Args.[0]
@@ -240,6 +251,7 @@ module Logical =
 
                 match d with
                 | DaxValue.Blank
+                | DaxValue.Currency 0L
                 | DaxValue.Decimal 0.0 ->
                     match List.tryItem 2 call.Args with
                     | Some alt when not (Fn.isOmitted alt) ->
@@ -269,6 +281,7 @@ module Logical =
                 | Some v when not (notFinite v) -> Typing.coerce t v
                 | _ -> Typing.coerce t (ev.Scalar(ctx, call.Args.[1])))
 
+        // ISERROR counts the infinities and NaN as errors (see `notFinite`).
         Fn.scalar "ISERROR" "Information" (1, 1) (Fn.typeIs DaxType.Boolean) (fun ev ctx call ->
             try
                 DaxValue.Boolean(notFinite (ev.Scalar(ctx, call.Args.[0])))

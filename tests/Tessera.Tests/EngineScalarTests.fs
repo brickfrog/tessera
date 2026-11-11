@@ -285,20 +285,24 @@ let tests =
             testCase "an aggregation that overflows is refused" (fun () ->
                 refused "SUMX ( { 5000000000000000000, 5000000000000000000 }, [Value] )" "out of the range"
                 is (p ()) "SUMX ( { 5000000000000000000, -5000000000000000000, 1 }, [Value] )" 1)
-            // The comparison table of the data types page makes both sides REAL; 2^53 + 1 has no
-            // REAL of its own, and whether the engine compares the exact values is not said.
+            // The comparison table of the data types page makes both sides REAL: 2^53 + 1 becomes
+            // the REAL 2^53. Two whole numbers still compare exactly.
             testCase "a whole number above 2^53 against a decimal number" (fun () ->
-                refused "9007199254740993 = 9007199254740992.0" "too large for a decimal number"
-                refused "9007199254740993 > 9007199254740992.0" "too large for a decimal number"
+                is (p ()) "9007199254740993 = 9007199254740992.0" true
+                is (p ()) "9007199254740993 > 9007199254740992.0" false
                 is (p ()) "9007199254740993 = 9007199254740992" false
                 is (p ()) "9007199254740993 > 1.5" true)
             // The multiplication table of the data types page has a Date/time column and no
-            // Date/time row: REAL by a date is REAL. 2020-10-23 is day 44127.
-            testCase "a decimal number times a date" (fun () ->
+            // Date/time row: REAL by a date is REAL, INTEGER by a date INTEGER, CURRENCY by a date
+            // REAL. 2020-10-23 is day 44127.
+            testCase "a number times a date" (fun () ->
                 is (p ()) "2.0 * dt\"2020-10-23\"" 88254.0
                 is (p ()) "2.0 * dt\"2020-10-23T12:00:00\"" 88255.0
-                refused "2 * dt\"2020-10-23\"" "multiplying a date"
-                refused "dt\"2020-10-23\" * 2.0" "multiplying a date")
+                is (p ()) "2 * dt\"2020-10-23\"" 88254L
+                is (p ()) "CURRENCY ( 2 ) * dt\"2020-10-23\"" 88254.0
+                // A whole result from a date with a time of day: how the fraction goes is not said.
+                refused "2 * dt\"2020-10-23T12:00:00\"" "time of day"
+                refused "dt\"2020-10-23\" * 2.0" "a date on the left")
             testCase "text with spaces, separators or a currency symbol as a number" (fun () ->
                 is (p ()) "\"22\" + 22" 44
                 refused "\" 12 \" + 1" "spaces around a number"
@@ -320,13 +324,18 @@ let tests =
             // dax.guide/round: decimal places, the nearest integer, left of the decimal point.
             testCase "ROUND" (fun () ->
                 is (p ()) "ROUND ( 2.675, 2 )" 2.68
+                // 1.005 * 100 as a float is 100.49999999999999: the number as written rounds to
+                // 1.01, the scaled float to 1.00, and no page says which is rounded. Refused.
+                isError "not-supported" "ROUND ( 1.005, 2 )"
+                is (p ()) "ROUND ( 2.625, 2 )" 2.63
                 is (p ()) "ROUND ( 2.5, 0 )" 3.0
                 // "rounds 2.15 up, to one decimal place. The expected result is 2.2" (Microsoft Learn).
                 is (p ()) "ROUND ( 2.15, 1 )" 2.2
                 is (p ()) "ROUND ( -2.4, 0 )" -2.0
                 is (p ()) "ROUND ( 21.5, -1 )" 20.0
-                // The pages don't say which way a negative number halfway goes.
-                isError "not-supported" "ROUND ( -2.5, 0 )"
+                // "Ties are broken by rounding half away from zero": ROUND(-1.15, 1) is -1.2.
+                is (p ()) "ROUND ( -2.5, 0 )" -3.0
+                is (p ()) "ROUND ( -1.15, 1 )" -1.2
                 is (p ()) "ROUND ( 1234.5, -2 )" 1200.0)
             // "INT rounds <Number> towards −∞" (dax.guide/int).
             testCase "INT" (fun () ->

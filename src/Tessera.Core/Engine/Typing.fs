@@ -104,6 +104,10 @@ module Typing =
             | _, StaticType.Blank -> StaticType.Blank
             | StaticType.Known x, StaticType.Known y ->
                 match x, y with
+                // The documentation's multiplication table (see `DaxValue.multiply`).
+                | DaxType.DateTime, _ -> StaticType.Unknown
+                | DaxType.Integer, DaxType.DateTime -> known DaxType.Integer
+                | (DaxType.Currency | DaxType.Decimal), DaxType.DateTime -> known DaxType.Decimal
                 | DaxType.Integer, DaxType.Integer -> known DaxType.Integer
                 | DaxType.Currency, DaxType.Currency -> known DaxType.Decimal
                 | DaxType.Currency, _

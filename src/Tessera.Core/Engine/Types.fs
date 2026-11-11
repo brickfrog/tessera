@@ -64,6 +64,27 @@ open System.Numerics
 open Tessera
 open Tessera.DaxAst
 
+/// Who is asking, for USERNAME, USERPRINCIPALNAME, USEROBJECTID, USERCULTURE and CUSTOMDATA. A
+/// server takes these from the connection; the local engine has none, so they are whatever the
+/// caller says, and a function whose value is None here is refused.
+type Identity = {
+    UserName: string option
+    UserPrincipalName: string option
+    UserObjectId: string option
+    UserCulture: string option
+    CustomData: string option
+}
+
+module Identity =
+    /// Nothing known: every identity function but CUSTOMDATA (which is then BLANK) is refused.
+    let none = {
+        UserName = None
+        UserPrincipalName = None
+        UserObjectId = None
+        UserCulture = None
+        CustomData = None
+    }
+
 /// A text that DAX was parsed from: spans are offsets into it.
 type SourceText = { Label: string; Text: string }
 
@@ -354,12 +375,24 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
             match DaxValue.typeOf value with
             | Some t when t <> d.DataType && d.DataType <> DaxType.Variant && DaxType.isNumeric t ->
                 if DaxType.isNumeric d.DataType then
+                    // A comparison made as floats can match several large column values at once.
+                    if not (DaxValue.comparesOneToOne d.DataType value) then
+                        raise (
+                            EngineException(
+                                DaxNotSupported(
+                                    $"a comparison of '{table.Name}'[{name}] with a decimal number too large for the column's values to stay distinct as decimal numbers",
+                                    ""
+                                )
+                            )
+                        )
+
                     match DaxValue.convertTo d.DataType value with
                     | Ok converted ->
                         match DaxValue.compare d.Collation converted value with
                         | Ok 0 -> d.TryFindId converted
                         | Error(Unsettled what) -> raise (EngineException(DaxNotSupported(what, "")))
                         | _ -> -1
+                    | Error(Unsettled what) -> raise (EngineException(DaxNotSupported(what, "")))
                     | _ -> -1
                 else
                     -1
@@ -504,6 +537,8 @@ and [<Sealed; AllowNullLiteral>] BRel(id: int, name: string, from: BColumn, toCo
             else
                 match DaxValue.convertTo target.DataType v with
                 | Ok c -> target.TryFindId c
+                | Error(Unsettled what) ->
+                    raise (EngineException(DaxNotSupported($"relationship '{name}': {what}", "")))
                 | Error _ -> -1
 
         let toIdOfFromId = f.Values |> Array.map (convert f t)
@@ -886,6 +921,8 @@ type Ctx = {
     /// evaluated without that row context; whether the engine would let it be seen is not
     /// documented, so anything that would depend on it is refused (see `Context.transition`).
     CallerRows: bool
+    /// Who is asking (see `Identity`): None unless the caller said (`Engine.withIdentity`).
+    Identity: Identity option
 }
 
 type Call = {

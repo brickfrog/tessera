@@ -28,7 +28,15 @@ type Prepared = internal {
     /// Calculated columns and tables that couldn't be computed, and tables whose blank row
     /// can't be decided: queries that touch them fail with the same error.
     Failures: (ObjectRef * TessError) list
+    /// Who is asking, for queries (see `withIdentity`); calculated columns and tables never see it.
+    Identity: Tessera.DaxEngine.Identity option
 }
+
+/// The same model for someone in particular: USERNAME, USERPRINCIPALNAME, USEROBJECTID, USERCULTURE
+/// and CUSTOMDATA answer from `identity` (a function whose value is None there is still refused;
+/// CUSTOMDATA is then BLANK). Without this, the engine refuses them all: it has no connection to
+/// take them from. `p` itself is unchanged: the two share the model and its data.
+let withIdentity (identity: Tessera.DaxEngine.Identity) (p: Prepared) : Prepared = { p with Identity = Some identity }
 
 /// The instant the date functions see as "now". `Now` is what TODAY and NOW return (local time),
 /// `UtcNow` what UTCTODAY and UTCNOW return. It is fixed when a model is prepared: the calculated
@@ -777,6 +785,7 @@ let prepareWith (options: Options) (db: Database) (store: DataStore) : Result<Pr
                     Database = db
                     Store = store
                     Failures = failures
+                    Identity = None
                 })
 
 /// `prepareWith` with the defaults: the date functions see the machine's clock, read once here.
@@ -1058,7 +1067,11 @@ let evaluateQuery (p: Prepared) (dax: string) : Result<QueryResult list, TessErr
                     | Some(_, e) -> raise (EngineException e)
                     | None -> model
 
-            let mutable ctx = Context.root model defs source true
+            let mutable ctx = {
+                Context.root model defs source true with
+                    Identity = p.Identity
+            }
+
             let queryVars = ResizeArray<Ident * Lazy<Value> * bool>()
 
             // Whether the rest of the query refers to a variable: a later variable (until one of
@@ -1143,7 +1156,11 @@ let evaluateScalar (p: Prepared) (dax: string) : Result<QueryValue, TessError> =
     | Error errors -> Error(syntaxError source.Label errors)
     | Ok expr ->
         run (fun () ->
-            let ctx = Context.root p.Model null source true
+            let ctx = {
+                Context.root p.Model null source true with
+                    Identity = p.Identity
+            }
+
             let _, values = Typing.column (ev.TypeOf(ctx, expr)) [| ev.Scalar(ctx, expr) |]
             queryValue values.[0])
 

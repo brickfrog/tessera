@@ -2038,16 +2038,17 @@ arguments, a circular dependency) and `dax-error` (an error DAX itself raises: `
 
 | Family | Functions |
 |---|---|
+| Aggregation | `AVERAGE` `AVERAGEA` `AVERAGEX` `CONCATENATEX` `COUNT` `COUNTA` `COUNTAX` `COUNTBLANK` `COUNTROWS` `COUNTX` `DISTINCTCOUNT` `DISTINCTCOUNTNOBLANK` `MAX` `MAXA` `MAXX` `MIN` `MINA` `MINX` `PRODUCTX` `RANKX` `SUM` `SUMX` |
 | Date and time | `CALENDAR` `CALENDARAUTO` `DATE` `DATEDIFF` `DATEVALUE` `DAY` `EDATE` `EOMONTH` `HOUR` `MINUTE` `MONTH` `NETWORKDAYS` `NOW` `QUARTER` `SECOND` `TIME` `TIMEVALUE` `TODAY` `UTCNOW` `UTCTODAY` `WEEKDAY` `WEEKNUM` `YEAR` `YEARFRAC` |
-| Aggregation | `AVERAGE` `AVERAGEX` `CONCATENATEX` `COUNT` `COUNTA` `COUNTAX` `COUNTBLANK` `COUNTROWS` `COUNTX` `DISTINCTCOUNT` `DISTINCTCOUNTNOBLANK` `MAX` `MAXX` `MIN` `MINX` `PRODUCTX` `RANKX` `SUM` `SUMX` |
 | Filter | `ALL` `ALLCROSSFILTERED` `ALLEXCEPT` (also as a table) `ALLNOBLANKROW` `CALCULATE` `CALCULATETABLE` `CROSSFILTER` `DISTINCT` `EARLIER` `EARLIEST` `FILTER` `HASONEFILTER` `HASONEVALUE` `ISCROSSFILTERED` `ISFILTERED` `KEEPFILTERS` `REMOVEFILTERS` `SELECTEDVALUE` `TREATAS` `USERELATIONSHIP` `VALUES` |
-| Information | `CONTAINSROW` `ISBLANK` `ISERROR` `ISINSCOPE` |
+| Information | `CONTAINS` `CONTAINSROW` `CUSTOMDATA` `ISBLANK` `ISEMPTY` `ISERROR` `ISEVEN` `ISINSCOPE` `ISLOGICAL` `ISNONTEXT` `ISNUMBER` `ISODD` `ISTEXT` `USERCULTURE` `USERNAME` `USEROBJECTID` `USERPRINCIPALNAME` |
 | Logical | `AND` `BLANK` `COALESCE` `ERROR` `FALSE` `IF` `IF.EAGER` `IFERROR` `NOT` `OR` `SWITCH` `TRUE` |
-| Math | `ABS` `DIVIDE` `INT` `MOD` `ROUND` |
+| Math | `ABS` `CEILING` `CONVERT` `CURRENCY` `DIVIDE` `EVEN` `EXP` `FACT` `FLOOR` `GCD` `INT` `ISO.CEILING` `LCM` `LN` `LOG` `LOG10` `MOD` `MROUND` `ODD` `PI` `POWER` `QUOTIENT` `ROUND` `ROUNDDOWN` `ROUNDUP` `SIGN` `SQRT` `SQRTPI` `TRUNC` |
 | Relationship | `LOOKUPVALUE` `RELATED` `RELATEDTABLE` |
-| Table manipulation | `ADDCOLUMNS` `CROSSJOIN` `CURRENTGROUP` `DATATABLE` `EXCEPT` `GENERATE` `GENERATEALL` `GROUPBY` `IGNORE` `INTERSECT` `NATURALINNERJOIN` `NATURALLEFTOUTERJOIN` `ROLLUPADDISSUBTOTAL` `ROLLUPGROUP` `ROW` `SELECTCOLUMNS` `SUMMARIZE` `SUMMARIZECOLUMNS` `TOPN` `UNION` |
-| Text | `CONCATENATE` |
-| Time intelligence | `FIRSTNONBLANK` `FIRSTNONBLANKVALUE` `LASTNONBLANK` `LASTNONBLANKVALUE` |
+| Statistical | `GEOMEAN` `GEOMEANX` `MEDIAN` `MEDIANX` `PERCENTILE.EXC` `PERCENTILE.INC` `PERCENTILEX.EXC` `PERCENTILEX.INC` `RANK.EQ` `STDEV.P` `STDEV.S` `STDEVX.P` `STDEVX.S` `VAR.P` `VAR.S` `VARX.P` `VARX.S` |
+| Table manipulation | `ADDCOLUMNS` `CROSSJOIN` `CURRENTGROUP` `DATATABLE` `EXCEPT` `GENERATE` `GENERATEALL` `GROUPBY` `IGNORE` `INTERSECT` `NATURALINNERJOIN` `NATURALLEFTOUTERJOIN` `NONVISUAL` `ROLLUPADDISSUBTOTAL` `ROLLUPGROUP` `ROW` `SELECTCOLUMNS` `SUMMARIZE` `SUMMARIZECOLUMNS` `TOPN` `UNION` |
+| Text | `COMBINEVALUES` `CONCATENATE` `CONTAINSSTRING` `CONTAINSSTRINGEXACT` `EXACT` `FIND` `FIXED` `FORMAT` `LEFT` `LEN` `LOWER` `MID` `REPLACE` `REPT` `RIGHT` `SEARCH` `SUBSTITUTE` `TOCSV` `TOJSON` `TRIM` `UNICHAR` `UNICODE` `UPPER` `VALUE` |
+| Time intelligence | `CLOSINGBALANCEMONTH` `CLOSINGBALANCEQUARTER` `CLOSINGBALANCEYEAR` `DATEADD` `DATESBETWEEN` `DATESINPERIOD` `DATESMTD` `DATESQTD` `DATESYTD` `ENDOFMONTH` `ENDOFQUARTER` `ENDOFYEAR` `FIRSTDATE` `FIRSTNONBLANK` `FIRSTNONBLANKVALUE` `LASTDATE` `LASTNONBLANK` `LASTNONBLANKVALUE` `NEXTDAY` `NEXTMONTH` `NEXTQUARTER` `NEXTYEAR` `OPENINGBALANCEMONTH` `OPENINGBALANCEQUARTER` `OPENINGBALANCEYEAR` `PARALLELPERIOD` `PREVIOUSDAY` `PREVIOUSMONTH` `PREVIOUSQUARTER` `PREVIOUSYEAR` `SAMEPERIODLASTYEAR` `STARTOFMONTH` `STARTOFQUARTER` `STARTOFYEAR` `TOTALMTD` `TOTALQTD` `TOTALYTD` |
 
   `SUMMARIZE` takes a table, group-by columns (its own, or of tables it has a many-to-one relationship to) and
   name/expression pairs; not `ROLLUP`. `SUMMARIZECOLUMNS` takes group-by columns, filter tables (with
@@ -2104,8 +2105,7 @@ are dates (`dateTime` in results); `YEAR`, `QUARTER`, `MONTH`, `DAY`, `HOUR`, `M
 
 `LEN`, `LEFT`, `RIGHT`, `MID`, `UPPER`, `LOWER`, `TRIM`, `REPT`, `SUBSTITUTE`, `REPLACE`, `SEARCH`, `FIND`, `EXACT`,
 `CONTAINSSTRING`, `CONTAINSSTRINGEXACT`, `COMBINEVALUES`, `UNICHAR`, `UNICODE`, `CONCATENATE`, `FIXED` and `FORMAT`
-are implemented for **en-US** (this supersedes "`FORMAT` and most text ... functions" in the list below). The
-model's culture is read from the model; `FORMAT`'s locale argument overrides it.
+are implemented for **en-US**. The model's culture is read from the model; `FORMAT`'s locale argument overrides it.
 
 - **Culture.** Any culture other than en-US is refused, for `FORMAT` (model culture or locale argument), `FIXED`,
   `UPPER`/`LOWER`, and for a number with decimals turned into text by `&` or a text function (the decimal separator
@@ -2206,10 +2206,50 @@ On a date column that is not unique or has gaps (a fact table's), `DATEADD` and 
 with gaps are an error, with the message the Power BI community quotes from the engine: "Function 'DATEADD' expects a contiguous selection when the date column is
 not unique, has gaps or it contains time portion."
 
+#### Numbers, conversion and the identity functions
+
+`RAND` and `RANDBETWEEN` are known names but always refused: a random answer can't be checked against a server's.
+
+Arithmetic follows the published descriptions of the engine (SQLBI's "Rounding errors with different data types in
+DAX" and "Understanding numeric data type conversions", Microsoft Learn's data types tables); where they say nothing
+the engine refuses rather than pick:
+
+- whole numbers and fixed decimal numbers wrap around on `+`, `-` and whole × whole, as SQLBI shows
+  (`5000000000000000000 + 5000000000000000000` is `-8446744073709551616`); a result that lands on the two values
+  that mean BLANK (2^63 - 1 and -2^63) is refused, and so is `SUM`/`SUMX` past the 64-bit range;
+- a whole or fixed decimal number compared with a decimal number is compared as decimal numbers (floating point), as
+  the comparison table says: `CURRENCY ( 0.1 ) = 0.1` is TRUE, and so is `9007199254740993 = 9007199254740992.0`;
+- a number times a date follows the multiplication table: a whole number times a date is a whole number, a fixed
+  decimal or decimal number times a date a decimal number;
+- fixed decimal results round half away from zero to four places; a value whose decimal reading and binary value
+  disagree about the rounding (`ROUND ( 1.005, 2 )`, `CURRENCY ( 2.00005 )`) is refused, since which one the engine
+  rounds isn't documented;
+- `DIVIDE` returns what `/` returns, a fixed decimal number for a fixed decimal numerator;
+- text read as a number takes only what doesn't depend on the culture: `"1,234"`, `"$5"` or `" 12 "` is refused,
+  `"abc"` is an error; `CONVERT` and `VALUE` read text as a date as the date functions do (see "Text as a date").
+
+`USERNAME`, `USERPRINCIPALNAME`, `USEROBJECTID`, `USERCULTURE` and `CUSTOMDATA` come from the connection on a server;
+the local engine has none, so it refuses them unless the caller says who is asking:
+
+```fsharp
+Engine.withIdentity : Identity -> Engine.Prepared -> Engine.Prepared
+// { Identity.none with UserName = Some "CONTOSO\\ann"; UserCulture = Some "en-US" }
+```
+
+A field left `None` stays refused (`CUSTOMDATA` is then BLANK, as for a connection without it). The original
+`Prepared` is unchanged; calculated columns and tables never see the identity. On the command line:
+
+```sh
+tess query model.bim --data fixture "EVALUATE { USERNAME () }" --user-name 'CONTOSO\ann'
+```
+
+with `--user-name`, `--user-principal-name`, `--user-object-id`, `--user-culture` and `--custom-data` (for `--data`
+only: a server takes them from the connection).
+
 #### What it refuses
 
-- **Not implemented yet:** time intelligence, `ALLSELECTED`, `FORMAT` and most text, math and statistical
-  functions, window functions (`OFFSET`, `INDEX`, `WINDOW`, `RANK`, `ROWNUMBER`), visual calculations,
+- **Not implemented yet:** `ALLSELECTED`, calendar-based time intelligence, the trigonometric functions, window
+  functions (`OFFSET`, `INDEX`, `WINDOW`, `RANK`, `ROWNUMBER`), visual calculations,
   query parameters, detail rows, KPIs, natural joins of tables with model columns (joined over their expanded
   tables). Row-level and object-level
   security are not applied (a query runs as an administrator's would).
@@ -2227,14 +2267,13 @@ not unique, has gaps or it contains time portion."
     (the engine defines no order), and sorting where BLANK meets zero or negative values, or values of different
     types (also in `START AT`);
   - whole-number arithmetic that reaches -2^63 or 2^63-1 (the documented range stops short of them, and the engine
-    uses one of them for BLANK); a total of an aggregation that overflows; a whole number above 2^53 compared with a
-    decimal where rounding it would change the answer;
+    uses one of them for BLANK); a total of an aggregation that overflows;
   - `BLANK () && BLANK ()`, `BLANK () || BLANK ()` and `NOT BLANK ()` (the sources disagree);
   - text turned into a number when it has spaces around it, a currency symbol, thousands separators or `%`;
   - a variable whose value is an error when the result may not need it (the engine may or may not evaluate it);
   - `MAXX` / `MINX` with their variant argument TRUE, and over numbers mixed with dates or TRUE/FALSE;
   - a date or TRUE/FALSE turned into text by `&` (the format depends on the model's culture), text read as a date
-    in arithmetic, a date multiplied, `ROUND` of a negative number exactly halfway;
+    in arithmetic, a date on the left of `*`, a whole number times a date with a time of day;
   - `DISTINCTCOUNT` of a column while its table's blank row is visible (whether that BLANK is counted: write
     `COUNTROWS ( DISTINCT ( ... ) )` or `COUNTROWS ( VALUES ( ... ) )` to say which);
   - a context transition, or a column read, inside a user-defined function that was called from a row context
@@ -2253,8 +2292,8 @@ compare such results as sets.
 calculated table that uses something the engine doesn't support, with what; then how many of each kind it can
 evaluate, and the unsupported things ranked by how many objects use them. It follows references: a measure that
 calls an unsupported measure or function is unsupported, and so is everything that depends, over relationships, on a
-calculated table or column that can't be computed (a `CALENDAR ( )` date table closes most of a model until date
-functions arrive). `--json` writes `{"command": "query coverage", "source", "summary": {measures, calculatedColumns,
+calculated table or column that can't be computed (a date table that can't be computed closes most of a model).
+`--json` writes `{"command": "query coverage", "source", "summary": {measures, calculatedColumns,
 calculatedTables: {total, supported}}, "objects": [{ref, kind, supported, unsupported: [...]}], "unsupported":
 [{reason, objects}]}`.
 

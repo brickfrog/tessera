@@ -881,6 +881,7 @@ module Context =
         Functions = []
         Group = null
         CallerRows = false
+        Identity = None
     }
 
     /// A row context on top of the others.
