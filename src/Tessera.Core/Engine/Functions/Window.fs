@@ -319,11 +319,11 @@ module Window =
     /// all columns in orderBy and partitionBy" (Learn), and "All orderBy and partitionBy
     /// expressions must be fully qualified column names and come from a single table".
     /// ALLSELECTED is not evaluated here yet: when it is, `defaultRelation` builds the relation.
-    let private omittedRelation =
-        "a window function without its relation argument (it defaults to ALLSELECTED of the ORDERBY and PARTITIONBY columns, which this engine doesn't evaluate here)"
+    let private omittedRelation (name: string) =
+        $"{name} without its relation argument (it defaults to ALLSELECTED of the ORDERBY and PARTITIONBY columns, which this engine doesn't evaluate here)"
 
-    let private defaultRelation (ctx: Ctx) (span: Span) : TableVal =
-        Fail.notSupported ctx span omittedRelation
+    let private defaultRelation (ctx: Ctx) (span: Span) (name: string) : TableVal =
+        Fail.notSupported ctx span (omittedRelation name)
 
     /// What `Check` refuses from the arguments alone.
     let private check (name: string) (args: Expr list) : string option =
@@ -339,7 +339,7 @@ module Window =
                 if c.Visual then
                     Some $"{name} with a reset or axis argument (visual calculations only)"
                 elif c.Relation.IsNone then
-                    Some omittedRelation
+                    Some(omittedRelation name)
                 elif c.OrderBy = Some [] then
                     Some $"{name} with an empty ORDERBY ()"
                 elif related c.PartitionBy || related (c.MatchBy |> Option.defaultValue []) then
@@ -487,7 +487,7 @@ module Window =
         let r =
             match c.Relation with
             | Some rel -> ev.Table(ctx, rel)
-            | None -> defaultRelation ctx call.Span
+            | None -> defaultRelation ctx call.Span name
 
         let n = r.Count
         let partition = columnsOf ev ctx r "PARTITIONBY" c.PartitionBy

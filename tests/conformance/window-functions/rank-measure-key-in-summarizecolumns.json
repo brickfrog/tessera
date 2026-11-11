@@ -1,0 +1,65 @@
+{
+  "title": "RANK ordered by a measure, with the current product from SUMMARIZECOLUMNS",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS (",
+    "    'Product'[Product],",
+    "    \"R\", RANK ( DENSE, ALL ( 'Product'[Product] ), ORDERBY ( [Sales Amount], DESC, 'Product'[Product], ASC ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        },
+        {
+          "name": "[R]"
+        }
+      ],
+      "rows": [
+        [
+          "Bike",
+          1
+        ],
+        [
+          "Lock",
+          2
+        ],
+        [
+          "Helmet",
+          3
+        ],
+        [
+          "Scooter",
+          4
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-the-rank-window-function-in-dax/",
+      "quote": "ORDERBY ( [Rounded Sales], DESC, 'Product'[Brand], ASC )",
+      "supports": "the article ranks brands over ALLSELECTED ( 'Product'[Brand] ) by a measure, with the brand as the second key"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/orderby-function-dax",
+      "quote": "The behavior for numerical values is blank values are ordered between zero and negative values.",
+      "supports": "descending, BLANK comes after every positive amount"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Sales Amount by product: Bike 100 + 200 + 100 = 400, Helmet 40 + 20 = 60, Lock 50 + 30 = 80, Scooter BLANK. Descending: Bike 400, Lock 80, Helmet 60, then Scooter's BLANK. The current product comes from SUMMARIZECOLUMNS's group; Scooter's row stays because its rank is not BLANK.",
+  "notes": "The type of the number is not asserted.",
+  "tags": [
+    "window-functions",
+    "rank",
+    "orderby",
+    "measure",
+    "summarizecolumns",
+    "blank"
+  ]
+}

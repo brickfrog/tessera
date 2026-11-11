@@ -1,0 +1,41 @@
+{
+  "title": "RANK is BLANK where there is more than one current row, as at a total",
+  "model": "sales",
+  "query": "EVALUATE ROW ( \"r\", RANK ( DENSE, ALL ( 'Product'[Product] ), ORDERBY ( 'Product'[Product], ASC ) ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "[r]"
+        }
+      ],
+      "rows": [
+        [
+          null
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://learn.microsoft.com/en-us/dax/rank-function-dax",
+      "quote": "RANK returns a blank value for total rows.",
+      "supports": "a total has several current rows"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-the-rank-window-function-in-dax/",
+      "quote": "when there is no current row – like at the total level – RANK shows a blank",
+      "supports": "no single current row gives BLANK"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "No row context and no filter on the product: every product is a current row, with ranks 1 to 4, so there is no one current row and RANK is BLANK.",
+  "notes": "The type of the number is not asserted: the column is BLANK.",
+  "tags": [
+    "window-functions",
+    "rank",
+    "orderby",
+    "all",
+    "apply-semantics"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "title": "OFFSET finds the current row in the filter context: the previous year's amount in a measure grouped by year",
+  "model": "sales",
+  "query": [
+    "EVALUATE",
+    "SUMMARIZECOLUMNS (",
+    "    'Date'[Year],",
+    "    \"Prev\", CALCULATE ( [Sales Amount], OFFSET ( -1, ALL ( 'Date'[Year] ), ORDERBY ( 'Date'[Year], ASC ) ) )",
+    ")"
+  ],
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Date[Year]",
+          "type": "int64"
+        },
+        {
+          "name": "[Prev]",
+          "type": "decimal"
+        }
+      ],
+      "rows": [
+        [
+          2024,
+          210.0
+        ]
+      ]
+    }
+  ],
+  "source": [
+    {
+      "url": "https://www.sqlbi.com/articles/introducing-window-functions-in-dax/",
+      "quote": "Using ALL to ignore the previous filters on year produces the correct result",
+      "supports": "the article's Prev Year Sales measure, CALCULATE ( [Sales Amount], OFFSET ( -1, ALL ( 'Date'[Year] ), ORDERBY ( 'Date'[Year], ASC ) ) ), grouped by year gives the previous year's sales"
+    },
+    {
+      "url": "https://www.sqlbi.com/articles/understanding-apply-semantics-for-window-functions-in-dax/",
+      "quote": "If a model column is not matched with any row context, then the VALUES of the column are evaluated in the current filter context",
+      "supports": "the current year comes from the filter SUMMARIZECOLUMNS puts on the year"
+    }
+  ],
+  "confidence": "derived",
+  "derivation": "Amount by year of OrderDate: 2023 = 210, 2024 = 330. For 2024 the previous year is 2023: 210. 2023 has no previous year: OFFSET returns an empty table, which as a CALCULATE filter leaves no rows, so the amount is BLANK, and SUMMARIZECOLUMNS leaves out the 2023 row, whose only value is BLANK.",
+  "tags": [
+    "window-functions",
+    "offset",
+    "orderby",
+    "all",
+    "summarizecolumns",
+    "calculate",
+    "apply-semantics"
+  ]
+}

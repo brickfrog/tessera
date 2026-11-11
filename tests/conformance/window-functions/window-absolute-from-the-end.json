@@ -1,0 +1,36 @@
+{
+  "title": "WINDOW with negative ABS bounds counts from the end of the partition",
+  "model": "sales",
+  "query": "EVALUATE WINDOW ( -2, ABS, -1, ABS, ALL ( 'Product'[Product] ), ORDERBY ( 'Product'[Product], ASC ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Lock"
+        ],
+        [
+          "Scooter"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://learn.microsoft.com/en-us/dax/window-function-dax",
+    "quote": "If from is negative, it's the position of the start of the window from the end of the partition. -1 means the last row in the partition.",
+    "supports": "-2, ABS is the second last row and -1, ABS the last; the last row is included"
+  },
+  "confidence": "derived",
+  "derivation": "Products ascending: Bike, Helmet, Lock, Scooter. The second last is Lock, the last Scooter.",
+  "tags": [
+    "window-functions",
+    "window",
+    "orderby",
+    "all"
+  ]
+}

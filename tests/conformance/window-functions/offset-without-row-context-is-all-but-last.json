@@ -1,0 +1,40 @@
+{
+  "title": "With no row context every row of the relation is a current row: OFFSET ( -1, ... ) returns all rows but the last",
+  "model": "sales",
+  "query": "EVALUATE OFFSET ( -1, ALL ( 'Product'[Product] ), ORDERBY ( 'Product'[Product], ASC ) )",
+  "expected": [
+    {
+      "columns": [
+        {
+          "name": "Product[Product]",
+          "type": "string"
+        }
+      ],
+      "rows": [
+        [
+          "Bike"
+        ],
+        [
+          "Helmet"
+        ],
+        [
+          "Lock"
+        ]
+      ]
+    }
+  ],
+  "source": {
+    "url": "https://www.sqlbi.com/articles/understanding-apply-semantics-for-window-functions-in-dax/",
+    "quote": "Therefore, the result contains all rows except the last one.",
+    "supports": "without a row context, VALUES of the column in the filter context gives every value, every row is current, and the results are put together"
+  },
+  "confidence": "derived",
+  "derivation": "No row context and no filter: the matching table is every product, so OFFSET runs for Bike, Helmet, Lock and Scooter. Their previous rows are none, Bike, Helmet and Lock.",
+  "tags": [
+    "window-functions",
+    "offset",
+    "orderby",
+    "all",
+    "apply-semantics"
+  ]
+}
