@@ -272,7 +272,8 @@ let tests =
                     "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], NONVISUAL ( TREATAS ( { \"Contoso\", \"Fabrikam\" }, Product[Brand] ) ), \"Qty\", [Qty], \"Visual Total\", CALCULATE ( [Qty], ALLSELECTED ( Product[Brand] ) ), \"Sel\", [TotalSel] )"
                     [ [ "Contoso"; 110; 450; 450 ]; [ "Fabrikam"; 220; 450; 450 ] ]
 
-                // A visual filter next to it is still restored: Contoso and Fabrikam's red products.
+                // A visual filter next to it is still restored: the red products of every brand
+                // (10 + 50 + 60), as the non-visual filter on the brand is not.
                 returns
                     p.Value
                     "EVALUATE SUMMARIZECOLUMNS ( Product[Brand], NONVISUAL ( TREATAS ( { \"Contoso\", \"Fabrikam\" }, Product[Brand] ) ), TREATAS ( { \"Red\" }, Product[Color] ), \"Qty\", [Qty], \"Visual Total\", CALCULATE ( [Qty], ALLSELECTED ( Product[Brand] ) ) )"

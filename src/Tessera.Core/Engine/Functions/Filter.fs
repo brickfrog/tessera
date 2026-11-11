@@ -828,7 +828,9 @@ module Filter =
         // 2 and 3. The row contexts become filters; none is left. The removals come next, so the
         // transition need not spell out what they remove (`Context.transitionDropping`).
         let moved =
-            Context.transitionDropping ctx call.Span (fun c -> removals |> List.exists (fun drop -> drop c))
+            match removals with
+            | [] -> Context.transition ctx call.Span
+            | _ -> Context.transitionDropping ctx call.Span (fun c -> removals |> List.exists (fun drop -> drop c))
 
         let mutable fc = Filters.withConfig moved.Filter config
 

@@ -1405,6 +1405,8 @@ let tests =
                     "CALCULATE ( [Amount], CROSSFILTER ( Sales[ProductKey], Product[ProductKey], ONEWAY_LEFTFILTERSRIGHT ) )",
                     "CROSSFILTER direction"
                     "CALCULATE ( [Amount], ALLSELECTED (), ALL ( Product ) )", "ALLSELECTED together with"
+                    "COUNTROWS ( SUMMARIZECOLUMNS ( Product[Color], KEEPFILTERS ( NONVISUAL ( VALUES ( Product[Color] ) ) ) ) )",
+                    "NONVISUAL together with KEEPFILTERS"
                 ]
 
                 let model = {

@@ -403,10 +403,39 @@ module TableFunctions =
                     Some "ROLLUPADDISSUBTOTAL with a filter for the grand total or for a level"
             | None -> None
 
-        args
-        |> List.tryPick (fun a ->
-            helper [ "ROLLUP"; "ROLLUPGROUP"; "ROLLUPISSUBTOTAL"; "ISSUBTOTAL" ] a
-            |> Option.orElseWith (fun () -> rollupFilters a))
+        // NONVISUAL forms the sources don't show (see `NonVisual`); which columns it filters needs
+        // the values.
+        let nonVisual =
+            let isNonVisual (a: Expr) = (callTo "NONVISUAL" a).IsSome
+
+            if
+                args
+                |> List.exists (fun a ->
+                    match callTo "KEEPFILTERS" a, callTo "NONVISUAL" a with
+                    | Some [ inner ], _ -> isNonVisual inner
+                    | _, Some [ inner ] -> (callTo "KEEPFILTERS" inner).IsSome
+                    | _ -> false)
+            then
+                Some "NONVISUAL together with KEEPFILTERS in SUMMARIZECOLUMNS"
+            elif
+                args |> List.exists isNonVisual
+                && args |> List.exists (fun a -> (callTo "ROLLUPADDISSUBTOTAL" a).IsSome)
+            then
+                Some "NONVISUAL together with ROLLUPADDISSUBTOTAL (what the subtotals show is not documented)"
+            elif
+                args |> List.exists isNonVisual
+                && args |> List.exists (fun a -> (callTo "KEEPFILTERS" a).IsSome)
+            then
+                Some "SUMMARIZECOLUMNS with NONVISUAL and KEEPFILTERS filters"
+            else
+                None
+
+        nonVisual
+        |> Option.orElseWith (fun () ->
+            args
+            |> List.tryPick (fun a ->
+                helper [ "ROLLUP"; "ROLLUPGROUP"; "ROLLUPISSUBTOTAL"; "ISSUBTOTAL" ] a
+                |> Option.orElseWith (fun () -> rollupFilters a)))
 
     /// A helper that only means something as an argument of another function.
     let private onlyInside (name: string) (host: string) : DaxFunction = {

@@ -257,6 +257,12 @@ let nameofTests =
                     [ 0; "'Sales'[Amount]"; "Amount"; 0; 1 ]
                 ]
 
+            // The shape of SQLBI's Power BI query: TOPN and ORDER BY over the result, by the column.
+            returnsInOrder
+                p
+                "DEFINE VAR __Core = SUMMARIZECOLUMNS ( Metric[Value1], Metric[Value2], \"P\", [Picked] ) VAR __Windowed = TOPN ( 502, __Core, Metric[Value1], 0, Metric[Value2], 1 ) EVALUATE __Windowed ORDER BY Metric[Value1] DESC, Metric[Value2]"
+                [ [ "Units"; "'Sales'[Units]"; 1 ]; [ "Amount"; "'Sales'[Amount]"; 0 ] ]
+
             // With a filter table on the group-by column, as Power BI sends a slicer's selection.
             returns
                 p

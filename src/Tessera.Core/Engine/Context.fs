@@ -1097,24 +1097,36 @@ module Context =
 
     /// The filters one row context becomes: every column being iterated, at the row's value.
     /// `drop` names the columns a modifier of the same CALCULATE removes next (see `transitionDropping`).
-    let private rowFiltersDropping (ctx: Ctx) (span: Span) (drop: BColumn -> bool) (rc: RowCtx) : Filter list =
+    let private rowFiltersDropping (ctx: Ctx) (span: Span) (drop: (BColumn -> bool) option) (rc: RowCtx) : Filter list =
         let t = rc.Table
 
         if t.IsPureBase then
             let b = t.BaseTable
             let row = t.BaseRows.[rc.Row]
-            let expanded = Filters.expandedColumns t.Config b
 
             // "all the columns of the expanded table will be part of the newly-created filter
             // context" (SQLBI, "Understanding context transition in DAX").
-            let kept (c: BColumn) =
-                not (drop c) && obj.ReferenceEquals(c.Table, b)
+            let narrowed =
+                match drop with
+                | None -> None
+                | Some drop ->
+                    let expanded = Filters.expandedColumns t.Config b
 
-            // A kept column being computed is a dependency on itself: `closeRows` tells a cycle.
-            if
-                expanded |> Array.exists drop
-                && not (expanded |> Array.exists (fun c -> kept c && c.Computing))
-            then
+                    let kept (c: BColumn) =
+                        not (drop c) && obj.ReferenceEquals(c.Table, b)
+
+                    // A kept column being computed is a dependency on itself: `closeRows` tells a
+                    // cycle.
+                    if
+                        expanded |> Array.exists drop
+                        && not (expanded |> Array.exists (fun c -> kept c && c.Computing))
+                    then
+                        Some(expanded |> Array.filter kept)
+                    else
+                        None
+
+            match narrowed with
+            | Some kept ->
                 // A modifier then removes some of those columns, which leaves the filter on the
                 // others (`Filters.remove`): the values this row has in them. The rows equal to it
                 // in every column (`closeRows`) have those same values, so the row alone gives the
@@ -1123,13 +1135,12 @@ module Context =
                 // all filters except for the one on ProductKey ... The circular dependency is no
                 // longer present" (SQLBI, "Understanding circular dependencies"). The kept columns
                 // of the table not computed yet are computed, as `closeRows` would.
-                for c in expanded do
-                    if kept c && not c.IsReady then
+                for c in kept do
+                    if not c.IsReady then
                         c.Data |> ignore
 
                 [ Rows(b, RowSet.One(b.Size, row), t.Config) ]
-            else
-                [ Rows(b, Filters.closeRows b [| row |], t.Config) ]
+            | None -> [ Rows(b, Filters.closeRows b [| row |], t.Config) ]
         else
             if not (isNull t.BaseTable) && (t.Config.Expanded t.BaseTable).Length > 1 then
                 Fail.notSupported
@@ -1147,15 +1158,14 @@ module Context =
                         | id -> OnColumn(c, RowSet.One(c.IdCount, id))
             ]
 
-    let rowFilters (ctx: Ctx) (span: Span) (rc: RowCtx) : Filter list =
-        rowFiltersDropping ctx span (fun _ -> false) rc
+    let rowFilters (ctx: Ctx) (span: Span) (rc: RowCtx) : Filter list = rowFiltersDropping ctx span None rc
 
     /// Context transition: every row context becomes filters, outermost first, each replacing the
     /// filters on its columns; no row context is left (dax.guide/calculate, steps 2 and 3). `drop`
     /// names the columns whose filters the caller removes right after, before anything reads the
     /// context (CALCULATE's ALL, ALLEXCEPT, REMOVEFILTERS...): a transition filter is exact only
     /// once those are gone.
-    let transitionDropping (ctx: Ctx) (span: Span) (drop: BColumn -> bool) : Ctx =
+    let private transitionWith (ctx: Ctx) (span: Span) (drop: (BColumn -> bool) option) : Ctx =
         if ctx.CallerRows then
             Fail.notSupported
                 ctx
@@ -1196,8 +1206,13 @@ module Context =
 
             { ctx with Filter = fc; Rows = [] }
 
-    let transition (ctx: Ctx) (span: Span) : Ctx =
-        transitionDropping ctx span (fun _ -> false)
+    /// Context transition (see `transitionWith`).
+    let transition (ctx: Ctx) (span: Span) : Ctx = transitionWith ctx span None
+
+    /// Context transition followed at once by the removal of the filters on the columns `drop`
+    /// names (CALCULATE with ALL, ALLEXCEPT, REMOVEFILTERS...): the caller removes them.
+
+    let transitionDropping (ctx: Ctx) (span: Span) (drop: BColumn -> bool) : Ctx = transitionWith ctx span (Some drop)
 
     /// The value a row context has for a model column: the innermost row context that has it,
     /// skipping `skip` of them (EARLIER).

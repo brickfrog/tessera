@@ -89,10 +89,16 @@ let tests =
                             then
                                 table.Name,
                                 c.Name,
-                                [ for g in c.RelatedColumnDetails.GroupByColumns -> g.GroupingColumn.Name ]
+                                [
+                                    for g in c.RelatedColumnDetails.GroupByColumns do
+                                        if not (isNull g.GroupingColumn) then
+                                            g.GroupingColumn.Name
+                                ]
                 ]
 
-                Expect.equal parameters.Length 3 "spaceparts has three field parameters"
+                // spaceparts has three; any other model is checked for what it has.
+                if path.Contains("spaceparts", StringComparison.OrdinalIgnoreCase) then
+                    Expect.equal parameters.Length 3 "spaceparts has three field parameters"
 
                 for (table, display, fields) in parameters do
                     let quote (c: string) = $"'{table}'[{c}]"
