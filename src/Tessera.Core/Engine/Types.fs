@@ -347,6 +347,13 @@ type BColumn(id: int, table: BTable, name: string, dataType: DaxType) =
         | Some why -> raise (EngineException(DaxNotSupported(why, "")))
         | None -> store
 
+    /// The stored values whatever the `Gate`: for copying a computed column, not for queries.
+    member this.Stored: StoreColumn =
+        if obj.ReferenceEquals(store, null) then
+            table.Model.ForceColumn this
+
+        store
+
     /// The id BLANK has in this column: the stored one, or one past the stored ids when no row is
     /// BLANK (the blank row's value still needs an id).
     member this.BlankId: int =
@@ -938,6 +945,8 @@ and [<Sealed; AllowNullLiteral>] Model(collation: Collation) =
     member val ForceColumn: BColumn -> unit = ignore with get, set
     member val ForceTable: BTable -> unit = ignore with get, set
     member val ForceBlankRow: BTable -> unit = ignore with get, set
+    /// The calculated columns (`BColumn`) and tables (`BTable`) being computed, innermost on top.
+    member val Computing = Stack<obj>() with get
     /// The instant TODAY and NOW see (local time), fixed when the model is prepared: every
     /// calculated table and column and every query sees the same one.
     member val Now: DateTime = DateTime.MinValue with get, set

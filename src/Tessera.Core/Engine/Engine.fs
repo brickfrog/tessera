@@ -218,7 +218,10 @@ let private staticGates (db: Database) : Dictionary<string, string> =
                     // expanded tables, which isn't implemented.
                     | RelationshipEndCardinality.One, RelationshipEndCardinality.One when not r.IsActive ->
                         unsupported.Add((r.FromTable.Name, $"the inactive one-to-one relationship {between}"))
-                    | _ -> ()
+                    | RelationshipEndCardinality.One, RelationshipEndCardinality.One
+                    | RelationshipEndCardinality.Many, RelationshipEndCardinality.Many -> ()
+                    | f, t ->
+                        unsupported.Add((r.FromTable.Name, $"the relationship {between}, whose ends are {f} and {t}"))
                 | _ ->
                     unsupported.Add((r.FromTable.Name, $"the relationship {between}, which is not on a single column"))
 
@@ -322,11 +325,28 @@ let private transitionTraits (model: Model) (defs: QueryDefs option) (expr: Expr
             then
                 narrows <- true
 
-            match model.Functions.TryGetValue name.Name with
-            | true, f when seen.Add f ->
+            let fromModel =
+                match model.Functions.TryGetValue name.Name with
+                | true, f -> Some f
+                | _ -> None
+
+            let fromQuery =
+                match defs with
+                | Some d ->
+                    match d.Functions.TryGetValue name.Name with
+                    | true, f -> Some f
+                    | _ -> None
+                | None -> None
+
+            match fromQuery |> Option.orElse fromModel with
+            | Some f when seen.Add f ->
                 // What a function does with its arguments can't be told here.
                 narrows <- true
-                walk f.Def.Body
+
+                try
+                    walk f.Def.Body
+                with EngineException _ ->
+                    ()
             | _ -> ()
         | Bracketed name
         | Qualified(_, name) ->
@@ -432,7 +452,7 @@ let private bindWith
         | Some e -> column.Failure <- Some e
         | None ->
             if original.IsReady then
-                column.SetData original.Data
+                column.SetData original.Stored
 
     let gates = staticGates db
     let tables = ResizeArray<BTable>()
@@ -719,6 +739,7 @@ let private bindWith
                         )
             | None, Some source ->
                 c.Computing <- true
+                model.Computing.Push(c)
 
                 try
                     fail (fun e -> c.Failure <- Some e) (fun () ->
@@ -762,6 +783,7 @@ let private bindWith
                         | Error e -> raise (DaxRuntimeException(DaxError.message e, source.Label)))
                 finally
                     c.Computing <- false
+                    model.Computing.Pop() |> ignore
 
     model.ForceTable <-
         fun (t: BTable) ->
@@ -772,6 +794,7 @@ let private bindWith
             | None, None -> t.SetRowCount 0
             | None, Some source ->
                 t.Computing <- true
+                model.Computing.Push(t)
 
                 try
                     fail (fun e -> t.Failure <- Some e) (fun () ->
@@ -837,6 +860,7 @@ let private bindWith
                         t.SetRowCount result.Count)
                 finally
                     t.Computing <- false
+                    model.Computing.Pop() |> ignore
 
     let deciding = HashSet<int>()
 

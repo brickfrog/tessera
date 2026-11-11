@@ -178,6 +178,14 @@ let nameofTests =
             notSupported p "EVALUATE VALUES ( Metric[Value1] )" "Group By Columns ('Metric'[Value2])"
             notSupported p "EVALUATE Metric" "Group By Columns"
             returns p "EVALUATE VALUES ( Metric[Value2] )" [ [ "'Sales'[Amount]" ]; [ "'Sales'[Units]" ] ]
+
+            // A query with definitions binds the model again: the computed table is copied, gate and all.
+            returns
+                p
+                "DEFINE MEASURE Sales[X] = 1 COLUMN Product[Z] = 1 TABLE T = { 1 } EVALUATE ROW ( \"n\", COUNTROWS ( VALUES ( Metric[Value2] ) ) + [X] )"
+                [ [ 3 ] ]
+
+            notSupported p "DEFINE MEASURE Sales[X] = 1 EVALUATE VALUES ( Metric[Value1] )" "Group By Columns"
             is p "CALCULATE ( [Picked], Metric[Value3] = 1 )" 1
 
             let coverage = Engine.coverage db
@@ -539,6 +547,19 @@ let oneToOneTests =
                 "CALCULATE ( [Units], TREATAS ( { ( \"Green\", \"Clothing\" ), ( \"Blue\", BLANK () ) }, Product[Color], ProductCategory[Category] ) )"
                 5)
 
+        // The engine takes the relationship's from side as the one whose rows are the joined rows:
+        // the same data declared the other way round leaves ProductCategory with keys Product
+        // lacks, which is refused.
+        testCase "the same data declared the other way round is refused" (fun () ->
+            let reversed = {
+                identity with
+                    Rels =
+                        oneToOne (rel ("ProductCategory", "SKU") ("Product", "SKU"))
+                        :: identity.Rels.Tail
+            }
+
+            notSupported (prepare reversed) "EVALUATE ROW ( \"x\", COUNTROWS ( ProductCategory ) )" "lacks")
+
         testCase "what isn't implemented is refused" (fun () ->
             // A category for a product that doesn't exist: Product would need a blank row.
             let extra =
@@ -739,6 +760,35 @@ let keyTests =
             let p = prepare alone
             Expect.isEmpty (Engine.failures p) "computed"
             is p "SUM ( BestProducts[U1] )" 2)
+
+        // A calculated table that iterates the table with CALCULATE depends on all of its columns,
+        // one of which reads the calculated table: a cycle, whatever computes first. What the
+        // calculated table's expression does to the transition isn't read, so it is refused.
+        testCase "a calculated table's transition over a table whose column reads it is not computed" (fun () ->
+            let m = {
+                Tables = [
+                    table "T" [ "V", DataType.Int64 ] [ [ 1 ]; [ 1 ]; [ 2 ] ]
+                    |> withCalculated [ "Y", DataType.Int64, "COUNTROWS ( X )" ]
+                    calculatedTable
+                        "X"
+                        [ "n", DataType.Int64 ]
+                        "ROW ( \"n\", SUMX ( T, CALCULATE ( COUNTROWS ( T ) ) ) )"
+                ]
+                Rels = []
+                Measures = []
+                Functions = []
+            }
+
+            match prepared m with
+            | Ok p ->
+                Expect.isNonEmpty (Engine.failures p) "refused"
+
+                for (_, e) in Engine.failures p do
+                    match e with
+                    | DaxNotSupported _ -> ()
+                    | other -> failtestf "%A" other
+            | Error(DaxInvalid(message, _)) -> Expect.stringContains message "circular" "circular"
+            | Error e -> failtestf "%A" e)
 
         testCase "a column marked as the key, without a relationship: a cycle is refused" (fun () ->
             let db, store = build (best [ test1; test2 ] false)

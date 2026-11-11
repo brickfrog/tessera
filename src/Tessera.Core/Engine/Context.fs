@@ -153,6 +153,17 @@ module Filters =
         let computing = table.Columns |> Array.filter _.Computing
         let key = table.UniqueColumn
 
+        // The object whose expression is evaluated now. If it is a column of this table, it isn't
+        // part of the row yet; any other column of the table being computed is (it is computed
+        // because something it needs is), so the transition needs it.
+        let innermost =
+            if table.Model.Computing.Count > 0 then
+                table.Model.Computing.Peek()
+            else
+                null
+
+        let own (c: BColumn) = obj.ReferenceEquals(c, innermost)
+
         match key with
         | Some _ when not (computing |> Array.exists _.ChangesRelationships) -> plain ()
         | _ ->
@@ -165,8 +176,19 @@ module Filters =
             // in the columns narrows the transition's filter and no key could apply; otherwise
             // (ALLEXCEPT keeping the key, a column marked as the key, USERELATIONSHIP with a key)
             // the cycle may not be there, and it is refused.
+            // Also unsettled: a key column being computed itself, and a transition from outside
+            // the table's own columns (a calculated table, another table's column), whose
+            // expression's traits aren't known here.
             let open' =
-                key.IsSome || table.MarkedKey.IsSome || computing |> Array.exists _.MayNarrow
+                key.IsSome
+                || table.MarkedKey.IsSome
+                || not (computing |> Array.exists own)
+                || computing |> Array.exists _.MayNarrow
+                || table.Model.Rels
+                   |> Array.exists (fun r ->
+                       not r.Limited
+                       && ((obj.ReferenceEquals(r.To.Table, table) && r.To.Computing)
+                           || (r.OneToOne && obj.ReferenceEquals(r.From.Table, table) && r.From.Computing)))
 
             let names (cols: BColumn seq) =
                 cols |> Seq.map (fun c -> $"[{c.Name}]") |> String.concat " and "
@@ -195,17 +217,16 @@ module Filters =
                         )
                     )
 
-            if computing.Length > 1 then
+            if computing |> Array.exists (fun c -> not (own c)) then
                 cycle computing
 
-            if computing.Length > 0 then
-                for c in table.Columns do
-                    if not c.IsReady && not c.Computing then
-                        try
-                            c.Data |> ignore
-                        with EngineException(DaxInvalid(message, _)) when
-                            message.StartsWith("circular dependency", StringComparison.Ordinal) && open' ->
-                            cycle (Seq.append computing [ c ])
+            for c in table.Columns do
+                if not c.IsReady && not c.Computing then
+                    try
+                        c.Data |> ignore
+                    with EngineException(DaxInvalid(message, _)) when
+                        message.StartsWith("circular dependency", StringComparison.Ordinal) && open' ->
+                        cycle (Seq.append computing [ c ])
 
             match table.Duplicates with
             | null -> plain ()
