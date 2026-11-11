@@ -20,6 +20,13 @@ namespace Tessera.DaxEngine
 //     argument of CALCULATE stands for, when the predicate reads nothing but its own columns,
 //     constants, variables and pure functions (`closedVariables` in Functions/Filter.fs). Keyed on
 //     the expression, the model, the columns and the values of the variables it reads.
+//   - `MeasureKey` (in `QueryDefs.Results`, so for one query): the value of a measure reference,
+//     keyed on the measure, the model, the relationships, every filter of the context, and the
+//     measures and functions being evaluated (which decide what is a circular dependency). Only
+//     for a measure that is `ScopeBlind`: neither it nor anything it uses reads the context's
+//     `ScopeMark`s (ALLSELECTED, ISFILTERED, ISCROSSFILTERED, HASONEFILTER, ISINSCOPE), which two
+//     contexts with the same filters need not share; only without calculation groups, outside a
+//     user-defined function called from a row context, and while nothing is being computed.
 //
 // Everything else a result reads is fixed for the model or the query: the data, the clock, the
 // identity, the query's definitions, roles (a role's model is another model).
@@ -340,3 +347,127 @@ type PredicateKey(expr: Expr, model: Model, columns: BColumn array, values: DaxV
 module QueryCache =
     let limit = 200_000
 
+/// The key of a measure's value in `QueryDefs.Results` (see the top of the file).
+[<Sealed; AllowNullLiteral>]
+type MeasureKey
+    (
+        measure: BMeasure,
+        model: Model,
+        config: RelConfig,
+        filters: Filter array,
+        measures: BMeasure list,
+        functions: BFunction list
+    ) =
+    let hash =
+        let mutable h =
+            HashCode.Combine(
+                RuntimeHelpers.GetHashCode measure,
+                RuntimeHelpers.GetHashCode model,
+                RuntimeHelpers.GetHashCode config,
+                FilterKey.hashAll filters
+            )
+
+        for m in measures do
+            h <- h * 31 + RuntimeHelpers.GetHashCode m
+
+        for f in functions do
+            h <- h * 31 + RuntimeHelpers.GetHashCode f
+
+        h
+
+    static let rec sameList (a: 'a list) (b: 'a list) =
+        match a, b with
+        | [], [] -> true
+        | x :: a, y :: b -> obj.ReferenceEquals(x, y) && sameList a b
+        | _ -> false
+
+    member _.Measure = measure
+    member _.Model = model
+    member _.Config = config
+    member _.Filters = filters
+    member _.Measures = measures
+    member _.Functions = functions
+    override _.GetHashCode() = hash
+
+    override this.Equals(o: obj) =
+        match o with
+        | :? MeasureKey as k ->
+            obj.ReferenceEquals(this, k)
+            || (hash = k.GetHashCode()
+                && obj.ReferenceEquals(measure, k.Measure)
+                && obj.ReferenceEquals(model, k.Model)
+                && obj.ReferenceEquals(config, k.Config)
+                && sameList measures k.Measures
+                && sameList functions k.Functions
+                && FilterKey.sameAll filters k.Filters)
+        | _ -> false
+
+module MeasureCache =
+
+    /// The functions that read a filter context's `ScopeMark`s (Functions/Filter.fs).
+    let private readsScope =
+        HashSet<string>(
+            [ "ALLSELECTED"; "ISFILTERED"; "ISCROSSFILTERED"; "HASONEFILTER"; "ISINSCOPE" ],
+            StringComparer.OrdinalIgnoreCase
+        )
+
+    let private isInternal (name: string) =
+        name.StartsWith("_", StringComparison.Ordinal)
+        && name.EndsWith(" FormatString", StringComparison.OrdinalIgnoreCase)
+
+    /// Whether nothing the measure evaluates, through the measures and user-defined functions it
+    /// names, reads the scope marks. Names are resolved loosely (any measure of the model or the
+    /// query with the name counts), which can only find more.
+    let scopeBlind (model: Model) (query: QueryDefs) (m: BMeasure) : bool =
+        let known =
+            match model.Measures.TryGetValue m.Name with
+            | true, x when obj.ReferenceEquals(x, m) -> true
+            | _ ->
+                match query.Measures.TryGetValue m.Name with
+                | true, x -> obj.ReferenceEquals(x, m)
+                | _ -> false
+
+        if not known then
+            false
+        else
+            match query.ScopeBlind.TryGetValue m with
+            | true, b -> b
+            | _ ->
+                let seenMeasures = HashSet<BMeasure>(HashIdentity.Reference)
+                let seenFunctions = HashSet<BFunction>(HashIdentity.Reference)
+                let mutable blind = true
+
+                let rec refs (names: NameRef list) =
+                    for r in names do
+                        if blind then
+                            match r.Kind with
+                            | NameKind.Function ->
+                                if readsScope.Contains r.Name then
+                                    blind <- false
+                                else
+                                    for fs in [ query.Functions; model.Functions ] do
+                                        match fs.TryGetValue r.Name with
+                                        | true, f when seenFunctions.Add f ->
+                                            refs (Tessera.DaxAst.functionReferences f.Def)
+                                        | _ -> ()
+                            | NameKind.Bracketed
+                            | NameKind.Qualified ->
+                                if isInternal r.Name then
+                                    blind <- false
+                                else
+                                    for ms in [ query.Measures; model.Measures ] do
+                                        match ms.TryGetValue r.Name with
+                                        | true, x when seenMeasures.Add x -> refs (Tessera.DaxAst.references x.Expr)
+                                        | _ -> ()
+                            | _ -> ()
+
+                seenMeasures.Add m |> ignore
+
+                try
+                    refs (Tessera.DaxAst.references m.Expr)
+                with _ ->
+                    // A measure that doesn't parse: its evaluation is the error.
+                    blind <- false
+
+                query.ScopeBlind.[m] <- blind
+                blind

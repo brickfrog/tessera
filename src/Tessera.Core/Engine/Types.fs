@@ -1236,8 +1236,12 @@ type QueryDefs() =
     member val Measures = Dictionary<string, BMeasure>(StringComparer.OrdinalIgnoreCase) with get
     member val MeasureTypes = Dictionary<BMeasure, StaticType>(HashIdentity.Reference) with get
     member val Functions = Dictionary<string, BFunction>(StringComparer.OrdinalIgnoreCase) with get
+    /// Measure values this query computed, by `MeasureKey` (Caching.fs).
+    member val Results = Dictionary<obj, DaxValue>() with get
     /// The filters of True/False filter arguments this query computed, by `PredicateKey` (Caching.fs).
     member val Predicates = Dictionary<obj, Filter list>() with get
+    /// Which measures read no scope marks (`MeasureCache.scopeBlind` in Caching.fs).
+    member val ScopeBlind = Dictionary<BMeasure, bool>(HashIdentity.Reference) with get
 
 /// A calculation item applied to a measure reference (see Functions/CalculationGroups.fs).
 type ItemApplication = {

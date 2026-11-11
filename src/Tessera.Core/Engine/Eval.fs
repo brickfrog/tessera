@@ -209,11 +209,44 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
 
             ev.Scalar(inner, m.Expr)
 
+        // Shared with other filter contexts with the same filters, for a measure that reads
+        // nothing else of the context (Caching.fs).
+        let shared () =
+            if
+                not (isNull ctx.Query)
+                && ctx.Model.CalcGroups.Length = 0
+                && not moved.CallerRows
+                && ctx.Model.Computing.Count = 0
+                && MeasureCache.scopeBlind ctx.Model ctx.Query m
+            then
+                let key =
+                    MeasureKey(
+                        m,
+                        ctx.Model,
+                        moved.Filter.Config,
+                        Array.ofList moved.Filter.Filters,
+                        ctx.Measures,
+                        ctx.Functions
+                    )
+
+                match ctx.Query.Results.TryGetValue key with
+                | true, v -> v
+                | _ ->
+                    let v = body ()
+
+                    if ctx.Query.Results.Count >= QueryCache.limit then
+                        ctx.Query.Results.Clear()
+
+                    ctx.Query.Results.[key] <- v
+                    v
+            else
+                body ()
+
         let cached () =
             match moved.Filter.Measures.TryGetValue(m :> obj) with
             | true, v -> v
             | _ ->
-                let v = body ()
+                let v = shared ()
                 moved.Filter.Measures.[m :> obj] <- v
                 v
 
