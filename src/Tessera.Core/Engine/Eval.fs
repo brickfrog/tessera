@@ -76,6 +76,23 @@ module Variables =
                         name.Span
                         $"the variable {name.Name}, which raises an error ({text}) although the result doesn't need its value (the engine raises that error unless it can tell before running that the variable is not used; it can't be told here which)"
 
+/// A function's `Check` is a function of the argument trees alone (see the author's guide in
+/// Types.fs), so its answer for a call of parsed code is kept with the call's arguments: an
+/// iterator calls the same call once per row, and some checks (FORMAT's) parse text.
+module private Checks =
+    let private answers = ConditionalWeakTable<Expr list, DaxFunction * string option>()
+
+    let check (fn: DaxFunction) (args: Expr list) : string option =
+        match args with
+        | [] -> fn.Check args
+        | _ ->
+            match answers.TryGetValue args with
+            | true, (f, answer) when obj.ReferenceEquals(f, fn) -> answer
+            | _ ->
+                let answer = fn.Check args
+                answers.AddOrUpdate(args, (fn, answer))
+                answer
+
 [<Sealed>]
 type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
     let ev = this :> IEval
@@ -416,7 +433,7 @@ type Evaluator(registry: IReadOnlyDictionary<string, DaxFunction>) as this =
 
             Fail.invalid ctx call.Span $"{fn.Name} takes {expected} arguments, {n} were given"
 
-        match fn.Check call.Args with
+        match Checks.check fn call.Args with
         | Some why -> Fail.notSupported ctx call.Span why
         | None -> ()
 
