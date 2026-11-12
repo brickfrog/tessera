@@ -68,7 +68,7 @@ type EmbedArgs =
             match this with
             | Target _ -> "the model, the fixture directory, and where to write the model with the data inside it."
             | Format _ ->
-                "output format: bim | tmdl | pbip. Default: inferred from the destination "
+                "output format: bim | tmdl | pbip | database.json. Default: inferred from the destination "
                 + "(*.bim -> bim, *.SemanticModel -> pbip, otherwise a tmdl folder)."
             | Force -> "overwrite a non-empty destination."
 
@@ -449,7 +449,7 @@ let private embed (ctx: Ctx) (args: ParseResults<EmbedArgs>) =
             |> Option.map Ok
             |> Option.defaultValue (
                 Error
-                    $"""unknown format '{f}'{Suggest.hint (Suggest.closest [ "bim"; "tmdl"; "pbip" ] f)} (expected bim, tmdl or pbip)"""
+                    $"""unknown format '{f}'{Suggest.hint (Suggest.closest ModelIO.OutputFormat.tokens f)} (expected {String.Join(", ", ModelIO.OutputFormat.tokens)})"""
             )
 
     match format with

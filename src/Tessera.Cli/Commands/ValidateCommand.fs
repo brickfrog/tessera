@@ -21,6 +21,7 @@ type Args =
     | Ci of system: string
     | No_Group
     | Sarif of file: string
+    | Watch
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -35,6 +36,7 @@ type Args =
             | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
             | No_Group -> "list every issue on its own, instead of folding issues with one root cause into the first."
             | Sarif _ -> Tessera.Cli.Sarif.usage
+            | Watch -> Tessera.Cli.Watch.usage
 
 /// "2 errors, 1 warning"; zero counts are left out.
 let private summaryText (issues: Issue list) =

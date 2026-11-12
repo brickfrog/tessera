@@ -116,6 +116,8 @@
     <Compile Include="JsonNullTests.fs" />
     <Compile Include="SuggestTests.fs" />
     <Compile Include="PlainOutputTests.fs" />
+    <Compile Include="WatchTests.fs" />
+    <Compile Include="CompletionTests.fs" />
     <Compile Include="Main.fs" />
   </ItemGroup>
 

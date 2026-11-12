@@ -24,6 +24,7 @@ type Args =
     | Stat
     | Name_Only
     | Sarif of file: string
+    | Watch
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -44,6 +45,7 @@ type Args =
             | Stat -> "with --fix: " + Mutation.Usage.stat
             | Name_Only -> "with --fix: " + Mutation.Usage.nameOnly
             | Sarif _ -> Tessera.Cli.Sarif.usage
+            | Watch -> Tessera.Cli.Watch.usage
 
 /// A lint finding in the shared envelope (see Findings.fs).
 let toFinding (f: Lint.Finding) : Findings.Finding = {

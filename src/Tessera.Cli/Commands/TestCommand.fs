@@ -37,6 +37,7 @@ type RunArgs =
     | Trx of file: string
     | Junit of file: string
     | Force
+    | Watch
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -58,6 +59,7 @@ type RunArgs =
             | Trx _ -> "also write the results as a Visual Studio test results (TRX) file."
             | Junit _ -> "also write the results as a JUnit XML file."
             | Force -> "let --trx / --junit replace a file that isn't a test report."
+            | Watch -> Tessera.Cli.Watch.usage
 
 type InitArgs =
     | [<MainCommand; ExactlyOnce>] Model of model: string

@@ -27,7 +27,7 @@ type Args =
                 $"compatibility level (at least {Scaffold.minCompatibilityLevel}). "
                 + $"Default: {Scaffold.defaultCompatibilityLevel}."
             | Format _ ->
-                "output format: bim | tmdl | pbip. Default: inferred from the path "
+                "output format: bim | tmdl | pbip | database.json. Default: inferred from the path "
                 + "(*.bim -> bim, *.SemanticModel -> pbip, otherwise a tmdl folder)."
             | Culture _ -> $"model culture, also used as the source query culture. Default: {Scaffold.defaultCulture}."
             | Force -> "overwrite a non-empty destination."
@@ -67,7 +67,7 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             |> Option.map Ok
             |> Option.defaultValue (
                 Error
-                    $"""unknown format '{f}'{Suggest.hint (Suggest.closest [ "bim"; "tmdl"; "pbip" ] f)} (expected bim, tmdl or pbip)"""
+                    $"""unknown format '{f}'{Suggest.hint (Suggest.closest ModelIO.OutputFormat.tokens f)} (expected {System.String.Join(", ", ModelIO.OutputFormat.tokens)})"""
             )
 
     let name =

@@ -85,6 +85,8 @@ tess query ./MyReport.pbip --data ./fixtures "EVALUATE SUMMARIZECOLUMNS('Date'[Y
 tess query ./MyReport.pbip --coverage            # which measures the local engine can evaluate, and what the rest need
 tess test init ./MyReport.pbip --data ./fixtures  # a test suite to fill in: one test per measure
 tess test run ./MyReport.pbip --ci github         # run .tess-tests/*.test.yaml offline, over the fixture data
+tess validate ./MyReport.pbip --watch            # again on every save, until Ctrl+C (also lint, bpa, test run)
+tess completion bash > ~/.local/share/bash-completion/completions/tess   # shell completion (zsh, fish, pwsh too)
 ```
 
 ### Accepted model paths
@@ -3163,6 +3165,57 @@ jobs:
           sarif_file: bpa.sarif
           category: tess-bpa   # one category per command, if you upload several
 ```
+
+### Re-running on save (`--watch`)
+
+`validate`, `lint`, `bpa` and `test run` take `--watch`: run once, then again whenever the model's files change,
+until Ctrl+C (which exits 0).
+
+```sh
+tess validate Sales.SemanticModel --watch
+tess bpa model.bim --rules team.json --watch --json | jq -c .summary
+```
+
+- **What it watches:** the model's files. A `.bim` is that one file; a TMDL folder, `.SemanticModel` folder or
+  `.pbip` project is the semantic model folder (not the report). `bpa` also watches its `--rules` files; `test run`
+  also watches its suite files (or the default `.tess-tests` folders) and its `--data` folder.
+- **What it ignores:** files outside those, hidden folders (`.git`, `.pbi`, `.vs`), editors' temporary and backup
+  files (`*~`, `.#*`, `*.swp`, `*.tmp`, `4913`, JetBrains `___jb_` files...), and the command's own outputs
+  (`--trx`, `--junit`).
+- **When it runs:** 300 ms after the last change of a burst, so an editor's save-rename, or a tool rewriting a
+  whole folder, is one run. A change during a run means one more run after it.
+- **How it notices:** a file system watcher, and, as a safety net for file systems that don't report changes
+  (network drives, some container and WSL mounts) or a watcher that overflows, a check of file sizes and times every
+  second.
+- **Output:** in text mode the screen is cleared before each run (only on a terminal), and a status line goes to
+  stderr. With `--json`, each run writes one JSON document on one line (JSON Lines), and no status line (`--ci`
+  annotations still go to stderr).
+- **Errors:** a usage error, or a model path that isn't there, stops it at once with the usual exit code. A model
+  that fails to load once it's running (a file saved half-way) is reported, and the watch goes on.
+- Not for server models (`xmla:`), and not with `lint --fix --save` / `--save-to`, which would change the files it
+  watches.
+
+### Shell completion (`completion`)
+
+`tess completion bash|zsh|fish|pwsh` prints a completion script for that shell. It knows every command,
+subcommand and option (it is generated from tess's own argument definitions), the values of options that take one
+of a fixed list (`--fail-on`, `--ci`, `--format`, `--layer`, ...), and completes file names where a command takes a
+path. For a model's objects (`get <model> measure:<Tab>`, `list <model> --table <Tab>`, `query <model> --role <Tab>`,
+perspectives) it asks tess, which reads the model given on the command line. That only ever reads local files: for
+an `xmla:` model it offers nothing, and it never prints errors into your shell.
+
+tess writes nothing to your shell's configuration: install the script yourself, and generate it again after
+upgrading tess.
+
+| Shell | Install |
+|---|---|
+| bash | `tess completion bash > ~/.local/share/bash-completion/completions/tess` (with the bash-completion package), or add `source <(tess completion bash)` to `~/.bashrc` |
+| zsh | `tess completion zsh > "${fpath[1]}/_tess"` (any folder on `$fpath`, before `compinit` runs), or add `source <(tess completion zsh)` to `~/.zshrc` after `compinit` |
+| fish | `tess completion fish > ~/.config/fish/completions/tess.fish` |
+| PowerShell | add `tess completion pwsh \| Out-String \| Invoke-Expression` to your `$PROFILE` (PowerShell 7) |
+
+Object names with spaces and symbols are quoted or escaped for the shell. Completing an object loads the model,
+so it takes about as long as `tess list` on it (under a second for a typical model).
 
 ### JSON and exit codes
 
