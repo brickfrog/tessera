@@ -45,7 +45,7 @@ talks only to the server you name.
 | FSharp.Core | © Microsoft Corporation (.NET Foundation) |
 | Argu | © 2019 Argu contributors (<https://github.com/fsprojects/Argu>) |
 | YamlDotNet | © Antoine Aubry and contributors (<https://github.com/aaubry/YamlDotNet>) |
-| Tabular Editor 2: small portions adapted in `src/Tessera.Core` (for example the BPA token codes in `BpaDaxToken.fs`), marked in the source | © 2017 Daniel Otykier (<https://github.com/TabularEditor/TabularEditor>) |
+| Tabular Editor 2: small portions adapted in `src/Tessera.Core` (for example the BPA token codes in `BpaDaxToken.fs`, and the database.json folder format in `FolderFormat.fs`), marked in the source; a TE2 test fixture in `tests/Tessera.Tests/Te2Fixture.fs` | © 2017 Daniel Otykier (<https://github.com/TabularEditor/TabularEditor>) |
 
 The MIT license text:
 

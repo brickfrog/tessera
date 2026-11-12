@@ -93,6 +93,7 @@ You can point any command at any of these:
 
 - a `.bim` file
 - a TMDL folder, or any `.tmdl` file inside one
+- a Tabular Editor "save to folder" folder (holding `database.json`), or its `database.json`
 - a `X.SemanticModel` folder, or its `definition.pbism`
 - a `.pbip` file, followed through `X.Report/definition.pbir` to its local model
 - a `X.Report` folder
@@ -106,7 +107,12 @@ Unless you pass `--format`, the format is inferred from the destination:
 |---|---|
 | `*.bim` | `bim` |
 | `*.SemanticModel` | `pbip`: TMDL in `definition/`, plus `definition.pbism` and `.platform` |
+| `.../database.json`, or a folder that holds one | `database.json`: Tabular Editor's folder format |
+| an existing folder with `definition.pbism` | `pbip` |
 | anything else | `tmdl` folder |
+
+`--serialization` is another name for `--format` (as in TE's CLI). Its values are a fixed list:
+`bim`, `tmdl`, `pbip` and `database.json`.
 
 The defaults match Power BI Desktop's output:
 
@@ -120,6 +126,98 @@ don't rewrite every line in git. With nothing there, it matches the source, and 
 Use `--eol lf|crlf`, `--indent-spaces N` or `--include-sensitive` to change these. `convert` won't write over a
 non-empty destination without `--force`. With `--force`, stale `.tmdl` files are removed and unrelated files are
 left alone. Re-saving a PBIP folder keeps its `.platform` `logicalId` and its `definition.pbism` settings.
+
+#### Writing PBIP
+
+A PBIP save merges into what's there and never clobbers it:
+
+- `definition/` gets the model's TMDL. Stale `.tmdl` files go, and files whose bytes haven't changed aren't
+  rewritten.
+- An existing `.platform` is kept as it is, including a Desktop-authored `displayName` and `description`.
+  An existing `definition.pbism` is kept too. The one exception: a pbism version older than 4.0 is raised to
+  4.2, because Power BI can't open TMDL under an older one. Other files (`diagramLayout.json`, `.pbi/`) are
+  never touched.
+- A missing `.platform` or `definition.pbism` is created. A new `.platform` has `displayName`, a new
+  `logicalId` and, when you convert from another PBIP, that item's `description`.
+- A `model.bim` next to the new `definition/` is removed, because Power BI refuses a folder that has both.
+- If the destination is a project folder (it holds a `.pbip` file or `X.SemanticModel` folders), the model
+  goes into its one `X.SemanticModel`. If there is none, a new folder is named after the item: the source
+  PBIP's `displayName`, else the database's or model's name. That new folder isn't the destination itself,
+  so no `--force` is needed. Any other destination is written as given. The `displayName` is the folder's
+  name without `.SemanticModel`.
+
+#### Deterministic output
+
+`convert` writes the same bytes on Linux, macOS and Windows for every format:
+- Line endings follow `--eol` and never the OS.
+- Collections keep the model's order, and file listings are sorted ordinally.
+- Every file name is portable:
+  - characters Windows refuses become `%xx` (a fixed set, not the running OS's);
+  - Windows device names (`CON`, `nul.txt`) get a `_` prefix;
+  - folder names don't end in a dot or a space;
+  - names that would collide on a case- or normalization-insensitive file system get `~2`, `~3`, ...
+    The first keeps its name.
+
+For TMDL, tess keeps TOM's own file names and only renames the files that wouldn't be portable. TMDL readers
+take object names from file contents, never from file names. Golden tests in `tests/Tessera.Tests/golden`
+pin the output byte for byte. A new `.platform`'s `logicalId` is random, as it has to be.
+
+### Tabular Editor folders (`database.json`)
+
+This is Tabular Editor's "save to folder" format, which TE2, TE3 and pbi-tools use. It is TOM's JSON split
+into a file per object:
+
+```
+database.json                        the database, with what isn't split out
+dataSources/  expressions/  functions/  relationships/  perspectives/  cultures/  roles/   <name>.json
+tables/<table>/<table>.json
+tables/<table>/{columns,measures,hierarchies,partitions,calculationItems,annotations}/<name>.json
+```
+
+```sh
+tess convert ./model.bim ./model-folder --serialization database.json
+tess convert ./model-folder ./Sales.SemanticModel        # ... and on to PBIP
+tess set ./model-folder "[Revenue]" -p formatString='#,0' --save   # saves back as database.json
+```
+
+The model's `TabularEditor_SerializeOptions` annotation sets the layout, as it does for TE, so a folder
+keeps its layout whoever saves it:
+- `Levels` decides which collections get their own files. That includes TE3's per-file UDFs (`Functions`)
+  and calculation items (`Tables/Calculation Items`); the old spelling `Tables/CalculationItems` is read
+  too. A level tess doesn't know leaves its objects inline.
+- `PrefixFilenames` adds `000 ` prefixes to keep the model's order.
+- `LocalTranslations`, `LocalPerspectives` and `LocalRelationships` store translations, perspective
+  membership and relationships as TE's annotations on the objects themselves.
+- `IgnoreInferredObjects`, `IgnoreInferredProperties`, `IgnoreTimestamps`, `SplitMultilineStrings`,
+  `IgnoreLineageTags`, `IgnorePrivacySettings` and `SortArrays` behave as in TE.
+
+A model without the annotation gets TE's default levels (every collection in its own file), and the
+annotation is written into `database.json`, as TE does. Reading resolves TE's local annotations back into
+translations, perspectives and relationships, then removes them, as TE does. A folder TE2 wrote with all
+three `Local*` options loads and saves back byte for byte.
+
+Where tess departs from TE2:
+- **File names** are portable on every OS (see above). TE2 escapes only what the running OS refuses.
+- **Reading order**: names with a number prefix (`000 `, `1000 `) are sorted by that number, the rest
+  ordinally. TE2 uses the current culture's order (so `1000 x` comes before `101 x`) and, for table
+  folders, the file system's. Without `PrefixFilenames`, split collections come back in file-name order;
+  this format stores no order. The model is otherwise the same.
+- **Relationship names** are kept under `LocalRelationships`. TE2 drops them all, so Power BI Desktop's
+  GUID names became "Relationship 1", "Relationship 2", ... Names of that generated form are still dropped.
+- **Linguistic metadata** survives `LocalTranslations`: a culture that has any keeps its file, without the
+  translations. TE2 drops such cultures.
+- **Refusals**: tess refuses to save, with an error, rather than lose data:
+  - `IgnoreIncrementalRefreshPartitions` when the model has incremental refresh partitions (TE2 deletes them);
+  - `LocalPerspectives` when a perspective has extended properties, or annotations on its members, which
+    TE's annotation can't hold;
+  - `LocalTranslations` with translations of objects TE can't annotate;
+  - an annotation that isn't valid JSON.
+- **Ignored keys**: `IncludeSensitive` (`--include-sensitive` decides), `AlsoSaveAsBim` (a TE UI option)
+  and `TmdlOptions` (TMDL only).
+
+A save into an existing folder removes stale `.json` files only under the format's own folders, matched
+by exact case, plus folders that end up empty. `README.md` and anything else of yours stays. Unchanged
+files aren't rewritten.
 
 ### New models (`init`)
 

@@ -1,0 +1,18 @@
+tables/Sales.tmdl
+tables/Date.tmdl
+tables/Time Intelligence.tmdl
+tables/_CON.tmdl
+tables/_CON~2.tmdl
+tables/_nul.txt.tmdl
+tables/Trailing..tmdl
+tables/Trailing .tmdl
+tables/a%3Ab.tmdl
+tables/Café.tmdl
+relationships.tmdl
+roles/Readers.tmdl
+perspectives/Sales View.tmdl
+cultures/da-DK.tmdl
+expressions.tmdl
+functions.tmdl
+model.tmdl
+database.tmdl

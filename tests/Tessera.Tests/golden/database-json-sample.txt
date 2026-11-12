@@ -1,0 +1,171 @@
+=== cultures/da-DK.json
+{
+  "name": "da-DK"
+}
+=== database.json
+{
+  "name": "Sample",
+  "compatibilityLevel": 1702,
+  "model": {
+    "culture": "en-US",
+    "discourageImplicitMeasures": true,
+    "annotations": [
+      {
+        "name": "TabularEditor_SerializeOptions",
+        "value": "{\"IgnoreInferredObjects\":true,\"IgnoreInferredProperties\":true,\"IgnoreTimestamps\":true,\"SplitMultilineStrings\":true,\"PrefixFilenames\":false,\"LocalTranslations\":false,\"LocalPerspectives\":false,\"SortArrays\":false,\"LocalRelationships\":false,\"Levels\":[\"Data Sources\",\"Functions\",\"Shared Expressions\",\"Perspectives\",\"Relationships\",\"Roles\",\"Tables\",\"Tables/Columns\",\"Tables/Hierarchies\",\"Tables/Measures\",\"Tables/Partitions\",\"Tables/Calculation Items\",\"Translations\"]}"
+      }
+    ]
+  }
+}
+=== expressions/ServerName.json
+{
+  "name": "ServerName",
+  "kind": "m",
+  "expression": "\"localhost\" meta [IsParameterQuery=true, Type=\"Text\", IsParameterQueryRequired=true]"
+}
+=== functions/Double.json
+{
+  "name": "Double",
+  "expression": "(x: INT64) => x * 2"
+}
+=== perspectives/Sales View.json
+{
+  "name": "Sales View"
+}
+=== relationships/Sales-Date.json
+{
+  "name": "Sales-Date",
+  "fromTable": "Sales",
+  "fromColumn": "DateKey",
+  "toTable": "Date",
+  "toColumn": "DateKey"
+}
+=== roles/Readers.json
+{
+  "name": "Readers",
+  "modelPermission": "read"
+}
+=== tables/Date/Date.json
+{
+  "name": "Date"
+}
+=== tables/Date/columns/DateKey.json
+{
+  "name": "DateKey",
+  "dataType": "int64",
+  "sourceColumn": "DateKey"
+}
+=== tables/Date/columns/Month.json
+{
+  "name": "Month",
+  "dataType": "string",
+  "sourceColumn": "Month"
+}
+=== tables/Date/columns/Year.json
+{
+  "name": "Year",
+  "dataType": "int64",
+  "sourceColumn": "Year"
+}
+=== tables/Date/hierarchies/Calendar.json
+{
+  "name": "Calendar",
+  "levels": [
+    {
+      "name": "Year",
+      "ordinal": 0,
+      "column": "Year"
+    },
+    {
+      "name": "Month",
+      "ordinal": 1,
+      "column": "Month"
+    }
+  ]
+}
+=== tables/Date/partitions/Date.json
+{
+  "name": "Date",
+  "source": {
+    "type": "m",
+    "expression": "let x = 1 in x"
+  }
+}
+=== tables/Sales/Sales.json
+{
+  "name": "Sales",
+  "description": [
+    "  Fact table.",
+    "",
+    "   Indented second paragraph.  "
+  ]
+}
+=== tables/Sales/columns/Amount.json
+{
+  "name": "Amount",
+  "dataType": "decimal",
+  "sourceColumn": "Amount"
+}
+=== tables/Sales/columns/DateKey.json
+{
+  "name": "DateKey",
+  "dataType": "int64",
+  "isHidden": true,
+  "sourceColumn": "DateKey"
+}
+=== tables/Sales/columns/Path%2fWith%5cSlashes.json
+{
+  "name": "Path/With\\Slashes",
+  "dataType": "string",
+  "sourceColumn": "P"
+}
+=== tables/Sales/measures/Total (hidden).json
+{
+  "name": "Total (hidden)",
+  "expression": "[Total]",
+  "isHidden": true
+}
+=== tables/Sales/measures/Total.json
+{
+  "name": "Total",
+  "expression": "SUM(Sales[Amount])",
+  "formatString": "#,0"
+}
+=== tables/Sales/partitions/Sales.json
+{
+  "name": "Sales",
+  "source": {
+    "type": "m",
+    "expression": "let x = 1 in x"
+  }
+}
+=== tables/Time Intelligence/Time Intelligence.json
+{
+  "name": "Time Intelligence",
+  "calculationGroup": {}
+}
+=== tables/Time Intelligence/calculationItems/Current.json
+{
+  "name": "Current",
+  "expression": "SELECTEDMEASURE()",
+  "ordinal": 0
+}
+=== tables/Time Intelligence/calculationItems/YTD.json
+{
+  "name": "YTD",
+  "expression": "TOTALYTD(SELECTEDMEASURE(), 'Date'[DateKey])",
+  "ordinal": 1
+}
+=== tables/Time Intelligence/columns/Period.json
+{
+  "name": "Period",
+  "dataType": "string",
+  "sourceColumn": "Name"
+}
+=== tables/Time Intelligence/partitions/Time Intelligence.json
+{
+  "name": "Time Intelligence",
+  "source": {
+    "type": "calculationGroup"
+  }
+}

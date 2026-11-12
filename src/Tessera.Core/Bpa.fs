@@ -586,6 +586,7 @@ let private baseFolders (source: ModelSource) = [
     match source.Format with
     | Bim -> Path.GetDirectoryName(Path.GetFullPath source.Path)
     | Tmdl -> Path.GetFullPath source.Path
+    | DatabaseJson -> Path.GetFullPath source.Path
     | Xmla -> ()
     yield! Option.toList source.SemanticModelFolder
 ]

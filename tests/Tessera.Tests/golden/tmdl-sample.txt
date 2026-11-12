@@ -1,0 +1,120 @@
+=== tables/Sales.tmdl
+///   Fact table.
+/// 
+///    Indented second paragraph.  
+table Sales
+
+	measure Total = SUM(Sales[Amount])
+		formatString: #,0
+
+	measure 'Total (hidden)' = [Total]
+		isHidden
+
+	column Amount
+		dataType: decimal
+		sourceColumn: Amount
+
+	column DateKey
+		dataType: int64
+		isHidden
+		sourceColumn: DateKey
+
+	column Path/With\Slashes
+		dataType: string
+		sourceColumn: P
+
+	partition Sales = m
+		source = let x = 1 in x
+
+
+=== tables/Date.tmdl
+table Date
+
+	column DateKey
+		dataType: int64
+		sourceColumn: DateKey
+
+	column Year
+		dataType: int64
+		sourceColumn: Year
+
+	column Month
+		dataType: string
+		sourceColumn: Month
+
+	hierarchy Calendar
+
+		level Year
+			column: Year
+
+		level Month
+			column: Month
+
+	partition Date = m
+		source = let x = 1 in x
+
+
+=== tables/Time Intelligence.tmdl
+table 'Time Intelligence'
+
+	calculationGroup
+
+		calculationItem Current = SELECTEDMEASURE()
+
+		calculationItem YTD = TOTALYTD(SELECTEDMEASURE(), 'Date'[DateKey])
+
+	column Period
+		dataType: string
+		sourceColumn: Name
+
+	partition 'Time Intelligence' = calculationGroup
+
+
+=== relationships.tmdl
+relationship Sales-Date
+	fromColumn: Sales.DateKey
+	toColumn: Date.DateKey
+
+
+=== roles/Readers.tmdl
+role Readers
+	modelPermission: read
+
+
+=== perspectives/Sales View.tmdl
+perspective 'Sales View'
+
+
+=== cultures/da-DK.tmdl
+cultureInfo da-DK
+
+
+=== expressions.tmdl
+expression ServerName = "localhost" meta [IsParameterQuery=true, Type="Text", IsParameterQueryRequired=true]
+
+
+=== functions.tmdl
+function Double = (x: INT64) => x * 2
+
+
+=== model.tmdl
+model Model
+	culture: en-US
+	discourageImplicitMeasures
+
+ref table Sales
+ref table Date
+ref table 'Time Intelligence'
+
+ref role Readers
+
+ref perspective 'Sales View'
+
+ref cultureInfo da-DK
+
+
+=== database.tmdl
+database Sample
+	compatibilityLevel: 1702
+
+

@@ -35,8 +35,6 @@ let private documentOptions =
 
 let private nodeOptions = JsonNodeOptions(PropertyNameCaseInsensitive = false)
 
-let private writeOptions = JsonSerializerOptions(WriteIndented = true)
-
 let private utf8NoBom = UTF8Encoding(false)
 
 let private readJson (path: string) : Result<JsonNode, string> =
@@ -146,10 +144,13 @@ let displayNameOf (semanticModelDir: string) =
     else
         name
 
+/// The text of a support file: two-space indented, non-ASCII written as is (as Desktop writes it;
+/// System.Text.Json's default writer \u-escapes it), the given line ending, one after the last line.
+let jsonText (node: JsonNode) (eol: string) =
+    FolderFormat.JsonText.write eol node + eol
+
 let private writeJson (path: string) (node: JsonNode) eol =
-    let text = node.ToJsonString(writeOptions).Replace("\r\n", "\n")
-    let text = if eol = "\n" then text else text.Replace("\n", eol)
-    File.WriteAllText(path, text + eol, utf8NoBom)
+    File.WriteAllText(path, jsonText node eol, utf8NoBom)
 
 let private newPbism () =
     JsonObject(
@@ -160,10 +161,41 @@ let private newPbism () =
         ]
     )
 
-let private newPlatform (displayName: string) (logicalId: Guid) =
+/// What a .platform says about its item.
+type Item = {
+    DisplayName: string
+    Description: string option
+}
+
+/// The item a semantic model folder's .platform describes, if it has a readable one with a
+/// displayName.
+let readItem (semanticModelDir: string) : Item option =
+    let platform = Path.Combine(semanticModelDir, platformFileName)
+
+    if File.Exists platform then
+        match readJson platform with
+        | Ok json ->
+            tryString json [ "metadata"; "displayName" ]
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.map (fun name -> {
+                DisplayName = name
+                Description =
+                    tryString json [ "metadata"; "description" ]
+                    |> Option.filter (String.IsNullOrEmpty >> not)
+            })
+        | Error _ -> None
+    else
+        None
+
+let private newPlatform (item: Item) (logicalId: Guid) =
     let metadata = JsonObject()
     metadata.["type"] <- JsonValue.Create "SemanticModel"
-    metadata.["displayName"] <- JsonValue.Create displayName
+    metadata.["displayName"] <- JsonValue.Create item.DisplayName
+
+    match item.Description with
+    | Some d -> metadata.["description"] <- JsonValue.Create d
+    | None -> ()
+
     let config = JsonObject()
     config.["version"] <- JsonValue.Create "2.0"
     config.["logicalId"] <- JsonValue.Create(logicalId.ToString())
@@ -173,10 +205,24 @@ let private newPlatform (displayName: string) (logicalId: Guid) =
     root.["config"] <- config
     root
 
-/// Make sure a semantic model folder has the PBIP support files for a TMDL definition.
-/// Existing files are preserved (a .platform keeps its logicalId); an existing definition.pbism
-/// whose version predates TMDL is bumped, keeping its other settings.
-let ensureSupportFiles (semanticModelDir: string) (eol: string) (newId: unit -> Guid) : Result<unit, TessError> =
+/// The text of a new .platform for an item.
+let platformText (item: Item) (logicalId: Guid) (eol: string) =
+    jsonText (newPlatform item logicalId) eol
+
+/// The text of a new definition.pbism.
+let pbismText (eol: string) = jsonText (newPbism ()) eol
+
+/// Make sure a semantic model folder has its PBIP support files: what's missing is added, what's
+/// there is kept ("merge, never clobber": a .platform keeps its displayName, description and
+/// logicalId). The one change to an existing file: a definition.pbism whose version predates TMDL
+/// is bumped (Power BI can't open the TMDL otherwise), keeping its other settings. A new .platform
+/// describes `item` (by default, the folder's name).
+let ensureSupportFilesFor
+    (semanticModelDir: string)
+    (item: Item option)
+    (eol: string)
+    (newId: unit -> Guid)
+    : Result<unit, TessError> =
     let pbism = Path.Combine(semanticModelDir, pbismFileName)
     let platform = Path.Combine(semanticModelDir, platformFileName)
 
@@ -205,7 +251,18 @@ let ensureSupportFiles (semanticModelDir: string) (eol: string) (newId: unit -> 
         pbismResult
         |> Result.map (fun () ->
             if not (File.Exists platform) then
-                writeJson platform (newPlatform (displayNameOf semanticModelDir) (newId ())) eol)
+                let item =
+                    item
+                    |> Option.defaultValue {
+                        DisplayName = displayNameOf semanticModelDir
+                        Description = None
+                    }
+
+                writeJson platform (newPlatform item (newId ())) eol)
     with
     | :? IOException
     | :? UnauthorizedAccessException as e -> Error(SaveFailed(semanticModelDir, e.Message))
+
+/// ensureSupportFilesFor a TMDL definition, naming a new .platform's item after the folder.
+let ensureSupportFiles (semanticModelDir: string) (eol: string) (newId: unit -> Guid) : Result<unit, TessError> =
+    ensureSupportFilesFor semanticModelDir None eol newId

@@ -47,7 +47,8 @@ module Eol =
     let ofText (text: string) = verdict (count text)
 
     /// Model files worth sampling at a path: a .bim file, or the .tmdl/.bim files under a folder
-    /// (for a PBIP folder, its definition/). Bounded so huge models stay cheap.
+    /// (for a PBIP folder, its definition/; for a database.json folder, its .json files). Bounded so
+    /// huge models stay cheap.
     let private sampleFiles (path: string) =
         if File.Exists path then
             [ path ]
@@ -55,7 +56,12 @@ module Eol =
             let definition = Path.Combine(path, Pbip.definitionFolderName)
             let root = if Directory.Exists definition then definition else path
 
-            [ "*.tmdl"; "*.bim" ]
+            [
+                "*.tmdl"
+                "*.bim"
+                if FolderFormat.isFolder root then
+                    "*.json"
+            ]
             |> Seq.collect (fun pattern -> Directory.EnumerateFiles(root, pattern, SearchOption.AllDirectories))
             |> Seq.truncate 25
             |> List.ofSeq
@@ -106,6 +112,8 @@ type OutputFormat =
     | TmdlFolder
     /// A PBIP "X.SemanticModel" folder: TMDL under definition/ plus definition.pbism and .platform.
     | PbipFolder
+    /// Tabular Editor's "save to folder" layout: database.json plus a file per object (FolderFormat).
+    | DatabaseJsonFolder
 
 module OutputFormat =
     let token =
@@ -113,21 +121,38 @@ module OutputFormat =
         | BimFile -> "bim"
         | TmdlFolder -> "tmdl"
         | PbipFolder -> "pbip"
+        | DatabaseJsonFolder -> "database.json"
+
+    /// Every format, in the order the CLI lists them.
+    let all = [ BimFile; TmdlFolder; PbipFolder; DatabaseJsonFolder ]
+
+    /// The format names `--format` / `--serialization` accept (a fixed list, for completions).
+    let tokens = all |> List.map token
 
     let tryParse (s: string) =
-        match s.Trim().ToLowerInvariant() with
-        | "bim" -> Some BimFile
-        | "tmdl" -> Some TmdlFolder
-        | "pbip" -> Some PbipFolder
-        | _ -> None
+        let s = s.Trim().ToLowerInvariant()
+        all |> List.tryFind (fun f -> token f = s)
 
-    /// Guess from the destination path: *.bim -> BIM, *.SemanticModel -> PBIP, otherwise a TMDL folder.
+    /// Guess from the destination path: *.bim -> BIM, *.SemanticModel -> PBIP, .../database.json -> the
+    /// database.json folder; an existing folder keeps its format (database.json, PBIP); otherwise a
+    /// TMDL folder.
     let infer (destination: string) =
         let trimmed = destination.TrimEnd('/', '\\')
 
         if trimmed.EndsWith(".bim", StringComparison.OrdinalIgnoreCase) then
             BimFile
         elif trimmed.EndsWith(Pbip.semanticModelSuffix, StringComparison.OrdinalIgnoreCase) then
+            PbipFolder
+        elif
+            String.Equals(
+                Path.GetFileName trimmed,
+                FolderFormat.databaseJsonFileName,
+                StringComparison.OrdinalIgnoreCase
+            )
+            || FolderFormat.isFolder trimmed
+        then
+            DatabaseJsonFolder
+        elif Directory.Exists trimmed && Pbip.isSemanticModelFolder trimmed then
             PbipFolder
         else
             TmdlFolder
@@ -265,6 +290,10 @@ let load (source: ModelSource) : Result<Database, TessError> =
         match source.Format with
         | Bim -> Ok(deserializeBim (File.ReadAllText source.Path))
         | Tmdl -> Ok(TmdlSerializer.DeserializeDatabaseFromFolder source.Path)
+        | DatabaseJson ->
+            match FolderFormat.combine source.Path with
+            | Ok json -> Ok(deserializeBim json)
+            | Error reason -> Error(LoadFailed(source.Path, reason))
         | Xmla ->
             Error(RemoteSourceUnsupported(source.Path, "a remote model is loaded over a connection, not from files"))
     with e ->
@@ -325,7 +354,8 @@ let toBimText (opts: SaveOptions) (db: Database) =
     | Lf -> json
     | CrLf -> json.Replace("\n", "\r\n")
 
-let private tmdlOptions (opts: SaveOptions) =
+/// TOM's TMDL options for a save.
+let tmdlOptions (opts: SaveOptions) =
     let formatting =
         MetadataFormattingOptionsBuilder(MetadataSerializationStyle.Tmdl)
             .WithBaseIndentationLevel(0)
@@ -366,14 +396,24 @@ let private filesUnder (dir: string) =
     |> Array.sort
     |> List.ofArray
 
-let private saveBim (opts: SaveOptions) (db: Database) (path: string) =
-    catchIo path (fun () ->
+/// Write bytes unless the file already holds exactly them (so a no-op save changes nothing on disk).
+let private writeIfChanged (path: string) (bytes: byte array) =
+    let unchanged =
+        File.Exists path
+        && Array.length bytes = int (FileInfo(path).Length)
+        && File.ReadAllBytes path = bytes
+
+    if not unchanged then
         match Path.GetDirectoryName path with
         | null
         | "" -> ()
         | dir -> Directory.CreateDirectory dir |> ignore
 
-        File.WriteAllText(path, toBimText opts db + Eol.text opts.Eol, utf8NoBom)
+        File.WriteAllBytes(path, bytes)
+
+let private saveBim (opts: SaveOptions) (db: Database) (path: string) =
+    catchIo path (fun () ->
+        writeIfChanged path (utf8NoBom.GetBytes(toBimText opts db + Eol.text opts.Eol))
 
         {
             Format = BimFile
@@ -385,15 +425,18 @@ let private saveBim (opts: SaveOptions) (db: Database) (path: string) =
 let private isTmdlFile (relative: string) =
     relative.EndsWith(".tmdl", StringComparison.OrdinalIgnoreCase)
 
-/// The .tmdl files (relative paths, '/'-separated) of a folder that a new serialization doesn't
-/// write, compared by exact case: on a case-insensitive file system, tables/Sales.tmdl is stale
-/// when the new output has tables/SALES.tmdl, even though both name the same file.
-let staleTmdlFiles (existing: string list) (written: string list) =
+/// The files (relative paths, '/'-separated) of a folder that a save owns (`isManaged`) but no
+/// longer writes, compared by exact case: on a case-insensitive file system, tables/Sales.tmdl is
+/// stale when the new output has tables/SALES.tmdl, even though both name the same file.
+let staleFiles (isManaged: string -> bool) (existing: string list) (written: string list) =
     let keep = Collections.Generic.HashSet<string>(written, StringComparer.Ordinal)
 
     existing
-    |> List.filter (fun f -> isTmdlFile f && not (keep.Contains f))
-    |> List.sort
+    |> List.filter (fun f -> isManaged f && not (keep.Contains f))
+    |> List.sortWith (fun a b -> String.CompareOrdinal(a, b))
+
+/// staleFiles for TMDL: any .tmdl file.
+let staleTmdlFiles (existing: string list) (written: string list) = staleFiles isTmdlFile existing written
 
 let private relativeFiles (dir: string) =
     if Directory.Exists dir then
@@ -403,59 +446,94 @@ let private relativeFiles (dir: string) =
     else
         []
 
-/// Write TMDL into a folder the way TOM's folder serializer does (stale .tmdl files removed, with
-/// folders they leave empty; other files left alone), but safe for case-only renames on
-/// case-insensitive file systems. TOM writes SALES.tmdl (which lands on the existing Sales.tmdl
-/// there) and then deletes Sales.tmdl as stale, losing the table. So serialize into a staging
-/// folder, delete stale files first (by exact case), then copy in what changed.
-let private writeTmdl (opts: SaveOptions) (db: Database) (dir: string) =
+/// Write a folder's files (relative '/'-separated paths): stale files the save owns are deleted
+/// first, by exact case (so a case-only rename on a case-insensitive file system doesn't delete the
+/// file it just wrote), with the folders they leave empty; then whatever changed is written. Files
+/// the save doesn't own are left alone.
+let private writeFolder (dir: string) (isManaged: string -> bool) (files: (string * byte array) list) =
     catchIo dir (fun () ->
-        let staging =
-            Path.Combine(Path.GetTempPath(), "tessera-tmdl-" + Guid.NewGuid().ToString("N"))
+        let local (relative: string) =
+            Path.Combine(dir, relative.Replace('/', Path.DirectorySeparatorChar))
 
-        try
-            TmdlSerializer.SerializeDatabaseToFolder(db, staging, tmdlOptions opts)
-            let written = relativeFiles staging
+        for stale in staleFiles isManaged (relativeFiles dir) (List.map fst files) do
+            let path = local stale
+            File.Delete path
 
-            let local (relative: string) =
-                Path.Combine(dir, relative.Replace('/', Path.DirectorySeparatorChar))
+            // Folders the deletion left empty go too, up to (not including) the root.
+            let root = Path.GetFullPath dir
+            let mutable folder = Path.GetDirectoryName(Path.GetFullPath path)
 
-            for stale in staleTmdlFiles (relativeFiles dir) written do
-                let path = local stale
-                File.Delete path
+            while not (isNull folder)
+                  && folder.Length > root.TrimEnd(Path.DirectorySeparatorChar).Length
+                  && Directory.Exists folder
+                  && Seq.isEmpty (Directory.EnumerateFileSystemEntries folder) do
+                Directory.Delete folder
+                folder <- Path.GetDirectoryName folder
 
-                // Folders the deletion left empty go too, up to (not including) the root.
-                let root = Path.GetFullPath dir
-                let mutable folder = Path.GetDirectoryName(Path.GetFullPath path)
+        Directory.CreateDirectory dir |> ignore
 
-                while not (isNull folder)
-                      && folder.Length > root.TrimEnd(Path.DirectorySeparatorChar).Length
-                      && Directory.Exists folder
-                      && Seq.isEmpty (Directory.EnumerateFileSystemEntries folder) do
-                    Directory.Delete folder
-                    folder <- Path.GetDirectoryName folder
+        for relative, bytes in files do
+            writeIfChanged (local relative) bytes)
 
-            for relative in written do
-                let source =
-                    Path.Combine(staging, relative.Replace('/', Path.DirectorySeparatorChar))
+/// The TMDL files for a database, as (relative path, bytes), in TOM's document order: exactly what
+/// TOM's folder serializer writes, with file names made portable. TOM writes `tables/CON.tmdl`
+/// (a device name on Windows) and, for tables whose names differ only by case, files that collide on
+/// Windows and macOS; those get `_CON.tmdl` and `sales~2.tmdl` (TMDL readers take object names from
+/// the files' content, never from their names). Computed in memory, so nothing collides on disk first.
+let tmdlFiles (opts: SaveOptions) (db: Database) : (string * byte array) list =
+    let context =
+        MetadataSerializationContext.Create(MetadataSerializationStyle.Tmdl, db, tmdlOptions opts)
 
-                let target = local relative
-                let bytes = File.ReadAllBytes source
+    let documents = [
+        for d in context ->
+            let logical = d.LogicalPath
 
-                let unchanged =
-                    File.Exists target
-                    && Array.length bytes = int (FileInfo(target).Length)
-                    && File.ReadAllBytes target = bytes
+            let relative =
+                if logical.StartsWith("./", StringComparison.Ordinal) then
+                    logical.Substring 2
+                else
+                    logical
 
-                if not unchanged then
-                    Directory.CreateDirectory(Path.GetDirectoryName target) |> ignore
-                    File.WriteAllBytes(target, bytes)
-        finally
-            try
-                if Directory.Exists staging then
-                    Directory.Delete(staging, true)
-            with _ ->
-                ())
+            use stream = new MemoryStream()
+            d.WriteTo(stream)
+            relative.Split('/') |> Array.map FolderFormat.SafeName.portable, stream.ToArray()
+    ]
+
+    // Unique file names per folder, the first of each clash keeping its name.
+    let byFolder =
+        documents
+        |> List.map (fun (segments, _) -> String.Join("/", segments.[.. segments.Length - 2]))
+        |> List.distinct
+
+    let names = Collections.Generic.Dictionary<string * int, string>()
+
+    for folder in byFolder do
+        let members =
+            documents
+            |> List.indexed
+            |> List.filter (fun (_, (segments, _)) -> String.Join("/", segments.[.. segments.Length - 2]) = folder)
+
+        let unique =
+            members
+            |> List.map (fun (_, (segments, _)) -> segments.[segments.Length - 1])
+            |> FolderFormat.SafeName.uniqueIn ".tmdl"
+
+        for (i, _), name in List.zip members unique do
+            names.[(folder, i)] <- name
+
+    documents
+    |> List.mapi (fun i (segments, bytes) ->
+        let folder = String.Join("/", segments.[.. segments.Length - 2])
+        let file = names.[(folder, i)] + ".tmdl"
+        (if folder = "" then file else folder + "/" + file), bytes)
+
+/// Write TMDL into a folder (see writeFolder: stale .tmdl files removed, other files left alone).
+let private writeTmdl (opts: SaveOptions) (db: Database) (dir: string) =
+    try
+        Ok(tmdlFiles opts db)
+    with e ->
+        Error(SaveFailed(dir, e.Message))
+    |> Result.bind (writeFolder dir isTmdlFile)
 
 let private saveTmdl opts db dir =
     writeTmdl opts db dir
@@ -466,18 +544,138 @@ let private saveTmdl opts db dir =
         Files = filesUnder dir
     })
 
-let private savePbip (opts: SaveOptions) (db: Database) (dir: string) =
+/// The folder options a model asks for: its TabularEditor_SerializeOptions annotation, or TE's
+/// default folder levels when it has none (and whether it had one).
+let private folderOptionsOf (db: Database) : Result<FolderFormat.FolderOptions * bool, string> =
+    let annotation =
+        match db.Model with
+        | null -> None
+        | m -> Option.ofObj (m.Annotations.Find FolderFormat.FolderOptions.annotationName)
+
+    match annotation with
+    | None -> Ok(FolderFormat.FolderOptions.defaultFolder, false)
+    | Some a ->
+        FolderFormat.FolderOptions.parse a.Value
+        |> Result.map (fun o -> o, true)
+        |> Result.mapError (fun e ->
+            $"the model's {FolderFormat.FolderOptions.annotationName} annotation can't be read: {e}")
+
+/// The database.json folder's files for a database. The model's TabularEditor_SerializeOptions
+/// annotation decides the layout; a model without one gets TE's default folder levels, and the
+/// annotation is written into database.json (as TE does), so later saves by any tool keep the layout.
+/// The annotation's own IncludeSensitive is not honoured: --include-sensitive decides.
+let databaseJsonFiles (opts: SaveOptions) (db: Database) : Result<FolderFormat.FolderFile list, string> =
+    folderOptionsOf db
+    |> Result.bind (fun (folder, present) ->
+        let needsCopy =
+            not (isNull db.Model)
+            && (not present
+                || folder.LocalTranslations
+                || folder.LocalPerspectives
+                || folder.LocalRelationships)
+
+        let target = if needsCopy then clone db else db
+
+        if needsCopy && not present then
+            target.Model.Annotations.Add(
+                Annotation(
+                    Name = FolderFormat.FolderOptions.annotationName,
+                    Value = FolderFormat.FolderOptions.toJson folder
+                )
+            )
+
+        FolderFormat.Local.apply folder (effectiveCompatibilityMode db) target
+        |> Result.bind (fun () ->
+            let options =
+                SerializeOptions(
+                    IgnoreInferredObjects = folder.IgnoreInferredObjects,
+                    IgnoreInferredProperties = folder.IgnoreInferredProperties,
+                    IgnoreTimestamps = folder.IgnoreTimestamps,
+                    SplitMultilineStrings = folder.SplitMultilineStrings,
+                    IncludeRestrictedInformation = opts.IncludeSensitive
+                )
+
+            FolderFormat.split folder (Eol.text opts.Eol) (serializeNamed target options)))
+
+let private saveDatabaseJson (opts: SaveOptions) (db: Database) (dir: string) =
+    (try
+        databaseJsonFiles opts db
+     with e ->
+         Error e.Message)
+    |> Result.mapError (fun e -> SaveFailed(dir, e))
+    |> Result.bind (fun files ->
+        writeFolder dir FolderFormat.isManagedFile [ for f in files -> f.Path, utf8NoBom.GetBytes f.Text ])
+    |> Result.map (fun () -> {
+        Format = DatabaseJsonFolder
+        Path = dir
+        Eol = opts.Eol
+        Files = filesUnder dir
+    })
+
+/// The item name for a new PBIP semantic model folder: the source's .platform displayName, else the
+/// database's name (unless it's empty or a GUID, as Power BI Desktop's are), else the model's.
+let private itemName (item: Pbip.Item option) (db: Database) =
+    let usable (s: string) =
+        not (String.IsNullOrWhiteSpace s) && not (fst (Guid.TryParse s))
+
+    match item with
+    | Some i -> i.DisplayName
+    | None when usable db.Name -> db.Name
+    | None when not (isNull db.Model) && usable db.Model.Name -> db.Model.Name
+    | None -> "SemanticModel"
+
+/// A folder that holds a PBIP project: a .pbip file, or X.SemanticModel folders.
+let private isProjectFolder (dir: string) =
+    Directory.Exists dir
+    && (not (Seq.isEmpty (Directory.EnumerateFiles(dir, "*.pbip")))
+        || Directory.GetDirectories dir |> Array.exists Pbip.isSemanticModelFolder)
+
+/// The semantic model folder a PBIP save writes, and the item name for a new .platform there. The
+/// destination itself, unless it's an existing project folder (with a .pbip or X.SemanticModel
+/// folders, and no definition.pbism of its own): then the one X.SemanticModel in it, or a new one
+/// named after the item (`item`, else the database's or model's name). A new .platform's
+/// displayName is the folder's name without ".SemanticModel", or the item's for a folder named here.
+let pbipTarget (item: Pbip.Item option) (db: Database) (destination: string) : Result<string * string, TessError> =
+    let destination = Path.GetFullPath destination
+
+    let trimmed =
+        destination.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+
+    if
+        trimmed.EndsWith(Pbip.semanticModelSuffix, StringComparison.OrdinalIgnoreCase)
+        || Pbip.isSemanticModelFolder destination
+        || not (isProjectFolder destination)
+    then
+        Ok(destination, Pbip.displayNameOf destination)
+    else
+        let existing =
+            Directory.GetDirectories destination
+            |> Array.filter Pbip.isSemanticModelFolder
+            |> Array.sortWith (fun a b -> String.CompareOrdinal(a, b))
+            |> List.ofArray
+
+        match existing with
+        | [ one ] -> Ok(one, Pbip.displayNameOf one)
+        | [] ->
+            let name = itemName item db
+
+            Ok(Path.Combine(destination, FolderFormat.SafeName.escape true name + Pbip.semanticModelSuffix), name)
+        | many -> Error(AmbiguousModel(destination, many))
+
+/// Write a PBIP semantic model folder (TMDL in definition/), merging into what's there: missing
+/// support files are added and existing ones kept (see Pbip.ensureSupportFilesFor). A model.bim
+/// there is replaced by the TMDL (a folder with both is ambiguous to Power BI).
+let private savePbip (opts: SaveOptions) (item: Pbip.Item) (db: Database) (dir: string) =
     let definition = Path.Combine(dir, Pbip.definitionFolderName)
     let staleBim = Path.Combine(dir, Pbip.modelBimFileName)
 
     catchIo dir (fun () -> Directory.CreateDirectory dir |> ignore)
     |> Result.bind (fun () -> writeTmdl opts db definition)
-    // A folder with both definition/ and model.bim is ambiguous to Power BI; TMDL wins.
     |> Result.bind (fun () ->
         catchIo staleBim (fun () ->
             if File.Exists staleBim then
                 File.Delete staleBim))
-    |> Result.bind (fun () -> Pbip.ensureSupportFiles dir (Eol.text opts.Eol) Guid.NewGuid)
+    |> Result.bind (fun () -> Pbip.ensureSupportFilesFor dir (Some item) (Eol.text opts.Eol) Guid.NewGuid)
     |> Result.map (fun () -> {
         Format = PbipFolder
         Path = dir
@@ -485,21 +683,67 @@ let private savePbip (opts: SaveOptions) (db: Database) (dir: string) =
         Files = filesUnder dir
     })
 
-/// Write a model. Refuses to touch a non-empty destination unless force is set.
-let save (format: OutputFormat) (opts: SaveOptions) (force: bool) (db: Database) (destination: string) =
+/// The item (displayName, description) of the PBIP a model was loaded from, if any.
+let sourceItem (source: ModelSource) =
+    source.SemanticModelFolder |> Option.bind Pbip.readItem
+
+/// Write a model. Refuses to touch a non-empty destination unless force is set. For PBIP, `item`
+/// names a new semantic model folder and its .platform (see pbipTarget); pass the source's
+/// (sourceItem) to carry its displayName and description over.
+let saveItem
+    (item: Pbip.Item option)
+    (format: OutputFormat)
+    (opts: SaveOptions)
+    (force: bool)
+    (db: Database)
+    (destination: string)
+    =
     let destination = Path.GetFullPath destination
 
-    if isNonEmpty destination && not force then
-        Error(DestinationNotEmpty destination)
-    elif format <> BimFile && File.Exists destination then
-        Error(SaveFailed(destination, "destination is a file, but the output format writes a folder"))
-    elif format = BimFile && Directory.Exists destination then
-        Error(SaveFailed(destination, "destination is a folder, but the output format writes a .bim file"))
-    else
+    // A database.json path names its folder.
+    let destination =
+        if
+            format = DatabaseJsonFolder
+            && String.Equals(
+                Path.GetFileName destination,
+                FolderFormat.databaseJsonFileName,
+                StringComparison.OrdinalIgnoreCase
+            )
+        then
+            Path.GetDirectoryName destination
+        else
+            destination
+
+    let target =
         match format with
-        | BimFile -> saveBim opts db destination
-        | TmdlFolder -> saveTmdl opts db destination
-        | PbipFolder -> savePbip opts db destination
+        | PbipFolder when not (File.Exists destination) -> pbipTarget item db destination
+        | _ -> Ok(destination, "")
+
+    match target with
+    | Error e -> Error e
+    | Ok(destination, displayName) ->
+        if isNonEmpty destination && not force then
+            Error(DestinationNotEmpty destination)
+        elif format <> BimFile && File.Exists destination then
+            Error(SaveFailed(destination, "destination is a file, but the output format writes a folder"))
+        elif format = BimFile && Directory.Exists destination then
+            Error(SaveFailed(destination, "destination is a folder, but the output format writes a .bim file"))
+        else
+            match format with
+            | BimFile -> saveBim opts db destination
+            | TmdlFolder -> saveTmdl opts db destination
+            | PbipFolder ->
+                let platformItem: Pbip.Item = {
+                    DisplayName = displayName
+                    Description = item |> Option.bind (fun i -> i.Description)
+                }
+
+                savePbip opts platformItem db destination
+            | DatabaseJsonFolder -> saveDatabaseJson opts db destination
+
+/// saveItem with no source item.
+let save (format: OutputFormat) (opts: SaveOptions) (force: bool) (db: Database) (destination: string) =
+    saveItem None format opts force db destination
 
 /// Where an in-place save of a loaded model goes: back to its own format and location (a .bim inside
 /// a PBIP folder stays a .bim).
@@ -508,6 +752,7 @@ let inPlace (source: ModelSource) =
     | Bim, _ -> BimFile, source.Path
     | Tmdl, Some folder -> PbipFolder, folder
     | Tmdl, None -> TmdlFolder, source.Path
+    | DatabaseJson, _ -> DatabaseJsonFolder, source.Path
     | Xmla, _ -> invalidOp "a remote model has no file location to save to"
 
 /// Save a model back where it came from: same format and line endings, restricted information kept
@@ -531,4 +776,4 @@ let saveTo (source: ModelSource) (force: bool) (db: Database) (destination: stri
             Eol = Eol.resolveAuto source.Path destination
     }
 
-    save (OutputFormat.infer destination) opts force db destination
+    saveItem (sourceItem source) (OutputFormat.infer destination) opts force db destination
