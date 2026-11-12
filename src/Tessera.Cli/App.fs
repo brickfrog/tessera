@@ -63,7 +63,11 @@ let private withHint (message: string) (suggestions: string list) =
     match suggestions with
     | [] -> message
     | _ ->
-        let newline = message.IndexOf '\n'
+        // Argu ends lines with Environment.NewLine: "\r\n" on Windows.
+        let newline =
+            match message.IndexOf '\n' with
+            | n when n > 0 && message.[n - 1] = '\r' -> n - 1
+            | n -> n
 
         let first, rest =
             if newline < 0 then
