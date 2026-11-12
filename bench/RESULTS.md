@@ -86,9 +86,9 @@ Check mode (every incremental result recomputed in full, without caches, and com
 | station-matrix/5 | 0.13 s -> 0.14 s | 0.71 s -> 0.62 s | |
 | station-matrix/10 | 0.22 s -> 0.18 s | 0.98 s -> 0.94 s | |
 | station-matrix/20 | 0.32 s -> 0.30 s | 1.9 s -> 1.6 s | |
-| station-matrix/all | 2.0 s -> 1.6 s | > 60 s -> > 60 s (187 s without a timeout) | |
+| station-matrix/all | 2.0 s -> 1.6 s | > 60 s -> > 60 s (171 s without a timeout) | |
 | allselected-shape/20 | 0.05 s -> 0.07 s | 0.90 s -> 1.0 s | 20.0 s -> 12.5 s |
-| allselected-shape/all | 0.67 s -> 0.71 s | > 60 s -> > 60 s (86 s without a timeout; before > 300 s) | |
+| allselected-shape/all | 0.67 s -> 0.71 s | > 60 s -> > 60 s (84 s without a timeout; before > 300 s) | |
 | share-of-selection | 0.13 s -> 0.07 s | 4.5 s -> 1.6 s | > 30 s -> 18.2 s |
 | rankx-customers | 0.014 s -> 0.010 s | 0.39 s -> 0.13 s | 21.3 s -> 1.4 s |
 | total/by queries that finished both times: sum | 110.2 s -> 64.2 s (344) | 31.3 s -> 27.0 s (330) | 303.9 s -> 41.8 s (107 of 129) |
@@ -104,7 +104,7 @@ By commit: the incremental contexts themselves (20,000 rows: station-matrix/2 > 
 incremental rows out of `VisCache`, shared by their base instead (2,000 rows: share-of-selection 1.6 s -> 1.1 s,
 peak 185 MB -> 112 MB, in a run with only those queries).
 
-**The target, the Station matrix at 2,000 rows in seconds, is not met** (187 s). The fixtures give every table N
+**The target, the Station matrix at 2,000 rows in seconds, is not met** (171 s). The fixtures give every table N
 rows, Budget Rate too, so `[Revenue]` and `[Gross Profit]` are SUMX over 2,000 Budget Rate rows with a CALCULATE
 each; the matrix needs about 48 million such row contexts, and incremental contexts made each one independent of
 the fact table's size (an index lookup) but not free: a transition, CALCULATE and SUM cost a few microseconds
