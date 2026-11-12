@@ -940,7 +940,7 @@ let private reportOptions (s: Shared) : Result<ReportOptions, string> =
         | Some name ->
             match Findings.Ci.tryParse name with
             | Some ci -> Ok ci
-            | None -> Error $"unknown --ci '{name}' (known: {Findings.Ci.names})"
+            | None -> Error(fst (ValidateCommand.ciUnknown name))
 
     match failOn, ci with
     | Error e, _

@@ -208,7 +208,7 @@ let tests =
             Expect.equal (names tables "table") [ "Product"; "Customer"; "Sales" ] ""
             Expect.equal (tables.[0].GetProperty("file").GetString()) product ""
             Expect.equal (tables.[0].GetProperty("rows").GetInt32()) 2 ""
-            Expect.equal (tables.[1].GetProperty("file").ValueKind) JsonValueKind.Null "no file"
+            Expect.isFalse (tables.[1].TryGetProperty "file" |> fst) "no file"
 
             let finding =
                 root.GetProperty("findings").EnumerateArray()

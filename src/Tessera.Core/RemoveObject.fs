@@ -117,6 +117,7 @@ let remove (db: Database) (spec: RemoveSpec) : Result<Mutation.Effect, TessError
                     match Selector.resolve entries selector with
                     | Ok e -> Ok(found @ [ e ], skipped)
                     | Error(ObjectNotFound _) when spec.IfExists -> Ok(found, skipped @ [ selector ])
+                    | Error(ObjectNotFoundSuggest _) when spec.IfExists -> Ok(found, skipped @ [ selector ])
                     | Error e -> Error e))
             (Ok([], []))
 

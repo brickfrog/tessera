@@ -530,7 +530,7 @@ set of conventions, the same as the Tabular Editor CLI's.
 - `--name-only` prints just the changed references.
 - Notes and warnings go to stderr, so stdout is only the change.
 - `--json` writes the change set (see `diff`) plus `dryRun`, `introducedErrors` (findings), `warnings`, `notes`,
-  `saved` (the format and path written, or `null`) and `files` (report files `rename` and `move` change, see
+  `saved` (the format and path written; left out on a dry run) and `files` (report files `rename` and `move` change, see
   [Reports](#reports-pbir)).
 
 **Safety:** a change that introduces new errors is shown, but `--save` refuses it (exit 1) unless `--force`.
@@ -3108,9 +3108,83 @@ How the fields work:
 `##vso[task.logissue ...]` lines, with info findings as plain lines so info-only runs stay green. Each line carries
 the code as its title.
 
+### SARIF (`--sarif`)
+
+`validate`, `bpa`, `lint` and `data check` take `--sarif <file>`: they also write their findings as a
+[SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) log, the format code scanning
+UIs (GitHub's among them) read. Like `--trx`, it replaces the file, and it is written on a clean run too (with no
+results). It doesn't change the command's own output or exit code.
+
+- **One run, one result per finding**, in the command's own order (`validate` lists every issue, not just the root
+  causes). `level` is `error`, `warning` or `note` (for info). `message` starts with the object's reference.
+- **Rules** (`tool.driver.rules`): the rules that ran, with their description and, for `bpa` and `lint`, their
+  severity and category (as a tag). `helpUri` only where the rule itself has a URL (a BPA rule's `LearnMoreUrl`);
+  tess adds none.
+- **Locations:** the file and line where the object is declared: the TMDL file and the line of `measure 'X'`, or
+  the line of the object's `"name"` in a .bim. A `data check` issue in a fixture file points at its line there.
+  Each result also has a logical location whose `fullyQualifiedName` is the object's tessera reference. When the
+  declaration can't be found (or a name is declared twice), the result points at the nearest enclosing object (a
+  measure's table), else line 1 of the model file, and its `properties.exactLocation` is `false`. A remote
+  (`xmla:`) model has no files, so its results have only the logical location.
+- **Paths** are relative to the repository root (the nearest folder above the model that holds `.git`, else the
+  current folder), with `/` and percent-encoding, under `uriBaseId` `SRCROOT`; a file outside that folder gets an
+  absolute `file:` URI. No machine-specific paths otherwise.
+- **Deterministic:** no timestamps or machine names; the same model gives the same bytes. tess writes no
+  `partialFingerprints`: GitHub's upload action computes its own.
+- `bpa`: findings an object's ignore annotation hides are left out, as they are from `findings` (GitHub doesn't
+  document SARIF suppressions, so they could show as open alerts); rules that couldn't run are
+  `toolConfigurationNotifications`. `properties` on a result carry `objectType`, `fixable`, `exactLocation` and,
+  where known, `expressionPosition` (the line within the expression; the region is the declaration's line).
+
+tess only writes the file; uploading it is your CI's job. With GitHub Actions (tess exits 1 on errors, so the upload
+step runs `if: always()`):
+
+```yaml
+permissions:
+  contents: read
+  security-events: write   # to upload code scanning results
+
+jobs:
+  model-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install tess (a release binary, see Install)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --repo brickfrog/tessera --pattern 'tess-*-linux-x64.tar.gz'
+          tar -xzf tess-*-linux-x64.tar.gz
+          echo "$PWD/$(ls -d tess-*-linux-x64/)" >> "$GITHUB_PATH"
+      - run: tess bpa "Sales.SemanticModel" --sarif bpa.sarif
+      - uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: bpa.sarif
+          category: tess-bpa   # one category per command, if you upload several
+```
+
 ### JSON and exit codes
 
 `--json` (or `-j`) writes one JSON document to stdout, errors included (`{"error": {"code", "message"}}`).
+
+**Plain output:** tess writes plain text only: no colour, no spinner, no line redrawn in place. Progress (`refresh
+--progress`) is one line per event on stderr, so logs read the same in CI as in a terminal. Should tess ever
+decorate output, it does so only on a terminal, and never when `CI` or `NO_COLOR` is set or `TERM` is `dumb`
+(`Output.plainOutput`).
+
+**"Did you mean":** when something isn't found or recognised, the error names the closest matches (within about a
+third of the length in edits, ignoring case; swapped letters count as one edit), at most three, and JSON lists them
+as the error's `suggestions`. That covers an object reference (any form: `measure:Sales/Totl`, `'Sales'[Totl]`,
+`[Totl]`, `Sles`), a command or subcommand (`tess vaildate`), an option (`--fial-on`), and option values: `--ci`,
+`--fail-on`, `--min-severity`, `--kind`, and `--rule` for `validate`, `lint` and `data check`. `bpa rules show`
+does the same for a rule ID, and `bpa rules ignore` warns with one. The message alone carries the hint for
+`--format`, `--eol`, `refresh --type` / `--progress`, `bpa rules list --layer` and `test --ci`.
+
+A key with no value is left out rather than written as `null`, in every command (as in the Tabular Editor CLI's
+findings): `list`'s `table`, `hidden` and `detail`, `deps --unused`'s `note`, `info`'s `semanticModelFolder`, an
+edit's `saved` on a dry run, and so on. `null` appears only where it is itself the value: a property that holds
+nothing (`get --properties`'s `value`, a change's `before` / `after`) and a BLANK cell in `query` results.
 
 | Code | Meaning |
 |---|---|

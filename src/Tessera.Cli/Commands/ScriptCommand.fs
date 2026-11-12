@@ -65,9 +65,9 @@ type Args =
 let private utf8 = UTF8Encoding(false)
 
 let private export (ctx: Ctx) (args: ParseResults<ExportArgs>) =
-    match args.GetResult ExportArgs.Targets, parseKinds (args.GetResults ExportArgs.Kind) with
+    match args.GetResult ExportArgs.Targets, parseKindsWith (args.GetResults ExportArgs.Kind) with
     | [], _ -> UsageError "expected the model"
-    | _, Error message -> UsageError message
+    | _, Error problem -> usage problem
     | _, Ok kinds when
         kinds
         |> List.exists (fun k -> not (List.contains k ExportScript.scriptableKinds))

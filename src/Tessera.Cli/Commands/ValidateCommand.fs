@@ -20,6 +20,7 @@ type Args =
     | Rule of rules: string
     | Ci of system: string
     | No_Group
+    | Sarif of file: string
 
     interface IArgParserTemplate with
         member this.Usage =
@@ -33,6 +34,7 @@ type Args =
                 $"only these rules (repeatable or comma-separated): {ids}."
             | Ci _ -> $"also write CI annotations to stderr: {Findings.Ci.names}."
             | No_Group -> "list every issue on its own, instead of folding issues with one root cause into the first."
+            | Sarif _ -> Tessera.Cli.Sarif.usage
 
 /// "2 errors, 1 warning"; zero counts are left out.
 let private summaryText (issues: Issue list) =
@@ -187,57 +189,97 @@ let private groupedAnnotations (grouped: (Issue * Grouping) list) = [
 ]
 
 /// A --min-severity / --fail-on value (shared with `lint`).
-let severityArg (name: string) (value: string option) (fallback: Severity) =
+let severityArgWith (name: string) (value: string option) (fallback: Severity) =
     match value with
     | None -> Ok fallback
     | Some v ->
         match Severity.tryParse v with
         | Some s -> Ok s
-        | None -> Error $"{name}: unknown severity '{v}' (known: error, warning, info)"
+        | None -> Error(unknownValue name "severity" v [ "error"; "warning"; "info" ])
+
+/// An unknown --ci value: the message (listing the names with their aliases) and suggestions.
+let ciUnknown (value: string) =
+    let suggestions =
+        Suggest.closest [ "github"; "gh"; "azdo"; "azure-devops"; "vsts"; "none" ] value
+
+    $"--ci: unknown CI system '{value}'{Suggest.hint suggestions} (known: {Findings.Ci.names})", suggestions
 
 /// A --ci value (shared with `lint`).
-let ciArg (value: string option) =
+let ciArgWith (value: string option) =
     match value with
     | None -> Ok Findings.NoCi
     | Some c ->
         Findings.Ci.tryParse c
         |> Option.map Ok
-        |> Option.defaultValue (Error $"--ci: unknown CI system '{c}' (known: {Findings.Ci.names})")
+        |> Option.defaultValue (Error(ciUnknown c))
+
+/// severityArgWith, with just the message.
+let severityArg (name: string) (value: string option) (fallback: Severity) =
+    severityArgWith name value fallback |> Result.mapError fst
+
+/// ciArgWith, with just the message.
+let ciArg (value: string option) = ciArgWith value |> Result.mapError fst
+
+/// The validate rules, for SARIF.
+let sarifRules: Sarif.Rule list = [ for id, description in rules -> Sarif.Rule.simple id description ]
+
+/// Write `issues` as SARIF to `path`, located in the model's files.
+let writeSarif
+    (path: string)
+    (modelPath: string)
+    (source: ModelSource)
+    (rules: Sarif.Rule list)
+    (findings: Findings.Finding list)
+    =
+    let index = SourceLocations.build source
+    Sarif.write path (Sarif.log (Sarif.rootFor modelPath) rules (Sarif.modelItems index findings) [])
 
 let run (ctx: Ctx) (args: ParseResults<Args>) =
     let modelPath = args.GetResult Args.Model
     let selected = parseList (args.GetResults Args.Rule)
     let known = rules |> List.map fst
-    let knownList = String.concat ", " known
 
     let options =
         match selected |> List.tryFind (fun r -> not (List.contains r known)) with
-        | Some bad -> Error $"unknown rule '{bad}' (known: {knownList})"
+        | Some bad -> Error(unknownValue "--rule" "rule" bad known)
         | None ->
-            severityArg "--min-severity" (args.TryGetResult Args.Min_Severity) Severity.Info
+            severityArgWith "--min-severity" (args.TryGetResult Args.Min_Severity) Severity.Info
             |> Result.bind (fun minimum ->
-                severityArg "--fail-on" (args.TryGetResult Args.Fail_On) Severity.Error
+                severityArgWith "--fail-on" (args.TryGetResult Args.Fail_On) Severity.Error
                 |> Result.map (fun failOn -> minimum, failOn))
 
-    let ci = ciArg (args.TryGetResult Args.Ci)
+    let ci = ciArgWith (args.TryGetResult Args.Ci)
 
     match options, ci with
-    | Error message, _
-    | _, Error message -> UsageError message
+    | Error problem, _
+    | _, Error problem -> usage problem
     | Ok(minimum, failOn), Ok ci ->
         let clock = Diagnostics.Stopwatch.StartNew()
 
-        match Source.load ctx modelPath with
+        let validated =
+            Source.load ctx modelPath
+            |> Result.bind (fun (source, db) ->
+                let g = Deps.build db
+
+                let issues =
+                    validateGraph g db
+                    |> List.filter (fun i -> selected.IsEmpty || List.contains i.Rule selected)
+
+                let shown = issues |> List.filter (fun i -> Severity.atLeast minimum i.Severity)
+
+                let ruleSet =
+                    sarifRules
+                    |> List.filter (fun r -> selected.IsEmpty || List.contains r.Id selected)
+
+                match args.TryGetResult Args.Sarif with
+                | Some path ->
+                    writeSarif path modelPath source ruleSet (shown |> List.map toFinding)
+                    |> Result.map (fun () -> g, issues, shown)
+                | None -> Ok(g, issues, shown))
+
+        match validated with
         | Error e -> Failed e
-        | Ok(_, db) ->
-            let g = Deps.build db
-
-            let issues =
-                validateGraph g db
-                |> List.filter (fun i -> selected.IsEmpty || List.contains i.Rule selected)
-
-            let shown = issues |> List.filter (fun i -> Severity.atLeast minimum i.Severity)
-
+        | Ok(g, issues, shown) ->
             if args.Contains Args.No_Group then
                 if ctx.Json then
                     writeJson ctx.Out (validateJson clock.Elapsed shown)

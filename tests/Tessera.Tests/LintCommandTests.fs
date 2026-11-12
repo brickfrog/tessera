@@ -189,7 +189,7 @@ let tests =
             Expect.equal (root.GetProperty("summary").GetProperty("modified").GetInt32()) 2 ""
             Expect.equal (root.GetProperty("introducedErrors").GetArrayLength()) 0 ""
             Expect.equal (root.GetProperty("warnings").GetArrayLength()) 1 ""
-            Expect.equal (root.GetProperty("saved").ValueKind) JsonValueKind.Null ""
+            Expect.isFalse (root.TryGetProperty "saved" |> fst) ""
 
         testCase "--fix warns that DI014 changes edge-case results"
         <| fun () ->

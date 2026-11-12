@@ -65,7 +65,10 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         | Some f ->
             ModelIO.OutputFormat.tryParse f
             |> Option.map Ok
-            |> Option.defaultValue (Error $"unknown format '{f}' (expected bim, tmdl or pbip)")
+            |> Option.defaultValue (
+                Error
+                    $"""unknown format '{f}'{Suggest.hint (Suggest.closest [ "bim"; "tmdl"; "pbip" ] f)} (expected bim, tmdl or pbip)"""
+            )
 
     let name =
         match args.TryGetResult Args.Name with

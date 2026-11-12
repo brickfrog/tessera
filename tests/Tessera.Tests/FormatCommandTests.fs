@@ -89,7 +89,7 @@ let looseTests =
             Expect.equal r.Code ExitCode.input ""
             let j = (json r).RootElement
             Expect.isFalse (j.GetProperty("success").GetBoolean()) ""
-            Expect.equal (j.GetProperty("formatted").ValueKind) JsonValueKind.Null ""
+            Expect.isFalse (j.TryGetProperty "formatted" |> fst) ""
             let e = j.GetProperty("errors").[0]
             Expect.equal (e.GetProperty("line").GetInt32(), e.GetProperty("column").GetInt32()) (2, 3) ""
             Expect.equal (e.GetProperty("message").GetString()) "')' without a matching '('" ""

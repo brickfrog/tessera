@@ -68,7 +68,8 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             ModelIO.OutputFormat.tryParse f
             |> Option.map Ok
             |> Option.defaultValue (
-                Error $"""unknown format '{f}' (expected {String.Join(", ", ModelIO.OutputFormat.tokens)})"""
+                Error
+                    $"""unknown format '{f}'{Suggest.hint (Suggest.closest ModelIO.OutputFormat.tokens f)} (expected {String.Join(", ", ModelIO.OutputFormat.tokens)})"""
             )
 
     // None = auto: decided once the source is resolved (see Eol.resolveAuto).
@@ -78,7 +79,9 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         | Some "auto" -> Ok None
         | Some "lf" -> Ok(Some ModelIO.Lf)
         | Some "crlf" -> Ok(Some ModelIO.CrLf)
-        | Some other -> Error $"unknown line ending '{other}' (expected auto, lf or crlf)"
+        | Some other ->
+            Error
+                $"""unknown line ending '{other}'{Suggest.hint (Suggest.closest [ "auto"; "lf"; "crlf" ] other)} (expected auto, lf or crlf)"""
 
     let indent =
         match args.TryGetResult Args.Indent_Spaces with

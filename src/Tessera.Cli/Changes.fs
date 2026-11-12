@@ -27,7 +27,7 @@ let changeJson (c: ObjectChange) : JsonNode =
             "properties",
             arr [
                 for p in c.Properties ->
-                    obj [ "property", str p.Path; "before", optStr p.Before; "after", optStr p.After ]
+                    objWithNulls [ "property", str p.Path; "before", optStr p.Before; "after", optStr p.After ]
             ]
     ]
 

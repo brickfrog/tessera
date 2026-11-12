@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Suggest.fs" />
     <Compile Include="Errors.fs" />
     <Compile Include="ObjectRef.fs" />
     <Compile Include="FolderFormat.fs" />
@@ -83,6 +84,7 @@
     <Compile Include="Engine/Engine.fs" />
     <Compile Include="TestSuite.fs" />
     <Compile Include="TestRun.fs" />
+    <Compile Include="SourceLocations.fs" />
   </ItemGroup>
 
   <ItemGroup>

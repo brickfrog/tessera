@@ -111,7 +111,17 @@
     <Compile Include="Te2Fixture.fs" />
     <Compile Include="FolderFormatTests.fs" />
     <Compile Include="FolderFormatCommandTests.fs" />
+    <Compile Include="JsonSchema.fs" />
+    <Compile Include="SarifTests.fs" />
+    <Compile Include="JsonNullTests.fs" />
+    <Compile Include="SuggestTests.fs" />
+    <Compile Include="PlainOutputTests.fs" />
     <Compile Include="Main.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The OASIS SARIF 2.1.0 schema, unmodified (see sarif/NOTICE.txt): the SARIF tests check against it. -->
+    <EmbeddedResource Include="sarif/sarif-schema-2.1.0.json" LogicalName="sarif-schema-2.1.0.json" />
   </ItemGroup>
 
   <ItemGroup>

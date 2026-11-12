@@ -16,6 +16,7 @@
     <Compile Include="Common.fs" />
     <Compile Include="Source.fs" />
     <Compile Include="Findings.fs" />
+    <Compile Include="Sarif.fs" />
     <Compile Include="Changes.fs" />
     <Compile Include="Mutation.fs" />
     <Compile Include="Commands/InfoCommand.fs" />

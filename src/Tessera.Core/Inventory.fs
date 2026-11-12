@@ -201,7 +201,7 @@ module Selector =
         | ObjectKind.Hierarchy -> true
         | _ -> false
 
-    let resolve (entries: ObjectEntry list) (input: string) : Result<ObjectEntry, TessError> =
+    let private resolveOnly (entries: ObjectEntry list) (input: string) : Result<ObjectEntry, TessError> =
         parse input
         |> Result.bind (fun selector ->
             match selector with
@@ -235,6 +235,43 @@ module Selector =
                 match named |> List.filter (fun e -> e.Ref.Kind = ObjectKind.Table) with
                 | [ table ] -> Ok table
                 | _ -> single input named)
+
+    /// Objects named close to what a selector names ("did you mean"), as references. Names are
+    /// compared as the selector gives them: `Table/Name` for one with a table, else the name.
+    let private similar (entries: ObjectEntry list) (selector: Selector) =
+        let byKey key (pool: ObjectEntry list) wanted =
+            let keyed = pool |> List.map (fun e -> key e, e)
+
+            Suggest.closest (keyed |> List.map fst) wanted
+            |> List.collect (fun k -> keyed |> List.filter (fun (x, _) -> x = k) |> List.map snd)
+            |> List.truncate 3
+            |> List.map (fun e -> ObjectRef.format e.Ref)
+
+        match selector with
+        | Exact r ->
+            let path (e: ObjectEntry) = String.concat "/" e.Ref.Path
+            byKey path (entries |> List.filter (fun e -> e.Ref.Kind = r.Kind)) (String.concat "/" r.Path)
+        | Qualified(table, name) ->
+            let qualified (e: ObjectEntry) =
+                (ObjectEntry.table e |> Option.defaultValue "") + "/" + ObjectEntry.name e
+
+            byKey qualified (entries |> List.filter isMember) (table + "/" + name)
+        | Member name -> byKey ObjectEntry.name (entries |> List.filter isMember) name
+        | Bare name ->
+            // A bare name means a table first (as resolving it does), so a close table wins.
+            match byKey ObjectEntry.name (entries |> List.filter (fun e -> e.Ref.Kind = ObjectKind.Table)) name with
+            | [] -> byKey ObjectEntry.name (entries |> List.filter (fun e -> e.Ref.Kind <> ObjectKind.Model)) name
+            | tables -> tables
+
+    /// The one object a selector names. When none does, ObjectNotFoundSuggest names the closest
+    /// (if any are close).
+    let resolve (entries: ObjectEntry list) (input: string) : Result<ObjectEntry, TessError> =
+        match resolveOnly entries input with
+        | Error(ObjectNotFound _) ->
+            match parse input |> Result.map (similar entries) with
+            | Ok(_ :: _ as close) -> Error(ObjectNotFoundSuggest(input, close))
+            | _ -> Error(ObjectNotFound input)
+        | result -> result
 
 /// Filters for `list`. Empty lists mean "no restriction".
 type Filter = {

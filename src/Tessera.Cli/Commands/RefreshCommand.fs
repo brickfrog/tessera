@@ -198,8 +198,9 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
             match Refresh.Kind.tryParse text with
             | Some k -> Ok k
             | None ->
-                let known = Refresh.Kind.all |> List.map Refresh.Kind.token |> String.concat ", "
-                Error $"unknown refresh type '{text}' (known: {known})"
+                let tokens = Refresh.Kind.all |> List.map Refresh.Kind.token
+                let known = String.concat ", " tokens
+                Error $"unknown refresh type '{text}'{Suggest.hint (Suggest.closest tokens text)} (known: {known})"
 
     let effectiveDate =
         match args.TryGetResult Effective_Date with
@@ -217,7 +218,9 @@ let run (ctx: Ctx) (args: ParseResults<Args>) =
         | Some text ->
             match RemoteRefresh.Detail.tryParse text with
             | Some d -> Ok d
-            | None -> Error $"unknown --progress '{text}' (known: objects, all, none)"
+            | None ->
+                Error
+                    $"""unknown --progress '{text}'{Suggest.hint (Suggest.closest [ "objects"; "all"; "none" ] text)} (known: objects, all, none)"""
 
     // Every positional argument, wherever the options are among them.
     match args.GetResults Args.Target |> List.concat, kind, effectiveDate, detail with

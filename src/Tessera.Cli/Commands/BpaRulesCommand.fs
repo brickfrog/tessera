@@ -216,7 +216,9 @@ let private list (ctx: Ctx) (args: ParseResults<ListArgs>) =
         |> List.map (fun t ->
             match layerNames |> List.tryFind (fun l -> RuleLayer.token l = t.ToLowerInvariant()) with
             | Some l -> Ok l
-            | None -> Error $"--layer: unknown layer '{t}' (known: builtin, model, config, env, cli)")
+            | None ->
+                Error
+                    $"""--layer: unknown layer '{t}'{Suggest.hint (Suggest.closest [ "builtin"; "model"; "config"; "env"; "cli" ] t)} (known: builtin, model, config, env, cli)""")
 
     match layers |> List.tryPick (fun r -> if Result.isError r then Some r else None) with
     | Some(Error message) -> UsageError message
@@ -305,7 +307,10 @@ let private show (ctx: Ctx) (args: ParseResults<ShowArgs>) =
         reportCollected ctx "bpa" c
 
         match findRule c.Effective ruleId with
-        | None -> Failed(RuleNotFound(ruleId, "the effective rules", None))
+        | None ->
+            match Suggest.closest (c.Effective |> List.map _.Id) ruleId with
+            | [] -> Failed(RuleNotFound(ruleId, "the effective rules", None))
+            | close -> Failed(RuleNotFoundSuggest(ruleId, "the effective rules", close))
         | Some r ->
             let disabled = disabledIds db
 
@@ -766,11 +771,15 @@ let private setIgnored (ignore: bool) (ctx: Ctx) (args: ParseResults<IgnoreArgs>
                                 Environment = environment ctx
                         }
                     with
-                    | Ok c -> ids |> List.filter (fun id -> (findRule c.Effective id).IsNone)
+                    | Ok c ->
+                        ids
+                        |> List.filter (fun id -> (findRule c.Effective id).IsNone)
+                        |> List.map (fun id -> id, Suggest.closest (c.Effective |> List.map _.Id) id)
                     | Error _ -> []
 
                 let warnings = [
-                    for id in unknown -> $"no rule with ID {id} is in effect (built-in, config or model rules)"
+                    for id, close in unknown ->
+                        $"no rule with ID {id} is in effect (built-in, config or model rules){Suggest.hint close}"
                 ]
 
                 withWarnings warnings (BpaRuleEdit.setIgnored ignore ids objects) db)

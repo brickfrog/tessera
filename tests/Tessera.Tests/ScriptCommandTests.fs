@@ -87,7 +87,7 @@ let tests =
                     ""
 
                 Expect.stringContains (root.GetProperty("script").GetString()) "MEASURE 'Sales'[Total]" ""
-                Expect.equal (root.GetProperty("output").ValueKind) JsonValueKind.Null ""
+                Expect.isFalse (root.TryGetProperty "output" |> fst) ""
                 Expect.equal (root.GetProperty("warnings").GetArrayLength()) 0 ""
 
             testCase "objects without DAX, and kinds a script doesn't hold, are refused"
@@ -164,7 +164,7 @@ let tests =
                 Expect.equal (change.GetProperty("objectPath").GetString()) "measure:Sales/Total" ""
                 Expect.equal (change.GetProperty("changeKind").GetString()) "modified" ""
                 Expect.equal (root.GetProperty("introducedErrors").GetArrayLength()) 0 ""
-                Expect.equal (root.GetProperty("saved").ValueKind) JsonValueKind.Null ""
+                Expect.isFalse (root.TryGetProperty "saved" |> fst) ""
 
             testCase "a syntax error: exit 3, with the line and column"
             <| fun () ->

@@ -539,7 +539,7 @@ let private resolveReference (ctx: Ctx) (path: string) (kind: ObjectKind) (local
     | None ->
         match Selector.resolve ofKind text with
         | Ok e -> Ok e
-        | Error(ObjectNotFound _ as notFound) ->
+        | Error((ObjectNotFound _ | ObjectNotFoundSuggest _) as notFound) ->
             match Selector.resolve all text with
             | Ok other ->
                 invalid
