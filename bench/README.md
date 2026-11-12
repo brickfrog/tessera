@@ -8,13 +8,15 @@ git clone https://github.com/TabularEditor/spaceparts-analytics /tmp/spaceparts 
 dotnet run --project src/Tessera.Cli -- data init "/tmp/spaceparts/Invoiced Sales.pbip" /tmp/fx200 --rows 200 --seed 7
 dotnet build -c Release bench/Tessera.Bench
 dotnet bench/Tessera.Bench/bin/Release/net10.0/Tessera.Bench.dll "/tmp/spaceparts/Invoiced Sales.pbip" /tmp/fx200 \
-    --timeout 60 --out results.tsv [--compare earlier.tsv] [--filter regex]
+    --timeout 60 --out results.tsv [--compare earlier.tsv] [--filter regex] [--check]
 ```
 
 Each query runs in a child process (one prepared model per child), so a query that runs past `--timeout` seconds
 is killed and the rest still run. The clock is fixed (2026-08-21 12:00) so TODAY gives the same answer every run.
 Each result is fingerprinted (a hash of its JSON, or of its error), and `--compare` reports every query whose
-answer differs from an earlier run's: speed must never buy a different answer.
+answer differs from an earlier run's: speed must never buy a different answer. `--check` runs the engine in its
+incremental check mode (every filter context whose rows are worked out incrementally is recomputed in full and
+compared; slow): the run reports how many were checked and fails if any differed.
 
 The queries:
 

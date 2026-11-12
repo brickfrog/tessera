@@ -46,6 +46,10 @@ type Prepared = internal {
 /// take them from. `p` itself is unchanged: the two share the model and its data.
 let withIdentity (identity: Tessera.DaxEngine.Identity) (p: Prepared) : Prepared = { p with Identity = Some identity }
 
+/// What the incremental filter contexts did on this prepared model, and the switches for it
+/// (`Check`, `Enabled`): for tests and the benchmark. A model seen as roles (`asRoles`) has its own.
+let incrementalStats (p: Prepared) : Tessera.DaxEngine.IncrementalStats = p.Model.Incremental
+
 /// The instant the date functions see as "now". `Now` is what TODAY and NOW return (local time),
 /// `UtcNow` what UTCTODAY and UTCNOW return. It is fixed when a model is prepared: the calculated
 /// tables and columns and every query against the prepared model see this one instant.

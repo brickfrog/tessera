@@ -15,7 +15,9 @@ namespace Tessera.DaxEngine
 //     its rows are computed from, a superset). Not used while a calculated column or table is
 //     being computed (the rows then depend on what is computed so far), nor for a set-up whose
 //     relationships let a table's rows depend on themselves (then the order of evaluation decides
-//     what is refused). Bounded by size; cleared when full.
+//     what is refused). Bounded by size; cleared when full. A context whose rows of a table are
+//     worked out incrementally (see "Incremental filter contexts" in the author's guide) neither
+//     looks them up here nor adds them: they are cheap from its base's rows, which are.
 //   - `PredicateKey` (in `QueryDefs.Predicates`, so for one query): the filter a True/False filter
 //     argument of CALCULATE stands for, when the predicate reads nothing but its own columns,
 //     constants, variables and pure functions (`closedVariables` in Functions/Filter.fs). Keyed on
@@ -239,6 +241,91 @@ type VisCache(config: RelConfig) =
 
              not cyclic)
 
+    /// Per table: the tables `Filters.compute` asks for their rows when it works out the table's,
+    /// and they theirs, over regular many-to-one relationships (the table itself included).
+    let reached =
+        lazy
+            (model.Tables
+             |> Array.map (fun t ->
+                 let seen = Array.zeroCreate<bool> model.Tables.Length
+                 let found = ResizeArray<BTable>()
+                 let stack = Stack<BTable>()
+                 seen.[t.Id] <- true
+                 stack.Push t
+
+                 while stack.Count > 0 do
+                     let x = stack.Pop()
+                     found.Add x
+
+                     for r in config.ManyToOne x do
+                         if not r.Limited then
+                             let y = r.To.Table
+
+                             if not seen.[y.Id] then
+                                 seen.[y.Id] <- true
+                                 stack.Push y
+
+                 found.ToArray()))
+
+    /// Per table: whether `Filters.compute` works out its rows, and those of every table it asks,
+    /// by intersections and preimages alone, so that the rows under a list of filters are the
+    /// rows under any first part of it intersected with what the rest allows (see "Incremental
+    /// filter contexts" in the author's guide). None of the tables asked may have a relationship
+    /// that filters both ways, a limited one or a one-to-one one: their steps take an image of a
+    /// table's rows (which an intersection doesn't distribute over) and refuse a filter by what
+    /// all of them keep.
+    let intersective =
+        lazy
+            (let bad (x: BTable) =
+                config.ManyToOne x |> Array.exists (fun r -> r.Limited || r.OneToOne)
+                || config.OneToMany x
+                   |> Array.exists (fun r -> r.Limited || r.OneToOne || config.Both.[r.Id])
+
+             reached.Value |> Array.map (fun tables -> not (tables |> Array.exists bad)))
+
+    /// Whether every relationship in force builds and its columns can be read: what
+    /// `Filters.compute` reads of them can't raise.
+    let relationshipsBuild =
+        lazy
+            (let readable (c: BColumn) =
+                c.IsReady && c.Failure.IsNone && c.Gate.IsNone
+
+             model.Rels
+             |> Array.forall (fun r ->
+                 not config.Active.[r.Id]
+                 || (try
+                         r.Check()
+                         readable r.From && readable r.To
+                     with _ ->
+                         false)))
+
+    /// Tables whose rows and blank row are known, not refused: asking for them can't raise.
+    let settled = Array.zeroCreate<bool> model.Tables.Length
+
+    let isSettled (x: BTable) =
+        settled.[x.Id]
+        || (let ok =
+                // The full computation asks for the table's size, so its rows and its blank row
+                // are decided either way.
+                (try
+                    x.Size |> ignore
+                    true
+                 with _ ->
+                     false)
+                && x.IsReady
+                && x.BlankRowKnown
+                && x.Failure.IsNone
+                && x.Gate.IsNone
+
+            if ok then
+                settled.[x.Id] <- true
+
+            ok)
+
+    /// A column whose values can be read without raising.
+    let readable (c: BColumn) =
+        c.IsReady && c.Failure.IsNone && c.Gate.IsNone
+
     /// The cache of a relationship set-up.
     static member Of(config: RelConfig) : VisCache =
         match config.VisCache with
@@ -252,6 +339,24 @@ type VisCache(config: RelConfig) =
     /// Whether the cache may be used now.
     member _.Usable: bool = model.Computing.Count = 0 && acyclic.Value
 
+    /// See `intersective` above.
+    member _.Intersective(t: BTable) : bool = intersective.Value.[t.Id]
+
+    /// Whether nothing `Filters.compute` reads to work out the table's rows under the filters can
+    /// raise: then the incremental and the full computation both succeed (see "Incremental filter
+    /// contexts" in the author's guide).
+    /// The columns it reads are those of the filters on columns (`OnColumn`, `Tuples`); a table
+    /// filter is read through the relationships.
+    member _.Safe(t: BTable, filters: Filter list) : bool =
+        relationshipsBuild.Value
+        && reached.Value.[t.Id] |> Array.forall isSettled
+        && filters
+           |> List.forall (fun f ->
+               match f with
+               | OnColumn(c, _) -> readable c
+               | Tuples(cols, _) -> cols |> Array.forall readable
+               | Rows _ -> true)
+
     member _.Key(filters: Filter list, t: BTable, via: BRel) : VisKey =
         let d = deps.Value.[t.Id]
         let test (x: BTable) = x.Id < d.Length && d.[x.Id]
@@ -262,6 +367,13 @@ type VisCache(config: RelConfig) =
             |> Array.ofList
 
         VisKey(t.Id, (if isNull via then -1 else via.Id), relevant)
+
+    /// Whether any of the filters touches a table the rows of `t` depend on (the filters `Key`
+    /// keeps): with none, the rows are those of a context without filters, all of them.
+    member _.Reached(filters: Filter list, t: BTable) : bool =
+        let d = deps.Value.[t.Id]
+        let test (x: BTable) = x.Id < d.Length && d.[x.Id]
+        filters |> List.exists (fun f -> FilterKey.touches config f test)
 
     member _.TryGet(key: VisKey, rows: byref<RowSet>) : bool = entries.TryGetValue(key, &rows)
 

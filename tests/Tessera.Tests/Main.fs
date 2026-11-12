@@ -14,4 +14,25 @@ let main argv =
             Console.Out
             Console.Error
             rest
-    | _ -> runTestsInAssemblyWithCLIArgs [] argv
+    | _ ->
+        // TESSERA_CHECK_INCREMENTAL=1: every incremental filter context is recomputed in full and
+        // compared (slow); the run fails if any differed.
+        let check = Environment.GetEnvironmentVariable "TESSERA_CHECK_INCREMENTAL" = "1"
+        let stats = Tessera.DaxEngine.IncrementalStats.Global
+
+        if check then
+            stats.Check <- true
+
+        let code = runTestsInAssemblyWithCLIArgs [] argv
+
+        if check then
+            eprintfn
+                "incremental filter contexts: %d applied, %d checked, %d mismatched, %d fell back after an error"
+                stats.Applied
+                stats.Checked
+                stats.Mismatched
+                stats.Errors
+
+            if stats.Mismatched > 0L then 1 else code
+        else
+            code

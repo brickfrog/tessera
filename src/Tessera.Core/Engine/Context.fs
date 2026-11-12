@@ -19,6 +19,7 @@ namespace Tessera.DaxEngine
 //     injecting a direct table filter": SQLBI, "Filtering tables").
 
 open System
+open System.Threading
 open System.Collections.Generic
 open Tessera
 open Tessera.DaxAst
@@ -366,36 +367,86 @@ module Filters =
     /// The filter on the columns `keep` names only (a filter with none of them is gone).
     let project (keep: BColumn -> bool) (f: Filter) : Filter list = without (fun c -> not (keep c)) f
 
-    /// A filter context with these filters under these relationships. A table filter evaluated
-    /// under other relationships keeps the columns it had then ("table expansion ... happens when
-    /// you define a table": SQLBI, "Expanded tables in DAX"), so it is spelled out by column.
-    let buildWith (scope: ScopeMark list) (config: RelConfig) (filters: Filter list) : FilterCtx =
+    /// A table filter evaluated under other relationships keeps the columns it had then ("table
+    /// expansion ... happens when you define a table": SQLBI, "Expanded tables in DAX"), so in a
+    /// context under these relationships it is spelled out by column.
+    let private spell (config: RelConfig) (f: Filter) : Filter list =
+        match f with
+        | Rows(table, rows, cfg) when not (obj.ReferenceEquals(cfg, config)) ->
+            // While a calculated column of the table is computed, the columns that aren't
+            // part of the row yet stay out, as in `without`: the one being computed, and
+            // with a key the ones not computed yet.
+            let computing = table.Columns |> Array.exists _.Computing
+
+            let left (c: BColumn) =
+                computing
+                && obj.ReferenceEquals(c.Table, table)
+                && not c.IsReady
+                && (c.Computing || table.UniqueColumn.IsSome)
+
+            spellOut table rows cfg (fun c -> not (left c))
+        | f -> [ f ]
+
+    /// How many contexts down a chain of `FilterCtx.Base` goes.
+    let private maxDepth = 4
+
+    /// The context of `fc`'s filters each through `f`, under `config`, with its chain of bases
+    /// (`FilterCtx.Base`) through `f` too: a base's filters are the first of its context's, so
+    /// theirs through `f` are the first of the result's. `fc` itself where nothing changed.
+    let rec private through (f: Filter -> Filter list) (config: RelConfig) (depth: int) (fc: FilterCtx) : FilterCtx =
+        let mutable same = obj.ReferenceEquals(fc.Config, config)
+
         let filters =
-            filters
-            |> List.collect (fun f ->
-                match f with
-                | Rows(table, rows, cfg) when not (obj.ReferenceEquals(cfg, config)) ->
-                    // While a calculated column of the table is computed, the columns that aren't
-                    // part of the row yet stay out, as in `without`: the one being computed, and
-                    // with a key the ones not computed yet.
-                    let computing = table.Columns |> Array.exists _.Computing
+            fc.Filters
+            |> List.collect (fun x ->
+                match f x with
+                | [ y ] when obj.ReferenceEquals(x, y) -> [ y ]
+                | ys ->
+                    same <- false
+                    ys)
 
-                    let left (c: BColumn) =
-                        computing
-                        && obj.ReferenceEquals(c.Table, table)
-                        && not c.IsReady
-                        && (c.Computing || table.UniqueColumn.IsSome)
+        if same then
+            fc
+        else
+            let made = FilterCtx(filters, config)
 
-                    spellOut table rows cfg (fun c -> not (left c))
-                | f -> [ f ])
+            if not (isNull fc.Base) && depth < maxDepth then
+                let b = through f config (depth + 1) fc.Base
 
-        FilterCtx(filters, config, scope)
+                if not b.Filters.IsEmpty && b.Filters.Length < filters.Length then
+                    made.Base <- b
+
+            made
+
+    /// A filter context with these filters under these relationships (see `spell`).
+    let buildWith (scope: ScopeMark list) (config: RelConfig) (filters: Filter list) : FilterCtx =
+        FilterCtx(List.collect (spell config) filters, config, scope)
 
     let build (config: RelConfig) (filters: Filter list) : FilterCtx = buildWith [] config filters
 
+    /// `made` (`fc` changed) with `fc`'s base through `f`, when that is still a first part of it.
+    let private withBase (made: FilterCtx) (b: FilterCtx) : FilterCtx =
+        if
+            not (isNull b)
+            && not b.Filters.IsEmpty
+            && b.Filters.Length < made.Filters.Length
+        then
+            made.Base <- b
+
+        made
+
     /// The same filters, with a mark added for ISINSCOPE (see `ScopeMark`).
     let mark (fc: FilterCtx) (m: ScopeMark) : FilterCtx =
-        FilterCtx(fc.Filters, fc.Config, m :: fc.Scope)
+        // While something is computed, a table's rows depend on what is computed so far: nothing
+        // is shared then (as `VisCache.Usable`).
+        let marked =
+            if fc.Config.Model.Computing.Count = 0 then
+                FilterCtx(fc.Filters, fc.Config, m :: fc.Scope, fc.State)
+            else
+                FilterCtx(fc.Filters, fc.Config, m :: fc.Scope)
+
+        marked.Base <- fc.Base
+        marked
 
     /// The columns a filter is on, as a test.
     let private covers (f: Filter) : BColumn -> bool =
@@ -404,9 +455,29 @@ module Filters =
         | Tuples(cols, _) -> fun x -> Array.exists (fun c -> obj.ReferenceEquals(x, c)) cols
         | Rows(table, _, cfg) -> fun x -> cfg.IsExpanded(table, x.Table)
 
+    /// What `covers` depends on, as a key: the column, the columns, or the table and relationships.
+    let private coverKey (filters: Filter list) : obj array = [|
+        for f in filters do
+            match f with
+            | OnColumn(c, _) -> box c
+            | Tuples(cols, _) ->
+                // What it replaces is the union of the columns, so their order or grouping doesn't matter.
+                for c in cols do
+                    box c
+            | Rows(table, _, cfg) ->
+                box table
+                box cfg
+    |]
+
     /// The context without any filter on the columns `drop` names.
     let remove (fc: FilterCtx) (drop: BColumn -> bool) : FilterCtx =
-        buildWith (Unfiltered drop :: fc.Scope) fc.Config (fc.Filters |> List.collect (without drop))
+        let made =
+            buildWith (Unfiltered drop :: fc.Scope) fc.Config (fc.Filters |> List.collect (without drop))
+
+        if isNull fc.Base then
+            made
+        else
+            withBase made (through (without drop) fc.Config 1 fc.Base)
 
     /// The context with filters added. Unless `keep` (KEEPFILTERS), each new filter first removes
     /// the context's filters on its columns; the new filters do not remove one another.
@@ -416,22 +487,50 @@ module Filters =
         else
             // Where calendar context clearing would change these filters: refused (Calendars.fs).
             let fc = CalendarHooks.beforeAdd fc filters keep
+            let added = List.collect (spell fc.Config) filters
 
-            let old, scope =
+            // The filters kept, as a context: the shared part of the result (every row of an
+            // iteration keeps the same ones), the same object for the same columns replaced.
+            let kept, scope =
                 if keep then
-                    fc.Filters, fc.Scope
+                    fc, fc.Scope
                 else
                     let tests = filters |> List.map covers
                     let drop (c: BColumn) = tests |> List.exists (fun t -> t c)
-                    fc.Filters |> List.collect (without drop), Unfiltered drop :: fc.Scope
+                    let model = fc.Config.Model
 
-            buildWith scope fc.Config (old @ filters)
+                    let kept =
+                        if model.Computing.Count > 0 then
+                            // What `without` refuses depends on what is being computed.
+                            through (without drop) fc.Config 0 fc
+                        else
+                            let key = coverKey filters
+
+                            match fc.State.Bases.TryGetValue key with
+                            | true, b -> b :?> FilterCtx
+                            | _ ->
+                                let b = through (without drop) fc.Config 0 fc
+
+                                if fc.State.Bases.Count < 16 then
+                                    fc.State.Bases.[key] <- b
+
+                                b
+
+                    kept, Unfiltered drop :: fc.Scope
+
+            let made = FilterCtx(kept.Filters @ added, fc.Config, scope)
+            withBase made (if added.IsEmpty then kept.Base else kept)
 
     let withConfig (fc: FilterCtx) (config: RelConfig) : FilterCtx =
         if obj.ReferenceEquals(fc.Config, config) then
             fc
         else
-            buildWith fc.Scope config fc.Filters
+            let made = buildWith fc.Scope config fc.Filters
+
+            if isNull fc.Base then
+                made
+            else
+                withBase made (through (spell config) config 1 fc.Base)
 
     // ---- Which rows are visible ------------------------------------------------------------------
 
@@ -471,30 +570,152 @@ module Filters =
             let shared = VisCache.Of fc.Config
 
             let set =
-                if shared.Usable then
-                    let k = shared.Key(fc.Filters, t, via)
-                    let mutable found = null
+                try
+                    if fc.Private then
+                        // Nothing that can reach the table: what `compute` gives then.
+                        if shared.Usable && not fc.Reference && not (shared.Reached(fc.Filters, t)) then
+                            RowSet.All t.Size
+                        else
+                            compute fc t via (RowSet.All t.Size)
+                    elif shared.Usable && incrementable fc t then
+                        // Its own rows are cheap from the base's (shared, cached): not worth a
+                        // key and an entry of their own.
+                        fresh fc t via
+                    elif shared.Usable then
+                        let k = shared.Key(fc.Filters, t, via)
+                        let mutable found = null
 
-                    if shared.TryGet(k, &found) then
-                        found
+                        if shared.TryGet(k, &found) then
+                            found
+                        else
+                            let set = fresh fc t via
+
+                            if shared.Usable then
+                                shared.Add(k, set)
+
+                            set
                     else
-                        let set = compute fc t via
+                        fresh fc t via
+                finally
+                    // A context asked again after an error must not see the table as in progress.
+                    fc.InProgress.Remove key |> ignore
 
-                        if shared.Usable then
-                            shared.Add(k, set)
-
-                        set
-                else
-                    compute fc t via
-
-            fc.InProgress.Remove key |> ignore
             fc.Visible.[key] <- set
             set
 
-    and private compute (fc: FilterCtx) (t: BTable) (via: BRel) : RowSet =
+    /// The rows worked out, not looked up: incrementally where that is exact, else in full.
+    and private fresh (fc: FilterCtx) (t: BTable) (via: BRel) : RowSet =
+        match incremental fc t via with
+        | null -> compute fc t via (RowSet.All t.Size)
+        | set -> set
+
+    /// The rows under the context's first filters (`FilterCtx.Base`), intersected with what the
+    /// others allow: null where that isn't known to be exact, or it raised (see "Incremental
+    /// filter contexts" in the author's guide).
+    /// Whether the rows of `t` may be worked out incrementally (see `incremental`).
+    and private incrementable (fc: FilterCtx) (t: BTable) : bool =
+        let shared = VisCache.Of fc.Config
+
+        not (isNull fc.Base)
+        && IncrementalStats.Global.Enabled
+        && t.Model.Incremental.Enabled
+        && shared.Usable
+        && shared.Intersective t
+        && shared.Safe(t, fc.Filters)
+
+    and private incremental (fc: FilterCtx) (t: BTable) (via: BRel) : RowSet =
+        let stats = t.Model.Incremental
+        let all = IncrementalStats.Global
+        let shared = VisCache.Of fc.Config
+
+        if not (incrementable fc t) then
+            null
+        else
+            if isNull fc.Added then
+                let a = FilterCtx(List.skip fc.Base.Filters.Length fc.Filters, fc.Config)
+                a.Private <- true
+                fc.Added <- a
+
+            let set =
+                try
+                    let start = vis fc.Base t via
+
+                    if shared.Reached(fc.Added.Filters, t) then
+                        // Shared by the contexts that add the same filters to the same base (two
+                        // CALCULATEs in one row of an iteration).
+                        let derived =
+                            match fc.Base.State.Derived with
+                            | :? Dictionary<VisKey, RowSet> as d -> d
+                            | _ ->
+                                let d = Dictionary<VisKey, RowSet>()
+                                fc.Base.State.Derived <- d
+                                d
+
+                        let k =
+                            VisKey(t.Id, (if isNull via then -1 else via.Id), Array.ofList fc.Added.Filters)
+
+                        match derived.TryGetValue k with
+                        | true, rows -> rows
+                        | _ ->
+                            let rows = compute fc.Added t via start
+
+                            if derived.Count >= 100_000 then
+                                derived.Clear()
+
+                            derived.[k] <- rows
+                            rows
+                    else
+                        start
+                with _ ->
+                    // The full computation raises what it raises.
+                    Interlocked.Increment(&stats.Errors) |> ignore
+                    Interlocked.Increment(&all.Errors) |> ignore
+                    null
+
+            if not (isNull set) then
+                Interlocked.Increment(&stats.Applied) |> ignore
+                Interlocked.Increment(&all.Applied) |> ignore
+
+                if stats.Check then
+                    stats.AppliedTo.AddOrUpdate(t.Name, 1L, (fun _ n -> n + 1L)) |> ignore
+
+                if all.Check || stats.Check then
+                    let reference = FilterCtx(fc.Filters, fc.Config)
+                    reference.Private <- true
+                    reference.Reference <- true
+
+                    let full =
+                        try
+                            vis reference t via
+                        with _ ->
+                            null
+
+                    Interlocked.Increment(&stats.Checked) |> ignore
+                    Interlocked.Increment(&all.Checked) |> ignore
+
+                    if isNull full || not (full.SameAs set) then
+                        Interlocked.Increment(&stats.Mismatched) |> ignore
+                        Interlocked.Increment(&all.Mismatched) |> ignore
+
+                        let says (r: RowSet) =
+                            if isNull r then "an error"
+                            elif r.IsAll then "all rows"
+                            else $"{r.Count} rows"
+
+                        raise (
+                            InvalidOperationException(
+                                $"incremental rows of '{t.Name}' differ from the full computation: {says set}, in full {says full}"
+                            )
+                        )
+
+            set
+
+    /// The rows of `t` the filters let through, of the rows `start` (all of them, or what a shared
+    /// part of the filters lets through: see `incremental`).
+    and private compute (fc: FilterCtx) (t: BTable) (via: BRel) (start: RowSet) : RowSet =
         let cfg = fc.Config
         let size = t.Size
-        let mutable set = RowSet.All size
+        let mutable set = start
 
         // Tables that are only reached through the relationship we came over: their filters are
         // the caller's business.

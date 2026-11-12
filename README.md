@@ -2642,8 +2642,21 @@ function authors are in the header of `Engine/Types.fs`.
 Station matrix of `[CF - Bar Chart X Min]` / `Max`, coverage), not part of the tests or CI; it fingerprints every
 answer so two runs can be compared. On 200 rows the Station matrix (200 stations, each a MINX over all of them under
 ALLSELECTED) went from more than 30 minutes to about 2 s. `bench/RESULTS.md` has the numbers at 200, 2,000 and 20,000
-rows, and what is still slow: each context transition still computes the fact table's visible rows from scratch, so
-an iterator over a dimension with a measure per row costs about (dimension rows x fact rows).
+rows. `--check` runs it in the incremental check mode below.
+
+#### Incremental filter contexts
+
+A filter context made from another (a context transition, CALCULATE's filters) works out a table's visible rows
+from the rows under the filters it kept, which every row of an iteration shares, intersected with what its added
+filters allow: for a transition on a dimension row, the fact rows of that one key instead of a scan of the fact
+table. That is exact where a table's rows are intersections and preimages of its filters only; across a relationship
+that filters both ways, a limited or a one-to-one relationship, while anything is being computed, or where a column
+read could raise, the engine computes the rows in full as before. The argument, and what it asks of an engine
+author, are in "Incremental filter contexts" in the header of `Engine/Types.fs`. A check mode recomputes every
+incremental result in full and fails on any difference: `TESSERA_CHECK_INCREMENTAL=1` for the test suite,
+`--check` for the benchmark, `(Engine.incrementalStats prepared).Check` in code. What remains slow is the cost of
+a context transition itself: an iterator over 2,000 dimension rows with a measure per row is 2,000 CALCULATEs
+however few fact rows each one reads (see `bench/RESULTS.md`).
 
 ### Testing a model (`test`)
 

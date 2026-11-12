@@ -26,7 +26,7 @@ Peak working set is the child process's, the largest of the run's children.
 The ten 200-row timeouts are `[CF - Bar Chart X Min]` / `Max` grouped by a dimension: the same quadratic
 ALLSELECTED shape as the station matrix.
 
-## After (this branch)
+## After the caches (wave 5, 3a4d821)
 
 Every answer of every run is the same as before (`--compare`: 0 changed at 200, 2,000 and 20,000 rows). Also run
 once with a temporary mode (since removed) that recomputed every cache hit and compared: no difference, at 200
@@ -62,7 +62,85 @@ killed ones too.
 By commit, at 200 rows: visible rows shared (station-matrix/20 27.5 s -> 5.5 s), predicate filters per query
 (-> 2.6 s), measure values per query (-> 0.28 s; the full matrix 2 s), Check answers kept (prepare 1.4 -> 1.1 s).
 
-## What is left, and the redesign it needs
+## Incremental filter contexts (wave 6, perf/engine-delta)
+
+A context made from another works out a table's rows from the rows under the filters it kept (shared by every row
+of an iteration) intersected with what its added filters allow; see "Incremental filter contexts" in the author's
+guide (Engine/Types.fs) for the argument and the fallbacks.
+
+Before and after were run back to back on the same quiet machine (before: the 3a4d821 build), with the same
+fixtures, filters and timeouts. `--compare`: **0 changed answers** at 200 rows (all 354 queries), 2,000 rows (all
+queries that finished both times: everything but the 16 that time out in both) and 20,000 rows (the subset: totals,
+by Customer, by Date, station-matrix/2, allselected-shape/20, share-of-selection, rankx-customers; a full run takes
+hours). Queries that timed out in the before run have no answer to compare with: at 2,000 rows station-matrix/all,
+allselected-shape/all and the 14 `[CF - Bar Chart X Min]` / `Max` queries (they time out after too); at 20,000 rows
+station-matrix/2, share-of-selection and 16 total/by queries, which now finish.
+
+Check mode (every incremental result recomputed in full, without caches, and compared): the whole test suite
+(1,960,547 results) and the 200-row benchmark (all queries, 22,203,220 results) with 0 differences.
+
+| | 200 rows | 2,000 rows | 20,000 rows |
+|---|---:|---:|---:|
+| prepare | 1.1 s -> 1.2 s | 1.2–1.4 s -> 1.2–1.4 s | 1.5–1.7 s -> 1.5–1.6 s |
+| station-matrix/2 | 0.13 s -> 0.14 s | 0.55 s -> 0.42 s | > 30 s -> **3.4 s** |
+| station-matrix/5 | 0.13 s -> 0.14 s | 0.71 s -> 0.62 s | |
+| station-matrix/10 | 0.22 s -> 0.18 s | 0.98 s -> 0.94 s | |
+| station-matrix/20 | 0.32 s -> 0.30 s | 1.9 s -> 1.6 s | |
+| station-matrix/all | 2.0 s -> 1.6 s | > 60 s -> > 60 s (171 s without a timeout) | |
+| allselected-shape/20 | 0.05 s -> 0.07 s | 0.90 s -> 1.0 s | 20.0 s -> 12.5 s |
+| allselected-shape/all | 0.67 s -> 0.71 s | > 60 s -> > 60 s (84 s without a timeout; before > 300 s) | |
+| share-of-selection | 0.13 s -> 0.07 s | 4.5 s -> 1.6 s | > 30 s -> 18.2 s |
+| rankx-customers | 0.014 s -> 0.010 s | 0.39 s -> 0.13 s | 21.3 s -> 1.4 s |
+| total/by queries that finished both times: sum | 110.2 s -> 64.2 s (344) | 31.3 s -> 27.0 s (330) | 303.9 s -> 41.8 s (107 of 129) |
+| ... that timed out | 0 -> 0 (60 s) | 14 -> 14 (60 s) | 22 -> 6 (30 s) |
+| peak working set | 302 MB -> 136 MB | 225 MB -> 150 MB | 260 MB -> 285 MB |
+
+At 20,000 rows the 16 total/by queries that now finish add 78 s (all of them `[Gross Margin %]`-like measures by
+Customer and Date); the 6 still timing out are `[CF - Bar Chart X Min]` / `Max` at the total and by those two. The
+working set is lower at 200 and 2,000 rows because rows worked out incrementally are no longer kept in `VisCache`
+(their base's are); at 20,000 it is the largest child's, a killed one before and one that finishes now.
+
+By commit: the incremental contexts themselves (20,000 rows: station-matrix/2 > 30 s -> 4.8 s); then keeping
+incremental rows out of `VisCache`, shared by their base instead (2,000 rows: share-of-selection 1.6 s -> 1.1 s,
+peak 185 MB -> 112 MB, in a run with only those queries).
+
+**The target, the Station matrix at 2,000 rows in seconds, is not met** (171 s). The fixtures give every table N
+rows, Budget Rate too, so `[Revenue]` and `[Gross Profit]` are SUMX over 2,000 Budget Rate rows with a CALCULATE
+each; the matrix needs about 48 million such row contexts, and incremental contexts made each one independent of
+the fact table's size (an index lookup) but not free: a transition, CALCULATE and SUM cost a few microseconds
+whatever they read. What is left is the second option below.
+
+## What is left: aggregating by group
+
+The first option of the redesign below is done (wave 6). The second is not, and the brief limited it to the exact
+shape `SUMX ( T, CALCULATE ( SUM ( F[x] ) ) )`. No measure of spaceparts has that shape: `[Revenue]` is
+`SUMX ( 'Budget Rate', CALCULATE ( SUM ( ... ) ) / 'Budget Rate'[Rate] )` and `[Gross Profit]` the difference of
+two such CALCULATEs over the rate, so the exact shape alone would show no number here; it was left for a planned
+change rather than added untested by any real query. The design, and why it is exact:
+
+- **What it computes.** Under a filter context C and no other row context, row r of the model table T (iterated as
+  itself, not a table expression over it) makes C_r: C less the filters on T's expanded table, plus the rows equal
+  to r (`closeRows`). Where the incremental conditions hold for F (`VisCache.Intersective` and `Safe`, nothing being
+  computed, T in F's expanded table over regular many-to-one relationships), the rows of F under C_r are the rows of
+  F under B (the kept part, the same for every r) whose row of T (`RowMap(F, T)`) is one of r's equals. One pass over
+  F's rows under B, bucketing them by that row of T, gives every row's fact rows at once.
+- **Why it is the same answer.** Each value is the existing SUM code run over exactly the row set the per-row
+  evaluation would give (the union of the buckets of r's equals, as a `RowSet`), so the order of the additions and
+  the type rules are SUM's own; SUMX then adds the values in T's row order as it does now. It must never re-implement
+  the accumulation.
+- **Where it must fall back to the row-by-row evaluation:** anything a transition can refuse (a date table's
+  transition rule in `DateTable.onTransition`, calendars' `CalendarHooks.beforeAdd`, a calculated column being
+  computed), calculation groups, a function called from a row context (`CallerRows`), a T that is not iterated as
+  itself.
+- **Check mode** compares every value with the row-by-row one, as for the incremental contexts.
+- **The variant spaceparts needs** is better done at the CALCULATE rather than the SUMX: `CALCULATE ( SUM ( F[x] ) )`
+  evaluated in a row context of T over a base B looks its value up in B's buckets, and the rest of the row's
+  expression (the division by `'Budget Rate'[Rate]`) is evaluated as now. The argument above is unchanged (it is
+  about that CALCULATE's value alone), and it covers `[Revenue]`, `[Gross Profit]` and the exact shape alike. That is
+  wider than the brief allowed, so it is a proposal, not done.
+
+## The redesign wave 5 proposed
+
 
 With the caches, a result is computed once per distinct context; what remains is the cost of computing a distinct
 one. The profile of every slow query left has the same shape: an iterator over a dimension with a measure per row
